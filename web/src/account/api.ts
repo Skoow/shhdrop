@@ -224,6 +224,50 @@ export async function oubliFin(
   return { session: jeton(o, "session"), h: octets(o, "h", 16), sProfil: octets(o, "s_profil", 32), blobProfil: octets(o, "blob_profil"), genProfil: entier(o, "gen_profil"), genPrive: entier(o, "gen_prive") };
 }
 
+// --- État du compte (session) --------------------------------------------------------------------
+
+/** GET /api/compte (§8.6, §21.6.2) : dates au jour (« 2026-11-14 ») ou null ; motif 1 à 10 ou null. */
+export type EtatServeur = {
+  creeLe: string;
+  palier: "neuf" | "confirme";
+  confirmeLe: string | null;
+  limites: { salons: number; places: number; heures: number };
+  salonsActifs: number;
+  totp: boolean;
+  recupJusqu: string | null;
+  retraitTotpLe: string | null;
+  banniJusqu: string | null;
+  banniMotif: number | null;
+};
+
+const JOUR = /^\d{4}-\d{2}-\d{2}$/;
+function jour(o: Obj, k: string): string {
+  const v = o[k];
+  if (typeof v !== "string" || !JOUR.test(v)) throw invalide();
+  return v;
+}
+const jourOuNull = (o: Obj, k: string) => (o[k] === null ? null : jour(o, k));
+
+export async function etat(n: Net, session: string): Promise<EtatServeur> {
+  const o = await appel(n, "GET", "", { session });
+  const l = o.limites;
+  if (typeof l !== "object" || l === null || (o.palier !== "neuf" && o.palier !== "confirme") || typeof o.totp !== "boolean") throw invalide();
+  const m = o.banni_motif;
+  if (m !== null && !(Number.isInteger(m) && (m as number) >= 1 && (m as number) <= 10)) throw invalide();
+  return {
+    creeLe: jour(o, "cree_le"),
+    palier: o.palier,
+    confirmeLe: jourOuNull(o, "confirme_le"),
+    limites: { salons: entier(l as Obj, "salons"), places: entier(l as Obj, "places"), heures: entier(l as Obj, "heures") },
+    salonsActifs: entier(o, "salons_actifs"),
+    totp: o.totp,
+    recupJusqu: jourOuNull(o, "recup_jusqu"),
+    retraitTotpLe: jourOuNull(o, "retrait_totp_le"),
+    banniJusqu: jourOuNull(o, "banni_jusqu"),
+    banniMotif: m as number | null,
+  };
+}
+
 // --- Coffres, pseudo, déconnexion (session) ---------------------------------------------------
 
 export async function lireCoffre(n: Net, session: string, sorte: "profil" | "prive"): Promise<{ blob: Bytes; gen: number }> {
@@ -244,6 +288,14 @@ export async function pseudoVerifier(n: Net, par: { jeton: string } | { etape: s
 
 export async function changerPseudo(n: Net, session: string, pCanon: string): Promise<void> {
   await appel(n, "POST", "pseudo", { session, body: { p_canon: pCanon } });
+}
+
+/**
+ * Nom d'appareil de la session courante (64 octets chiffrés par K_etiquette). Après une
+ * connexion seulement : K_etiquette vient de K_compte, que l'appareil n'ouvre qu'avec la réponse.
+ */
+export async function etiquetterSession(n: Net, session: string, etiquette: Bytes): Promise<void> {
+  await appel(n, "POST", "sessions/etiquette", { session, body: { etiquette: b64u(etiquette) } });
 }
 
 export async function deconnexion(n: Net, session: string): Promise<void> {

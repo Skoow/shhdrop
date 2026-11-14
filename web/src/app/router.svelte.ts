@@ -32,10 +32,31 @@ export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
   "/signaler": "signaler",
 };
 
+/** Pages du compte (plan du compte, lot 10), seulement si __COMPTES__ : chemin → route. */
+export type CompteRoute = "compte" | "inscription" | "connexion" | "oubli" | "profil";
+// Relue par TestAppRoutesMatchClientRouter (server/cmd/shhdrop) et comparée à compteRoutes du
+// serveur, qui ne les sert en 200 qu'avec SHH_COMPTES=1 (sinon 404, comme toute page inconnue).
+const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
+  "/compte": "compte",
+  "/compte/inscription": "inscription",
+  "/compte/connexion": "connexion",
+  "/compte/oubli": "oubli",
+  "/compte/profil": "profil",
+};
+
 export type Route = {
   /** envoyer : page d'envoi (composeur, même vide), où mène « Commencer » (retours DROP). */
-  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | "notfound";
+  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | CompteRoute | "notfound";
 };
+
+/**
+ * Seul paramètre d'adresse du site (conception compte §10.4) : « ?suite=salon », exactement,
+ * posé par « Créer un salon » sans session. Aucune donnée : il dit seulement où revenir après la
+ * connexion. Toute autre requête est ignorée (jamais lue, jamais recopiée).
+ */
+export function suite(search: string): "salon" | null {
+  return search === "?suite=salon" ? "salon" : null;
+}
 
 /**
  * Fragment de 20 à 44 caractères de l'alphabet des clés qui n'est pas une clé valide : un lien
@@ -44,7 +65,7 @@ export type Route = {
  */
 const TRUNCATED_FRAGMENT = /^#[A-Za-z0-9_-]{20,44}$/;
 
-export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false): Route {
+export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false, comptes: boolean = __COMPTES__): Route {
   const prefix = base.endsWith("/") ? base.slice(0, -1) : base; // "" ou "/shhdrop"
   let p = pathname;
   if (prefix !== "") {
@@ -67,6 +88,9 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   if (p === "/envois") return { name: "envois" };
   // Historique des téléchargements (conception compte §21.15.5) : sur l'appareil, aucun secret dans l'adresse.
   if (p === "/telechargements") return { name: "telechargements" };
+  // Pages du compte : sans __COMPTES__ (défaut, démo), la même 404 qu'une adresse inconnue.
+  const compte = comptes && Object.hasOwn(COMPTE_PATHS, p) ? COMPTE_PATHS[p] : undefined;
+  if (compte !== undefined) return { name: compte };
   // « /s/ » reste réservé aux futurs liens universels (spec §16) : aucune route aujourd'hui.
   return { name: "notfound" };
 }
@@ -103,9 +127,13 @@ export function href(path: string): string {
   return base().replace(/\/$/, "") + path;
 }
 
-/** Chemin interne seulement : « /… », sans « // », « \ », « # » ni « ? » (aucun secret ne transite ici). */
+/**
+ * Chemin interne seulement : « /… », sans « // », « \ », « # » ni « ? » (aucun secret ne transite
+ * ici) ; seule exception, « ?suite=salon » sur la connexion et l'inscription (suite()).
+ */
 export function navigate(path: string, opts: { back?: boolean } = {}): void {
-  if (!/^\/(?!\/)[^\\#?]*$/.test(path)) throw new Error("chemin interne attendu");
+  const nu = path.replace(/^(\/compte\/(?:connexion|inscription))\?suite=salon$/, "$1");
+  if (!/^\/(?!\/)[^\\#?]*$/.test(nu)) throw new Error("chemin interne attendu");
   const go = () => {
     history.pushState(null, "", href(path));
     sync();

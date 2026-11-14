@@ -39,6 +39,7 @@ func (a compteAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/compte/reauth", a.reauth)
 	mux.HandleFunc("GET /api/compte/sessions", a.sessions)
 	mux.HandleFunc("POST /api/compte/sessions/fermer", a.fermer)
+	mux.HandleFunc("POST /api/compte/sessions/etiquette", a.etiquette)
 	mux.HandleFunc("POST /api/compte/deconnexion", a.deconnexion)
 	mux.HandleFunc("GET /api/compte/coffre/profil", a.lireCoffre(compte.Profil))
 	mux.HandleFunc("PUT /api/compte/coffre/profil", a.ecrireCoffre(compte.Profil))
@@ -443,6 +444,34 @@ func (a compteAPI) fermer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct{}{})
 }
 
+// etiquette : { etiquette } (64 octets chiffrés par l'appareil) → {} ; nom d'appareil de la
+// session courante, posé après la connexion (lot 10 : K_etiquette vient de K_compte, que
+// l'appareil n'a qu'après la réponse de connexion).
+func (a compteAPI) etiquette(w http.ResponseWriter, r *http.Request) {
+	c, err := a.session(r)
+	if err != nil {
+		failCompte(w, err)
+		return
+	}
+	var b struct {
+		Etiquette string `json:"etiquette"`
+	}
+	if err := lire(w, r, &b, maxJSON); err != nil {
+		failCompte(w, err)
+		return
+	}
+	etiq, err := secret(b.Etiquette, 64)
+	if err != nil {
+		failCompte(w, err)
+		return
+	}
+	if err := a.c.EtiquetterSession(c, etiq); err != nil {
+		failCompte(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct{}{})
+}
+
 func (a compteAPI) deconnexion(w http.ResponseWriter, r *http.Request) {
 	c, err := a.session(r)
 	if err != nil {
@@ -654,7 +683,7 @@ func (a compteAPI) oubliRenvoyer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct{}{})
 }
 
-// oubliVerifier : { etape, code, totp, totp_perdu } → { h } ou { attente_jusqu }.
+// oubliVerifier : { etape, code, totp, totp_perdu } → { h, gen_prive } ou { attente_jusqu }.
 func (a compteAPI) oubliVerifier(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Etape     string  `json:"etape"`
@@ -671,7 +700,7 @@ func (a compteAPI) oubliVerifier(w http.ResponseWriter, r *http.Request) {
 		failCompte(w, err)
 		return
 	}
-	h, att, err := a.c.OubliVerifier(e, b.Code, *b.TOTP, *b.TOTPPerdu)
+	v, att, err := a.c.OubliVerifier(e, b.Code, *b.TOTP, *b.TOTPPerdu)
 	if err != nil {
 		failCompte(w, err)
 		return
@@ -683,8 +712,9 @@ func (a compteAPI) oubliVerifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
-		H string `json:"h"`
-	}{b64.EncodeToString(h[:])})
+		H        string `json:"h"`
+		GenPrive uint64 `json:"gen_prive"`
+	}{b64.EncodeToString(v.H[:]), v.GenPrive})
 }
 
 // oubliFin : { etape, a_auth, env_mdp, blob_prive, persistante, etiquette } →

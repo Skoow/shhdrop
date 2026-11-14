@@ -4,6 +4,7 @@
 export {
   BadPasswordError,
   CAPTCHA_MIN_MS,
+  PREPARED_MIN_LEFT_MS,
   CorruptError,
   GrantInvalidError,
   ReopenLimitError,
@@ -26,7 +27,7 @@ export {
   type OpenOpts,
   type PreviewKind,
 } from "./transfer/client";
-export { prepareCaptcha, type PreparedCaptcha } from "./transfer/prepare";
+export { prepareCaptcha, proofForm, type PreparedCaptcha } from "./transfer/prepare";
 // Envoi dès l'ajout (spec §41.14) : brouillon et état des lignes.
 export { createDraft, failedElement, type Draft, type ElementStatus } from "./transfer/draft";
 export { SERVER_STALL_MS } from "./transfer/upload";

@@ -405,7 +405,7 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	static := placeholder()
 	if cfg.StaticDir != "" {
 		var err error
-		if static, err = staticHandler(cfg.StaticDir); err != nil {
+		if static, err = staticHandler(cfg.StaticDir, cfg.Comptes); err != nil {
 			return err
 		}
 	}

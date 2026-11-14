@@ -45,7 +45,7 @@ func TestStaticPrecompressedAndImmutable(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h, err := staticHandler(dir)
+	h, err := staticHandler(dir, false)
 	if err != nil {
 		t.Fatal(err)
 	}

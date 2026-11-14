@@ -306,3 +306,21 @@ func (s *Service) FermerAutres(c Courante) error {
 	_, err := s.db.Exec(`DELETE FROM sessions WHERE h=? AND t_v<>?`, c.H[:], c.tv[:])
 	return err
 }
+
+// EtiquetterSession : nom d'appareil de la session courante (64 octets chiffrés par le client
+// avec K_etiquette, §8.5). Lot 10 : à la connexion, l'appareil n'a pas encore K_compte (il
+// l'ouvre avec Env_mdp, rendu par la réponse) ; il pose donc le nom juste après. Seule la
+// session de la requête change ; le serveur ne voit que des octets chiffrés.
+func (s *Service) EtiquetterSession(c Courante, etiquette []byte) error {
+	if len(etiquette) != 64 {
+		return ErrRequete
+	}
+	r, err := s.db.Exec(`UPDATE sessions SET etiquette=? WHERE t_v=? AND h=?`, etiquette, c.tv[:], c.H[:])
+	if err != nil {
+		return err
+	}
+	if n, _ := r.RowsAffected(); n == 0 {
+		return ErrSession
+	}
+	return nil
+}

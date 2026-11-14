@@ -65,6 +65,46 @@ describe("dictionnaires", () => {
     expect(en["hero.title"]).toBe("One link, one password, then nothing.");
   });
 
+  // Plan du compte, lot 10 : textes exacts de la conception (§12.1, §12.2, §21.2.4, §21.3, §21.15).
+  it("compte : textes exacts de la conception", () => {
+    const N = NNBSP;
+    const exacts: Record<string, string> = {
+      "account.signup.title": "Créer un compte",
+      "account.signup.sub": "Un compte gratuit sert seulement à créer des salons. Partager et rejoindre restent sans compte.",
+      "account.email.hint": `C'est votre seul moyen de récupérer le compte${N}: utilisez une adresse que vous gardez.`,
+      "account.password.hint": `10${N}caractères au moins`,
+      "account.age.err": "Cochez cette case pour continuer.",
+      "account.signup.send": "Recevoir un code",
+      "account.code.sent": `Nous venons d'envoyer un code à 6${N}chiffres à l'adresse indiquée, si elle peut être utilisée.`,
+      "account.created": "Compte créé.",
+      "account.state.deja": "Cette adresse a déjà un compte. Connectez-vous ou utilisez «\u00a0Mot de passe oublié\u00a0».",
+      "account.state.banni": "Cette adresse ne peut pas créer de compte jusqu'au {date}.",
+      "account.err.email": "Adresse e-mail invalide.",
+      "account.err.ascii": "Utilisez une adresse sans accent ni caractère spécial.",
+      "account.err.jetable": "Les adresses jetables ne sont pas acceptées.",
+      "account.err.mdpCourt": `Au moins 10${N}caractères.`,
+      "account.err.mdpAdresse": "Le mot de passe ne doit pas être votre adresse.",
+      "account.err.code.other": `Code incorrect. Il reste {n}${N}essais.`,
+      "account.err.codeExpire": "Code expiré. Demandez-en un nouveau.",
+      "account.err.limit": "Trop de tentatives. Réessayez dans {duree}.",
+      "account.err.busy": "Les inscriptions sont momentanément fermées. Réessayez plus tard.",
+      "account.err.reseau": "Connexion perdue. Vérifiez votre réseau et réessayez.",
+      "account.stay.hint": "À éviter sur un appareil partagé.",
+      "account.err.identifiants": "Adresse ou mot de passe incorrect.",
+      "account.err.totpFaux": "Code incorrect.",
+      "account.err.totpRejoue": "Ce code a déjà servi. Attendez le suivant.",
+      "account.forgot.sent": "Si un compte utilise cette adresse, nous venons de lui envoyer un code.",
+      "account.forgot.totpNeeded": `Ce compte a la double authentification${N}: entrez aussi le code de votre application.`,
+      "account.forgot.attente": `Par sécurité, la double authentification sera retirée le {date}. Revenez à cette date avec un nouveau code reçu par e-mail. Si ce n'est pas vous, connectez-vous avec votre application${N}: la demande sera annulée.`,
+      "account.forgot.keep": "Votre pseudo, votre photo, votre abonnement et vos salons en cours sont gardés. Les liens et la gestion de salons enregistrés seulement dans votre ancien coffre seront perdus, sauf s'ils sont encore sur un de vos appareils.",
+      "account.forgot.recup": "Par sécurité, après une récupération par e-mail, l'adresse ne peut pas être changée ni le compte supprimé avant le {date}.",
+      "account.err.coffre": "Vos données chiffrées ne s'ouvrent pas sur cet appareil. Reconnectez-vous.",
+    };
+    for (const [k, v] of Object.entries(exacts)) expect((fr as Record<string, string>)[k], k).toBe(v);
+    // Aucune étape ni promesse de code de secours (décision 1 du propriétaire, §21.2).
+    for (const [k, v] of Object.entries(fr)) if (k.startsWith("account.")) expect(v, k).not.toMatch(/secours/i);
+  });
+
   it("mêmes paramètres {…} dans les deux langues", () => {
     const params = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
     for (const k of Object.keys(fr) as (keyof typeof fr)[]) expect(params(en[k]), k).toEqual(params(fr[k]));

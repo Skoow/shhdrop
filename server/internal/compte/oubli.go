@@ -80,28 +80,39 @@ func (s *Service) RenvoyerOubli(ip netip.Addr, jeton [32]byte, email string) err
 	return s.renvoyer(ip, jeton, email, etapeOubli, nil)
 }
 
-// OubliVerifier : rend h quand l'étape est vérifiée ; totpPerdu (double authentification
-// active, retrait pas encore échu) : rend seulement la date du retrait, et l'étape a servi.
-func (s *Service) OubliVerifier(jeton [32]byte, code, totp string, totpPerdu bool) ([16]byte, string, error) {
+// Verifie : réponse d'oubli/verifier. GenPrive : gen du coffre privé au moment de la
+// vérification ; oubli/fin exige un coffre privé vide daté de GenPrive + 1 (lot 10 : sans lui,
+// l'appareil ne pouvait pas finir la récupération).
+type Verifie struct {
+	H        [16]byte
+	GenPrive uint64
+}
+
+// OubliVerifier : rend h et gen_prive quand l'étape est vérifiée ; totpPerdu (double
+// authentification active, retrait pas encore échu) : rend seulement la date du retrait, et
+// l'étape a servi.
+func (s *Service) OubliVerifier(jeton [32]byte, code, totp string, totpPerdu bool) (Verifie, string, error) {
 	now := s.now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e := s.et.trouver(jeton, etapeOubli, now)
 	if e == nil {
-		return [16]byte{}, "", ErrEtape
+		return Verifie{}, "", ErrEtape
 	}
 	if err := s.verifierCodeLocked(jeton, e, code); err != nil {
-		return [16]byte{}, "", err
+		return Verifie{}, "", err
 	}
 	var eb, scelle []byte
 	var retrait sql.NullInt64
-	err := s.db.QueryRow(`SELECT e_envoi, totp, totp_retrait_jour FROM comptes WHERE h=?`, e.h[:]).Scan(&eb, &scelle, &retrait)
+	var genPrive uint64
+	err := s.db.QueryRow(`SELECT e_envoi, totp, totp_retrait_jour, gen_prive FROM comptes WHERE h=?`, e.h[:]).Scan(
+		&eb, &scelle, &retrait, &genPrive)
 	if e.fantome || err != nil || subtle.ConstantTimeCompare(eb, e.envoi[:]) != 1 {
 		s.et.retirer(jeton)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return [16]byte{}, "", err
+			return Verifie{}, "", err
 		}
-		return [16]byte{}, "", ErrEtape // compte supprimé ou adresse changée entre-temps
+		return Verifie{}, "", ErrEtape // compte supprimé ou adresse changée entre-temps
 	}
 	aujourdhui := jourDe(now)
 	switch {
@@ -114,22 +125,22 @@ func (s *Service) OubliVerifier(jeton [32]byte, code, totp string, totpPerdu boo
 			j = retrait.Int64 // une nouvelle demande ne recule pas la date
 		} else if _, err := s.db.Exec(`UPDATE comptes SET totp_retrait_jour=? WHERE h=? AND totp_retrait_jour IS NULL`,
 			j, e.h[:]); err != nil {
-			return [16]byte{}, "", err
+			return Verifie{}, "", err
 		}
 		s.et.retirer(jeton)
-		return [16]byte{}, dateJour(j), nil
+		return Verifie{}, dateJour(j), nil
 	case totp == "":
-		return [16]byte{}, "", ErrTOTPRequis
+		return Verifie{}, "", ErrTOTPRequis
 	default:
 		if err := s.verifierTOTPLocked(e.h, scelle, totp, now); err != nil {
-			return [16]byte{}, "", s.totpEchoue(jeton, e, err)
+			return Verifie{}, "", s.totpEchoue(jeton, e, err)
 		}
 		if err := annulerRetrait(s.db, e.h); err != nil {
-			return [16]byte{}, "", err
+			return Verifie{}, "", err
 		}
 	}
 	e.verifie = true
-	return e.h, "", nil
+	return Verifie{e.h, genPrive}, "", nil
 }
 
 // OubliFin : nouveau mot de passe et coffre privé ; rend la session, s_profil et le coffre de

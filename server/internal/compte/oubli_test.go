@@ -84,7 +84,7 @@ func TestOubliAdresseExacteSeulement(t *testing.T) {
 	if m.A != "lea.dupont@gmail.com" || m.Langue != "en" {
 		t.Fatalf("%+v", m)
 	}
-	if h, att, err := b.s.OubliVerifier(e, m.Code, "", false); err != nil || h == [16]byte{} || att != "" {
+	if v, att, err := b.s.OubliVerifier(e, m.Code, "", false); err != nil || v.H == [16]byte{} || att != "" {
 		t.Fatal(err)
 	}
 	// Le lendemain (3 e-mails par jour et par adresse, variantes comprises) : « + » refusé aussi.
@@ -218,7 +218,7 @@ func TestOubliExigeTOTP(t *testing.T) {
 	if _, _, err := b.s.OubliVerifier(e, code, codeA(sec, b.clk.Now(), 3), false); !errors.Is(err, ErrTOTPFaux) {
 		t.Fatal("code d'application faux :", err)
 	}
-	if hh, _, err := b.s.OubliVerifier(e, code, codeA(sec, b.clk.Now(), 0), false); err != nil || hh != h {
+	if hh, _, err := b.s.OubliVerifier(e, code, codeA(sec, b.clk.Now(), 0), false); err != nil || hh.H != h {
 		t.Fatal(err)
 	}
 	if _, err := b.s.OubliFin(e, donneesOubli(2), OptionsSession{}); err != nil {
@@ -479,5 +479,32 @@ func TestRetraitTOTPAnnuleParSession(t *testing.T) {
 	e, _ = b.s.OubliDebut(ipA, "lea@exemple.fr", "fr")
 	if _, _, err := b.s.OubliVerifier(e, b.post.dernier(t).Code, "", false); !errors.Is(err, ErrTOTPRequis) {
 		t.Fatal("après annulation :", err)
+	}
+}
+
+// oubli/verifier rend gen_prive (lot 10) : sans lui, l'appareil ne peut pas dater le coffre
+// privé vide qu'exige oubli/fin (gen_prive + 1), puisque le coffre a pu être écrit entre-temps.
+func TestOubliVerifierRendGenPrive(t *testing.T) {
+	b := nouveauBanc(t)
+	_, j, _ := b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	c, err := b.s.Session(j)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for g := uint64(1); g < 4; g++ {
+		if _, err := b.s.EcrireCoffre(c, Prive, g, coffreTest("SHH-ACCT1", g+1, 4096)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e, err := b.s.OubliDebut(ipN(1), "lea@exemple.fr", "fr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, att, err := b.s.OubliVerifier(e, b.post.dernier(t).Code, "", false)
+	if err != nil || att != "" || v.GenPrive != 4 || v.H == [16]byte{} {
+		t.Fatalf("%+v %q %v", v, att, err)
+	}
+	if _, err := b.s.OubliFin(e, donneesOubli(v.GenPrive+1), OptionsSession{}); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -1,0 +1,11 @@
+// Remplaçant de pages.ts sans __COMPTES__ (greffon shh-comptes de vite.config.ts) : aucune page,
+// aucun import. App.svelte ne les montre jamais sans le drapeau (match() ne rend pas ces routes).
+import type { Component } from "svelte";
+
+const absente = (() => {
+  throw new Error("compte_absent");
+}) as unknown as Component;
+export const Connexion = absente;
+export const Inscription = absente;
+export const Oubli = absente;
+export const restaurer = async (): Promise<void> => undefined;

@@ -131,6 +131,7 @@ var routesCompte = [][2]string{
 	{"POST", "/api/compte/inscription/debut"}, {"POST", "/api/compte/inscription/renvoyer"},
 	{"POST", "/api/compte/inscription/fin"}, {"POST", "/api/compte/connexion"}, {"POST", "/api/compte/reauth"},
 	{"GET", "/api/compte/sessions"}, {"POST", "/api/compte/sessions/fermer"}, {"POST", "/api/compte/deconnexion"},
+	{"POST", "/api/compte/sessions/etiquette"},
 	{"GET", "/api/compte/coffre/profil"}, {"PUT", "/api/compte/coffre/profil"}, {"GET", "/api/compte/coffre/prive"},
 	{"PUT", "/api/compte/coffre/prive"}, {"POST", "/api/compte/pseudo/verifier"}, {"POST", "/api/compte/pseudo"},
 	// Lot 5.
@@ -196,7 +197,20 @@ func TestParcoursCompteHTTP(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	s2 := o["session"].(string)
+	// Nom d'appareil posé après la connexion (lot 10) : 64 octets exactement, session exigée.
+	etiq := enc.EncodeToString(rnd(64))
+	for _, x := range []string{"", enc.EncodeToString(rnd(63)), etiq + "A"} {
+		expect(t, e.do(req{method: "POST", path: "/api/compte/sessions/etiquette", hdr: sess(s2),
+			body: mustJSON(map[string]any{"etiquette": x})}), 400, badRequest)
+	}
+	expect(t, e.do(req{method: "POST", path: "/api/compte/sessions/etiquette",
+		body: mustJSON(map[string]any{"etiquette": etiq})}), 401, `{"error":"session"}`)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/sessions/etiquette", hdr: sess(a.session),
+		body: mustJSON(map[string]any{"etiquette": etiq})}), 200, `{}`)
 	w = e.do(req{method: "GET", path: "/api/compte/sessions", hdr: sess(s2)})
+	if strings.Count(w.Body.String(), `"etiquette":"`+etiq+`"`) != 1 {
+		t.Fatal(w.Body.String())
+	}
 	expect(t, w, 200, "")
 	if !strings.Contains(w.Body.String(), `"courante":true`) || strings.Count(w.Body.String(), `"sid"`) != 2 {
 		t.Fatal(w.Body.String())
@@ -402,7 +416,7 @@ func TestParcoursLot5HTTP(t *testing.T) {
 	e.clk.Add(30 * time.Second)
 	w = e.do(req{method: "POST", path: "/api/compte/oubli/verifier", remote: ip,
 		body: mustJSON(map[string]any{"etape": et2, "code": code, "totp": totpCode(sec, e.clk.Now()), "totp_perdu": false})})
-	expect(t, w, 200, `{"h":"`+a.h+`"}`)
+	expect(t, w, 200, `{"h":"`+a.h+`","gen_prive":1}`)
 	nouveau := enc.EncodeToString(rnd(32))
 	w = e.do(req{method: "POST", path: "/api/compte/oubli/fin", remote: ip, body: mustJSON(map[string]any{
 		"etape": et2, "a_auth": nouveau, "env_mdp": enc.EncodeToString(rnd(60)), "blob_prive": coffreB64("SHH-ACCT1", 2),

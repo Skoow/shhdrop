@@ -1,6 +1,6 @@
 // Défi anti-robot récupéré à l'avance (pré-calcul, UI §9.4.2, Q2).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { prepareCaptcha } from "./prepare";
+import { prepareCaptcha, proofForm } from "./prepare";
 
 afterEach(() => vi.useRealTimers());
 
@@ -60,5 +60,30 @@ describe("prepareCaptcha", () => {
     await expect(prepareCaptcha("https://srv.test/", s.net)).rejects.toThrow("origine_invalide");
     expect(s.calls).toEqual([]);
     await expect(prepareCaptcha(ORIGIN, net(challenge({ shown_at: undefined })).net)).rejects.toThrow("reponse_invalide");
+  });
+});
+
+// Routes du compte (inscription/debut, oubli/debut, connexion après 5 échecs ; plan du compte,
+// lot 10) : mêmes champs anti-robot que POST /api/shares, rendus au plus tôt 3,1 s après la
+// réception du défi (le serveur refuse avant 3 s), et une seule fois par défi.
+describe("proofForm", () => {
+  it("champs { altcha, hp, shown_at } ; attend CAPTCHA_MIN_MS depuis la réception ; usage unique", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "performance", "setTimeout"] });
+    const s = net(challenge());
+    const p = await prepareCaptcha(ORIGIN, s.net);
+    let done: unknown = null;
+    const f = proofForm(p, ORIGIN, { kind: "pow", payload: "preuve" }).then((v) => (done = v));
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(done).toBeNull();
+    await vi.advanceTimersByTimeAsync(200);
+    await f;
+    expect(done).toEqual({ altcha: "preuve", hp: "", shown_at: "jeton" });
+    await expect(proofForm(p, ORIGIN, { kind: "pow", payload: "preuve" })).rejects.toThrow("preuve_invalide");
+  });
+  it("autre origine, preuve d'une autre sorte : refus", async () => {
+    const p = await prepareCaptcha(ORIGIN, net(challenge()).net);
+    await expect(proofForm(p, "https://autre.test", { kind: "pow", payload: "x" })).rejects.toThrow("preuve_invalide");
+    const q = await prepareCaptcha(ORIGIN, net(challenge()).net);
+    await expect(proofForm(q, ORIGIN, { kind: "recaptcha", token: "t" } as never)).rejects.toThrow("preuve_invalide");
   });
 });

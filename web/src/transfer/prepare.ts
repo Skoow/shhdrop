@@ -4,7 +4,7 @@
 // (WeakMap) : l'objet rendu est opaque et figé, et un objet forgé par l'appelant est ignoré.
 import * as api from "./api";
 import { checkOrigin } from "../engine/pure";
-import { senderError } from "./client";
+import { CAPTCHA_MIN_MS, senderError, type CaptchaProof } from "./client";
 
 export type PreparedCaptcha = {
   /** Défi à résoudre (réponse du serveur sans shown_at ni fallback). */
@@ -52,4 +52,20 @@ export async function prepareCaptcha(origin: string, net?: api.Net): Promise<Pre
   } catch (e) {
     throw senderError(e);
   }
+}
+
+/**
+ * Champs anti-robot des routes du compte (inscription/debut, oubli/debut, connexion après 5
+ * échecs ; plan du compte, lot 10) : les mêmes que POST /api/shares, preuve de travail seulement
+ * (le repli n'existe pas encore pour ces routes). Rendus au plus tôt CAPTCHA_MIN_MS après la
+ * réception du défi (le serveur refuse avant 3 s) ; usage unique (le sel est consommé).
+ * Défi forgé, déjà utilisé, d'une autre origine, ou preuve d'une autre sorte : preuve_invalide.
+ */
+export async function proofForm(p: PreparedCaptcha, origin: string, proof: CaptchaProof): Promise<{ altcha: string; hp: string; shown_at: string }> {
+  if (proof.kind !== "pow" || typeof proof.payload !== "string") throw new Error("preuve_invalide");
+  const cap = takeCaptcha(p, origin);
+  if (cap === undefined) throw new Error("preuve_invalide");
+  const wait = cap.receivedAt + CAPTCHA_MIN_MS - performance.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  return { altcha: proof.payload, hp: "", shown_at: cap.shownAt };
 }

@@ -34,7 +34,10 @@ import (
 //     page n'existe pas. »), jamais un « soft 404 » en 200.
 //
 // Les en-têtes de sécurité sont posés par api.New autour de ce gestionnaire.
-func staticHandler(dir string) (http.Handler, error) {
+//
+// comptes (SHH_COMPTES=1) : les pages du compte (compteRoutes) répondent 200 aussi ; sans le
+// compte, 404 comme toute page inconnue.
+func staticHandler(dir string, comptes bool) (http.Handler, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return nil, fmt.Errorf("SHH_STATIC_DIR %s : %w", dir, err)
@@ -63,7 +66,7 @@ func staticHandler(dir string) (http.Handler, error) {
 		}
 		status := http.StatusOK
 		if errors.Is(err, fs.ErrNotExist) && !strings.Contains(path.Base(name), ".") && !isDir(fsys, name) {
-			if !appRoutes[r.URL.Path] {
+			if !appRoutes[r.URL.Path] && !(comptes && compteRoutes[r.URL.Path]) {
 				status = http.StatusNotFound
 			}
 			name = "index.html"
@@ -190,6 +193,16 @@ var appRoutes = map[string]bool{
 	"/envoyer":          true,
 	"/envois":           true,
 	"/telechargements":  true,
+}
+
+// compteRoutes : pages du compte (table COMPTE_PATHS de web/src/app/router.svelte.ts, lot 10),
+// servies en 200 seulement avec SHH_COMPTES=1.
+var compteRoutes = map[string]bool{
+	"/compte":             true,
+	"/compte/inscription": true,
+	"/compte/connexion":   true,
+	"/compte/oubli":       true,
+	"/compte/profil":      true,
 }
 
 // staticName : chemin de l'URL → nom dans le dossier ; refuse les segments cachés.

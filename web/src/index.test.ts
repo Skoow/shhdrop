@@ -61,6 +61,9 @@ describe("interface publique", () => {
         "openShare",
         "parseLink",
         "prepareCaptcha",
+        // Plan du compte, lot 10 : champs anti-robot des routes du compte (même preuve qu'un partage).
+        "proofForm",
+        "PREPARED_MIN_LEFT_MS",
         "shareLink",
         "shareStatus",
       ].sort(),

@@ -12,6 +12,8 @@ const S = (n: number, v = 1) => b64u(B(n, v));
 const JETON = S(32, 9);
 const OUV = { session: S(32, 2), h: S(16, 3), env_mdp: S(60, 4), s_profil: S(32, 5), blob_profil: S(4141, 6), gen_profil: 1, blob_prive: S(4141, 7), gen_prive: 2 };
 
+const ETAT = { h: S(16, 3), cree_le: "2026-11-14", palier: "neuf", confirme_le: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salons_actifs: 0, totp: false, banni: false, recup_jusqu: null, retrait_totp_le: null, banni_jusqu: null, banni_motif: null };
+
 function net(reply: (s: Seen) => Response | Promise<Response>) {
   const seen: Seen[] = [];
   const fetch = (async (url: string, init: RequestInit) => {
@@ -40,6 +42,8 @@ const CALLS: [string, (n: A.Net) => Promise<unknown>, unknown][] = [
   ["pseudoVerifier (étape)", (n) => A.pseudoVerifier(n, { etape: S(32) }, "lea"), { libre: false }],
   ["changerPseudo", (n) => A.changerPseudo(n, JETON, "lea"), {}],
   ["deconnexion", (n) => A.deconnexion(n, JETON), {}],
+  ["etiquetterSession", (n) => A.etiquetterSession(n, JETON, B(64)), {}],
+  ["etat", (n) => A.etat(n, JETON), ETAT],
 ];
 
 describe("routes et en-têtes", () => {
@@ -58,7 +62,7 @@ describe("routes et en-têtes", () => {
   });
 
   it("X-Shh-Session seulement sur les routes de session, avec le jeton exact", async () => {
-    const withSession = new Set(["lireCoffre", "ecrireCoffre", "pseudoVerifier", "changerPseudo", "deconnexion"]);
+    const withSession = new Set(["lireCoffre", "ecrireCoffre", "pseudoVerifier", "changerPseudo", "deconnexion", "etiquetterSession", "etat"]);
     for (const [name, call, res] of CALLS) {
       const { n, seen } = net(() => ok(res));
       await call(n);
@@ -83,6 +87,7 @@ describe("routes et en-têtes", () => {
     expect(bodies.ecrireCoffre).toEqual({ if_gen: 3, blob: S(4141) });
     expect(bodies["pseudoVerifier (étape)"]).toEqual({ etape: S(32), p_canon: "lea" });
     expect(bodies.deconnexion).toEqual({});
+    expect(bodies.etiquetterSession).toEqual({ etiquette: S(64) });
     expect(bodies.lireCoffre).toBeUndefined();
   });
 
@@ -109,6 +114,14 @@ describe("réponses", () => {
     expect(await call({ h: S(16), gen_prive: 4 })).toEqual({ h: B(16), genPrive: 4 });
     expect(await call({ attente_jusqu: "2026-11-21" })).toEqual({ attenteJusqu: "2026-11-21" });
     await expect(call({ h: S(16) })).rejects.toThrow("reponse_invalide");
+  });
+
+  it("GET /api/compte : état décodé (dates ou null, motif), forme stricte", async () => {
+    expect(await A.etat(net(() => ok(ETAT)).n, JETON)).toEqual({ creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 0, totp: false, recupJusqu: null, retraitTotpLe: null, banniJusqu: null, banniMotif: null });
+    const banni = await A.etat(net(() => ok({ ...ETAT, banni: true, banni_jusqu: "2029-11-14", banni_motif: 6, recup_jusqu: "2026-11-21" })).n, JETON);
+    expect(banni).toMatchObject({ banniJusqu: "2029-11-14", banniMotif: 6, recupJusqu: "2026-11-21" });
+    for (const bad of [{ ...ETAT, banni_jusqu: 3 }, { ...ETAT, banni_motif: 11 }, { ...ETAT, palier: "or" }, { ...ETAT, recup_jusqu: "demain" }])
+      await expect(A.etat(net(() => ok(bad)).n, JETON)).rejects.toThrow("reponse_invalide");
   });
 
   it("réponse mal formée (taille, type) : reponse_invalide", async () => {

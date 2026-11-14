@@ -1,0 +1,48 @@
+// Preuve anti-robot des pages du compte (conception compte §8.8, §10.1 : « calculée pendant la
+// saisie, comme pour un partage ») : défi lu à l'avance (preparerPreuve, au premier champ
+// rempli), preuve de travail dans son Worker, puis les champs { altcha, hp, shown_at } au plus
+// tôt 3,1 s après la réception (proofForm). Un défi sert une fois ; échu (2 min) ou bientôt
+// échu : un nouveau est lu. Aucune clé n'existe encore à ce moment (le repli reCAPTCHA, §26,
+// resterait possible ici : la clé du compte n'est tirée qu'après, par account/session.svelte.ts).
+import { solvePow } from "../../captcha/pow";
+import { PREPARED_MIN_LEFT_MS, prepareCaptcha, proofForm, type CaptchaProof, type PreparedCaptcha } from "../../index";
+
+type Preuve = { altcha: string; hp: string; shown_at: string };
+let prete: { cap: Promise<PreparedCaptcha>; proof: Promise<CaptchaProof> } | null = null;
+
+const origine = () => location.origin;
+
+function lancer() {
+  const cap = prepareCaptcha(origine());
+  const proof = cap.then((c) => solvePow(c.challenge, { fallbackOrigin: c.fallbackOrigin, mode: "pow" }));
+  proof.catch(() => undefined);
+  prete = { cap, proof };
+}
+
+/** Lit un défi et lance la preuve, s'il n'y en a pas déjà une en cours. */
+export function preparerPreuve(): void {
+  if (prete === null) lancer();
+}
+
+/** Champs anti-robot pour UNE requête ; erreurs : celles de prepareCaptcha (réseau, limite). */
+export async function obtenirPreuve(): Promise<Preuve> {
+  if (prete === null) lancer();
+  let p = prete!;
+  prete = null;
+  let cap: PreparedCaptcha;
+  try {
+    cap = await p.cap;
+  } catch {
+    lancer(); // défi illisible (coupure) : un seul nouvel essai
+    p = prete!;
+    prete = null;
+    cap = await p.cap;
+  }
+  if (cap.expiresAt - performance.now() < PREPARED_MIN_LEFT_MS) {
+    lancer();
+    p = prete!;
+    prete = null;
+    cap = await p.cap;
+  }
+  return proofForm(cap, origine(), await p.proof);
+}

@@ -3,7 +3,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { resolveConfig, type Rollup } from "vite";
-import { demoGuard } from "../vite.config";
+import { comptesPages, demoGuard } from "../vite.config";
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
 const webDir = dirname(srcDir);
@@ -324,6 +324,23 @@ describe("vite.config.ts résolu", () => {
     expect(await define(undefined, "1")).toBe("true");
     expect(await define("demo", undefined)).toBe("false");
     expect(await define("demo", "1")).toBe("false");
+  });
+
+  // Plan du compte, lot 10 : App.svelte ne voit les pages du compte que par routes/compte/pages.ts,
+  // remplacé par pages.off.ts (aucun import) sans __COMPTES__ : ni le module de compte ni le moteur
+  // du salon n'entrent alors dans le graphe du site.
+  it("pages du compte : App.svelte → routes/compte/pages seulement ; pages.off.ts sans __COMPTES__", () => {
+    const app = files.find((f) => f.rel === "App.svelte")!.text;
+    expect(app).not.toMatch(/\/account\//);
+    expect([...app.matchAll(/from\s*"(\.\/routes\/compte\/[^"]*)"/g)].map((m) => m[1])).toEqual(["./routes/compte/pages"]);
+    const off = readFileSync(join(srcDir, "routes/compte/pages.off.ts"), "utf8");
+    expect(off).not.toMatch(/\bfrom\s*["'`]\.|\bimport\s*\(/); // aucun module du site
+    const resolve = (actifs: boolean, source: string, importer: string) =>
+      (comptesPages(actifs).resolveId as (this: unknown, s: string, i?: string) => string | null).call({}, source, importer);
+    const appPath = join(srcDir, "App.svelte");
+    expect(resolve(false, "./routes/compte/pages", appPath)).toBe(join(srcDir, "routes/compte/pages.off.ts"));
+    expect(resolve(true, "./routes/compte/pages", appPath)).toBeNull();
+    expect(resolve(false, "./routes/compte/pages", join(srcDir, "main.ts"))).toBeNull();
   });
 
   it("mode demo : base /shhdrop/, sortie dist-demo, demoMeta", async () => {

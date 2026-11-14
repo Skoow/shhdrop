@@ -22,6 +22,10 @@
   import AppShell from "./ui/AppShell.svelte";
   import { chrome } from "./app/chrome.svelte";
   import { tabBarVisible } from "./app/tabbar";
+  // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
+  // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
+  // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
+  import { Connexion, Inscription, Oubli, restaurer } from "./routes/compte/pages";
 
   // UI §9 : vérifié une fois, avant toute route. Sans ces capacités, aucune route ne démarre
   // (ni lecture du lien, ni requête).
@@ -104,6 +108,9 @@
   $effect(() => watchKeyboard(window, (open) => document.documentElement.classList.toggle("kbd-open", open)));
   // Entrée d'onglet (K_lien) effacée après 30 min sans activité, sur tous les écrans (audit web D2).
   $effect(() => watchOpenGrant(window));
+  // « Rester connecté » (conception compte §9) : la session gardée sur cet appareil est rouverte
+  // au démarrage ; échue ou fermée ailleurs, elle est oubliée. Seulement avec __COMPTES__.
+  if (__COMPTES__ && supported) restaurer().catch(() => undefined);
 </script>
 
 <svelte:window onhashchange={onHashChange} />
@@ -134,6 +141,14 @@
     <Downloads />
   {:else if router.current.name === "offres"}
     <Offres />
+  {:else if router.current.name === "inscription"}
+    <Inscription />
+  {:else if router.current.name === "oubli"}
+    <Oubli />
+  {:else if (router.current.name === "connexion" || router.current.name === "compte" || router.current.name === "profil")}
+    <!-- /compte et /compte/profil (paramètres et profil : lot 13) : sans session, la connexion
+         (conception §12.4) ; avec session, la même page dit « connecté ». -->
+    <Connexion />
   {:else}
     <!-- Pages d'information (pied de page, retours UI5). -->
     <InfoPage name={router.current.name} />

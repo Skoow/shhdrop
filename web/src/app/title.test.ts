@@ -23,6 +23,19 @@ describe("titre de l'onglet", () => {
     expect(routeTitle("open")).toBe("Open a share · Shhgone");
     expect(routeTitle("confidentialite")).toBe("Privacy · Shhgone");
   });
+  it("pages du compte (lot 10) : titres fixes, jamais d'adresse ni de pseudo", () => {
+    setLang("fr");
+    expect(routeTitle("inscription")).toBe("Créer un compte · Shhgone");
+    expect(routeTitle("connexion")).toBe("Se connecter · Shhgone");
+    expect(routeTitle("oubli")).toBe("Mot de passe oublié · Shhgone");
+    expect(routeTitle("compte")).toBe("Compte · Shhgone");
+    expect(routeTitle("profil")).toBe("Profil · Shhgone");
+    setLang("en");
+    expect(routeTitle("inscription")).toBe("Create an account · Shhgone");
+    expect(routeTitle("connexion")).toBe("Sign in · Shhgone");
+    expect(routeTitle("oubli")).toBe("Forgotten password · Shhgone");
+    setLang("fr");
+  });
   it("progression : « 42 % · Shhgone », pourcentage d'abord, borné, jamais de nom ; puis le titre de l'écran revient", () => {
     expect(progressTitle(42.7, "fr")).toBe("42\u202f% · Shhgone");
     expect(progressTitle(150, "en")).toBe("100% · Shhgone");

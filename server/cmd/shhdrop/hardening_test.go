@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -281,11 +282,60 @@ func TestAppRoutesMatchClientRouter(t *testing.T) {
 		got[m[1]] = true
 	}
 	// Pages d'information : table INFO_PATHS ("/chemin": "route").
-	for _, m := range regexp.MustCompile(`(?m)^  "(/[a-z-]+)": "[a-z]+",$`).FindAllStringSubmatch(string(src), -1) {
+	// Lue dans son seul bloc : la table COMPTE_PATHS a la même forme de ligne.
+	info := string(src)
+	if i := strings.Index(info, "const INFO_PATHS"); i >= 0 {
+		info = info[i:]
+		info = info[:strings.Index(info, "};")]
+	} else {
+		t.Fatal("table INFO_PATHS introuvable")
+	}
+	for _, m := range regexp.MustCompile(`(?m)^  "(/[a-z-]+)": "[a-z]+",$`).FindAllStringSubmatch(info, -1) {
 		got[m[1]] = true
 	}
 	if len(got) < 3 || !maps.Equal(got, appRoutes) {
 		t.Fatalf("routes du client %v, du serveur %v", got, appRoutes)
+	}
+	// Pages du compte : table COMPTE_PATHS, une entrée par ligne (4 espaces : dans un objet
+	// de premier niveau), comparée à compteRoutes.
+	i := strings.Index(string(src), "const COMPTE_PATHS")
+	if i < 0 {
+		t.Fatal("table COMPTE_PATHS introuvable")
+	}
+	bloc := string(src)[i:]
+	bloc = bloc[:strings.Index(bloc, "};")]
+	compte := map[string]bool{}
+	for _, m := range regexp.MustCompile(`(?m)^  "(/[a-z/-]+)": "[a-z]+",$`).FindAllStringSubmatch(bloc, -1) {
+		compte[m[1]] = true
+	}
+	if len(compte) == 0 || !maps.Equal(compte, compteRoutes) {
+		t.Fatalf("pages du compte du client %v, du serveur %v", compte, compteRoutes)
+	}
+	for p := range compteRoutes {
+		if appRoutes[p] {
+			t.Fatalf("%s est à la fois une page publique et une page du compte", p)
+		}
+	}
+}
+
+// Les pages du compte ne répondent 200 qu'avec SHH_COMPTES=1.
+func TestPagesDuCompteSeulementAvecComptes(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<!doctype html>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, comptes := range []bool{false, true} {
+		h, err := staticHandler(dir, comptes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for p := range compteRoutes {
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest("GET", p, nil))
+			if want := map[bool]int{false: 404, true: 200}[comptes]; w.Code != want {
+				t.Fatalf("comptes=%v %s : %d, attendu %d", comptes, p, w.Code, want)
+			}
+		}
 	}
 }
 

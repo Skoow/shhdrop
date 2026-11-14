@@ -23,7 +23,7 @@ import { loadSalonEngine, type SalonEngine } from "../salon/engine";
 
 export type { Profil, Reglages, CoffrePrive, EntreePrivee } from "./vaults";
 export { REGLAGES_DEFAUT } from "./vaults";
-export { CompteError, type Preuve } from "./api";
+export { CompteError, type Preuve, type EtatServeur } from "./api";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 type PseudoMoteur = Pick<SalonEngine, "pseudoValide" | "cleUnicite" | "pseudoReserve">;
@@ -176,6 +176,45 @@ async function pseudoCanon(p: string): Promise<{ affiche: string; pCanon: string
   return { affiche, pCanon };
 }
 
+// --- Saisie (écrans) ----------------------------------------------------------------------------
+
+/**
+ * Vérifie sur l'appareil, sans requête, ce que l'écran a saisi : codes d'erreur par champ
+ * (adresse_invalide, adresse_non_ascii ; mdp_court, mdp_long, mdp_adresse ; pseudo_longueur,
+ * pseudo_caracteres, pseudo_ecritures, pseudo_reserve). Objet vide : rien à redire. Mêmes règles
+ * que confirmer() et oubli.fin() (moteur), dites avant d'envoyer un code.
+ */
+export async function verifierSaisie(s: { email?: string; mdp?: string; pseudo?: string }): Promise<Partial<Record<"email" | "mdp" | "pseudo", string>>> {
+  const out: Partial<Record<"email" | "mdp" | "pseudo", string>> = {};
+  const code = (e: unknown) => {
+    if (e instanceof Error) return e.message;
+    throw e;
+  };
+  let adresse: Adresse | null = null;
+  if (s.email !== undefined)
+    try {
+      adresse = await normaliserAdresse(s.email);
+    } catch (e) {
+      out.email = code(e);
+    }
+  if (s.mdp !== undefined) {
+    try {
+      // Adresse invalide ou absente : la règle de longueur se vérifie quand même (adresse neutre).
+      await motDePasseValide(s.mdp, adresse ?? { canon: "", exacte: "" });
+    } catch (e) {
+      out.mdp = code(e);
+    }
+  }
+  if (s.pseudo !== undefined) {
+    try {
+      await pseudoCanon(s.pseudo);
+    } catch (e) {
+      out.pseudo = code(e);
+    }
+  }
+  return out;
+}
+
 // --- Inscription -----------------------------------------------------------------------------
 
 /** Étape 1 : envoie le code (toujours la même réponse, que l'adresse ait un compte ou non). */
@@ -236,11 +275,16 @@ async function apresOuverture(o: api.Ouverture, kek: Bytes, persistante: boolean
     o.sProfil.fill(0);
     throw e;
   }
+  // Nom d'appareil, au mieux : un échec (réseau, serveur) ne ferme pas la session ouverte ; la
+  // liste des appareils montrera seulement une ligne sans nom.
+  const ouv = ouverte;
+  if (ouv) await etiquette(ouv.cles.etiquette, ouv.h).then((e) => api.etiquetterSession(deps.net, ouv.jeton, e)).catch(() => undefined);
 }
 
 /**
  * Connexion : « ouvert », ou « totp » (code de l'application à donner à validerTotp). Le nom
- * d'appareil n'est pas envoyé : K_compte (qui le chiffre) n'est connue qu'après la réponse.
+ * d'appareil n'est pas dans la connexion (K_compte, qui le chiffre, n'est connue qu'après la
+ * réponse) : il part juste après, par sessions/etiquette.
  */
 export async function seConnecter(email: string, mdp: string, persistante: boolean, preuve?: Preuve): Promise<"ouvert" | "totp"> {
   const adresse = await normaliserAdresse(email);
@@ -320,6 +364,14 @@ export const oubli = {
     }
   },
 };
+
+// --- État du compte ---------------------------------------------------------------------------
+
+/** GET /api/compte : palier, dates, double authentification, bannissement, attente de récupération. */
+export async function etatCompte(): Promise<api.EtatServeur> {
+  const o = ouverteOuErreur();
+  return garde(() => api.etat(deps.net, o.jeton));
+}
 
 // --- Pseudo ----------------------------------------------------------------------------------
 

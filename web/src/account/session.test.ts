@@ -129,6 +129,14 @@ function fauxServeur() {
         v.gen++;
         return ok({ gen: v.gen });
       }
+      case "GET ": {
+        if (!qui) return err(401, "session");
+        return ok({ h: b64u(comptes.get(qui)!.h as Uint8Array<ArrayBuffer>), cree_le: "2026-11-14", palier: "neuf", confirme_le: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salons_actifs: 0, totp: false, banni: false, recup_jusqu: null, retrait_totp_le: null, banni_jusqu: null, banni_motif: null });
+      }
+      case "POST sessions/etiquette":
+        if (!qui) return err(401, "session");
+        etiquettes.push(body.etiquette as string);
+        return ok({});
       case "POST deconnexion":
         if (!qui) return err(401, "session");
         sessions.delete(headers["X-Shh-Session"]!);
@@ -167,6 +175,10 @@ function configurer() {
       return () => (p.annule = true);
     },
   });
+}
+
+function configurerFetch(fetch: typeof globalThis.fetch) {
+  C.configurerCompte({ net: { origin: "https://shh.test", fetch } });
 }
 
 beforeEach(() => {
@@ -252,6 +264,29 @@ describe("inscription", () => {
   });
 });
 
+describe("saisie et état (écrans du lot 10)", () => {
+  it("verifierSaisie : erreurs par champ, sans requête, avant tout envoi", async () => {
+    expect(await C.verifierSaisie({ email: "Lea@Exemple.fr", mdp: MDP, pseudo: "Léa" })).toEqual({});
+    expect(await C.verifierSaisie({ email: "pas une adresse", mdp: MDP, pseudo: "Léa" })).toEqual({ email: "adresse_invalide" });
+    expect(await C.verifierSaisie({ email: "léa@exemple.fr" })).toEqual({ email: "adresse_non_ascii" });
+    expect(await C.verifierSaisie({ email: "lea@exemple.fr", mdp: "court" })).toEqual({ mdp: "mdp_court" });
+    expect(await C.verifierSaisie({ email: "lea@exemple.fr", mdp: "lea@exemple.fr" })).toEqual({ mdp: "mdp_adresse" });
+    expect(await C.verifierSaisie({ email: "lea@exemple.fr", pseudo: "a" })).toEqual({ pseudo: "pseudo_longueur" });
+    expect(await C.verifierSaisie({ email: "lea@exemple.fr", pseudo: "Admin" })).toEqual({ pseudo: "pseudo_reserve" });
+    // Adresse invalide : le mot de passe se vérifie quand même (longueur).
+    expect(await C.verifierSaisie({ email: "x", mdp: "court" })).toEqual({ email: "adresse_invalide", mdp: "mdp_court" });
+    expect(await C.verifierSaisie({ pseudo: "Léa" })).toEqual({});
+    expect(srv.requetes).toEqual([]);
+  });
+
+  it("etatCompte : GET /api/compte avec la session ; sans session, erreur", async () => {
+    await expect(C.etatCompte()).rejects.toThrow("aucune_session");
+    await inscription();
+    expect(await C.etatCompte()).toMatchObject({ palier: "neuf", banniJusqu: null });
+    expect(srv.requetes.at(-1)!.headers["X-Shh-Session"]).toBeTruthy();
+  });
+});
+
 describe("connexion et TOTP", () => {
   it("connexion : coffres ouverts ; variante d'adresse acceptée par le même sel", async () => {
     await inscription("lea.dupont@gmail.com");
@@ -260,6 +295,31 @@ describe("connexion et TOTP", () => {
     await C.seConnecter("LeaDupont+x@GMAIL.com", MDP, false);
     expect(C.account.etat).toBe("ouvert");
     expect(C.account.profil?.pseudo).toBe("Léa");
+  });
+
+  it("nom d'appareil : absent de la connexion (K_compte inconnue), posé juste après par sessions/etiquette", async () => {
+    await inscription();
+    await C.seDeconnecter();
+    srv.etiquettes.length = 0;
+    await C.seConnecter("lea.dupont@exemple.fr", MDP, false);
+    const cx = srv.requetes.find((r) => r.path.endsWith("/connexion"))!;
+    expect(cx.body.etiquette).toBe("");
+    const et = srv.requetes.filter((r) => r.path.endsWith("sessions/etiquette"));
+    expect(et).toHaveLength(1);
+    expect(et[0]!.headers["X-Shh-Session"]).toBeTruthy();
+    const c = srv.comptes.get("lea.dupont@exemple.fr")!;
+    const { kekMdp } = await deriver(MDP, "lea.dupont@exemple.fr");
+    const k = await clesDuCompte(await ouvrirEnveloppe(kekMdp, c.h, c.envMdp), c.sProfil);
+    expect(await ouvrirEtiquette(k.etiquette, c.h, unb64u(srv.etiquettes[0]!))).toBe("Firefox · ordinateur");
+  });
+
+  it("nom d'appareil refusé (réseau, serveur ancien) : la connexion reste ouverte", async () => {
+    await inscription();
+    await C.seDeconnecter();
+    const f = srv.fetch;
+    configurerFetch((async (u: string, i: RequestInit) => (u.endsWith("sessions/etiquette") ? new Response('{"error":"not_found"}', { status: 404 }) : f(u, i))) as never);
+    await C.seConnecter("lea.dupont@exemple.fr", MDP, false);
+    expect(C.account.etat).toBe("ouvert");
   });
 
   it("mot de passe faux : identifiants, rien d'ouvert", async () => {

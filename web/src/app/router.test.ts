@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { href, match, navigate, router } from "./router.svelte";
+import { href, match, navigate, router, suite } from "./router.svelte";
 
 const KEY = "A".repeat(42) + "Q"; // 43 caractères base64url (forme seulement)
 
@@ -70,6 +70,45 @@ describe("match", () => {
     expect(match("/shhdrop/telechargements", "", base)).toEqual({ name: "telechargements" });
     expect(match("/", `#${KEY}`, base)).toEqual({ name: "notfound" });
     expect(match("/shhdropx/", `#${KEY}`, base)).toEqual({ name: "notfound" });
+  });
+});
+
+// Plan du compte, lot 10 : pages du compte seulement si __COMPTES__ (sinon la même 404 qu'une
+// adresse inconnue) ; « ?suite=salon » seul paramètre, et aucune donnée dans l'adresse.
+describe("pages du compte", () => {
+  const C = (p: string, base = "/") => match(p, "", base, false, true);
+  it("avec __COMPTES__ : /compte, inscription, connexion, oubli, profil", () => {
+    expect(C("/compte")).toEqual({ name: "compte" });
+    expect(C("/compte/inscription")).toEqual({ name: "inscription" });
+    expect(C("/compte/connexion")).toEqual({ name: "connexion" });
+    expect(C("/compte/oubli")).toEqual({ name: "oubli" });
+    expect(C("/compte/profil")).toEqual({ name: "profil" });
+    expect(C("/shhdrop/compte/connexion", "/shhdrop/")).toEqual({ name: "connexion" });
+    // Un « # » n'ouvre rien ici (App le retire).
+    expect(match("/compte/connexion", `#${KEY}`, "/", false, true)).toEqual({ name: "connexion" });
+  });
+  it("adresses voisines → 404", () => {
+    for (const p of ["/compte/", "/compte/x", "/compte/connexion/", "/compte/connexion/x", "/Compte", "/compte/Connexion", "/comptes", "/compte/parametres"])
+      expect(C(p), p).toEqual({ name: "notfound" });
+  });
+  it("sans __COMPTES__ (défaut, démo) : toutes → 404", () => {
+    for (const p of ["/compte", "/compte/inscription", "/compte/connexion", "/compte/oubli", "/compte/profil"]) {
+      expect(match(p), p).toEqual({ name: "notfound" });
+      expect(match(p, "", "/", false, false), p).toEqual({ name: "notfound" });
+    }
+  });
+  it("suite : « ?suite=salon » exactement, sinon rien", () => {
+    expect(suite("?suite=salon")).toBe("salon");
+    for (const q of ["", "?", "?suite=", "?suite=Salon", "?suite=salon&x=1", "?x=1&suite=salon", "?suite=salon#k", "?email=lea@exemple.fr"]) expect(suite(q), q).toBeNull();
+  });
+  it("navigate : « ?suite=salon » admis sur la connexion et l'inscription seulement", () => {
+    navigate("/compte/connexion?suite=salon");
+    expect(location.pathname + location.search).toBe("/compte/connexion?suite=salon");
+    navigate("/compte/inscription?suite=salon");
+    expect(location.search).toBe("?suite=salon");
+    for (const p of ["/compte/connexion?suite=x", "/compte/connexion?email=a@b.fr", "/securite?suite=salon", "/compte/oubli?suite=salon", "/compte/connexion?suite=salon#k"])
+      expect(() => navigate(p), p).toThrow();
+    navigate("/");
   });
 });
 

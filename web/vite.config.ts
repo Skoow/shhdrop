@@ -304,10 +304,30 @@ export function comptesActifs(demo: boolean): boolean {
   return !demo && process.env.SHH_SITE_COMPTES === "1";
 }
 
+/**
+ * Pages du compte (plan du compte, lot 10) : App.svelte ne les voit que par
+ * src/routes/compte/pages.ts. Sans __COMPTES__ (défaut, démo), ce module est remplacé par
+ * pages.off.ts (aucune page, aucun import) : ni le module de compte, ni le moteur du salon qu'il
+ * charge n'entrent dans le graphe du site (check-dist.mjs : aucune trace du compte ; la démo
+ * refuse tout module du salon).
+ */
+export function comptesPages(actifs: boolean): Plugin {
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  return {
+    name: "shh-comptes",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (actifs || !/^\.\/routes\/compte\/pages(?:\.ts)?$/.test(source)) return null;
+      if (!(importer ?? "").replace(/\\/g, "/").endsWith("/src/App.svelte")) return null;
+      return join(here, "src/routes/compte/pages.off.ts");
+    },
+  };
+}
+
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
-    plugins: [svelte(), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
+    plugins: [comptesPages(comptesActifs(demo)), svelte(), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
     define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)) },
     build: {
