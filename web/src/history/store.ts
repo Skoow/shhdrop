@@ -1,6 +1,13 @@
-// Historique local des envois (spec §33, §33.1 ; UI §9.6). EXCEPTION ÉCRITE à « aucun
-// stockage navigateur » (UI §12.1, source-rules.test.ts) : seul ce module touche IndexedDB et
-// le secret de gestion stocké.
+// Historique de l'appareil (spec §33, §33.1 ; UI §9.6 ; conception compte §21.7, §21.8).
+// EXCEPTION ÉCRITE à « aucun stockage navigateur » (UI §12.1, source-rules.test.ts) : seul ce
+// module touche IndexedDB et les secrets stockés.
+// - Quatre sortes d'entrées (`sorte`) : envoi (« Lien prêt »), recu (partage ouvert), salon_cree,
+//   salon_rejoint ; `origine` : local (créée sur cet appareil) ou compte (reçue du coffre privé
+//   d'un compte, retirée à la déconnexion, §37.11 A-G8). Une entrée d'avant (sans ces champs) se
+//   relit en envoi local.
+// - Exception écrite de la conception compte §21.8 : une entrée reçue ou de salon garde son lien
+//   (« #<K_lien> », « #c<K_lien> »). Il ne suffit jamais seul : le mot de passe reste nécessaire
+//   et n'est JAMAIS gardé. Un envoi ne garde que son lien de gestion, jamais son lien de partage.
 // - Chaque entrée est chiffrée AES-256-GCM (WebCrypto) avec une clé créée NON EXTRACTIBLE et
 //   gardée dans IndexedDB ; nonce aléatoire de 96 bits à chaque écriture ; l'identifiant
 //   (tiré au hasard, sans lien avec le partage) est la donnée associée authentifiée.
@@ -16,11 +23,23 @@
 
 export type HistoryState = "ready" | "draining" | "gone" | "expired";
 export type Opening = { count: number; between: [number, number] };
+export type Sorte = "envoi" | "recu" | "salon_cree" | "salon_rejoint";
+export type Origine = "local" | "compte";
+/** Sorte dominante d'un partage reçu (icône) : familles de ui/formats.ts ; "" hors reçu. */
+export const FORMATS = ["pdf", "doc", "sheet", "slides", "text", "code", "archive", "image", "video", "audio", "exec", "disk", "font", "book", "note", "file"] as const;
 export type HistoryEntry = {
   id: string;
-  /** Lien de gestion « https://…/#m<S_gestion> », chiffré au repos. */
+  sorte: Sorte;
+  origine: Origine;
+  /** Envoi : lien de gestion « https://…/#m<S_gestion> », chiffré au repos ; "" sinon. */
   manage: string;
-  /** Heure locale exacte de la création (jamais envoyée). */
+  /** Reçu : lien « https://…/#<K_lien> » ; salon : invitation « https://…/#c<K_lien> » ; "" pour un envoi. */
+  link: string;
+  /** Libellé local d'un salon (64 caractères au plus) ; "" sinon. */
+  label: string;
+  /** Reçu : sorte dominante (FORMATS) ; "" sinon. */
+  format: string;
+  /** Heure locale exacte de la création, de l'ouverture ou de l'entrée (jamais envoyée). */
   createdAt: number;
   sizeBytes: number;
   itemsCount: number;
@@ -39,8 +58,9 @@ export type HistoryEntry = {
   /** Détruit depuis cet appareil (sinon : constaté absent du serveur). */
   destroyedHere: boolean;
 };
-export type NewEntry = Pick<HistoryEntry, "manage" | "createdAt" | "sizeBytes" | "itemsCount" | "expiresAt" | "maxOpens">;
-export type Patch = Partial<Omit<HistoryEntry, "id" | "manage" | "createdAt" | "sizeBytes" | "itemsCount">>;
+export type NewEntry = Pick<HistoryEntry, "manage" | "createdAt" | "sizeBytes" | "itemsCount" | "expiresAt" | "maxOpens"> &
+  Partial<Pick<HistoryEntry, "sorte" | "link" | "label" | "format">>;
+export type Patch = Partial<Omit<HistoryEntry, "id" | "sorte" | "origine" | "manage" | "link" | "createdAt" | "sizeBytes" | "itemsCount">>;
 
 export const HISTORY_KEEP_GONE_MS = 7 * 86_400_000;
 
@@ -64,6 +84,10 @@ export type Backend = {
 };
 
 const MANAGE_LINK = /^https?:\/\/[^#\s]+#m[A-Za-z0-9_-]{43}$/;
+const SHARE_LINK = /^https?:\/\/[^#\s]+#[A-Za-z0-9_-]{43}$/;
+const ROOM_LINK = /^https?:\/\/[^#\s]+#c[A-Za-z0-9_-]{43}$/;
+const SORTES: readonly Sorte[] = ["envoi", "recu", "salon_cree", "salon_rejoint"];
+const LABEL_MAX = 64;
 const ID = /^[A-Za-z0-9_-]{22}$/;
 const STATES: readonly HistoryState[] = ["ready", "draining", "gone", "expired"];
 const AAD = "shhdrop/history/v1/";
@@ -210,13 +234,33 @@ export function memoryBackend(): Backend & { raw(): Map<string, Rec> } {
 
 const int = (x: unknown, min = 0): x is number => Number.isSafeInteger(x) && (x as number) >= min;
 
-function clean(x: unknown): HistoryEntry | null {
+/**
+ * Entrée validée champ par champ, ou null. Tout champ inconnu (mot de passe, noms, contenu…) est
+ * ignoré. Lien selon la sorte : envoi → lien de gestion seulement ; reçu → lien de partage
+ * seulement ; salon → invitation « #c » seulement. Sans sorte ni origine (entrée d'avant le lot
+ * 11) : envoi local.
+ */
+export function cleanEntry(x: unknown): HistoryEntry | null {
   if (typeof x !== "object" || x === null) return null;
   const o = x as Record<string, unknown>;
   if (typeof o.id !== "string" || !ID.test(o.id)) return null;
-  if (typeof o.manage !== "string" || !MANAGE_LINK.test(o.manage)) return null;
+  const sorte = o.sorte === undefined ? "envoi" : o.sorte;
+  const origine = o.origine === undefined ? "local" : o.origine;
+  if (!SORTES.includes(sorte as Sorte) || (origine !== "local" && origine !== "compte")) return null;
+  const manage = o.manage ?? "";
+  const link = o.link ?? "";
+  const label = o.label ?? "";
+  const format = o.format ?? "";
+  if (typeof manage !== "string" || typeof link !== "string" || typeof label !== "string" || typeof format !== "string") return null;
+  if (sorte === "envoi") {
+    if (!MANAGE_LINK.test(manage) || link !== "" || label !== "" || format !== "") return null;
+  } else {
+    if (manage !== "") return null;
+    if (sorte === "recu" ? !SHARE_LINK.test(link) || label !== "" || !(FORMATS as readonly string[]).includes(format) : !ROOM_LINK.test(link) || format !== "") return null;
+    if (label.length > LABEL_MAX || /[\u0000-\u001f\u007f]/.test(label)) return null;
+  }
   for (const k of ["createdAt", "sizeBytes", "itemsCount", "expiresAt", "opensUsed", "lastSeenAt", "endedAt"]) if (!int(o[k])) return null;
-  if (!int(o.maxOpens, 1)) return null;
+  if (!int(o.maxOpens, sorte === "envoi" ? 1 : 0)) return null;
   if (!STATES.includes(o.state as HistoryState) || typeof o.destroyedHere !== "boolean" || !Array.isArray(o.opens)) return null;
   const opens: Opening[] = [];
   for (const p of o.opens.slice(-32)) {
@@ -227,7 +271,12 @@ function clean(x: unknown): HistoryEntry | null {
   }
   return {
     id: o.id,
-    manage: o.manage,
+    sorte: sorte as Sorte,
+    origine: origine as Origine,
+    manage,
+    link,
+    label,
+    format,
     createdAt: o.createdAt as number,
     sizeBytes: o.sizeBytes as number,
     itemsCount: o.itemsCount as number,
@@ -241,6 +290,9 @@ function clean(x: unknown): HistoryEntry | null {
     destroyedHere: o.destroyedHere,
   };
 }
+
+/** Ce qui identifie le partage ou le salon d'une entrée, d'un appareil à l'autre : son lien. */
+export const linkKey = (e: Pick<HistoryEntry, "sorte" | "manage" | "link">): string => (e.sorte === "envoi" ? e.manage.slice(e.manage.lastIndexOf("#")) : e.link.slice(e.link.lastIndexOf("#")));
 
 // ---------- État affiché, tri ----------
 
@@ -275,7 +327,10 @@ export function sortEntries(list: readonly HistoryEntry[], now: number): History
 export type History = {
   list(): Promise<HistoryEntry[]>;
   get(id: string): Promise<HistoryEntry | null>;
+  /** Ajoute une entrée de cet appareil ; même lien (gestion, partage, invitation) déjà gardé : celle-là. */
   add(e: NewEntry): Promise<HistoryEntry>;
+  /** Garde une entrée entière (venue du compte) ; faux si une entrée du même lien est déjà là. */
+  put(e: HistoryEntry): Promise<boolean>;
   update(id: string, patch: Patch): Promise<HistoryEntry | null>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
@@ -319,7 +374,7 @@ export async function openHistory(deps: { backend: Backend | null; now?: () => n
       const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: r.iv, additionalData: aad(id) }, key, r.ct));
       const v = JSON.parse(new TextDecoder().decode(pt)) as Record<string, unknown>;
       pt.fill(0);
-      return clean({ ...v, id });
+      return cleanEntry({ ...v, id });
     } catch {
       return null;
     }
@@ -344,9 +399,14 @@ export async function openHistory(deps: { backend: Backend | null; now?: () => n
     },
     async add(n) {
       const t = now();
-      const e = clean({
+      const e = cleanEntry({
         id: randomId(),
+        sorte: n.sorte ?? "envoi",
+        origine: "local",
         manage: n.manage,
+        link: n.link ?? "",
+        label: n.label ?? "",
+        format: n.format ?? "",
         createdAt: n.createdAt,
         sizeBytes: n.sizeBytes,
         itemsCount: n.itemsCount,
@@ -360,15 +420,22 @@ export async function openHistory(deps: { backend: Backend | null; now?: () => n
         destroyedHere: false,
       });
       if (e === null) throw new Error("entree_invalide");
-      const same = (await all()).find((x) => x.manage === e.manage);
+      const same = (await all()).find((x) => linkKey(x) === linkKey(e));
       if (same) return same;
       await seal(e);
       return e;
     },
+    async put(x) {
+      const e = cleanEntry(x);
+      if (e === null) throw new Error("entree_invalide");
+      if ((await all()).some((y) => y.id === e.id || linkKey(y) === linkKey(e))) return false;
+      await seal(e);
+      return true;
+    },
     async update(id, patch) {
       const old = await h.get(id);
       if (!old) return null;
-      const e = clean({ ...old, ...patch, id: old.id, manage: old.manage });
+      const e = cleanEntry({ ...old, ...patch, id: old.id, sorte: old.sorte, origine: old.origine, manage: old.manage, link: old.link });
       if (e === null) throw new Error("entree_invalide");
       await seal(e);
       return e;

@@ -117,3 +117,52 @@ describe("relecture (A) : « Effacer l'historique » ne se bloque jamais sur les
     }
   });
 });
+
+// Conception compte §21.7, §21.8 (plan, lot 11) : partages reçus gardés sur l'appareil (lien,
+// jamais le mot de passe), retirés par « Oublier ce partage sur cet appareil » ; « Vos envois »
+// (shares.entries) ne voit que les envois ; entrées du compte importées et retirées à la
+// déconnexion ; chaque ajout ou retrait local est signalé (synchronisation du compte).
+describe("partages reçus (lot 11)", () => {
+  const KEY = "k".repeat(43);
+  const LINK = "https://x.test/#" + KEY;
+  const received = () => ({ link: LINK, expiresAt: Date.now() + 3600_000, itemsCount: 2, sizeBytes: 300, format: "image" });
+
+  it("recordReceived : entrée « recu » locale dans shares.all, jamais dans shares.entries (envois)", async () => {
+    await seed();
+    await live.recordReceived(received());
+    expect(live.shares.entries.map((e) => e.sorte)).toEqual(["envoi"]);
+    const r = live.shares.all.find((e) => e.sorte === "recu")!;
+    expect(r).toMatchObject({ link: LINK, origine: "local", itemsCount: 2, sizeBytes: 300, format: "image", manage: "" });
+    expect(live.shares.all).toHaveLength(2);
+  });
+
+  it("forgetReceived(clé) : l'entrée de ce lien part, les autres restent", async () => {
+    await seed();
+    await live.recordReceived(received());
+    await live.forgetReceived(KEY);
+    expect(live.shares.all.map((e) => e.sorte)).toEqual(["envoi"]);
+  });
+
+  it("chaque ajout ou retrait local est signalé ; importer() n'est pas signalé (venu du compte)", async () => {
+    const seen: string[] = [];
+    const stop = live.onLocalChange((c) => seen.push(`${c.kind}:${c.entry.sorte}`));
+    await seed();
+    await live.recordReceived(received());
+    await live.forgetReceived(KEY);
+    const env = live.shares.entries[0]!;
+    await live.forgetShare(env.id);
+    await live.importEntries([{ ...env, id: "C".repeat(22), origine: "compte" }]);
+    stop();
+    await live.recordReceived(received());
+    expect(seen).toEqual(["add:envoi", "add:recu", "remove:recu", "remove:envoi"]);
+    expect(live.shares.entries.map((e) => e.origine)).toEqual(["compte"]);
+  });
+
+  it("dropAccountEntries : seules les entrées venues du compte partent ; celles de l'appareil restent", async () => {
+    const env = await seed();
+    await live.importEntries([{ ...env, id: "C".repeat(22), origine: "compte", manage: OTHER }]);
+    expect(live.shares.entries).toHaveLength(2);
+    await live.dropAccountEntries();
+    expect(live.shares.entries.map((e) => e.id)).toEqual([env.id]);
+  });
+});

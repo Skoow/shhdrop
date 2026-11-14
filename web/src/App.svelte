@@ -25,7 +25,7 @@
   // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Connexion, Inscription, Oubli, restaurer } from "./routes/compte/pages";
+  import { Accueil, Connexion, Inscription, Oubli, connecte, restaurer } from "./routes/compte/pages";
 
   // UI §9 : vérifié une fois, avant toute route. Sans ces capacités, aucune route ne démarre
   // (ni lecture du lien, ni requête).
@@ -38,7 +38,10 @@
   let sending = $state(false);
 
   // Téléphone : barre d'onglets sur les écrans racine de l'expéditeur seulement (app/tabbar.ts).
-  const tabs = $derived(tabBarVisible({ supported, route: router.current.name, sending, composing: chrome.composing }));
+  // Accueil connecté (plan du compte, lot 12) : seulement avec __COMPTES__ et une session ouverte ;
+  // sans compte (et dans tout build public), l'accueil reste l'accueil actuel.
+  const connected = $derived(__COMPTES__ && connecte());
+  const tabs = $derived(tabBarVisible({ supported, route: router.current.name, sending, composing: chrome.composing, connected }));
 
   // UI §12.2 : une page restaurée du cache « page précédente » est rechargée.
   reloadIfRestored(window);
@@ -92,13 +95,15 @@
 
   // UI §9.2.2 : hors de l'accueil, un fichier déposé ne fait jamais naviguer l'onglet. Sur
   // l'accueil, Home reçoit le dépôt (voile pleine page), sauf pendant un envoi.
-  $effect(() => guardFileDrop(window, () => supported && (router.current.name === "home" || router.current.name === "envoyer") && !sending));
+  // Accueil connecté : pas de composeur, donc aucun dépôt reçu là (le fichier ne fait jamais naviguer).
+  $effect(() => guardFileDrop(window, () => supported && ((router.current.name === "home" && !connected) || router.current.name === "envoyer") && !sending));
 
   // Titre de l'onglet par route et par langue (scan UX B9) ; l'accueil (SendFlow) tient le sien.
   $effect(() => {
     void getLang();
     const name = router.current.name;
     if (!supported) setScreenTitle("unsupported");
+    else if (name === "home" && connected) setScreenTitle("inbox");
     else if (name !== "home" && name !== "envoyer") setScreenTitle(name);
     // Référencement : description, canonique et noindex par route (app/seo.ts).
     applySeo(supported ? name : "unsupported");
@@ -126,6 +131,8 @@
     <Unsupported />
   {:else if router.current.name === "notfound"}
     <NotFound />
+  {:else if router.current.name === "home" && connected}
+    <Accueil />
   {:else if router.current.name === "home" || router.current.name === "envoyer"}
     <!-- Accueil, puis composeur dès le premier élément (UI §9.1, §9.2) ; « /envoyer » : composeur
          même vide (retours DROP). Un seul SendFlow pour les deux : passer de l'un à l'autre garde

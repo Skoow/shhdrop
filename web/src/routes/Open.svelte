@@ -9,6 +9,9 @@
   import { scrubAddressBar } from "../app/link";
   import { followLink, href, markReopen } from "../app/router.svelte";
   import { createReceiver } from "../flows/receive.svelte";
+  import { summarizeOpened } from "../flows/received";
+  import { forgetReceived, keepReceivedDefault, loadHistory, recordReceived, shares } from "../history/live.svelte";
+  import Case from "./compte/Case.svelte";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { PW_TRIES, isGeneratedPassword } from "../index";
@@ -47,6 +50,21 @@
     scrub: () => {
       if (!scrubAddressBar(history, location.pathname)) scrubAddressBar(history, href("/"));
     },
+    // Conception compte §21.7 : « Garder » (historique de l'appareil, chiffré) ; jamais le mot de passe.
+    keepDefault: keepReceivedDefault,
+    keepReceived: (k, o) => recordReceived({ ...k, ...summarizeOpened(o) }),
+    forgetReceived,
+  });
+
+  // Case « Garder » : cochée selon le réglage, une fois l'historique de l'appareil lu (lecture
+  // locale, rien n'est créé) ; un choix déjà fait dans la page n'est pas écrasé.
+  let keepTouched = false;
+  $effect(() => {
+    untrack(() =>
+      void loadHistory().then(() => {
+        if (!keepTouched) r.keep = keepReceivedDefault();
+      }),
+    );
   });
 
   // Démontage (autre route, nouveau lien collé) : un déverrouillage ou une lecture encore en
@@ -296,6 +314,7 @@
           </div>
         {/if}
         <p id="open-tries" class="small">{t("open.tries", { n: PW_TRIES })}</p>
+        <Case label={shares.account ? t("open.keep.account") : t("open.keep")} hint={t("open.keep.hint")} bind:checked={() => r.keep, (v) => ((keepTouched = true), (r.keep = v))} />
         {#if r.reopening}
           <p id="open-cost" class="cost">{t("open.reopen.body")}</p>
         {:else if r.otherTab}

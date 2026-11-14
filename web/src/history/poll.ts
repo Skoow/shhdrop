@@ -16,6 +16,8 @@ export const JITTER_MAX_MS = 4000;
 export type Status = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };
 export type PollDeps = {
   manageStatus: (manage: string) => Promise<Status>;
+  /** Partage reçu (conception compte §21.7) : meta sur son lien, aucune ouverture consommée. */
+  shareMeta?: (link: string) => Promise<{ expiresInS: number; opensLeft: number }>;
   manageDestroy?: (manage: string) => Promise<void>;
   now: () => number;
   visible: () => boolean;
@@ -82,7 +84,12 @@ export function pollHistory(h: Pick<History, "get" | "list" | "update">, deps: P
     if (!deps.visible()) return { kind: "skipped", reason: "hidden" };
     let s: Status;
     try {
-      s = await deps.manageStatus(e.manage);
+      if (e.sorte === "recu") {
+        if (!deps.shareMeta) return { kind: "skipped", reason: "missing" };
+        const m = await deps.shareMeta(e.link);
+        s = { opensUsed: 0, maxOpens: 0, expiresInS: m.expiresInS, state: "ready" };
+      } else if (e.sorte === "envoi") s = await deps.manageStatus(e.manage);
+      else return { kind: "skipped", reason: "missing" }; // salons : avec leurs écrans (C-3, C-5)
     } catch (err) {
       const t = deps.now();
       if (notFound(err)) {
@@ -100,7 +107,8 @@ export function pollHistory(h: Pick<History, "get" | "list" | "update">, deps: P
     attempted.set(id, t);
     const cur = (await h.get(id)) ?? e;
     if (effectiveState(cur, t) === "gone") return { kind: "skipped", reason: "ended" }; // détruit pendant la relecture
-    const entry = await h.update(id, statusPatch(cur, s, t));
+    const patch = statusPatch(cur, s, t);
+    const entry = await h.update(id, cur.sorte === "envoi" ? patch : { expiresAt: patch.expiresAt, lastSeenAt: t, state: "ready" });
     return entry ? { kind: "updated", entry } : { kind: "skipped", reason: "missing" };
   }
 
@@ -121,7 +129,7 @@ export function pollHistory(h: Pick<History, "get" | "list" | "update">, deps: P
       const t = deps.now();
       for (const e of await h.list()) {
         if (token.off) return;
-        if (isActive(e, t)) await refreshOne(e.id, token);
+        if (e.sorte === "envoi" && isActive(e, t)) await refreshOne(e.id, token);
       }
     },
     stop(): void {
@@ -132,6 +140,7 @@ export function pollHistory(h: Pick<History, "get" | "list" | "update">, deps: P
     async destroy(id: string): Promise<DestroyResult> {
       const e = await h.get(id);
       if (!e) return { kind: "destroyed" };
+      if (e.sorte !== "envoi") return { kind: "error", error: "serveur" }; // aucun secret de gestion
       try {
         await deps.manageDestroy!(e.manage);
       } catch (err) {

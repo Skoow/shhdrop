@@ -15,6 +15,11 @@ const { default: Strip } = await import("./ActiveSharesStrip.svelte");
 const T = Date.now();
 const entry = (i: number, o: Partial<HistoryEntry> = {}): HistoryEntry => ({
   id: String(i).repeat(22),
+  sorte: "envoi",
+  origine: "local",
+  link: "",
+  label: "",
+  format: "",
   manage: "https://x.example/#m" + String(i).repeat(43),
   createdAt: T - 60_000,
   sizeBytes: 148_897_792,

@@ -3,6 +3,9 @@
   // D'abord l'état LOCAL (lecture d'IndexedDB, aucune requête) ; puis, page visible, une relecture
   // des partages actifs dont l'état date de plus de 5 min, l'un après l'autre, chacun après une
   // gigue de 0,5 à 4 s (history/poll.ts). Jamais en arrière-plan, aucune boucle.
+  // Filtre « Reçus » (plan du compte, lot 12 ; conception §21.7) : les partages ouverts sur cet
+  // appareil avec « Garder » coché, mêmes lignes que l'accueil connecté (InboxRow) ; jamais relus
+  // au chargement (seulement « Actualiser » dans leur détail). Les compteurs restent ceux des envois.
   import { untrack } from "svelte";
   import { followLink, href, navigate } from "../app/router.svelte";
   import { t } from "../i18n/i18n.svelte";
@@ -17,10 +20,12 @@
     shares,
     stopRefresh,
   } from "../history/live.svelte";
-  import { isActive } from "../history/store";
+  import { isActive, type HistoryEntry } from "../history/store";
   import { announce } from "../ui/announce";
   import Button from "../ui/Button.svelte";
   import { Plus, Trash2 } from "../ui/Icon";
+  import InboxDetail from "../ui/InboxDetail.svelte";
+  import InboxRow from "../ui/InboxRow.svelte";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import Segmented from "../ui/Segmented.svelte";
   import ShareCard from "../ui/ShareCard.svelte";
@@ -44,16 +49,25 @@
     };
   });
 
-  type Filter = "active" | "ended" | "all";
+  type Filter = "active" | "ended" | "all" | "received";
   let filter = $state<Filter>("all");
   const filters = $derived([
     { value: "active" as const, label: t("hist.filter.active") },
     { value: "ended" as const, label: t("hist.filter.ended") },
     { value: "all" as const, label: t("hist.filter.all") },
+    { value: "received" as const, label: t("hist.filter.received") },
   ]);
   const activeCount = $derived(shares.entries.filter((e) => isActive(e, now)).length);
   const endedCount = $derived(shares.entries.length - activeCount);
   const shown = $derived(shares.entries.filter((e) => filter === "all" || (filter === "active") === isActive(e, now)));
+  const received = $derived(shares.all.filter((e) => e.sorte === "recu"));
+  let picked = $state<string | null>(null);
+  const pickedEntry = $derived(picked === null ? null : (received.find((e) => e.id === picked) ?? null));
+  async function removeReceived(e: HistoryEntry) {
+    if (picked === e.id) picked = null;
+    await forgetShare(e.id);
+    announce(t("home.inbox.removed"));
+  }
 
   let title: HTMLHeadingElement | undefined = $state();
   $effect(() => {
@@ -93,7 +107,7 @@
     <ul class="list" role="list" aria-label={t("hist.loading")}>
       {#each [0, 1] as k (k)}<li class="skel" aria-hidden="true"></li>{/each}
     </ul>
-  {:else if shares.entries.length === 0}
+  {:else if shares.all.length === 0}
     <div class="empty" data-history-empty>
       <svg class="art" viewBox="0 0 64 80" width="64" height="80" aria-hidden="true">
         <path d="M8 4h32l16 16v52a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="2" />
@@ -112,7 +126,28 @@
     </div>
   {:else}
     <div class="filters"><Segmented label={t("hist.filter")} options={filters} bind:value={filter} /></div>
-    {#if shown.length === 0}
+    {#if filter === "received"}
+      {#if pickedEntry}
+        <InboxDetail
+          entry={pickedEntry}
+          {now}
+          split={false}
+          info={shares.info[pickedEntry.id]}
+          onback={() => (picked = null)}
+          onrefresh={async () => void (await refreshShare(pickedEntry.id))}
+          ondestroy={async () => false}
+          onremove={() => void removeReceived(pickedEntry)}
+        />
+      {:else if received.length === 0}
+        <p class="sub">{t("hist.empty.received")}</p>
+      {:else}
+        <ul class="rows" role="list">
+          {#each received as e, i (e.id)}
+            <InboxRow entry={e} {now} index={i} onopen={() => (picked = e.id)} onremove={() => void removeReceived(e)} />
+          {/each}
+        </ul>
+      {/if}
+    {:else if shown.length === 0}
       <p class="sub">{t("hist.empty.filter")}</p>
     {:else}
       <ul class="list" role="list">
@@ -183,6 +218,14 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rows {
+    display: grid;
+    gap: 2px;
+    width: min(100%, 640px);
     margin: 0;
     padding: 0;
     list-style: none;

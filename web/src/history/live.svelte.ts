@@ -1,13 +1,15 @@
-// État partagé de l'historique pour les écrans (accueil, « Vos envois », « Lien prêt »).
+// État partagé de l'historique de l'appareil pour les écrans (accueil, « Vos envois », « Lien
+// prêt », ouverture d'un partage). `entries` : les envois seulement (« Vos envois », bandeau de
+// l'accueil) ; `all` : toutes les sortes (envois, partages reçus, salons ; conception compte §21.7).
 // Ouvre le stockage une seule fois : IndexedDB en production, mémoire dans la démo (origine
 // partagée de GitHub Pages : rien n'y est écrit) ; indisponible → `status: "unavailable"` et
 // le site marche sans historique. Lire l'historique ne fait AUCUNE requête réseau ; les
 // relectures passent par `refreshShare` (poll.ts : visible, 5 min, gigue).
 import { getDemo } from "../app/demo-hooks";
-import { destroyShare, shareStatus } from "../index";
+import { destroyShare, fetchMeta, shareStatus } from "../index";
 import { destroyedPatch, missingPatch, pollHistory, statusPatch, type PollError, type Poller, type RefreshResult, type Status } from "./poll";
 import { pageReturns } from "./returns";
-import { effectiveState, idbBackend, memoryBackend, openHistory, type Backend, type History, type HistoryEntry, type NewEntry } from "./store";
+import { effectiveState, idbBackend, linkKey, memoryBackend, openHistory, type Backend, type History, type HistoryEntry, type NewEntry } from "./store";
 
 export type ShareInfo = {
   busy?: boolean;
@@ -21,11 +23,46 @@ export type ShareInfo = {
 
 export const shares = $state({
   status: "idle" as "idle" | "loading" | "ready" | "unavailable",
+  /** Envois seulement (sorte « envoi »). */
   entries: [] as HistoryEntry[],
+  /** Toutes les entrées de l'appareil (envois, reçus, salons), triées comme l'historique. */
+  all: [] as HistoryEntry[],
   /** « Garder dans mon historique » (Q-H2 : activé par défaut). */
   enabled: true,
   info: {} as Record<string, ShareInfo>,
+  /**
+   * Compte ouvert sur cet appareil (posé par account/session.svelte.ts, jamais lu du stockage) :
+   * la case « Garder dans mon accueil » suit alors son réglage « Garder les liens que j'ouvre ».
+   * null : sans compte, elle suit « Garder dans mon historique » de l'appareil.
+   */
+  account: null as null | { keepReceived: boolean },
 });
+
+/** Case « Garder » de la page d'ouverture d'un partage : cochée selon le réglage (§21.7). */
+// Sans compte : décochée (14 novembre, relecture des lots 11 et 12) : garder un lien reçu
+// garde sa clé sur l'appareil, qui peut être partagé ; la personne coche si elle le veut.
+// Avec un compte : son réglage « garder les reçus ».
+export const keepReceivedDefault = (): boolean => (shares.account ? shares.account.keepReceived : false);
+export function setAccountPrefs(p: { keepReceived: boolean } | null): void {
+  shares.account = p;
+}
+
+/** Ajout ou retrait d'une entrée par un geste sur cet appareil (synchronisation du compte). */
+export type LocalChange = { kind: "add" | "remove"; entry: HistoryEntry };
+const listeners = new Set<(c: LocalChange) => void>();
+/** Écoute les ajouts et retraits faits sur cet appareil ; rend l'arrêt. */
+export function onLocalChange(f: (c: LocalChange) => void): () => void {
+  listeners.add(f);
+  return () => void listeners.delete(f);
+}
+function notify(c: LocalChange): void {
+  for (const f of [...listeners])
+    try {
+      f(c);
+    } catch {
+      // un auditeur en échec ne bloque pas l'historique
+    }
+}
 
 function backend(): Backend | null {
   if (getDemo()) return memoryBackend();
@@ -68,6 +105,7 @@ async function getPoller(): Promise<Poller | null> {
   return (poller ??= pollHistory(h, {
     manageStatus: (m) => shareStatus(m, location.origin),
     manageDestroy: (m) => destroyShare(m, location.origin),
+    shareMeta: (l) => fetchMeta(l, location.origin),
     now: () => Date.now(),
     visible: () => document.visibilityState === "visible",
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -76,7 +114,9 @@ async function getPoller(): Promise<Poller | null> {
 }
 
 async function reload(h: History): Promise<void> {
-  shares.entries = await h.list();
+  const list = await h.list();
+  shares.all = list;
+  shares.entries = list.filter((e) => e.sorte === "envoi");
 }
 
 /** Lecture locale (aucune requête). Sans effet si déjà lue, sauf `force`. */
@@ -86,6 +126,7 @@ export async function loadHistory(force = false): Promise<History | null> {
   const h = await peek();
   if (h === "absent") {
     shares.entries = [];
+    shares.all = [];
     shares.enabled = true;
     shares.status = "ready";
     return null;
@@ -95,8 +136,7 @@ export async function loadHistory(force = false): Promise<History | null> {
     return null;
   }
   try {
-    const [list, enabled] = await Promise.all([h.list(), h.enabled()]);
-    shares.entries = list;
+    const [, enabled] = await Promise.all([reload(h), h.enabled()]);
     shares.enabled = enabled;
     shares.status = "ready";
     return h;
@@ -116,18 +156,69 @@ export async function recordShare(e: NewEntry): Promise<string | null> {
   try {
     const got = await h.add(e);
     await reload(h);
+    notify({ kind: "add", entry: got });
     return got.id;
   } catch {
     return null;
   }
 }
 
+/**
+ * Partage ouvert avec « Garder » coché (conception compte §21.7) : son lien (K_lien), le nombre
+ * d'éléments, la taille, la sorte dominante et l'échéance ; JAMAIS le mot de passe, un nom ni un
+ * contenu (cleanEntry les ignore de toute façon).
+ */
+export async function recordReceived(r: { link: string; expiresAt: number; itemsCount: number; sizeBytes: number; format: string }): Promise<string | null> {
+  return recordShare({ sorte: "recu", manage: "", link: r.link, format: r.format, createdAt: Date.now(), sizeBytes: r.sizeBytes, itemsCount: r.itemsCount, expiresAt: r.expiresAt, maxOpens: 0 });
+}
+
 export async function forgetShare(id: string): Promise<void> {
   const h = await store();
   if (!h) return;
+  const e = await h.get(id).catch(() => null);
   await h.remove(id).catch(() => undefined);
   delete shares.info[id];
   await reload(h).catch(() => undefined);
+  if (e) notify({ kind: "remove", entry: e });
+}
+
+/** « Oublier ce partage sur cet appareil » : l'entrée reçue de ce lien (K_lien) part aussi. */
+export async function forgetReceived(key: string): Promise<void> {
+  const h = await peek();
+  if (!h || h === "absent") return;
+  const list = await h.list().catch(() => [] as HistoryEntry[]);
+  for (const e of list) if (e.sorte === "recu" && linkKey(e) === "#" + key) await forgetShare(e.id);
+}
+
+/** Entrées venues du coffre privé d'un compte (origine « compte ») : gardées, sans signal. */
+export async function importEntries(list: readonly HistoryEntry[]): Promise<void> {
+  const h = await store();
+  if (!h) return;
+  for (const e of list) await h.put(e).catch(() => false);
+  await reload(h).catch(() => undefined);
+}
+
+/** Retire des entrées (retirées du compte ailleurs), sans signal. */
+export async function dropEntries(ids: readonly string[]): Promise<void> {
+  const h = await peek();
+  if (!h || h === "absent") return;
+  for (const id of ids) await h.remove(id).catch(() => undefined);
+  await reload(h).catch(() => undefined);
+}
+
+/** Déconnexion (§37.11 A-G8) : les entrées venues du compte partent ; celles de l'appareil restent. */
+export async function dropAccountEntries(): Promise<void> {
+  const h = await peek();
+  if (!h || h === "absent") return;
+  const list = await h.list().catch(() => [] as HistoryEntry[]);
+  await dropEntries(list.filter((e) => e.origine === "compte").map((e) => e.id));
+}
+
+/** Toutes les entrées de l'appareil (lecture locale, aucune requête) ; aucun historique : []. */
+export async function allEntries(): Promise<HistoryEntry[]> {
+  const h = await peek();
+  if (!h || h === "absent") return [];
+  return h.list().catch(() => []);
 }
 
 export async function clearHistory(): Promise<void> {
@@ -178,7 +269,7 @@ async function syncOne(manage: string, r: ManagedResult): Promise<void> {
     const h = await peek();
     if (!h || h === "absent") return;
     const key = secretOf(manage);
-    const e = (await h.list()).find((x) => secretOf(x.manage) === key);
+    const e = (await h.list()).find((x) => x.sorte === "envoi" && secretOf(x.manage) === key);
     if (!e) return;
     const t = Date.now();
     const cur = effectiveState(e, t);

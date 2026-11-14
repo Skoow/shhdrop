@@ -174,3 +174,50 @@ describe("pollHistory", () => {
 });
 
 void (undefined as unknown as History);
+
+// Conception compte §21.7 (plan, lots 11 et 12) : un partage reçu n'a pas de lien de gestion ; il
+// n'est relu (meta, aucune ouverture consommée) que sur demande (« Actualiser »), au plus une fois
+// toutes les 5 min, après la même gigue ; jamais par la relecture d'affichage de « Vos envois ».
+describe("pollHistory : partages reçus", () => {
+  const LINK = "https://shhdrop.example/#" + "K".repeat(43);
+  async function withReceived(over: Partial<PollDeps> = {}) {
+    const meta = vi.fn(async (_l: string) => ({ expiresInS: 1800, opensLeft: 1 }));
+    const s = await setup({ shareMeta: meta, ...over });
+    const r = await s.h.add({ sorte: "recu", manage: "", link: LINK, format: "image", createdAt: H21, sizeBytes: 5, itemsCount: 1, expiresAt: H21 + 3600_000, maxOpens: 0 });
+    return { ...s, r, meta };
+  }
+
+  it("start() (affichage) ne relit que les envois", async () => {
+    const { clock, p, status, meta } = await withReceived();
+    clock.t = H21 + REFRESH_MIN_MS;
+    await p.start();
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(meta).not.toHaveBeenCalled();
+  });
+
+  it("« Actualiser » d'un reçu : meta sur son lien, échéance mise à jour, au plus une fois toutes les 5 min", async () => {
+    const { clock, p, r, meta, h, status } = await withReceived();
+    expect(await p.refreshOne(r.id)).toMatchObject({ kind: "skipped", reason: "fresh" });
+    clock.t = H21 + REFRESH_MIN_MS;
+    expect((await p.refreshOne(r.id)).kind).toBe("updated");
+    expect(meta).toHaveBeenCalledWith(LINK);
+    expect(status).not.toHaveBeenCalled();
+    expect((await h.get(r.id))!).toMatchObject({ expiresAt: H21 + REFRESH_MIN_MS + 1800_000, lastSeenAt: H21 + REFRESH_MIN_MS, state: "ready" });
+    clock.t += 1000;
+    expect((await p.refreshOne(r.id)).kind).toBe("skipped");
+    expect(meta).toHaveBeenCalledTimes(1);
+  });
+
+  it("reçu absent du serveur avant l'échéance : « Détruit » constaté (pas « détruit ici »)", async () => {
+    const { clock, p, r, h } = await withReceived({ shareMeta: vi.fn(async () => Promise.reject(new NotFoundError())) });
+    clock.t = H21 + REFRESH_MIN_MS;
+    await p.refreshOne(r.id);
+    expect((await h.get(r.id))!).toMatchObject({ state: "gone", destroyedHere: false });
+  });
+
+  it("destroy() refusé pour un reçu (aucun secret de gestion)", async () => {
+    const { p, r, h } = await withReceived({ manageDestroy: vi.fn(async () => undefined) });
+    expect((await p.destroy(r.id)).kind).toBe("error");
+    expect((await h.get(r.id))!.state).toBe("ready");
+  });
+});

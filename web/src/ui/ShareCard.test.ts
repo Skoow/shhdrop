@@ -11,6 +11,11 @@ import ShareCard from "./ShareCard.svelte";
 const T = new Date(2026, 10, 12, 18, 58, 30).getTime();
 const entry = (o: Partial<HistoryEntry> = {}): HistoryEntry => ({
   id: "a".repeat(22),
+  sorte: "envoi",
+  origine: "local",
+  link: "",
+  label: "",
+  format: "",
   manage: "https://x.example/#m" + "b".repeat(43),
   createdAt: T - 120_000,
   sizeBytes: 1000,

@@ -1,13 +1,18 @@
 <script lang="ts">
   // Barre d'onglets du téléphone (< 768 px), façon app : Envoyer, Mes partages, Téléchargements (conception compte §21.15.5). Plus d'onglet Réglages : langue, nettoyage et liens sont dans le pied de page.
   // Visibilité décidée par app/tabbar.ts ; masquée sur ordinateur par la CSS seule.
-  import { currentTab, TABS, type TabId } from "../app/tabbar";
+  import { currentTab, tabPath, tabsFor, type TabId } from "../app/tabbar";
+  import { shares } from "../history/live.svelte";
   import { followLink, href, router } from "../app/router.svelte";
   import { t, type Key } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
   import TabIcon from "./TabIcon.svelte";
 
-  const current = $derived(currentTab(router.current.name));
+  // Connecté (conception compte §21.15.1) : Accueil, Envoyer, Téléchargements, Profil. Le compte
+  // ouvert est dit par l'historique (shares.account, posé par la session) : aucun code du compte ici.
+  const connected = $derived(shares.account !== null);
+  const tabs = $derived(tabsFor(connected));
+  const current = $derived(currentTab(router.current.name, connected));
 
   function soon(id: TabId) {
     announce(t(`tabs.soon.${id}` as Key));
@@ -16,10 +21,10 @@
 
 <nav class="tabbar" aria-label={t("tabs.nav")} data-tabbar>
   <ul>
-    {#each TABS as tab (tab.id)}
+    {#each tabs as tab (tab.id)}
       <li>
         {#if !tab.soon}
-          {@const to = tab.id === "send" ? "/" : tab.id === "downloads" ? "/telechargements" : "/envois"}
+          {@const to = tabPath(tab.id, connected)}
           <a class="tab" href={href(to)} aria-current={current === tab.id ? "page" : undefined} onclick={(e) => followLink(e, to)}>
             <TabIcon id={tab.id} /><span class="lb">{t(`tabs.${tab.id}` as Key)}</span>
           </a>
@@ -68,7 +73,9 @@
     padding: 0;
     max-width: 560px;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* Trois onglets sans compte, quatre connecté (conception compte §21.15.1). */
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
   }
   .tab {
     position: relative;

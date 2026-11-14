@@ -12,6 +12,13 @@
   {:else if id === "shares"}
     <circle cx="12" cy="12" r="8.5" />
     <path d="M12 7.5V12l3 2" />
+  {:else if id === "home"}
+    <!-- messages-square (conception compte §21.15.1) -->
+    <path d="M14.5 9.5a2 2 0 0 1-2 2h-6l-3 3v-9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z" />
+    <path d="M17.5 8.5h1a2 2 0 0 1 2 2v10l-3-3h-6a2 2 0 0 1-2-2v-1" />
+  {:else if id === "profile"}
+    <circle cx="12" cy="8.5" r="3.75" />
+    <path d="M5 20a7 7 0 0 1 14 0" />
   {:else if id === "downloads"}
     <path d="M12 4v10.5" />
     <path d="m7.5 10 4.5 4.5 4.5-4.5" />

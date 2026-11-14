@@ -12,6 +12,11 @@
 // - Pseudo : règle et p_canon du module du salon (src/salon/engine.ts), chargé seulement ici.
 // - Déconnexion : le serveur oublie la session (au mieux : sans réseau, l'appareil efface quand
 //   même) ; l'appareil efface la base de persist.ts, K_compte, s_profil et le clair des coffres.
+// - Historique de l'appareil (lot 11, sync.ts) : à l'ouverture, fusion avec le coffre privé
+//   (écriture immédiate, liée à la connexion que le serveur voit déjà) ; ensuite chaque ajout ou
+//   retrait fait sur l'appareil part dans l'écriture différée. Déconnexion, session échue, ou
+//   démarrage sans session gardée : les entrées venues du compte sont retirées de l'appareil,
+//   celles de l'appareil restent (§37.11 A-G8).
 import * as api from "./api";
 import { netParDefaut, type Net, type Preuve } from "./api";
 import { aleatoire32, clesDeKCompte, clesDuCompte, ouvrirEnveloppe, scellerEnveloppe, type ClesCompte } from "./keys";
@@ -20,6 +25,9 @@ import { nomAppareil, scellerEtiquette } from "./device";
 import { effacer, idbDuNavigateur, lire, sauver } from "./persist";
 import { deriverCompte, motDePasseValide, normaliserAdresse, type Adresse } from "../engine/index";
 import { loadSalonEngine, type SalonEngine } from "../salon/engine";
+import { allEntries, dropAccountEntries, dropEntries, importEntries, onLocalChange, setAccountPrefs } from "../history/live.svelte";
+import type { HistoryEntry } from "../history/store";
+import { ajouterEntree, fusionner, retirerEntree } from "./sync";
 
 export type { Profil, Reglages, CoffrePrive, EntreePrivee } from "./vaults";
 export { REGLAGES_DEFAUT } from "./vaults";
@@ -37,6 +45,18 @@ type Deps = {
   salon: () => Promise<PseudoMoteur>;
   /** A_auth et KEK_mdp (Argon2id du moteur) ; l'appelant efface les deux. */
   deriver: typeof deriverCompte;
+  /** Historique de l'appareil (history/live.svelte.ts). */
+  historique: Historique;
+};
+
+/** Ce que la session voit de l'historique de l'appareil. */
+export type Historique = {
+  lister(): Promise<HistoryEntry[]>;
+  importer(es: readonly HistoryEntry[]): Promise<void>;
+  retirer(ids: readonly string[]): Promise<void>;
+  retirerCompte(): Promise<void>;
+  ecouter(f: (c: { kind: "add" | "remove"; entry: HistoryEntry }) => void): () => void;
+  regler(p: { keepReceived: boolean } | null): void;
 };
 
 const defaut = (): Deps => ({
@@ -49,6 +69,7 @@ const defaut = (): Deps => ({
   },
   salon: loadSalonEngine,
   deriver: deriverCompte,
+  historique: { lister: allEntries, importer: importEntries, retirer: dropEntries, retirerCompte: dropAccountEntries, ecouter: onLocalChange, regler: setAccountPrefs },
 });
 let deps: Deps = defaut();
 
@@ -66,6 +87,8 @@ class EtatCompte {
   prive = $state.raw<CoffrePrive | undefined>(undefined);
   /** Coffre illisible (mauvaise clé, gen plus petit que le dernier vu) : bandeau de §12.4. */
   erreur = $state.raw<"coffre_illisible" | undefined>(undefined);
+  /** Session ouverte par « Mot de passe oublié » (§21.2.3) : bandeau de l'accueil (§21.15.1). */
+  recupere = $state(false);
 }
 export const account = new EtatCompte();
 
@@ -86,11 +109,14 @@ let inscription: { h: Bytes; etape: string; adresse: Adresse } | null = null;
 let totp: { etape: string; kek: Bytes; persistante: boolean } | null = null;
 let oubliEnCours: { etape: string; adresse: Adresse; h?: Bytes; genPrive?: number } | null = null;
 let attente: { patches: ((p: CoffrePrive) => CoffrePrive)[]; annuler: () => void } | null = null;
+let arreterEcoute: (() => void) | null = null;
 
 /** Efface tout ce que la page tient du compte (ce que fait aussi un rechargement). */
 function oublierMemoire(): void {
   attente?.annuler();
   attente = null;
+  arreterEcoute?.();
+  arreterEcoute = null;
   if (ouverte) {
     ouverte.kCompte.fill(0);
     ouverte.sProfil.fill(0);
@@ -99,6 +125,7 @@ function oublierMemoire(): void {
   ouverte = inscription = totp = oubliEnCours = null;
   account.etat = "absent";
   account.profil = account.prive = account.erreur = undefined;
+  account.recupere = false;
 }
 /** Tests : simule un rechargement de la page. */
 export const _oublierMemoire = oublierMemoire;
@@ -120,6 +147,39 @@ async function oublierAppareil(): Promise<void> {
   oublierMemoire();
   const idb = deps.idb();
   if (idb) await effacer(idb).catch(() => undefined);
+  await oublierHistoriqueDuCompte();
+}
+
+/** Entrées venues du compte retirées de l'appareil ; la page ne suit plus le réglage du compte. */
+async function oublierHistoriqueDuCompte(): Promise<void> {
+  deps.historique.regler(null);
+  await deps.historique.retirerCompte().catch(() => undefined);
+}
+
+/**
+ * Fusion de l'historique de l'appareil et du coffre privé (sync.ts), puis écoute des ajouts et
+ * retraits faits ici (écriture différée). Au mieux : un échec laisse la session ouverte.
+ */
+async function synchroniser(o: Ouverte, recuperation: boolean): Promise<void> {
+  const h = deps.historique;
+  h.regler({ keepReceived: o.profil.valeur.reglages.garderRecus });
+  arreterEcoute = h.ecouter((c) => {
+    if (ouverte !== o) return;
+    const f = c.kind === "add" ? (p: CoffrePrive) => ajouterEntree(p, c.entry) : (p: CoffrePrive) => retirerEntree(p, c.entry);
+    void ecrirePrive(f, { differe: true }).catch(() => undefined);
+  });
+  try {
+    const local = await h.lister();
+    const r = fusionner(local, o.prive.valeur, { now: Date.now(), recuperation });
+    if (r.retirer.length > 0) await h.retirer(r.retirer);
+    if (r.importer.length > 0) await h.importer(r.importer);
+    if (r.coffre !== null && ouverte === o) {
+      // Sur 409, la fusion est refaite sur le coffre relu.
+      await ecrireTout(o, [(p) => fusionner(local, p, { now: Date.now(), recuperation }).coffre ?? p]);
+    }
+  } catch {
+    // Historique illisible ou coffre refusé : la session reste ouverte ; la prochaine connexion refusionne.
+  }
 }
 
 async function memoriser(o: Ouverte): Promise<void> {
@@ -144,6 +204,8 @@ async function ouvrirSession(s: {
   persistante: boolean;
   profil: { blob: Uint8Array; gen: number } | { relire: number };
   prive: { blob: Uint8Array; gen: number } | { relire: number } | { valeur: CoffrePrive; gen: number };
+  /** Après « Mot de passe oublié » : tout l'historique de l'appareil revient dans le coffre neuf. */
+  recuperation?: boolean;
 }): Promise<void> {
   const cles = await clesDuCompte(s.kCompte, s.sProfil);
   const coffre = async <T>(sorte: Sorte, src: { blob: Uint8Array; gen: number } | { relire: number } | { valeur: T; gen: number }, versJson: (v: T) => Bytes, deJson: (b: Uint8Array) => T, vide: T) => {
@@ -160,7 +222,10 @@ async function ouvrirSession(s: {
   account.profil = profil.valeur;
   account.prive = prive.valeur;
   account.etat = "ouvert";
-  await memoriser(ouverte);
+  account.recupere = s.recuperation === true;
+  const o = ouverte;
+  await memoriser(o);
+  await synchroniser(o, s.recuperation === true);
 }
 
 async function etiquette(cle: CryptoKey, h: Uint8Array): Promise<Bytes> {
@@ -355,7 +420,7 @@ export const oubli = {
       const blobPrive = await sceller("prive", k.prive, o.h, gen, priveEnJson(priveVide()));
       const r = await api.oubliFin(deps.net, { etape: o.etape, aAuth, envMdp, blobPrive, persistante, etiquette: await etiquette(k.etiquette, o.h) });
       if (r.genPrive !== gen || r.h.some((x, i) => x !== o.h![i])) throw new Error("reponse_invalide");
-      await garde(() => ouvrirSession({ jeton: r.session, h: r.h, kCompte, sProfil: r.sProfil, persistante, profil: { blob: r.blobProfil, gen: r.genProfil }, prive: { valeur: priveVide(), gen } }));
+      await garde(() => ouvrirSession({ jeton: r.session, h: r.h, kCompte, sProfil: r.sProfil, persistante, profil: { blob: r.blobProfil, gen: r.genProfil }, prive: { valeur: priveVide(), gen }, recuperation: true }));
       garde_ = true;
     } finally {
       aAuth.fill(0);
@@ -460,10 +525,12 @@ async function ecrireTout(o: Ouverte, ps: ((p: CoffrePrive) => CoffrePrive)[]): 
 
 /** Au démarrage : rouvre une session gardée (« Rester connecté ») ; sinon rien. Session échue : oubliée. */
 export async function restaurer(): Promise<void> {
+  if (ouverte) return;
   const idb = deps.idb();
-  if (!idb || ouverte) return;
-  const s = await lire(idb);
-  if (!s) return;
+  const s = idb ? await lire(idb) : null;
+  // Aucune session gardée : rien d'un compte ne reste dans l'historique de l'appareil (onglet
+  // fermé sans se déconnecter, session en mémoire seulement).
+  if (!s) return oublierHistoriqueDuCompte();
   account.etat = "verrouille";
   try {
     await ouvrirSession({ jeton: s.jeton, h: s.h as Bytes, kCompte: s.kCompte as Bytes, sProfil: s.sProfil as Bytes, persistante: true, profil: { relire: s.genProfil }, prive: { relire: s.genPrive } });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currentTab, tabBarVisible, tabBarUseful, TABS } from "./tabbar";
+import { currentTab, tabBarVisible, tabBarUseful, tabPath, tabsFor, TABS } from "./tabbar";
 
 const base = { supported: true, sending: false, composing: false };
 
@@ -32,5 +32,22 @@ describe("barre d'onglets (téléphone)", () => {
     expect(currentTab("securite")).toBeNull();
     expect(currentTab("confidentialite")).toBeNull();
     expect(currentTab("notfound")).toBeNull();
+  });
+
+  // Conception compte §21.15.1 (plan, lot 12) : connecté, quatre onglets Accueil, Envoyer,
+  // Téléchargements, Profil ; sans compte, rien ne change (trois onglets).
+  it("connecté : quatre onglets (Accueil, Envoyer, Téléchargements, Profil), chemins et onglet courant ; sans compte inchangé", () => {
+    expect(tabsFor(true).map((t) => `${t.id}${t.soon ? "*" : ""}`)).toEqual(["home", "send", "downloads", "profile"]);
+    expect(tabsFor(false)).toBe(TABS);
+    expect(["home", "send", "downloads", "profile"].map((id) => tabPath(id as never, true))).toEqual(["/", "/envoyer", "/telechargements", "/compte/profil"]);
+    expect(["send", "shares", "downloads"].map((id) => tabPath(id as never, false))).toEqual(["/", "/envois", "/telechargements"]);
+    expect(currentTab("home", true)).toBe("home");
+    expect(currentTab("envoyer", true)).toBe("send");
+    expect(currentTab("profil", true)).toBe("profile");
+    expect(currentTab("compte", true)).toBe("profile");
+    expect(currentTab("envois", true)).toBeNull();
+    expect(currentTab("home")).toBe("send");
+    expect(tabBarVisible({ ...base, route: "profil", connected: true })).toBe(true);
+    expect(tabBarVisible({ ...base, route: "profil" })).toBe(false);
   });
 });

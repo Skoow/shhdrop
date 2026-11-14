@@ -17,6 +17,10 @@
 // l'étiquette du partage. Rouvrir le lien du message dans ce navigateur, même après avoir
 // fermé l'onglet, passe à l'état « reopen » (mot de passe ressaisi, aucune ouverture de plus).
 // Octroi gardé mais partage introuvable : « return_lost » (retour impossible, dit clairement).
+//
+// Partage reçu gardé (conception compte §21.7, lot 11) : case « Garder » (`keep`, cochée selon
+// le réglage) ; après une ouverture réussie, le lien et l'échéance sont remis par valeur à
+// `keepReceived` (historique de l'appareil, chiffré) ; jamais le mot de passe.
 import type { LinkState } from "../app/link";
 import { pageReturns, type Returns } from "../history/returns";
 import {
@@ -105,6 +109,12 @@ export type ReceiverDeps = {
   navType: () => string;
   /** Sortie de la page (pagehide) ; rend l'arrêt. */
   onHide: (f: () => void) => () => void;
+  /** Case « Garder » cochée au départ (réglage de l'appareil ou du compte). */
+  keepDefault: () => boolean;
+  /** Garde le partage ouvert (lien par valeur, échéance) ; jamais appelé avec le mot de passe. */
+  keepReceived: (r: { link: string; expiresAt: number }, o: Opened) => Promise<unknown>;
+  /** Oublie l'entrée reçue de ce lien (clé K_lien). */
+  forgetReceived: (key: string) => Promise<void>;
 };
 
 export type Receiver = {
@@ -125,6 +135,8 @@ export type Receiver = {
   readonly otherTab: boolean;
   /** Rechargement : l'écran dit « Rouvrir » (états reopen et unlocking qui en vient). */
   readonly reopening: boolean;
+  /** Case « Garder dans mon accueil » : lue au moment de l'ouverture réussie. */
+  keep: boolean;
   /** Activité (clic, touche, défilement, visibilité) : repousse l'effacement après 30 min. */
   touch(): void;
   continueHere(): void;
@@ -189,6 +201,9 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
       addEventListener("pagehide", f);
       return () => removeEventListener("pagehide", f);
     },
+    keepDefault: () => false,
+    keepReceived: async () => undefined,
+    forgetReceived: async () => undefined,
     ...deps,
   };
 
@@ -235,7 +250,10 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     app: null as string | null,
     otherTab: false,
     reopening: reloaded,
+    keep: d.keepDefault(),
   });
+  /** Clé du partage gardé dans l'historique (pour « Oublier ce partage sur cet appareil »). */
+  let keptKey: string | null = null;
   let opened = $state.raw<Opened | undefined>(undefined);
 
   /** L'ouverture gardée s'arrête ici : plus d'entrée d'onglet, de retour gardé ni de réponse. */
@@ -412,6 +430,12 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     get reopening() {
       return s.reopening;
     },
+    get keep() {
+      return s.keep;
+    },
+    set keep(v: boolean) {
+      s.keep = v;
+    },
     touch() {
       guard.touch();
     },
@@ -435,7 +459,9 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
     },
     async forgetHere() {
       if (s.state !== "open") return;
-      await drop();
+      const k = keptKey;
+      keptKey = null;
+      await Promise.all([drop(), k === null ? undefined : d.forgetReceived(k).catch(() => undefined)]);
     },
     dispose() {
       // Contenu déjà affiché : son entrée d'onglet et son retour gardé restent (spec §41.4,
@@ -480,6 +506,11 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
           if (tag !== null) await d.returns.forget(tag).catch(() => undefined);
           void o.done().catch(() => undefined);
           return;
+        }
+        if (s.keep) {
+          // Au mieux, sans attendre : un stockage plein ou refusé n'empêche pas d'afficher.
+          keptKey = keyOf(l);
+          void d.keepReceived({ link: l, expiresAt }, o).catch(() => undefined);
         }
         opened = o;
         s.state = "open";

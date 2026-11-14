@@ -145,11 +145,15 @@ describe("règles de sources", () => {
       expect(f.text, f.rel).toMatch(/__COMPTES__/);
     }
   });
-  it("historique : aucun secret de partage ni nom d'élément dans HistoryEntry", () => {
+  // Conception compte §21.7, §21.8 (plan, lot 11) : exception écrite, une entrée reçue ou de salon
+  // garde son lien (`link`, K_lien) ; un envoi jamais (cleanEntry, history/store.test.ts). Toujours
+  // aucun mot de passe, nom d'élément ni contenu : la liste des champs reste fermée.
+  it("historique : liste fermée des champs de HistoryEntry (lien seulement pour un reçu ou un salon), aucun mot de passe ni nom", () => {
     const store = files.find((f) => f.rel === "history/store.ts")!;
     const type = store.text.match(/export type HistoryEntry = \{([\s\S]*?)\n\};/)![1]!;
     const fields = [...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1]);
-    expect(fields).toEqual(["id", "manage", "createdAt", "sizeBytes", "itemsCount", "expiresAt", "maxOpens", "opensUsed", "opens", "state", "lastSeenAt", "endedAt", "destroyedHere"]);
+    expect(fields).toEqual(["id", "sorte", "origine", "manage", "link", "label", "format", "createdAt", "sizeBytes", "itemsCount", "expiresAt", "maxOpens", "opensUsed", "opens", "state", "lastSeenAt", "endedAt", "destroyedHere"]);
+    expect(type).not.toMatch(/password|motDePasse|mdp|name|nom|text|content|items\b/i);
   });
   // Spec §41.4 : exception écrite, l'octroi d'ouverture de l'onglet (session/open-grant.ts),
   // et plus tard le salon (chat/session.ts, §39.13.3). Nulle part ailleurs.

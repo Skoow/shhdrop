@@ -99,11 +99,12 @@ describe("historique chiffré (IndexedDB simulé)", () => {
 
   it("jamais de K_lien, de mot de passe ni de nom d'élément : les champs inconnus sont ignorés", async () => {
     const h = (await openHistory({ backend: memoryBackend(), now: () => T0 }))!;
-    const e = await h.add({ ...fresh(), link: "https://x/#" + "k".repeat(43), password: "secret", names: ["photo.jpg"] } as unknown as NewEntry);
+    const e = await h.add({ ...fresh(), password: "secret", names: ["photo.jpg"] } as unknown as NewEntry);
     const keys = Object.keys(e).sort();
     expect(keys).toEqual(
-      ["createdAt", "destroyedHere", "endedAt", "expiresAt", "id", "itemsCount", "lastSeenAt", "manage", "maxOpens", "opens", "opensUsed", "sizeBytes", "state"].sort(),
+      ["createdAt", "destroyedHere", "endedAt", "expiresAt", "format", "id", "itemsCount", "label", "lastSeenAt", "link", "manage", "maxOpens", "opens", "opensUsed", "origine", "sizeBytes", "sorte", "state"].sort(),
     );
+    expect(e).toMatchObject({ sorte: "envoi", origine: "local", link: "", label: "", format: "" });
     expect(JSON.stringify(await h.list())).not.toMatch(/photo\.jpg|secret|k{43}/);
   });
 
@@ -198,7 +199,12 @@ describe("historique chiffré (IndexedDB simulé)", () => {
 describe("état affiché et tri (UI §9.6.2)", () => {
   const base: HistoryEntry = {
     id: "a".repeat(22),
+    sorte: "envoi",
+    origine: "local",
     manage: MANAGE,
+    link: "",
+    label: "",
+    format: "",
     createdAt: T0,
     sizeBytes: 1,
     itemsCount: 1,
@@ -227,5 +233,95 @@ describe("état affiché et tri (UI §9.6.2)", () => {
       e("5", { state: "gone", endedAt: T0 + 20 }),
     ];
     expect(sortEntries(list, T0).map((x) => x.id[0])).toEqual(["3", "4", "1", "5", "2"]);
+  });
+});
+
+// Conception compte §21.7, §21.8 (plan, lot 11) : quatre sortes d'entrées (envoi, reçu, salon
+// créé, salon rejoint) et leur origine (cet appareil ou le compte). Exception écrite à §33 : un
+// partage reçu ou un salon garde son lien (K_lien), chiffré comme le reste ; jamais un mot de
+// passe, un nom d'élément ni un contenu ; un envoi ne garde jamais de lien de partage.
+describe("historique de l'appareil : quatre sortes (lot 11)", () => {
+  const LINK = "https://shhdrop.example/#" + "k".repeat(43);
+  const LINK2 = "https://shhdrop.example/#" + "q".repeat(43);
+  const ROOM = "https://shhdrop.example/#c" + "r".repeat(43);
+  const recu = (over: Partial<NewEntry> = {}): NewEntry => ({
+    sorte: "recu",
+    manage: "",
+    link: LINK,
+    format: "image",
+    createdAt: T0,
+    sizeBytes: 148_897_792,
+    itemsCount: 6,
+    expiresAt: T0 + 12 * 3600_000,
+    maxOpens: 0,
+    ...over,
+  });
+
+  it("migration : une entrée d'avant (sans sorte ni origine) se relit en envoi local, intacte", async () => {
+    const b = memoryBackend();
+    const h = (await openHistory({ backend: b, now: () => T0 }))!;
+    // Entrée écrite par la version précédente : même chiffrement, champs d'alors seulement.
+    const key = await b.key(undefined as unknown as CryptoKey);
+    const id = "O".repeat(22);
+    const old = { manage: MANAGE, createdAt: T0, sizeBytes: 5, itemsCount: 1, expiresAt: T0 + 3600_000, maxOpens: 2, opensUsed: 1, opens: [], state: "ready", lastSeenAt: T0, endedAt: 0, destroyedHere: false };
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode("shhdrop/history/v1/" + id) }, key, new TextEncoder().encode(JSON.stringify(old))));
+    await b.put(id, { iv, ct });
+    expect(await h.list()).toEqual([{ id, sorte: "envoi", origine: "local", link: "", label: "", format: "", ...old }]);
+  });
+
+  it("partage reçu : lien gardé (chiffré au repos), aucun mot de passe, nom ni contenu ; origine locale", async () => {
+    const b = memoryBackend();
+    const h = (await openHistory({ backend: b, now: () => T0 }))!;
+    const e = await h.add({ ...recu(), password: "secret-mdp", names: ["photo.jpg"], items: [{ name: "photo.jpg" }], text: "contenu" } as unknown as NewEntry);
+    expect(e).toMatchObject({ sorte: "recu", origine: "local", manage: "", link: LINK, format: "image", itemsCount: 6 });
+    expect(JSON.stringify(await h.list())).not.toMatch(/secret-mdp|photo\.jpg|contenu|password|names|items"/);
+    const raw = dump(b.raw());
+    expect(raw).not.toContain("k".repeat(43));
+    expect(raw).not.toContain("secret-mdp");
+  });
+
+  it("K_lien accepté seulement pour un reçu ou un salon ; jamais pour un envoi", async () => {
+    const h = (await openHistory({ backend: memoryBackend(), now: () => T0 }))!;
+    // Envoi : lien de gestion seulement ; un lien de partage à côté est refusé.
+    await expect(h.add(fresh({ link: LINK }))).rejects.toThrow();
+    // Reçu : lien de partage exigé, ni lien de gestion ni lien de salon.
+    await expect(h.add(recu({ link: "" }))).rejects.toThrow();
+    await expect(h.add(recu({ manage: MANAGE }))).rejects.toThrow();
+    await expect(h.add(recu({ link: ROOM }))).rejects.toThrow();
+    await expect(h.add(recu({ link: MANAGE }))).rejects.toThrow();
+    await expect(h.add(recu({ format: "<script>" }))).rejects.toThrow();
+    // Salons : lien d'invitation « #c », libellé local court.
+    const s = await h.add({ sorte: "salon_rejoint", manage: "", link: ROOM, label: "Équipe", createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 3600_000, maxOpens: 0 });
+    expect(s).toMatchObject({ sorte: "salon_rejoint", link: ROOM, label: "Équipe" });
+    await expect(h.add({ sorte: "salon_cree", manage: "", link: LINK2, createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
+    await expect(h.add({ sorte: "salon_cree", manage: "", link: ROOM.replace("r", "s"), label: "x".repeat(65), createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
+    await expect(h.add({ ...fresh(), sorte: "autre" } as unknown as NewEntry)).rejects.toThrow();
+  });
+
+  it("le même lien reçu n'est gardé qu'une fois ; un autre lien fait une autre entrée", async () => {
+    const h = (await openHistory({ backend: memoryBackend(), now: () => T0 }))!;
+    const a = await h.add(recu());
+    expect((await h.add(recu())).id).toBe(a.id);
+    await h.add(recu({ link: LINK2 }));
+    expect(await h.list()).toHaveLength(2);
+  });
+
+  it("put : entrée venue du compte, avec son identifiant ; refusée si mal formée ; un même lien déjà là reste", async () => {
+    const h = (await openHistory({ backend: memoryBackend(), now: () => T0 }))!;
+    const local = await h.add(recu());
+    const vue = { ...local, id: "C".repeat(22), origine: "compte" as const };
+    expect(await h.put(vue)).toBe(false); // même lien : l'entrée de l'appareil reste
+    const autre = { ...vue, link: LINK2 };
+    expect(await h.put(autre)).toBe(true);
+    expect((await h.get("C".repeat(22)))?.origine).toBe("compte");
+    await expect(h.put({ ...autre, id: "D".repeat(22), link: "x" })).rejects.toThrow();
+  });
+
+  it("update ne change ni la sorte, ni l'origine, ni les liens", async () => {
+    const h = (await openHistory({ backend: memoryBackend(), now: () => T0 }))!;
+    const e = await h.add(recu());
+    const u = await h.update(e.id, { sorte: "envoi", origine: "compte", link: LINK2, manage: MANAGE, state: "gone" } as never);
+    expect(u).toMatchObject({ sorte: "recu", origine: "local", link: LINK, manage: "", state: "gone" });
   });
 });

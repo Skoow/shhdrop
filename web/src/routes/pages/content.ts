@@ -136,6 +136,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Le contenu déchiffré reste en mémoire et n'est jamais écrit dans le stockage du navigateur.",
           "Le lien et un jeton d'ouverture restent dans le stockage de l'onglet le temps de l'ouverture, pour qu'un rechargement ne coûte pas une ouverture.",
           "Vos préférences (langue) restent sur votre appareil.",
+          "Si vous cochez « Garder ce partage », le lien reçu (avec sa clé), sa taille et son échéance sont gardés chiffrés sur cet appareil, jamais le mot de passe. Ils s'effacent 7 jours après l'échéance, ou quand vous les retirez.",
         ],
       },
       {
@@ -307,6 +308,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Decrypted content stays in memory and is never written to browser storage.",
           "The link and an open token stay in the tab's storage while the share is open, so a reload doesn't cost an open.",
           "Your preferences (language) stay on your device.",
+          "If you tick “Keep this share”, the received link (with its key), its size and its expiry are kept encrypted on this device, never the password. They are erased 7 days after expiry, or when you remove them.",
         ],
       },
       {

@@ -143,3 +143,20 @@ describe("TopNav", () => {
     expect(btn("Security")).toBeDefined();
   });
 });
+
+// Conception compte §21.15.1 (plan, lot 12) : connecté, « Mes partages » devient « Accueil » ;
+// sans compte, rien ne change.
+describe("TopNav connecté", () => {
+  it("« Accueil » (vers /) à la place de « Mes partages » tant qu'un compte est ouvert", async () => {
+    const { setAccountPrefs } = await import("../history/live.svelte");
+    const links = () => [...document.querySelectorAll<HTMLAnchorElement>(".acts a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
+    show();
+    expect(links()[0]).toEqual(["Mes partages", "/envois"]);
+    setAccountPrefs({ keepReceived: true });
+    flushSync();
+    expect(links()[0]).toEqual(["Accueil", "/"]);
+    setAccountPrefs(null);
+    flushSync();
+    expect(links()[0]).toEqual(["Mes partages", "/envois"]);
+  });
+});
