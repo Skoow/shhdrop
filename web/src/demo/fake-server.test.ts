@@ -120,7 +120,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const o = await openShare(r.link, PW, ORIGIN, undefined, net);
     expect(await shareStatus(r.manage, ORIGIN, net)).toMatchObject({ opensUsed: 1, maxOpens: 1, state: "draining" });
     await expect(openShare(r.link, PW, ORIGIN, undefined, net)).rejects.toBeInstanceOf(NotFoundError);
-    await o.destroy("report");
+    await o.destroy(10);
     expect(fake.shares()).toBe(0);
     await o.done();
     expect(statuses).toContain("POST /api/shares/destroy 204");
@@ -281,19 +281,25 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const { net, statuses } = setup({ rateBytesPerS: 1e9 });
     const r = await share(net, 2, [bigFile()]);
     const a = await openShare(r.link, PW, ORIGIN, undefined, net);
-    await a.destroy("report");
+    await a.destroy(1);
     await expect(a.item(0)).rejects.toThrow();
     expect(statuses, statuses.join("\n")).toContain("GET /api/shares/segments/0 410");
     const fake2 = createFakeServer();
-    for (const reason of ["ReperRaison", "", "REPORT", null]) {
+    // Catégorie (conception compte §21.10.2) : entier 1 à 10, seulement avec "report" (comme le serveur).
+    const bad: Record<string, unknown>[] = [
+      ...["ReperRaison", "", "REPORT", null].map((reason) => ({ reason })),
+      ...[0, 11, 1.5, "3", null].map((categorie) => ({ reason: "report", categorie })),
+      { categorie: 3 },
+    ];
+    for (const extra of bad) {
       const res = await fake2.handle(
         new Request(`${ORIGIN}/api/shares/destroy`, {
           method: "POST",
           headers: { "X-Shh-Access": b64u(new Uint8Array(32)) },
-          body: JSON.stringify({ proof: b64u(new Uint8Array(32)), reason }),
+          body: JSON.stringify({ proof: b64u(new Uint8Array(32)), ...extra }),
         }),
       );
-      expect([res.status, await res.text()]).toEqual([400, '{"error":"bad_request"}']);
+      expect([res.status, await res.text()], JSON.stringify(extra)).toEqual([400, '{"error":"bad_request"}']);
     }
   });
 

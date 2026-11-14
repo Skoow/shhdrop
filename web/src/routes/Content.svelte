@@ -21,7 +21,7 @@
   import { getLang, t, type Key } from "../i18n/i18n.svelte";
   import { setProgressTitle } from "../app/title";
   import type { ItemSink } from "../flows/downloads.svelte";
-  import type { Opened } from "../index";
+  import type { Categorie, Opened } from "../index";
   import { announce } from "../ui/announce";
   import Button from "../ui/Button.svelte";
   import { copyText } from "../ui/clipboard";
@@ -336,16 +336,18 @@
   }
 
   let destroyError = $state("");
-  async function destroy(report: boolean): Promise<string | null> {
+  /** Détruire (report null) ou Signaler avec sa catégorie (conception compte §21.10.2). */
+  async function destroy(report: Categorie | null): Promise<string | null> {
     if (ended !== null || wiped) return null;
     destroyError = "";
     let dissolving: Promise<void> = Promise.resolve();
     const out = await destroyFromContent(o, report, { onDestroyed: () => (dissolving = dissolve()) });
     if (out === "network" || out === "limit") {
       const msg = t(out === "limit" ? "content.destroy.limit" : "content.destroy.net");
-      if (!report) destroyError = msg;
+      if (report === null) destroyError = msg;
       return msg;
     }
+    if (report !== null) announce(t("report.done"));
     wiped = true;
     reportOpen = false;
     viewAt = null;
@@ -518,7 +520,7 @@
           confirmLabel={t("content.destroy.yes")}
           kind="danger"
           triggerVariant="ghost"
-          onconfirm={async () => void (await destroy(false))}
+          onconfirm={async () => void (await destroy(null))}
         >
           {#snippet icon()}<Trash2 size={18} />{/snippet}
         </InlineConfirm>
@@ -536,7 +538,7 @@
   {/if}
 </div>
 <ViewerPanel items={viewItems} bind:at={viewAt} {viewOnly} load={loadPreview} held={dl.readerHeld} ondownload={(i) => saveOne(i)} onclose={() => undefined} />
-<ReportSheet bind:open={reportOpen} onconfirm={() => destroy(true)} />
+<ReportSheet bind:open={reportOpen} sorte="partage" onconfirm={(c) => destroy(c)} />
 
 <style>
   .content {

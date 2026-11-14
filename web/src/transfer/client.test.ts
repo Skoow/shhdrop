@@ -755,11 +755,12 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
     const net = { fetch: f, retryDelayMs: 1 };
     const o = await openShare(LINK, PW, ORIGIN, undefined, net);
     await expect(fetchMeta(LINK, ORIGIN, net)).rejects.toBeInstanceOf(NotFoundError);
-    await o.destroy("report");
+    await o.destroy(9);
     expect(bodies).toHaveLength(1);
     const b = JSON.parse(bodies[0]!) as Record<string, unknown>;
-    expect(Object.keys(b).sort()).toEqual(["proof", "reason"]);
+    expect(Object.keys(b)).toEqual(["proof", "reason", "categorie"]);
     expect(b.reason).toBe("report");
+    expect(b.categorie).toBe(9);
     expect(typeof b.proof).toBe("string");
     expect(headers[0]).toMatch(/^[A-Za-z0-9_-]{43}$/);
     await o.destroy();

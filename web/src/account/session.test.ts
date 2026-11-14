@@ -23,6 +23,9 @@ function fauxServeur() {
   const comptes = new Map<string, Compte>(); // e-mail exact → compte
   const etapes = new Map<string, { email: string; h: Uint8Array; sorte: "inscription" | "oubli" | "totp"; verifie?: boolean }>();
   const sessions = new Map<string, string>(); // jeton → e-mail
+  const recentes = new Set<string>(); // sessions « récentes » (connexion ou reauth de moins de 5 min)
+  const nomDe = new Map<string, string>(); // jeton → étiquette (nom d'appareil chiffré)
+  const sid = new Map<string, string>(); // jeton → identifiant montré dans la liste
   const pseudos = new Set<string>();
   const requetes: { method: string; path: string; headers: Record<string, string>; body: Record<string, unknown> }[] = [];
   const etiquettes: string[] = [];
@@ -32,6 +35,8 @@ function fauxServeur() {
   const ouvrirSession = (email: string) => {
     const t = b64u(rnd(32));
     sessions.set(t, email);
+    recentes.add(t);
+    sid.set(t, b64u(rnd(16)));
     return t;
   };
   const ouverture = (email: string) => {
@@ -60,7 +65,9 @@ function fauxServeur() {
         if (body.etiquette) etiquettes.push(body.etiquette as string);
         comptes.set(e.email, { h: e.h, aAuth: body.a_auth as string, envMdp: unb64u(body.env_mdp as string), sProfil: unb64u(body.s_profil as string), pCanon: body.p_canon as string, coffres: { profil: { blob: unb64u(body.blob_profil as string), gen: 1 }, prive: { blob: unb64u(body.blob_prive as string), gen: 1 } }, totp: false });
         etapes.delete(body.etape as string);
-        return ok({ session: ouvrirSession(e.email) }, 201);
+        const t = ouvrirSession(e.email);
+        if (body.etiquette) nomDe.set(t, body.etiquette as string);
+        return ok({ session: t }, 201);
       }
       case "POST connexion": {
         const c = comptes.get(body.email as string);
@@ -136,7 +143,91 @@ function fauxServeur() {
       case "POST sessions/etiquette":
         if (!qui) return err(401, "session");
         etiquettes.push(body.etiquette as string);
+        nomDe.set(headers["X-Shh-Session"]!, body.etiquette as string);
         return ok({});
+      // Lot 13 : paramètres (mêmes formes que handlers_compte.go, lot 5).
+      case "POST reauth": {
+        if (!qui) return err(401, "session");
+        const c = comptes.get(qui)!;
+        if (c.aAuth !== body.a_auth) return err(403, "identifiants");
+        if (c.totp && body.totp === "") return err(403, "totp_requis");
+        if (c.totp && body.totp !== "654321") return err(403, "totp_faux");
+        recentes.add(headers["X-Shh-Session"]!);
+        return ok({});
+      }
+      case "POST mdp": {
+        if (!qui) return err(401, "session");
+        if (!recentes.has(headers["X-Shh-Session"]!)) return err(403, "recent");
+        const c = comptes.get(qui)!;
+        c.aAuth = body.a_auth as string;
+        c.envMdp = unb64u(body.env_mdp as string);
+        for (const [t, m] of sessions) if (m === qui && t !== headers["X-Shh-Session"]) sessions.delete(t);
+        return ok({});
+      }
+      case "POST email/debut": {
+        if (!qui) return err(401, "session");
+        if (!recentes.has(headers["X-Shh-Session"]!)) return err(403, "recent");
+        if (body.email_actuel !== qui) return err(403, "identifiants");
+        const e = b64u(rnd(32));
+        etapes.set(e, { email: body.email_nouveau as string, h: comptes.get(qui)!.h, sorte: "inscription" });
+        return ok({ etape: e });
+      }
+      case "POST email/renvoyer":
+        return qui ? ok({}) : err(401, "session");
+      case "POST email/fin": {
+        if (!qui) return err(401, "session");
+        if (!recentes.has(headers["X-Shh-Session"]!)) return err(403, "recent");
+        const e = etapes.get(body.etape as string);
+        if (!e) return err(404, "not_found");
+        if (body.code !== CODE) return err(403, "code_faux", { attempts_left: 4 });
+        const c = comptes.get(qui)!;
+        c.aAuth = body.a_auth as string;
+        c.envMdp = unb64u(body.env_mdp as string);
+        comptes.delete(qui);
+        comptes.set(e.email, c);
+        for (const [t, m] of sessions) if (m === qui) sessions.set(t, e.email);
+        etapes.delete(body.etape as string);
+        return ok({});
+      }
+      case "POST totp/debut":
+        if (!qui) return err(401, "session");
+        if (!recentes.has(headers["X-Shh-Session"]!)) return err(403, "recent");
+        etapes.set("totp-activation", { email: qui, h: comptes.get(qui)!.h, sorte: "totp" });
+        return ok({ etape: b64u(rnd(32)), secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" });
+      case "POST totp/fin":
+        if (!qui) return err(401, "session");
+        if (body.code !== "654321") return err(403, "totp_faux");
+        comptes.get(qui)!.totp = true;
+        return ok({});
+      case "POST totp/retirer":
+        if (!qui) return err(401, "session");
+        if (!recentes.has(headers["X-Shh-Session"]!)) return err(403, "recent");
+        comptes.get(qui)!.totp = false;
+        return ok({});
+      case "POST totp/annuler-retrait":
+        return qui ? ok({}) : err(401, "session");
+      case "GET sessions": {
+        if (!qui) return err(401, "session");
+        const out = [...sessions].filter(([, m]) => m === qui).map(([t]) => ({ sid: sid.get(t)!, ajoutee: "2026-11", etiquette: nomDe.get(t) ?? "", courante: t === headers["X-Shh-Session"], persistante: false }));
+        return ok({ sessions: out });
+      }
+      case "POST sessions/fermer": {
+        if (!qui) return err(401, "session");
+        for (const [t, m] of sessions) if (m === qui && (body.autres === true ? t !== headers["X-Shh-Session"] : sid.get(t) === body.sid)) sessions.delete(t);
+        return ok({});
+      }
+      case "GET export":
+        if (!qui) return err(401, "session");
+        return ok({ cree_le: "2026-11-14", anciennete_depuis: "2026-11-14", vu_mois: "2026-11", totp: comptes.get(qui)!.totp, retrait_totp_le: null, recup_jusqu: null, banni_jusqu: null, banni_motif: null, salons_actifs: 1, sessions: [{ ajoutee: "2026-11", persistante: false }] });
+      case "POST supprimer": {
+        if (!qui) return err(401, "session");
+        if (!recentes.has(headers["X-Shh-Session"]!)) return err(403, "recent");
+        const c = comptes.get(qui)!;
+        pseudos.delete(c.pCanon);
+        comptes.delete(qui);
+        for (const [t, m] of sessions) if (m === qui) sessions.delete(t);
+        return ok({ salons_fermes: 2 });
+      }
       case "POST deconnexion":
         if (!qui) return err(401, "session");
         sessions.delete(headers["X-Shh-Session"]!);
@@ -144,7 +235,7 @@ function fauxServeur() {
     }
     return err(404, "not_found");
   }) as unknown as typeof globalThis.fetch;
-  return { comptes, sessions, requetes, etiquettes, fetch };
+  return { comptes, sessions, recentes, requetes, etiquettes, fetch };
 }
 
 let srv: ReturnType<typeof fauxServeur>;
@@ -466,5 +557,181 @@ describe("session et déconnexion", () => {
       expect(r.path).toMatch(/^\/api\/compte(\/|$)/);
       expect(JSON.stringify(r.body)).not.toMatch(/session/);
     }
+  });
+});
+
+// Plan du compte, lot 13 : paramètres. Le mot de passe ne quitte jamais l'appareil (seul A_auth
+// part) ; l'adresse n'est connue de la page que si elle a été tapée ici (jamais stockée).
+describe("paramètres (lot 13)", () => {
+  const sansMdp = (...mdps: string[]) => {
+    const tout = JSON.stringify(srv.requetes);
+    for (const m of mdps) {
+      expect(tout).not.toContain(m);
+      expect(tout).not.toContain(b64u(new TextEncoder().encode(m)));
+    }
+  };
+
+  it("confirmerIdentite : A_auth de l'adresse connue ; après un rechargement l'adresse est redemandée, sans requête", async () => {
+    await inscription(undefined, true);
+    expect(C.adresseConnue()).toBe(true);
+    await C.confirmerIdentite(MDP, "");
+    const r = srv.requetes.at(-1)!;
+    expect([r.path, Object.keys(r.body)]).toEqual(["/api/compte/reauth", ["a_auth", "totp"]]);
+    expect(r.body.a_auth).toBe(srv.comptes.get("lea.dupont@exemple.fr")!.aAuth);
+    await expect(C.confirmerIdentite("mauvais mot de passe", "")).rejects.toMatchObject({ code: "identifiants" });
+    // « Rester connecté » puis rechargement : la page ne connaît plus l'adresse.
+    C._oublierMemoire();
+    await C.restaurer();
+    expect(C.account.etat).toBe("ouvert");
+    expect(C.adresseConnue()).toBe(false);
+    const n = srv.requetes.length;
+    await expect(C.confirmerIdentite(MDP, "")).rejects.toThrow("adresse_requise");
+    expect(srv.requetes.length).toBe(n);
+    await C.confirmerIdentite(MDP, "", "Lea.Dupont@exemple.fr");
+    expect(C.adresseConnue()).toBe(true);
+    sansMdp(MDP);
+  });
+
+  it("changerMotDePasse : nouvelle enveloppe de K_compte, les autres appareils déconnectés ; refus local avant requête", async () => {
+    await inscription();
+    const autre = [...srv.sessions.keys()][0]!;
+    C._oublierMemoire();
+    await C.seConnecter("lea.dupont@exemple.fr", MDP, false);
+    expect(srv.sessions.has(autre)).toBe(true);
+    const n = srv.requetes.length;
+    await expect(C.changerMotDePasse("court")).rejects.toThrow("mdp_court");
+    await expect(C.changerMotDePasse("lea.dupont@exemple.fr")).rejects.toThrow("mdp_adresse");
+    expect(srv.requetes.length).toBe(n);
+    await C.changerMotDePasse("nouveau mot de passe");
+    expect(srv.sessions.has(autre)).toBe(false); // le serveur ferme toujours les autres sessions
+    expect(C.account.etat).toBe("ouvert");
+    const c = srv.comptes.get("lea.dupont@exemple.fr")!;
+    const { aAuth, kekMdp } = await deriverCompte("nouveau mot de passe", "lea.dupont@exemple.fr");
+    expect(c.aAuth).toBe(b64u(aAuth));
+    expect((await ouvrirEnveloppe(kekMdp, c.h, c.envMdp)).length).toBe(32);
+    C._oublierMemoire();
+    await expect(C.seConnecter("lea.dupont@exemple.fr", MDP, false)).rejects.toMatchObject({ code: "identifiants" });
+    await C.seConnecter("lea.dupont@exemple.fr", "nouveau mot de passe", false);
+    expect(C.account.profil?.pseudo).toBe("Léa");
+    sansMdp(MDP, "nouveau mot de passe");
+  });
+
+  it("session plus récente : « recent » passe à l'écran (qui redemande le mot de passe)", async () => {
+    await inscription();
+    srv.recentes.clear();
+    await expect(C.changerMotDePasse("nouveau mot de passe")).rejects.toMatchObject({ code: "recent" });
+    await C.confirmerIdentite(MDP, "");
+    await C.changerMotDePasse("nouveau mot de passe");
+  });
+
+  it("changement d'adresse : adresses exactes, A_auth et enveloppe refaits avec le sel de la nouvelle ; connexion par la nouvelle", async () => {
+    await inscription();
+    await C.confirmerIdentite(MDP, "", "lea.dupont@exemple.fr");
+    await C.changementAdresse.debut("Lea.Nouvelle+x@Exemple.fr", "fr");
+    const d = srv.requetes.at(-1)!;
+    expect(d.body).toEqual({ email_actuel: "lea.dupont@exemple.fr", email_nouveau: "lea.nouvelle+x@exemple.fr", langue: "fr" });
+    await C.renvoyerCode();
+    expect(srv.requetes.at(-1)!.body).toMatchObject({ email: "lea.nouvelle+x@exemple.fr" });
+    await expect(C.changementAdresse.fin("000000", MDP, "")).rejects.toMatchObject({ code: "code_faux" });
+    await C.changementAdresse.fin(CODE, MDP, "");
+    const f = srv.requetes.at(-1)!;
+    expect(Object.keys(f.body)).toEqual(["etape", "code", "a_auth", "env_mdp", "totp"]);
+    const { aAuth } = await deriverCompte(MDP, "lea.nouvelle@exemple.fr"); // sel : adresse canonique
+    expect(f.body.a_auth).toBe(b64u(aAuth));
+    C._oublierMemoire();
+    await C.seConnecter("lea.nouvelle+x@exemple.fr", MDP, false);
+    expect(C.account.etat).toBe("ouvert");
+    sansMdp(MDP);
+  });
+
+  it("double authentification : lien d'ajout sans adresse ni pseudo ; activation par le premier code ; retrait", async () => {
+    await inscription();
+    const r = await C.totpCommencer();
+    expect(r.secret).toBe("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP");
+    expect(r.lien).toBe("otpauth://totp/Shhgone?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Shhgone&algorithm=SHA1&digits=6&period=30");
+    await expect(C.totpActiver("000000")).rejects.toMatchObject({ code: "totp_faux" });
+    await C.totpActiver("654321");
+    expect(srv.comptes.get("lea.dupont@exemple.fr")!.totp).toBe(true);
+    expect(srv.requetes.at(-1)!.body).toEqual({ etape: expect.any(String), code: "654321" });
+    await expect(C.confirmerIdentite(MDP, "")).rejects.toMatchObject({ code: "totp_requis" });
+    await C.confirmerIdentite(MDP, "654321");
+    await C.totpRetirer();
+    expect(srv.comptes.get("lea.dupont@exemple.fr")!.totp).toBe(false);
+    await C.totpAnnulerRetrait();
+    expect(srv.requetes.at(-1)!.path).toBe("/api/compte/totp/annuler-retrait");
+  });
+
+  it("appareils : noms déchiffrés sur l'appareil, « cet appareil » ; déconnecter un appareil ou tous les autres", async () => {
+    await inscription();
+    C._oublierMemoire();
+    await C.seConnecter("lea.dupont@exemple.fr", MDP, false);
+    const l = await C.appareils();
+    expect(l).toHaveLength(2);
+    expect(l.map((a) => a.nom)).toEqual(["Firefox · ordinateur", "Firefox · ordinateur"]);
+    expect(l.filter((a) => a.courante)).toHaveLength(1);
+    const autre = l.find((a) => !a.courante)!;
+    await C.deconnecterAppareil(autre.sid);
+    expect(srv.requetes.at(-1)!.body).toEqual({ sid: autre.sid });
+    expect(await C.appareils()).toHaveLength(1);
+    await C.deconnecterAutres();
+    expect(srv.requetes.at(-1)!.body).toEqual({ autres: true });
+  });
+
+  it("export : données du serveur, profil et listes, sans adresse, sans jeton ni secret de lien", async () => {
+    await inscription(undefined, false, profil({ photo: new Uint8Array([1, 2, 3]) }));
+    const gestion = "https://shh.test/#m" + "G".repeat(43);
+    const lien = "https://shh.test/#" + "L".repeat(43);
+    await C.ecrirePrive((p) => ({ ...p, envois: [{ id: "e1", cree: 1, expire: 2, gestion, taille: 10, elements: 1, ouvertures_max: 1 }], recus: [{ id: "r1", cree: 1, expire: 2, lien, taille: 5, elements: 1, format: "pdf" }] }), { differe: false });
+    const texte = await C.exporterDonnees();
+    const j = JSON.parse(texte);
+    expect(j.serveur).toMatchObject({ cree_le: "2026-11-14", anciennete_depuis: "2026-11-14", salons_actifs: 1 });
+    expect(j.profil).toMatchObject({ pseudo: "Léa", photo: b64u(new Uint8Array([1, 2, 3])), langue: "fr" });
+    expect(j.listes.envois).toEqual([{ cree: 1, expire: 2, taille: 10, elements: 1, ouvertures_max: 1 }]);
+    expect(j.listes.recus).toEqual([{ cree: 1, expire: 2, taille: 5, elements: 1, format: "pdf" }]);
+    for (const x of ["lea.dupont", "exemple.fr", "G".repeat(43), "L".repeat(43), "#m", ...srv.sessions.keys()]) expect(texte).not.toContain(x);
+  });
+
+  it("réglages de confidentialité écrits dans le coffre de profil ; « Garder les liens » suit sur l'appareil", async () => {
+    const regler = vi.fn();
+    C.configurerCompte({ historique: { lister: async () => [], importer: async () => undefined, retirer: async () => undefined, retirerCompte: async () => undefined, ecouter: () => () => undefined, regler } });
+    await inscription();
+    await C.ecrireProfil({ reglages: { ...REGLAGES_DEFAUT, garderRecus: false } });
+    expect(regler).toHaveBeenLastCalledWith({ keepReceived: false });
+    const c = srv.comptes.get("lea.dupont@exemple.fr")!;
+    const k = await clesDuCompte(await ouvrirEnveloppe((await deriverCompte(MDP, "lea.dupont@exemple.fr")).kekMdp, c.h, c.envMdp), c.sProfil);
+    expect(profilDeJson(await ouvrir("profil", k.profil, c.h, c.coffres.profil.blob, c.coffres.profil.gen)).reglages.garderRecus).toBe(false);
+  });
+
+  it("suppression : après confirmation d'identité, le serveur efface le compte ; l'appareil l'oublie, l'écran de fin reste (account.supprime)", async () => {
+    const effacerAppareil = vi.fn(async () => undefined);
+    const detruirePartage = vi.fn(async () => undefined);
+    C.configurerCompte({ effacerAppareil, detruirePartage });
+    await inscription(undefined, true);
+    const gestion = "https://shh.test/#m" + "G".repeat(42) + "A";
+    await C.ecrirePrive((p) => ({ ...p, envois: [{ id: "e1", cree: 1, expire: Date.now() + 60_000, gestion, taille: 1, elements: 1, ouvertures_max: 1 }] }), { differe: false });
+    expect(await C.partagesASupprimer()).toBe(1);
+    await C.confirmerIdentite(MDP, "");
+    const etapes: string[] = [];
+    for await (const p of C.supprimerTout({ effacerAppareil: true })) etapes.push(p.etape);
+    expect(etapes).toEqual(["partages", "partages", "compte", "fini"]);
+    expect(detruirePartage).toHaveBeenCalledWith(gestion);
+    expect(effacerAppareil).toHaveBeenCalled();
+    expect(srv.comptes.size).toBe(0);
+    expect(C.account.etat).toBe("absent");
+    expect(C.account.supprime).toBe(true);
+    expect([...idb.raw().keys()]).toEqual([]);
+    sansMdp(MDP);
+  });
+
+  it("« Rester connecté » coupé sur cet appareil : la copie gardée est effacée, la session reste ouverte", async () => {
+    await inscription(undefined, true);
+    expect(C.account.persistante).toBe(true);
+    expect([...idb.raw().keys()].length).toBeGreaterThan(0);
+    await C.arreterResterConnecte();
+    expect(C.account.persistante).toBe(false);
+    expect([...idb.raw().keys()]).toEqual([]);
+    expect(C.account.etat).toBe("ouvert");
+    await C.ecrireProfil({ langue: "en" }); // aucune nouvelle copie gardée
+    expect([...idb.raw().keys()]).toEqual([]);
   });
 });

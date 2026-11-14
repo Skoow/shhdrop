@@ -94,7 +94,7 @@ test("maxOpens = 1 (draining) : Détruire fonctionne quand même", async ({ page
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });
 
-test("Signaler : feuille sans motif, corps fixe { proof, reason: \"report\" }, détruit ; capture", async ({ page, shh, browser }) => {
+test("Signaler : dix catégories, « Autre » par défaut, corps { proof, reason: \"report\", categorie }, détruit ; capture", async ({ page, shh, browser }) => {
   test.setTimeout(150_000);
   const sent = await opened(browser, shh.origin, 3);
   await page.goto(sent.link);
@@ -109,16 +109,21 @@ test("Signaler : feuille sans motif, corps fixe { proof, reason: \"report\" }, d
   await page.locator("footer[data-foot]").getByRole("button", { name: "Signaler ce partage" }).click();
   const sheet = page.getByRole("dialog", { name: "Signaler ce contenu" });
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByText(/PHAROS/)).toBeVisible();
-  expect(await sheet.locator("input, textarea, select, [role=radio]").count()).toBe(0);
+  // Lot 14 du compte : dix catégories en boutons radio, aucun champ libre ; « Autre » choisi d'avance.
+  expect(await sheet.getByRole("radio").count()).toBe(10);
+  expect(await sheet.locator("textarea, select, input:not([type=radio])").count()).toBe(0);
+  await expect(sheet.getByRole("radio", { name: /^Autre/ })).toBeChecked();
   await settle(page);
   expect(await axe(page)).toEqual([]);
   await capture(page, "report-sheet");
+  await sheet.getByRole("radio", { name: /^Arnaque/ }).check();
+  await sheet.getByRole("button", { name: "Continuer" }).click();
+  await expect(sheet.getByText(/PHAROS/)).toBeVisible();
   await sheet.getByRole("button", { name: "Signaler et détruire" }).click();
   await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
   expect(bodies).toHaveLength(1);
-  expect(Object.keys(JSON.parse(bodies[0]!)).sort()).toEqual(["proof", "reason"]);
-  expect(JSON.parse(bodies[0]!).reason).toBe("report");
+  expect(Object.keys(JSON.parse(bodies[0]!))).toEqual(["proof", "reason", "categorie"]);
+  expect(JSON.parse(bodies[0]!)).toMatchObject({ reason: "report", categorie: 8 });
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });
 

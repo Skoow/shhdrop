@@ -9,8 +9,16 @@
   import Button from "./Button.svelte";
   import { Camera } from "./Icon";
 
-  type Props = { photo?: Uint8Array | null; initiale?: string };
-  let { photo = $bindable(null), initiale = "" }: Props = $props();
+  type Props = {
+    photo?: Uint8Array | null;
+    initiale?: string;
+    /** Profil (§21.15.3) : avatar de 96 px centré, au lieu de 64 px en ligne. */
+    grand?: boolean;
+    /** Après chaque changement (ajout, retrait) ; l'écran range les octets dans le coffre de profil. */
+    onchange?: (p: Uint8Array | null) => void | Promise<void>;
+  };
+  let { photo = $bindable(null), initiale = "", grand = false, onchange }: Props = $props();
+  const px = $derived(grand ? 96 : 64);
   const uid = $props.id();
   let input: HTMLInputElement | undefined = $state();
   let erreur = $state("");
@@ -33,22 +41,24 @@
       photo = await reencoder(f);
       erreur = "";
       announce(t("account.photo.added"));
+      await onchange?.(photo);
     } catch {
       erreur = t("account.photo.err");
     }
   }
-  function retirer() {
+  async function retirer() {
     photo = null;
     erreur = "";
     announce(t("account.photo.removed"));
+    await onchange?.(null);
   }
 </script>
 
-<div class="av" role="group" aria-labelledby="{uid}-l" aria-describedby="{uid}-h{erreur ? ` ${uid}-e` : ''}">
+<div class={["av", { grand }]} style:--px="{px}px" role="group" aria-labelledby="{uid}-l" aria-describedby="{uid}-h{erreur ? ` ${uid}-e` : ''}">
   <p id="{uid}-l" class="l">{t("account.photo")} <span class="opt">· {t("account.photo.optional")}</span></p>
   <div class="ligne">
     <span class="rond" aria-hidden={url ? undefined : "true"}>
-      {#if url}<img src={url} alt={t("account.photo.preview")} width="64" height="64" />{:else}<span class="ini">{initiale.slice(0, 1).toUpperCase()}</span>{/if}
+      {#if url}<img src={url} alt={t("account.photo.preview")} width={px} height={px} />{:else}<span class="ini">{initiale.slice(0, 1).toUpperCase()}</span>{/if}
     </span>
     <div class="btns">
       <Button variant="secondary" dense onpress={() => input?.click()}>
@@ -90,8 +100,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
+    width: var(--px);
+    height: var(--px);
     border-radius: 50%;
     overflow: hidden;
     background: var(--surface-3);
@@ -106,6 +116,18 @@
     font-size: 1.5rem;
     font-weight: 600;
     color: var(--text-2);
+  }
+  .grand .ligne {
+    flex-direction: column;
+    justify-content: center;
+  }
+  .grand .l,
+  .grand .hint,
+  .grand .err {
+    text-align: center;
+  }
+  .grand .ini {
+    font-size: 2.25rem;
   }
   .btns {
     display: flex;

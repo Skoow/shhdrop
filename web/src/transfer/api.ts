@@ -470,13 +470,23 @@ export async function watch(c: Ctx, token: string, signal?: AbortSignal): Promis
 export type DestroyAuth = { kAcces: KAcces; kPreuve: KPreuve } | { sGestion: SGestion };
 
 /**
- * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy, reason "report" pour un
- * signalement (le serveur ne conserve pas le motif). Expéditeur (S_gestion) : POST
+ * Catégorie d'un signalement (conception compte §21.10.1) : codes fixes, mêmes dans le site et
+ * les apps (1 Terrorisme … 9 Données personnelles exposées, 10 Autre).
+ */
+export type Categorie = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export const CATEGORIES: readonly Categorie[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const CATEGORIE_AUTRE: Categorie = 10;
+
+/**
+ * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy ; un signalement porte sa
+ * catégorie : corps exact `{"proof":…,"reason":"report","categorie":n}` (conception compte
+ * §21.10.2 ; le serveur ne garde que des compteurs en mémoire). Expéditeur (S_gestion) : POST
  * /api/manage/destroy, S_gestion en en-tête, corps vide (spec §32). keepalive : la requête
  * survit à la fermeture de la page (annulation d'un envoi, `pagehide`).
  */
-export async function destroy(c: Ctx, a: DestroyAuth, reason?: "report", keepalive?: boolean): Promise<void> {
-  const r = reason === undefined ? {} : { reason };
+export async function destroy(c: Ctx, a: DestroyAuth, report?: Categorie, keepalive?: boolean): Promise<void> {
+  if (report !== undefined && !CATEGORIES.includes(report)) throw new Error("categorie_invalide");
+  const r = report === undefined ? {} : { reason: "report", categorie: report };
   const q: Req =
     "sGestion" in a
       ? { method: "POST", path: "/api/manage/destroy", headers: { "X-Shh-Manage": b64u(a.sGestion) }, keepalive }

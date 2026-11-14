@@ -79,7 +79,7 @@ describe("le serveur ne voit rien", () => {
   let id: Uint8Array<ArrayBuffer>; // id du client (HKDF de K_lien) : jamais envoyé
   let handle: string; // id interne tiré par le serveur (nom du fichier, jetons)
   let manage: string;
-  let kLien2: KLien; // second partage : signalé par Opened.destroy("report")
+  let kLien2: KLien; // second partage : signalé par Opened.destroy(catégorie)
   let kAcces2: KAcces;
   let id2: Uint8Array<ArrayBuffer>;
   let handle2: string;
@@ -146,7 +146,7 @@ describe("le serveur ne voit rien", () => {
     expect(Buffer.from(blobFile.subarray(16, 48)).equals(engagement), "R capturée = R du partage").toBe(true);
     const segOff = (n: number) => 48 + n * 64 * 65552;
     fillCopy = blobFile.subarray(segOff(3), segOff(6));
-    // Second partage (une seule ouverture) : lu puis détruit par Opened.destroy("report"), qui
+    // Second partage (une seule ouverture) : lu puis détruit par Opened.destroy(catégorie), qui
     // envoie K_accès et K_preuve ; ces requêtes et le disque sont fouillés comme les autres.
     const r2 = await createShare(srv.origin, [{ kind: "text", name: "", mime: "text/plain", data: utf8(`texte ${MARKER} texte`) }], {
       ttlHours: 1,
@@ -164,7 +164,7 @@ describe("le serveur ne voit rien", () => {
     kAcces2 = (await deriveAccess(kLien2)).kAcces;
     const o2 = await openShare(r2.link, GENERATED, srv.origin, undefined, { fetch });
     expect(o2.manifest.items[0]!.text).toBe(`texte ${MARKER} texte`);
-    await o2.destroy("report");
+    await o2.destroy(6); // signalement « Harcèlement » (conception compte §21.10.2)
     await o2.done(); // 410 « gone » attendu et toléré : le partage est déjà effacé
     o2.wipe();
     expect(seeds.list).toHaveLength(2);
@@ -295,7 +295,7 @@ describe("le serveur ne voit rien", () => {
       "GET /api/shares/segments/2",
       "POST /api/shares/done",
       "GET /api/manage/status",
-      // Second partage : Opened.destroy("report") puis done (404 toléré).
+      // Second partage : Opened.destroy(catégorie) puis done (404 toléré).
       "GET /api/captcha",
       "POST /api/shares",
       // Note seule (D41-37) : un élément, un PUT d'un morceau ; lue dans le segment 0 à l'ouverture.

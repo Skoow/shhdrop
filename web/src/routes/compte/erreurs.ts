@@ -8,7 +8,7 @@ import { getLang, t } from "../../i18n/i18n.svelte";
 export type Champ = "email" | "mdp" | "pseudo" | "code" | "totp" | "photo";
 export type Erreur = { champ?: Champ; texte: string };
 /** Où l'erreur arrive : la même 404 (étape échue) ou 503 ne se disent pas de la même façon. */
-export type Moment = "inscription" | "code" | "connexion" | "totp" | "oubli";
+export type Moment = "inscription" | "code" | "connexion" | "totp" | "oubli" | "parametres";
 
 const CHAMP_CODE: Record<string, [Champ, Parameters<typeof t>[0]]> = {
   adresse_invalide: ["email", "account.err.email"],
@@ -26,6 +26,9 @@ const CHAMP_CODE: Record<string, [Champ, Parameters<typeof t>[0]]> = {
   totp_faux: ["totp", "account.err.totpFaux"],
   totp_rejoue: ["totp", "account.err.totpRejoue"],
   photo_illisible: ["photo", "account.photo.err"],
+  // Lot 13 (paramètres).
+  adresse_requise: ["email", "account.identity.email"],
+  totp_requis: ["totp", "account.totp.needed"],
 };
 
 const ILLISIBLE = new Set(["coffre_illisible", "coffre_recule", "coffre_version", "enveloppe_invalide"]);
@@ -57,6 +60,14 @@ export function erreur(e: unknown, moment: Moment): Erreur {
       return { texte: t("account.err.reseau") };
     case "identifiants":
       return { texte: t("account.err.identifiants") };
+    // Lot 13 : session plus « récente » (l'écran redemande le mot de passe) ; attente de 7 jours
+    // après une récupération par e-mail (R4) ; nouvelle adresse déjà prise.
+    case "recent":
+      return { texte: t("account.identity.recent") };
+    case "attente":
+      return { texte: t("account.forgot.recup", { date: jourLong((e as { jusqu?: string }).jusqu ?? "") }) };
+    case "deja_inscrit":
+      return { champ: "email", texte: t("account.email.deja") };
   }
   if (ILLISIBLE.has(code)) return { texte: t("account.err.coffre") };
   return { texte: t("account.err.autre") };

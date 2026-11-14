@@ -4,6 +4,8 @@
 export {
   BadPasswordError,
   CAPTCHA_MIN_MS,
+  CATEGORIES,
+  CATEGORIE_AUTRE,
   PREPARED_MIN_LEFT_MS,
   CorruptError,
   GrantInvalidError,
@@ -20,6 +22,7 @@ export {
   openShare,
   shareStatus,
   type CaptchaCtx,
+  type Categorie,
   type CaptchaProof,
   type CreateOpts,
   type Net,

@@ -4,9 +4,9 @@
 // - Sortie de page (pagehide, démontage) : wipe() et révocation seulement, SANS done() (spec
 //   §41.4, D42-22) : l'ouverture reste valable jusqu'à l'échéance, pour qu'un rechargement ou un
 //   retour depuis ce navigateur la rouvre.
-// - Détruire, Signaler : opened.destroy() (ou destroy("report"), motif non conservé), puis
+// - Détruire, Signaler : opened.destroy() (ou destroy(catégorie), seule la catégorie compte), puis
 //   wipe() ; la dissolution (onDestroyed) ne commence qu'après la réponse du serveur.
-import { LimitError, NotFoundError, type Opened } from "../index";
+import { LimitError, NotFoundError, type Categorie, type Opened } from "../index";
 import { revokeAll } from "../viewers/blobs";
 
 /** Sortie de page : effacement local, aucune requête (l'octroi rouvre l'ouverture au rechargement). */
@@ -41,12 +41,12 @@ export type DestroyOutcome = "destroyed" | "gone" | "network" | "limit";
  */
 export async function destroyFromContent(
   opened: Opened,
-  report: boolean,
+  report: Categorie | null,
   deps: { onDestroyed: () => void } = { onDestroyed: () => undefined },
 ): Promise<DestroyOutcome> {
   let outcome: DestroyOutcome;
   try {
-    await (report ? opened.destroy("report") : opened.destroy());
+    await (report !== null ? opened.destroy(report) : opened.destroy());
     outcome = "destroyed";
   } catch (e) {
     if (e instanceof LimitError) return "limit";

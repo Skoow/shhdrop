@@ -105,6 +105,53 @@ describe("dictionnaires", () => {
     for (const [k, v] of Object.entries(fr)) if (k.startsWith("account.")) expect(v, k).not.toMatch(/secours/i);
   });
 
+  // Plan du compte, lots 13 et 14 : textes exacts de la conception (§21.10, §21.15.3, §21.15.4,
+  // §21.15.7) et des décisions du propriétaire du 14 novembre.
+  it("profil, paramètres, suppression et signalement : textes exacts", () => {
+    const N = NNBSP;
+    const exacts: Record<string, string> = {
+      "account.profile.privacy": `Votre pseudo, votre photo et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe${N}: le service peut donc les lire. Vos liens et la gestion de vos salons ne sont lisibles qu'avec votre mot de passe.`,
+      "account.profile.limit": "Vous pourrez changer de pseudo demain.",
+      "account.card.since": "Membre depuis le {date}",
+      "account.card.neuf": `Récent${N}: {salons}${N}salon à la fois, {places}${N}places, {heures}${N}h. Dès le {date}${N}: 3${N}salons, 10${N}places.`,
+      "account.card.confirme": `Confirmé${N}: {salons}${N}salons à la fois, {places}${N}places.`,
+      "account.email.note": "C'est votre seul moyen de récupérer le compte. Nous n'écrivons jamais à l'ancienne adresse.",
+      "account.mdp.others": "Vos autres appareils seront déconnectés.",
+      "account.totp.hint": `Si vous perdez ce téléphone, la récupération par e-mail prendra 7${N}jours.`,
+      "account.totp.pending": `Une demande de retrait de la double authentification est en cours. Ce n'est pas vous${N}?`,
+      "account.totp.cancelPending": "Annuler la demande",
+      "account.privacy.propose": "Proposer mon pseudo et ma photo dans les salons",
+      "account.privacy.links": "Garder les liens que j'ouvre dans mon accueil",
+      "account.privacy.rooms": "Garder les salons que je rejoins",
+      "account.privacy.downloads": "Historique des téléchargements sur cet appareil",
+      "account.privacy.stay": "Rester connecté sur cet appareil",
+      "account.recovery.mail": "Gardez l'accès à votre boîte mail.",
+      "account.data.export": "Exporter mes données",
+      "account.data.inactive": `Sans connexion pendant 13${N}mois, ce compte est effacé. Nous ne pouvons pas vous prévenir${N}: nous n'avons pas votre adresse.`,
+      "account.delete.done": "Compte supprimé.",
+      "account.delete.pass": "Votre pass Plus sera perdu. Un remboursement ne se demande qu'au vendeur.",
+      "account.delete.device": "Effacer aussi les données de cet appareil",
+      "report.question": `Que se passe-t-il${N}?`,
+      "report.share.body": "Le partage sera détruit tout de suite pour tout le monde. Nous ne voyons pas le contenu et ne gardons que la catégorie, sans rien qui vous identifie.",
+      "report.room.body": `Vous quitterez le salon. Nous ne voyons pas les messages${N}; nous comptons ce signalement pour ce salon, sans rien qui vous identifie.`,
+      "report.confirm": "Signaler et détruire",
+      "report.room.confirm": "Quitter et signaler",
+      "report.done": "Merci. Signalement envoyé.",
+      "report.cat.1.help": "Apologie, menaces ou propagande terroriste",
+      "report.cat.9.help": "Adresse, documents d'identité, photos privées d'un tiers",
+    };
+    for (const [k, v] of Object.entries(exacts)) expect((fr as Record<string, string>)[k], k).toBe(v);
+    // Plus de case « Déconnecter mes autres appareils » (décision du propriétaire) ; plus de
+    // promesse « aucune trace » du signalement (la catégorie est comptée en mémoire).
+    for (const [k, v] of Object.entries(fr)) {
+      expect(v, k).not.toMatch(/Déconnecter mes autres appareils/);
+      expect(v, k).not.toMatch(/aucune trace de votre signalement/);
+    }
+    expect(Object.keys(fr)).not.toContain("report.body");
+    // Dix catégories, chacune avec son aide sauf « Autre ».
+    for (let n = 1; n <= 10; n++) expect(Object.hasOwn(fr, `report.cat.${n}.help`), `aide ${n}`).toBe(n !== 10);
+  });
+
   it("mêmes paramètres {…} dans les deux langues", () => {
     const params = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
     for (const k of Object.keys(fr) as (keyof typeof fr)[]) expect(params(en[k]), k).toEqual(params(fr[k]));

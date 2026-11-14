@@ -152,7 +152,7 @@ describe("gestion : shareStatus et destruction", () => {
     expect(await shareStatus(r.manage, srv().origin)).toMatchObject({ opensUsed: 1, state: "draining" });
     // destroyShare (lien + mot de passe) relit meta : impossible en « draining ».
     await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(NotFoundError);
-    await o.destroy("report");
+    await o.destroy(2); // signalement par catégorie (conception compte §21.10.2)
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
     await expect(o.destroy()).rejects.toBeInstanceOf(NotFoundError);
     o.wipe();

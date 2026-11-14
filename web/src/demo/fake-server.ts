@@ -824,10 +824,12 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
 
   /** Destinataire : K_accès en en-tête, K_preuve dans le corps (POST /api/shares/destroy). */
   async function destroy(req: Request): Promise<Response> {
-    const b = await readJSON(req, ["proof", "reason"]);
-    // Motif fermé (spec §36 S14) : absent, ou exactement "report".
+    const b = await readJSON(req, ["proof", "reason", "categorie"]);
+    // Motif fermé (spec §36 S14) : absent, ou exactement "report" ; catégorie (conception compte
+    // §21.10.2) : entier 1 à 10, seulement avec "report" ; absente : « Autre ». Comme le serveur.
     const report = "reason" in b;
     if (report && b.reason !== "report") throw badRequest();
+    if ("categorie" in b && (!report || !Number.isInteger(b.categorie) || (b.categorie as number) < 1 || (b.categorie as number) > 10)) throw badRequest();
     const ka = headerSecret(req, "X-Shh-Access");
     const kp = decodeB64(b.proof, 32);
     const e = await find(ka, "accessV");

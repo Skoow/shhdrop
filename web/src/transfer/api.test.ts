@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BadResponse, HttpError, captcha, create, ctx, destroy, done, finalize, getSegment, meta, putSegment, retryAfterHeader, status, unlock, watch, type FinalizeBody } from "./api";
+import { BadResponse, HttpError, captcha, create, ctx, destroy, done, finalize, getSegment, meta, putSegment, retryAfterHeader, status, unlock, watch, type Categorie, type FinalizeBody } from "./api";
 import type { KAcces, KPreuve, SGestion } from "../engine/pure";
 
 const FIN: FinalizeBody = {
@@ -176,7 +176,7 @@ describe("API v2 (spec §29.8)", () => {
     await meta(c, ka);
     await getSegment(c, "t", 3, 1);
     await done(c, "t");
-    await destroy(c, { kAcces: ka, kPreuve: kp }, "report");
+    await destroy(c, { kAcces: ka, kPreuve: kp }, 6);
     await destroy(c, { sGestion: sg });
     await status(c, sg);
     expect(urls).toEqual([
@@ -191,7 +191,8 @@ describe("API v2 (spec §29.8)", () => {
     expect(bodies[4]).toBeUndefined();
     expect(heads[4]!.get("X-Shh-Manage")).toBe(Buffer.from(sg).toString("base64url"));
     expect(heads[5]!.get("X-Shh-Manage")).toBe(Buffer.from(sg).toString("base64url"));
-    expect(JSON.parse(String(bodies[3]))).toEqual({ proof: Buffer.from(kp).toString("base64url"), reason: "report" });
+    // Signalement par catégorie (conception compte §21.10.2) : corps exact, aucun autre champ.
+    expect(String(bodies[3])).toBe(`{"proof":"${Buffer.from(kp).toString("base64url")}","reason":"report","categorie":6}`);
   });
   it("finalize : jeton en en-tête, corps JSON exact", async () => {
     const f = vi.fn(async (_: RequestInfo | URL, _i?: RequestInit) => new Response('{"expires_in_s":5}'));
@@ -295,3 +296,20 @@ describe("audit web D4 : valeurs de meta bornées aux maxima de l'offre", () => 
   });
 });
 
+
+it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute requête (conception compte §21.10.1)", async () => {
+  const sent: string[] = [];
+  const f = vi.fn(async (_u: string, init?: RequestInit) => {
+    sent.push(String(init?.body));
+    return new Response(null, { status: 204 });
+  });
+  const c = ctx("http://x", { fetch: f as unknown as typeof fetch, retryDelayMs: 1 });
+  const a = { kAcces: new Uint8Array(32) as KAcces, kPreuve: new Uint8Array(32) as KPreuve };
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) await destroy(c, a, n as Categorie);
+  expect(sent.map((b) => JSON.parse(b).categorie)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  for (const bad of [0, 11, 1.5, -1, NaN]) await expect(destroy(c, a, bad as Categorie)).rejects.toThrow("categorie_invalide");
+  expect(f).toHaveBeenCalledTimes(10);
+  // Sans signalement : ni reason ni categorie.
+  await destroy(c, a);
+  expect(JSON.parse(sent.at(-1)!)).toEqual({ proof: Buffer.from(new Uint8Array(32)).toString("base64url") });
+});

@@ -110,7 +110,7 @@ test("destinataire : plus de « Signaler » en haut ; le lien du pied ouvre la c
   await report.click();
   const sheet = page.getByRole("dialog", { name: "Signaler ce contenu" });
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Signaler et détruire" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Continuer" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
   // Le partage n'a pas été signalé : toujours là.

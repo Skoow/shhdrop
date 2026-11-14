@@ -25,7 +25,7 @@
   // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Accueil, Connexion, Inscription, Oubli, connecte, restaurer } from "./routes/compte/pages";
+  import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, restaurer, supprime } from "./routes/compte/pages";
 
   // UI §9 : vérifié une fois, avant toute route. Sans ces capacités, aucune route ne démarre
   // (ni lecture du lien, ni requête).
@@ -152,9 +152,15 @@
     <Inscription />
   {:else if router.current.name === "oubli"}
     <Oubli />
+  {:else if router.current.name === "compte" && (connected || (__COMPTES__ && supprime()))}
+    <!-- Paramètres et profil (lot 13) : avec une session ouverte seulement (et l'écran de fin
+         d'une suppression faite ici, alors que la session n'existe plus). -->
+    <Parametres />
+  {:else if router.current.name === "profil" && connected}
+    <Profil />
   {:else if (router.current.name === "connexion" || router.current.name === "compte" || router.current.name === "profil")}
-    <!-- /compte et /compte/profil (paramètres et profil : lot 13) : sans session, la connexion
-         (conception §12.4) ; avec session, la même page dit « connecté ». -->
+    <!-- /compte et /compte/profil sans session : la connexion (conception §12.4) ; /compte/connexion
+         avec session : la même page dit « connecté ». -->
     <Connexion />
   {:else}
     <!-- Pages d'information (pied de page, retours UI5). -->

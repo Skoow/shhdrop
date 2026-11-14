@@ -8,6 +8,9 @@ describe("interface publique", () => {
       [
         "BadPasswordError",
         "CAPTCHA_MIN_MS",
+        // Codes des catégories de signalement (conception compte §21.10.1) : constantes, aucun secret.
+        "CATEGORIES",
+        "CATEGORIE_AUTRE",
         "GrantInvalidError",
         "ReopenLimitError",
         "grantTag",

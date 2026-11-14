@@ -6,6 +6,10 @@ export { default as Inscription } from "./Inscription.svelte";
 export { default as Oubli } from "./Oubli.svelte";
 export { restaurer } from "../../account/session.svelte";
 export { default as Accueil } from "./Accueil.svelte";
+export { default as Parametres } from "./Parametres.svelte";
+export { default as Profil } from "./Profil.svelte";
 import { account } from "../../account/session.svelte";
 /** Session ouverte sur cet appareil (accueil connecté, onglets du compte) ; lu dans un effet ou le gabarit. */
 export const connecte = (): boolean => account.etat === "ouvert";
+/** Compte supprimé depuis cette page : l'écran de fin des paramètres reste affiché sans session. */
+export const supprime = (): boolean => account.supprime;

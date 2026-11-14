@@ -6,7 +6,7 @@ import { destroyFromContent, finish, release } from "./endoflife";
 function fake(destroy: () => Promise<void> = async () => undefined, done: () => Promise<void> = async () => undefined) {
   const log: string[] = [];
   const o = {
-    destroy: vi.fn(async (r?: string) => {
+    destroy: vi.fn(async (r?: number) => {
       log.push(`destroy(${r ?? ""})`);
       await destroy();
       log.push("destroy résolu");
@@ -50,8 +50,8 @@ describe("release (pagehide, démontage ; spec §41.4)", () => {
 });
 
 describe("destroyFromContent", () => {
-  it("Détruire : destroy() sans argument ; Signaler : destroy(\"report\") ; wipe et onDestroyed après la réponse", async () => {
-    for (const report of [false, true]) {
+  it("Détruire : destroy() sans argument ; Signaler : destroy(catégorie) ; wipe et onDestroyed après la réponse", async () => {
+    for (const report of [null, 4] as const) {
       let release!: () => void;
       const { o, log } = fake(() => new Promise<void>((r) => (release = r)));
       const onDestroyed = vi.fn(() => void log.push("dissolution"));
@@ -61,14 +61,14 @@ describe("destroyFromContent", () => {
       expect(o.wipe).not.toHaveBeenCalled();
       release();
       expect(await p).toBe("destroyed");
-      expect(o.destroy).toHaveBeenCalledWith(...(report ? ["report"] : []));
-      expect(log).toEqual([`destroy(${report ? "report" : ""})`, "destroy résolu", "wipe", "dissolution"]);
+      expect(o.destroy).toHaveBeenCalledWith(...(report !== null ? [4] : []));
+      expect(log).toEqual([`destroy(${report ?? ""})`, "destroy résolu", "wipe", "dissolution"]);
     }
   });
   it("NotFoundError → wipe(), gone", async () => {
     const { o } = fake(async () => Promise.reject(new NotFoundError()));
     const onDestroyed = vi.fn();
-    expect(await destroyFromContent(o, false, { onDestroyed })).toBe("gone");
+    expect(await destroyFromContent(o, null, { onDestroyed })).toBe("gone");
     expect(o.wipe).toHaveBeenCalledTimes(1);
     expect(onDestroyed).toHaveBeenCalledTimes(1);
   });
@@ -76,7 +76,7 @@ describe("destroyFromContent", () => {
     for (const [e, want] of [[new Error("reseau"), "network"], [new LimitError(5), "limit"]] as const) {
       const { o } = fake(async () => Promise.reject(e));
       const onDestroyed = vi.fn();
-      expect(await destroyFromContent(o, true, { onDestroyed })).toBe(want);
+      expect(await destroyFromContent(o, 10, { onDestroyed })).toBe(want);
       expect(o.wipe).not.toHaveBeenCalled();
       expect(onDestroyed).not.toHaveBeenCalled();
     }

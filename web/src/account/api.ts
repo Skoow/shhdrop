@@ -301,3 +301,119 @@ export async function etiquetterSession(n: Net, session: string, etiquette: Byte
 export async function deconnexion(n: Net, session: string): Promise<void> {
   await appel(n, "POST", "deconnexion", { session, body: {} });
 }
+
+// --- Paramètres (lot 13 ; routes du lot 5, handlers_compte.go) ---------------------------------
+// Toutes avec la session ; celles qui changent la sécurité exigent une session « récente » (moins
+// de 5 min depuis une connexion ou un reauth) : sinon 403 `recent`, et l'écran redemande le mot
+// de passe. Le mot de passe ne part jamais : seulement A_auth et l'enveloppe de K_compte.
+
+/** Session « récente » : A_auth du mot de passe actuel, code de l'application ("" si inactive). */
+export async function reauth(n: Net, session: string, aAuth: Bytes, totp: string): Promise<void> {
+  await appel(n, "POST", "reauth", { session, body: { a_auth: b64u(aAuth), totp } });
+}
+
+/** Nouveau mot de passe ; le serveur ferme toujours les autres sessions. */
+export async function changerMdp(n: Net, session: string, aAuth: Bytes, envMdp: Bytes): Promise<void> {
+  await appel(n, "POST", "mdp", { session, body: { a_auth: b64u(aAuth), env_mdp: b64u(envMdp) } });
+}
+
+/** Adresses exactes ; le code part à la nouvelle seulement (§21.3). */
+export async function emailDebut(n: Net, session: string, b: { actuel: string; nouveau: string; langue: string }): Promise<{ etape: string }> {
+  const o = await appel(n, "POST", "email/debut", { session, body: { email_actuel: b.actuel, email_nouveau: b.nouveau, langue: b.langue } });
+  return { etape: jeton(o, "etape") };
+}
+
+export async function emailRenvoyer(n: Net, session: string, etape: string, email: string): Promise<void> {
+  await appel(n, "POST", "email/renvoyer", { session, body: { etape, email } });
+}
+
+/** A_auth et enveloppe recalculés avec le sel de la NOUVELLE adresse (§6). */
+export async function emailFin(n: Net, session: string, b: { etape: string; code: string; aAuth: Bytes; envMdp: Bytes; totp: string }): Promise<void> {
+  await appel(n, "POST", "email/fin", { session, body: { etape: b.etape, code: b.code, a_auth: b64u(b.aAuth), env_mdp: b64u(b.envMdp), totp: b.totp } });
+}
+
+const BASE32 = /^[A-Z2-7]{16,128}$/;
+
+/** Seule réponse du serveur qui contient le secret TOTP (base32, sans bourrage). */
+export async function totpDebut(n: Net, session: string): Promise<{ etape: string; secret: string }> {
+  const o = await appel(n, "POST", "totp/debut", { session, body: {} });
+  if (typeof o.secret !== "string" || !BASE32.test(o.secret)) throw invalide();
+  return { etape: jeton(o, "etape"), secret: o.secret };
+}
+
+export async function totpFin(n: Net, session: string, etape: string, code: string): Promise<void> {
+  await appel(n, "POST", "totp/fin", { session, body: { etape, code } });
+}
+
+export async function totpRetirer(n: Net, session: string): Promise<void> {
+  await appel(n, "POST", "totp/retirer", { session, body: {} });
+}
+
+/** « Ce n'est pas vous ? Annuler » (§21.2.4) : session, même non récente. */
+export async function totpAnnulerRetrait(n: Net, session: string): Promise<void> {
+  await appel(n, "POST", "totp/annuler-retrait", { session, body: {} });
+}
+
+/** Une session du compte (§8.5) : mois d'ajout, nom chiffré par l'appareil (ou aucun). */
+export type SessionAppareil = { sid: string; ajoutee: string; etiquette: Bytes | null; courante: boolean; persistante: boolean };
+const MOIS = /^\d{4}-\d{2}$/;
+
+export async function sessions(n: Net, session: string): Promise<SessionAppareil[]> {
+  const o = await appel(n, "GET", "sessions", { session });
+  if (!Array.isArray(o.sessions)) throw invalide();
+  return o.sessions.map((v: unknown) => {
+    if (typeof v !== "object" || v === null) throw invalide();
+    const s = v as Obj;
+    octets(s, "sid", 16);
+    if (typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.courante !== "boolean" || typeof s.persistante !== "boolean") throw invalide();
+    const e = octets(s, "etiquette");
+    if (e.length !== 0 && e.length !== 64) throw invalide();
+    return { sid: s.sid as string, ajoutee: s.ajoutee, etiquette: e.length === 0 ? null : e, courante: s.courante, persistante: s.persistante };
+  });
+}
+
+export async function fermerSession(n: Net, session: string, quoi: { sid: string } | { autres: true }): Promise<void> {
+  await appel(n, "POST", "sessions/fermer", { session, body: "sid" in quoi ? { sid: quoi.sid } : { autres: true } });
+}
+
+/** GET export (§12.4) : ce que le serveur garde du compte, sans adresse. */
+export type ExportServeur = {
+  creeLe: string;
+  ancienneteDepuis: string;
+  vuMois: string;
+  totp: boolean;
+  retraitTotpLe: string | null;
+  recupJusqu: string | null;
+  banniJusqu: string | null;
+  banniMotif: number | null;
+  salonsActifs: number;
+  sessions: { ajoutee: string; persistante: boolean }[];
+};
+
+export async function exporter(n: Net, session: string): Promise<ExportServeur> {
+  const o = await appel(n, "GET", "export", { session });
+  const m = o.banni_motif;
+  if (typeof o.totp !== "boolean" || typeof o.vu_mois !== "string" || !MOIS.test(o.vu_mois) || !Array.isArray(o.sessions)) throw invalide();
+  if (m !== null && !(Number.isInteger(m) && (m as number) >= 1 && (m as number) <= 10)) throw invalide();
+  return {
+    creeLe: jour(o, "cree_le"),
+    ancienneteDepuis: jour(o, "anciennete_depuis"),
+    vuMois: o.vu_mois,
+    totp: o.totp,
+    retraitTotpLe: jourOuNull(o, "retrait_totp_le"),
+    recupJusqu: jourOuNull(o, "recup_jusqu"),
+    banniJusqu: jourOuNull(o, "banni_jusqu"),
+    banniMotif: m as number | null,
+    salonsActifs: entier(o, "salons_actifs"),
+    sessions: o.sessions.map((v: unknown) => {
+      const s = v as Obj;
+      if (typeof s !== "object" || s === null || typeof s.ajoutee !== "string" || !MOIS.test(s.ajoutee) || typeof s.persistante !== "boolean") throw invalide();
+      return { ajoutee: s.ajoutee, persistante: s.persistante };
+    }),
+  };
+}
+
+/** Suppression du compte (session récente) : salons créés fermés par le serveur. */
+export async function supprimer(n: Net, session: string): Promise<{ salonsFermes: number }> {
+  return { salonsFermes: entier(await appel(n, "POST", "supprimer", { session, body: {} }), "salons_fermes") };
+}

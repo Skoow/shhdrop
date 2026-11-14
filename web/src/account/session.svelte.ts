@@ -23,15 +23,22 @@ import { aleatoire32, clesDeKCompte, clesDuCompte, ouvrirEnveloppe, scellerEnvel
 import { creerCoffre, ouvrir, priveDeJson, priveEnJson, priveVide, profilDeJson, profilEnJson, sceller, type Coffre, type CoffrePrive, type Profil, type Sorte } from "./vaults";
 import { nomAppareil, scellerEtiquette } from "./device";
 import { effacer, idbDuNavigateur, lire, sauver } from "./persist";
+import { b64u } from "../engine/pure";
 import { deriverCompte, motDePasseValide, normaliserAdresse, type Adresse } from "../engine/index";
 import { loadSalonEngine, type SalonEngine } from "../salon/engine";
 import { allEntries, dropAccountEntries, dropEntries, importEntries, onLocalChange, setAccountPrefs } from "../history/live.svelte";
 import type { HistoryEntry } from "../history/store";
 import { ajouterEntree, fusionner, retirerEntree } from "./sync";
+import { partagesConnus, supprimerTout as suppression, type Progres } from "./suppression";
+import { clearDownloads } from "../downloads/live.svelte";
+import { clearHistory } from "../history/live.svelte";
+import { destroyShare } from "../index";
+import { ouvrirEtiquette } from "./device";
 
 export type { Profil, Reglages, CoffrePrive, EntreePrivee } from "./vaults";
 export { REGLAGES_DEFAUT } from "./vaults";
 export { CompteError, type Preuve, type EtatServeur } from "./api";
+export type { Progres } from "./suppression";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 type PseudoMoteur = Pick<SalonEngine, "pseudoValide" | "cleUnicite" | "pseudoReserve">;
@@ -47,6 +54,10 @@ type Deps = {
   deriver: typeof deriverCompte;
   /** Historique de l'appareil (history/live.svelte.ts). */
   historique: Historique;
+  /** Suppression du compte (lot 13) : destruction d'un partage par son lien de gestion, effacement de l'appareil. */
+  detruirePartage: (lienGestion: string) => Promise<void>;
+  effacerAppareil: () => Promise<void>;
+  maintenant: () => number;
 };
 
 /** Ce que la session voit de l'historique de l'appareil. */
@@ -70,6 +81,13 @@ const defaut = (): Deps => ({
   salon: loadSalonEngine,
   deriver: deriverCompte,
   historique: { lister: allEntries, importer: importEntries, retirer: dropEntries, retirerCompte: dropAccountEntries, ecouter: onLocalChange, regler: setAccountPrefs },
+  // Même origine que la page (démo : base du dépôt) ; secret de gestion seul, jamais le jeton de session.
+  detruirePartage: (l) => destroyShare(l, globalThis.location?.origin ?? ""),
+  effacerAppareil: async () => {
+    await clearHistory().catch(() => undefined);
+    await clearDownloads().catch(() => undefined);
+  },
+  maintenant: () => Date.now(),
 });
 let deps: Deps = defaut();
 
@@ -89,6 +107,13 @@ class EtatCompte {
   erreur = $state.raw<"coffre_illisible" | undefined>(undefined);
   /** Session ouverte par « Mot de passe oublié » (§21.2.3) : bandeau de l'accueil (§21.15.1). */
   recupere = $state(false);
+  /** « Rester connecté » : la session est gardée sur cet appareil (persist.ts). */
+  persistante = $state(false);
+  /**
+   * Le compte vient d'être supprimé depuis cette page : l'écran de fin (« Compte supprimé. »)
+   * reste affiché alors que la session n'existe plus. Remis à faux à l'ouverture d'une session.
+   */
+  supprime = $state(false);
 }
 export const account = new EtatCompte();
 
@@ -103,10 +128,19 @@ type Ouverte = {
   persistante: boolean;
   profil: Coffre<Profil>;
   prive: Coffre<CoffrePrive>;
+  /**
+   * Adresse du compte, seulement si elle a été tapée dans CETTE page (inscription, connexion,
+   * récupération, confirmation d'identité) : mémoire seulement, jamais gardée sur l'appareil ni
+   * dans un coffre. Elle donne le sel d'A_auth pour une confirmation d'identité (lot 13) ; après
+   * un rechargement (« Rester connecté »), l'écran la redemande.
+   */
+  adresse?: Adresse;
 };
 let ouverte: Ouverte | null = null;
 let inscription: { h: Bytes; etape: string; adresse: Adresse } | null = null;
-let totp: { etape: string; kek: Bytes; persistante: boolean } | null = null;
+let totp: { etape: string; kek: Bytes; persistante: boolean; adresse: Adresse } | null = null;
+let emailEnCours: { etape: string; nouvelle: Adresse } | null = null;
+let totpEnCours: string | null = null;
 let oubliEnCours: { etape: string; adresse: Adresse; h?: Bytes; genPrive?: number } | null = null;
 let attente: { patches: ((p: CoffrePrive) => CoffrePrive)[]; annuler: () => void } | null = null;
 let arreterEcoute: (() => void) | null = null;
@@ -122,10 +156,11 @@ function oublierMemoire(): void {
     ouverte.sProfil.fill(0);
   }
   totp?.kek.fill(0);
-  ouverte = inscription = totp = oubliEnCours = null;
+  ouverte = inscription = totp = oubliEnCours = emailEnCours = totpEnCours = null;
   account.etat = "absent";
   account.profil = account.prive = account.erreur = undefined;
   account.recupere = false;
+  account.persistante = false;
 }
 /** Tests : simule un rechargement de la page. */
 export const _oublierMemoire = oublierMemoire;
@@ -206,6 +241,8 @@ async function ouvrirSession(s: {
   prive: { blob: Uint8Array; gen: number } | { relire: number } | { valeur: CoffrePrive; gen: number };
   /** Après « Mot de passe oublié » : tout l'historique de l'appareil revient dans le coffre neuf. */
   recuperation?: boolean;
+  /** Adresse tapée dans cette page (mémoire seulement). */
+  adresse?: Adresse;
 }): Promise<void> {
   const cles = await clesDuCompte(s.kCompte, s.sProfil);
   const coffre = async <T>(sorte: Sorte, src: { blob: Uint8Array; gen: number } | { relire: number } | { valeur: T; gen: number }, versJson: (v: T) => Bytes, deJson: (b: Uint8Array) => T, vide: T) => {
@@ -218,10 +255,12 @@ async function ouvrirSession(s: {
   const profil = await coffre<Profil>("profil", s.profil, profilEnJson, profilDeJson, undefined as unknown as Profil);
   const prive = await coffre<CoffrePrive>("prive", s.prive, priveEnJson, priveDeJson, priveVide());
   oublierMemoire();
-  ouverte = { jeton: s.jeton, h: s.h, kCompte: s.kCompte, sProfil: s.sProfil, cles, persistante: s.persistante, profil, prive };
+  ouverte = { jeton: s.jeton, h: s.h, kCompte: s.kCompte, sProfil: s.sProfil, cles, persistante: s.persistante, profil, prive, adresse: s.adresse };
+  account.persistante = s.persistante;
   account.profil = profil.valeur;
   account.prive = prive.valeur;
   account.etat = "ouvert";
+  account.supprime = false;
   account.recupere = s.recuperation === true;
   const o = ouverte;
   await memoriser(o);
@@ -292,6 +331,11 @@ export async function inscrire(email: string, langue: string, preuve: Preuve): P
 export async function renvoyerCode(): Promise<void> {
   if (inscription) return api.inscriptionRenvoyer(deps.net, inscription.etape, inscription.adresse.exacte);
   if (oubliEnCours) return api.oubliRenvoyer(deps.net, oubliEnCours.etape, oubliEnCours.adresse.exacte);
+  if (emailEnCours && ouverte) {
+    const { jeton } = ouverte;
+    const e = emailEnCours;
+    return garde(() => api.emailRenvoyer(deps.net, jeton, e.etape, e.nouvelle.exacte));
+  }
   throw new Error("aucune_etape");
 }
 
@@ -317,7 +361,7 @@ export async function confirmer(code: string, mdp: string, profil: Profil, persi
     const blobProfil = await sceller("profil", cles.profil, ins.h, 1, profilEnJson(p));
     const blobPrive = await sceller("prive", cles.prive, ins.h, 1, priveEnJson(priveVide()));
     const r = await api.inscriptionFin(deps.net, { etape: ins.etape, code, aAuth, envMdp, sProfil, pCanon, blobProfil, blobPrive, persistante, etiquette: await etiquette(cles.etiquette, ins.h) });
-    await ouvrirSession({ jeton: r.session, h: ins.h, kCompte, sProfil, persistante, profil: { blob: blobProfil, gen: 1 }, prive: { valeur: priveVide(), gen: 1 } });
+    await ouvrirSession({ jeton: r.session, h: ins.h, kCompte, sProfil, persistante, profil: { blob: blobProfil, gen: 1 }, prive: { valeur: priveVide(), gen: 1 }, adresse: ins.adresse });
     garde_ = true;
   } finally {
     aAuth.fill(0);
@@ -331,10 +375,10 @@ export async function confirmer(code: string, mdp: string, profil: Profil, persi
 
 // --- Connexion -------------------------------------------------------------------------------
 
-async function apresOuverture(o: api.Ouverture, kek: Bytes, persistante: boolean): Promise<void> {
+async function apresOuverture(o: api.Ouverture, kek: Bytes, persistante: boolean, adresse: Adresse): Promise<void> {
   const kCompte = await garde(() => ouvrirEnveloppe(kek, o.h, o.envMdp));
   try {
-    await garde(() => ouvrirSession({ jeton: o.session, h: o.h, kCompte, sProfil: o.sProfil, persistante, profil: { blob: o.blobProfil, gen: o.genProfil }, prive: { blob: o.blobPrive, gen: o.genPrive } }));
+    await garde(() => ouvrirSession({ jeton: o.session, h: o.h, kCompte, sProfil: o.sProfil, persistante, profil: { blob: o.blobProfil, gen: o.genProfil }, prive: { blob: o.blobPrive, gen: o.genPrive }, adresse }));
   } catch (e) {
     kCompte.fill(0);
     o.sProfil.fill(0);
@@ -359,11 +403,11 @@ export async function seConnecter(email: string, mdp: string, persistante: boole
     const r = await api.connexion(deps.net, { email: adresse.exacte, aAuth, persistante, etiquette: null, preuve });
     if ("totp" in r) {
       totp?.kek.fill(0);
-      totp = { etape: r.totp, kek: kekMdp, persistante };
+      totp = { etape: r.totp, kek: kekMdp, persistante, adresse };
       gardeKek = true;
       return "totp";
     }
-    await apresOuverture(r, kekMdp, persistante);
+    await apresOuverture(r, kekMdp, persistante, adresse);
     return "ouvert";
   } finally {
     aAuth.fill(0);
@@ -377,7 +421,7 @@ export async function validerTotp(code: string): Promise<void> {
   const r = await api.connexionTotp(deps.net, t.etape, code); // erreur : l'étape reste (5 essais)
   totp = null;
   try {
-    await apresOuverture(r, t.kek, t.persistante);
+    await apresOuverture(r, t.kek, t.persistante, t.adresse);
   } finally {
     t.kek.fill(0);
   }
@@ -420,7 +464,7 @@ export const oubli = {
       const blobPrive = await sceller("prive", k.prive, o.h, gen, priveEnJson(priveVide()));
       const r = await api.oubliFin(deps.net, { etape: o.etape, aAuth, envMdp, blobPrive, persistante, etiquette: await etiquette(k.etiquette, o.h) });
       if (r.genPrive !== gen || r.h.some((x, i) => x !== o.h![i])) throw new Error("reponse_invalide");
-      await garde(() => ouvrirSession({ jeton: r.session, h: r.h, kCompte, sProfil: r.sProfil, persistante, profil: { blob: r.blobProfil, gen: r.genProfil }, prive: { valeur: priveVide(), gen }, recuperation: true }));
+      await garde(() => ouvrirSession({ jeton: r.session, h: r.h, kCompte, sProfil: r.sProfil, persistante, profil: { blob: r.blobProfil, gen: r.genProfil }, prive: { valeur: priveVide(), gen }, recuperation: true, adresse: o.adresse }));
       garde_ = true;
     } finally {
       aAuth.fill(0);
@@ -474,7 +518,11 @@ function ouverteOuErreur(): Ouverte {
 
 export async function ecrireProfil(patch: Partial<Profil>): Promise<void> {
   const o = ouverteOuErreur();
-  account.profil = await garde(() => o.profil.ecrire((v) => ({ ...v, ...patch })));
+  const v = await garde(() => o.profil.ecrire((v) => ({ ...v, ...patch })));
+  if (ouverte !== o) return;
+  account.profil = v;
+  // « Garder les liens que j'ouvre » : la case de la page d'ouverture suit le réglage du compte.
+  if (patch.reglages) deps.historique.regler({ keepReceived: v.reglages.garderRecus });
   await memoriser(o);
 }
 
@@ -550,4 +598,218 @@ export async function seDeconnecter(): Promise<void> {
   const jeton = ouverte?.jeton;
   await oublierAppareil();
   if (jeton !== undefined) await api.deconnexion(deps.net, jeton).catch(() => undefined);
+}
+
+// --- Paramètres (plan, lot 13 ; conception compte §21.15.4) --------------------------------------
+// Les changements de sécurité demandent une session « récente » (serveur) : l'écran confirme
+// d'abord l'identité (mot de passe, et code de l'application si elle est active). Le mot de passe
+// ne quitte jamais l'appareil : seulement A_auth et l'enveloppe de K_compte.
+
+/** L'adresse du compte a été tapée dans cette page (sinon : l'écran la demande). */
+export function adresseConnue(): boolean {
+  return ouverte?.adresse !== undefined;
+}
+
+/**
+ * Rend la session « récente » (reauth). `email` : l'adresse tapée à l'écran (exigée si la page ne
+ * la connaît pas : Error("adresse_requise"), sans requête). Réussite : l'adresse est retenue
+ * en mémoire pour la suite (changement de mot de passe ou d'adresse).
+ */
+export async function confirmerIdentite(mdp: string, codeTotp: string, email?: string): Promise<void> {
+  const o = ouverteOuErreur();
+  const adresse = email !== undefined && email.trim() !== "" ? await normaliserAdresse(email) : o.adresse;
+  if (!adresse) throw new Error("adresse_requise");
+  const { aAuth, kekMdp } = await deps.deriver(mdp, adresse.canon);
+  try {
+    await garde(() => api.reauth(deps.net, o.jeton, aAuth, codeTotp));
+    if (ouverte === o) o.adresse = adresse;
+  } finally {
+    aAuth.fill(0);
+    kekMdp.fill(0);
+  }
+}
+
+/** Nouveau mot de passe : nouvelle enveloppe de K_compte ; le serveur ferme TOUJOURS les autres sessions. */
+export async function changerMotDePasse(nouveau: string): Promise<void> {
+  const o = ouverteOuErreur();
+  if (!o.adresse) throw new Error("adresse_requise");
+  await motDePasseValide(nouveau, o.adresse);
+  const { aAuth, kekMdp } = await deps.deriver(nouveau, o.adresse.canon);
+  try {
+    const envMdp = await scellerEnveloppe(kekMdp, o.h, o.kCompte);
+    await garde(() => api.changerMdp(deps.net, o.jeton, aAuth, envMdp));
+  } finally {
+    aAuth.fill(0);
+    kekMdp.fill(0);
+  }
+}
+
+/** Changement d'adresse (§21.3, R21) : code à la nouvelle adresse seulement ; mot de passe redemandé (le sel change). */
+export const changementAdresse = {
+  /** Après confirmerIdentite avec l'adresse ACTUELLE exacte. */
+  async debut(nouvelle: string, langue: string): Promise<void> {
+    const o = ouverteOuErreur();
+    if (!o.adresse) throw new Error("adresse_requise");
+    const n = await normaliserAdresse(nouvelle);
+    const actuelle = o.adresse.exacte;
+    const r = await garde(() => api.emailDebut(deps.net, o.jeton, { actuel: actuelle, nouveau: n.exacte, langue }));
+    emailEnCours = { etape: r.etape, nouvelle: n };
+  },
+  /** Code reçu, mot de passe (A_auth et enveloppe refaits avec le sel de la nouvelle adresse), code de l'application ("" si inactive). */
+  async fin(code: string, mdp: string, codeTotp: string): Promise<void> {
+    const o = ouverteOuErreur();
+    const e = emailEnCours;
+    if (!e) throw new Error("aucune_etape");
+    await motDePasseValide(mdp, e.nouvelle);
+    const { aAuth, kekMdp } = await deps.deriver(mdp, e.nouvelle.canon);
+    try {
+      const envMdp = await scellerEnveloppe(kekMdp, o.h, o.kCompte);
+      await garde(() => api.emailFin(deps.net, o.jeton, { etape: e.etape, code, aAuth, envMdp, totp: codeTotp }));
+      emailEnCours = null;
+      if (ouverte === o) o.adresse = e.nouvelle;
+    } finally {
+      aAuth.fill(0);
+      kekMdp.fill(0);
+    }
+  },
+};
+
+/**
+ * Activation de la double authentification : secret rendu une fois par le serveur, lien d'ajout
+ * construit ici, SANS adresse ni pseudo dans le libellé (§8.4 : l'application se synchronise
+ * souvent dans un nuage). Le QR est dessiné sur l'appareil.
+ */
+export async function totpCommencer(): Promise<{ secret: string; lien: string }> {
+  const o = ouverteOuErreur();
+  const r = await garde(() => api.totpDebut(deps.net, o.jeton));
+  totpEnCours = r.etape;
+  return { secret: r.secret, lien: `otpauth://totp/Shhgone?secret=${r.secret}&issuer=Shhgone&algorithm=SHA1&digits=6&period=30` };
+}
+
+/** Premier code juste : la double authentification est active. */
+export async function totpActiver(code: string): Promise<void> {
+  const o = ouverteOuErreur();
+  const etape = totpEnCours;
+  if (!etape) throw new Error("aucune_etape");
+  await garde(() => api.totpFin(deps.net, o.jeton, etape, code));
+  totpEnCours = null;
+}
+
+export async function totpRetirer(): Promise<void> {
+  const o = ouverteOuErreur();
+  await garde(() => api.totpRetirer(deps.net, o.jeton));
+}
+
+export async function totpAnnulerRetrait(): Promise<void> {
+  const o = ouverteOuErreur();
+  await garde(() => api.totpAnnulerRetrait(deps.net, o.jeton));
+}
+
+/** Un appareil connecté (§8.5) : nom déchiffré ICI (null : aucun, ou illisible). */
+export type Appareil = { sid: string; ajoutee: string; nom: string | null; courante: boolean; persistante: boolean };
+
+export async function appareils(): Promise<Appareil[]> {
+  const o = ouverteOuErreur();
+  const l = await garde(() => api.sessions(deps.net, o.jeton));
+  return Promise.all(l.map(async (s) => ({ sid: s.sid, ajoutee: s.ajoutee, nom: s.etiquette ? await ouvrirEtiquette(o.cles.etiquette, o.h, s.etiquette) : null, courante: s.courante, persistante: s.persistante })));
+}
+
+export async function deconnecterAppareil(sid: string): Promise<void> {
+  const o = ouverteOuErreur();
+  await garde(() => api.fermerSession(deps.net, o.jeton, { sid }));
+}
+
+export async function deconnecterAutres(): Promise<void> {
+  const o = ouverteOuErreur();
+  await garde(() => api.fermerSession(deps.net, o.jeton, { autres: true }));
+}
+
+/**
+ * « Exporter mes données » (§12.4, §21.15.4 point 10) : fichier JSON fait SUR L'APPAREIL. Données
+ * du serveur (GET export, sans adresse), profil déchiffré, et listes du coffre privé SANS leurs
+ * secrets : ni lien de gestion, ni lien de partage ou d'invitation, ni identifiant (un fichier
+ * exporté traîne souvent dans un dossier de téléchargements ; un lien de gestion y suffirait à
+ * détruire un partage). Jamais l'adresse ni le jeton.
+ */
+export async function exporterDonnees(): Promise<string> {
+  const o = ouverteOuErreur();
+  const x = await garde(() => api.exporter(deps.net, o.jeton));
+  const p = o.profil.valeur;
+  const prive = o.prive.valeur;
+  const sans = (l: CoffrePrive[keyof CoffrePrive], garder: readonly string[]) => l.map((v) => Object.fromEntries(garder.filter((k) => k in v).map((k) => [k, v[k]])));
+  return JSON.stringify(
+    {
+      format: "shhgone-export-compte",
+      v: 1,
+      exporte_le: new Date(deps.maintenant()).toISOString().slice(0, 10),
+      serveur: {
+        cree_le: x.creeLe,
+        anciennete_depuis: x.ancienneteDepuis,
+        derniere_connexion_mois: x.vuMois,
+        double_authentification: x.totp,
+        retrait_double_authentification_le: x.retraitTotpLe,
+        attente_apres_recuperation_jusqu: x.recupJusqu,
+        banni_jusqu: x.banniJusqu,
+        banni_motif: x.banniMotif,
+        salons_actifs: x.salonsActifs,
+        appareils: x.sessions,
+      },
+      profil: { pseudo: p.pseudo, photo: p.photo === null ? null : b64u(p.photo as Bytes), langue: p.langue, reglages: p.reglages, pass: p.pass },
+      listes: {
+        envois: sans(prive.envois, ["cree", "expire", "taille", "elements", "ouvertures_max"]),
+        recus: sans(prive.recus, ["cree", "expire", "taille", "elements", "format"]),
+        salons: sans(prive.salons, ["cree", "expire", "libelle"]),
+        rejoints: sans(prive.rejoints, ["cree", "expire", "libelle"]),
+      },
+    },
+    null,
+    2,
+  );
+}
+/**
+ * Coupe « Rester connecté » sur cet appareil : la copie gardée (persist.ts) est effacée, la
+ * session reste ouverte jusqu'au rechargement. L'activer ne se fait qu'à la connexion : le serveur
+ * fixe la durée de la session à ce moment-là (aucune route pour la changer ensuite).
+ */
+export async function arreterResterConnecte(): Promise<void> {
+  const o = ouverteOuErreur();
+  o.persistante = false;
+  account.persistante = false;
+  const idb = deps.idb();
+  if (idb) await effacer(idb).catch(() => undefined);
+}
+
+// --- Suppression totale (suppression.ts) ----------------------------------------------------------
+
+/** Liens de gestion des partages encore vivants que cet appareil ou le coffre privé connaît. */
+async function liensASupprimer(o: Ouverte): Promise<string[]> {
+  const local = await deps.historique.lister().catch(() => [] as HistoryEntry[]);
+  return partagesConnus(o.prive.valeur, local, deps.maintenant());
+}
+
+/** Nombre de partages connus qui seront détruits (texte de confirmation). */
+export async function partagesASupprimer(): Promise<number> {
+  return (await liensASupprimer(ouverteOuErreur())).length;
+}
+
+/**
+ * Supprime le compte (§21.12) : après confirmerIdentite (session récente). Progression pour
+ * l'écran ; refus avant toute destruction pendant l'attente d'après une récupération.
+ */
+export function supprimerTout(opts: { effacerAppareil: boolean }): AsyncGenerator<Progres> {
+  const o = ouverteOuErreur();
+  return suppression(opts, {
+    avant: async () => {
+      const e = await garde(() => api.etat(deps.net, o.jeton));
+      if (e.recupJusqu) throw new api.CompteError(403, "attente", { jusqu: e.recupJusqu });
+    },
+    partages: () => liensASupprimer(o),
+    detruire: (l) => deps.detruirePartage(l),
+    supprimerCompte: async () => (await garde(() => api.supprimer(deps.net, o.jeton))).salonsFermes,
+    oublierCompte: () => {
+      account.supprime = true; // avant que la session disparaisse : l'écran de fin reste monté
+      return oublierAppareil();
+    },
+    effacerAppareil: () => deps.effacerAppareil(),
+  });
 }

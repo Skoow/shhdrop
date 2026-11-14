@@ -45,6 +45,7 @@ import { createDraft } from "./draft";
 import { segmentSource, type SegmentSource } from "./segments";
 
 export type { Net } from "./api";
+export { CATEGORIES, CATEGORIE_AUTRE, type Categorie } from "./api";
 export type { PreparedCaptcha } from "./prepare";
 export type { PreviewKind } from "./safety";
 
@@ -552,7 +553,8 @@ export type Opened = {
    * après la dernière ouverture (état « draining »). Erreurs : voir readerError ;
    * Error("cles_effacees") après wipe().
    */
-  destroy(reason?: "report"): Promise<void>;
+  /** Détruit le partage ; avec une catégorie : signalement (conception compte §21.10.2). */
+  destroy(report?: api.Categorie): Promise<void>;
   /**
    * Met à zéro K_accès, K_preuve et le segment en cache, et oublie le lecteur et les clés des
    * éléments (le manifeste reste en mémoire : voir ContainerReader.wipe). Ni destroy(), ni item(),
@@ -751,12 +753,12 @@ async function openWith(
           const r = await api.watch(c, u.downloadToken, signal);
           return r === "gone" && (destroying || finished) ? "stop" : r;
         },
-        destroy: (reason) =>
+        destroy: (report) =>
           guarded(async () => {
             if (wiped) throw new Error("cles_effacees");
             destroying = true;
             try {
-              await api.destroy(c, { kAcces, kPreuve }, reason);
+              await api.destroy(c, { kAcces, kPreuve }, report);
               segs.clear(); // détruit : plus aucune lecture, même des segments gardés
             } catch (e) {
               destroying = false;

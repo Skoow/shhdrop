@@ -44,7 +44,23 @@ const CALLS: [string, (n: A.Net) => Promise<unknown>, unknown][] = [
   ["deconnexion", (n) => A.deconnexion(n, JETON), {}],
   ["etiquetterSession", (n) => A.etiquetterSession(n, JETON, B(64)), {}],
   ["etat", (n) => A.etat(n, JETON), ETAT],
+  // Lot 13 : paramètres, export, suppression (routes du lot 5).
+  ["reauth", (n) => A.reauth(n, JETON, B(32), "123456"), {}],
+  ["changerMdp", (n) => A.changerMdp(n, JETON, B(32), B(60)), {}],
+  ["emailDebut", (n) => A.emailDebut(n, JETON, { actuel: "a@b.fr", nouveau: "c@d.fr", langue: "fr" }), { etape: S(32) }],
+  ["emailRenvoyer", (n) => A.emailRenvoyer(n, JETON, S(32), "c@d.fr"), {}],
+  ["emailFin", (n) => A.emailFin(n, JETON, { etape: S(32), code: "123456", aAuth: B(32), envMdp: B(60), totp: "" }), {}],
+  ["totpDebut", (n) => A.totpDebut(n, JETON), { etape: S(32), secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" }],
+  ["totpFin", (n) => A.totpFin(n, JETON, S(32), "123456"), {}],
+  ["totpRetirer", (n) => A.totpRetirer(n, JETON), {}],
+  ["totpAnnulerRetrait", (n) => A.totpAnnulerRetrait(n, JETON), {}],
+  ["sessions", (n) => A.sessions(n, JETON), { sessions: [{ sid: S(16), ajoutee: "2026-11", etiquette: S(64), courante: true, persistante: false }] }],
+  ["fermerSession", (n) => A.fermerSession(n, JETON, { sid: S(16) }), {}],
+  ["fermerAutres", (n) => A.fermerSession(n, JETON, { autres: true }), {}],
+  ["exporter", (n) => A.exporter(n, JETON), { cree_le: "2026-11-14", anciennete_depuis: "2026-11-14", vu_mois: "2026-11", totp: false, retrait_totp_le: null, recup_jusqu: null, banni_jusqu: null, banni_motif: null, salons_actifs: 1, sessions: [{ ajoutee: "2026-11", persistante: true }] }],
+  ["supprimer", (n) => A.supprimer(n, JETON), { salons_fermes: 2 }],
 ];
+const SESSION_ROUTES = ["reauth", "changerMdp", "emailDebut", "emailRenvoyer", "emailFin", "totpDebut", "totpFin", "totpRetirer", "totpAnnulerRetrait", "sessions", "fermerSession", "fermerAutres", "exporter", "supprimer"];
 
 describe("routes et en-têtes", () => {
   it("toutes les requêtes vont à /api/compte*, sans cookie, sans redirection, rien dans l'URL", async () => {
@@ -53,7 +69,7 @@ describe("routes et en-têtes", () => {
       await call(n);
       expect(seen.length, name).toBe(1);
       const s = seen[0]!;
-      expect(s.url, name).toMatch(/^https:\/\/shh\.test\/api\/compte(\/[a-z/]+)?$/);
+      expect(s.url, name).toMatch(/^https:\/\/shh\.test\/api\/compte(\/[a-z/-]+)?$/);
       expect(s.url, name).not.toMatch(/\/api\/(shares|manage|salons)/);
       expect(s.init.credentials, name).toBe("omit");
       expect(s.init.redirect, name).toBe("error");
@@ -62,7 +78,7 @@ describe("routes et en-têtes", () => {
   });
 
   it("X-Shh-Session seulement sur les routes de session, avec le jeton exact", async () => {
-    const withSession = new Set(["lireCoffre", "ecrireCoffre", "pseudoVerifier", "changerPseudo", "deconnexion", "etiquetterSession", "etat"]);
+    const withSession = new Set(["lireCoffre", "ecrireCoffre", "pseudoVerifier", "changerPseudo", "deconnexion", "etiquetterSession", "etat", ...SESSION_ROUTES]);
     for (const [name, call, res] of CALLS) {
       const { n, seen } = net(() => ok(res));
       await call(n);
@@ -89,6 +105,35 @@ describe("routes et en-têtes", () => {
     expect(bodies.deconnexion).toEqual({});
     expect(bodies.etiquetterSession).toEqual({ etiquette: S(64) });
     expect(bodies.lireCoffre).toBeUndefined();
+    // Lot 13 : corps des routes de paramètres (handlers_compte.go).
+    expect(bodies.reauth).toEqual({ a_auth: S(32), totp: "123456" });
+    expect(bodies.changerMdp).toEqual({ a_auth: S(32), env_mdp: S(60) });
+    expect(bodies.emailDebut).toEqual({ email_actuel: "a@b.fr", email_nouveau: "c@d.fr", langue: "fr" });
+    expect(bodies.emailRenvoyer).toEqual({ etape: S(32), email: "c@d.fr" });
+    expect(bodies.emailFin).toEqual({ etape: S(32), code: "123456", a_auth: S(32), env_mdp: S(60), totp: "" });
+    expect(bodies.totpDebut).toEqual({});
+    expect(bodies.totpFin).toEqual({ etape: S(32), code: "123456" });
+    expect(bodies.totpRetirer).toEqual({});
+    expect(bodies.totpAnnulerRetrait).toEqual({});
+    expect(bodies.fermerSession).toEqual({ sid: S(16) });
+    expect(bodies.fermerAutres).toEqual({ autres: true });
+    expect(bodies.supprimer).toEqual({});
+    expect(bodies.sessions).toBeUndefined();
+    expect(bodies.exporter).toBeUndefined();
+  });
+
+  it("routes des paramètres : méthode et chemin exacts", async () => {
+    const want: Record<string, string> = {
+      reauth: "POST reauth", changerMdp: "POST mdp", emailDebut: "POST email/debut", emailRenvoyer: "POST email/renvoyer", emailFin: "POST email/fin",
+      totpDebut: "POST totp/debut", totpFin: "POST totp/fin", totpRetirer: "POST totp/retirer", totpAnnulerRetrait: "POST totp/annuler-retrait",
+      sessions: "GET sessions", fermerSession: "POST sessions/fermer", fermerAutres: "POST sessions/fermer", exporter: "GET export", supprimer: "POST supprimer",
+    };
+    for (const [name, call, res] of CALLS) {
+      if (!(name in want)) continue;
+      const { n, seen } = net(() => ok(res));
+      await call(n);
+      expect(`${seen[0]!.method} ${seen[0]!.url.replace("https://shh.test/api/compte/", "")}`, name).toBe(want[name]);
+    }
   });
 
   it("connexion avec preuve ALTCHA : les trois champs ensemble", async () => {
@@ -99,6 +144,22 @@ describe("routes et en-têtes", () => {
 });
 
 describe("réponses", () => {
+  it("lot 13 : secret TOTP, appareils, export et suppression décodés ; forme stricte", async () => {
+    expect(await A.totpDebut(net(() => ok({ etape: S(32), secret: "JBSWY3DPEHPK3PXP" })).n, JETON)).toEqual({ etape: S(32), secret: "JBSWY3DPEHPK3PXP" });
+    await expect(A.totpDebut(net(() => ok({ etape: S(32), secret: "pas du base32 !" })).n, JETON)).rejects.toThrow("reponse_invalide");
+    const ss = await A.sessions(net(() => ok({ sessions: [{ sid: S(16, 7), ajoutee: "2026-11", etiquette: S(64, 8), courante: true, persistante: false }, { sid: S(16, 9), ajoutee: "2026-10", etiquette: "", courante: false, persistante: true }] })).n, JETON);
+    expect(ss).toEqual([
+      { sid: S(16, 7), ajoutee: "2026-11", etiquette: B(64, 8), courante: true, persistante: false },
+      { sid: S(16, 9), ajoutee: "2026-10", etiquette: null, courante: false, persistante: true },
+    ]);
+    for (const bad of [{ sessions: [{ sid: S(15), ajoutee: "2026-11", etiquette: "", courante: true, persistante: false }] }, { sessions: [{ sid: S(16), ajoutee: "2026-11-01", etiquette: "", courante: true, persistante: false }] }, { sessions: "x" }])
+      await expect(A.sessions(net(() => ok(bad)).n, JETON)).rejects.toThrow("reponse_invalide");
+    const x = await A.exporter(net(() => ok({ cree_le: "2026-11-14", anciennete_depuis: "2026-11-15", vu_mois: "2026-11", totp: true, retrait_totp_le: "2026-11-21", recup_jusqu: null, banni_jusqu: null, banni_motif: null, salons_actifs: 1, sessions: [{ ajoutee: "2026-11", persistante: true }] })).n, JETON);
+    expect(x).toEqual({ creeLe: "2026-11-14", ancienneteDepuis: "2026-11-15", vuMois: "2026-11", totp: true, retraitTotpLe: "2026-11-21", recupJusqu: null, banniJusqu: null, banniMotif: null, salonsActifs: 1, sessions: [{ ajoutee: "2026-11", persistante: true }] });
+    expect(await A.supprimer(net(() => ok({ salons_fermes: 3 })).n, JETON)).toEqual({ salonsFermes: 3 });
+    await expect(A.supprimer(net(() => ok({ salons_fermes: -1 })).n, JETON)).rejects.toThrow("reponse_invalide");
+  });
+
   it("connexion : ouverture décodée, ou étape TOTP", async () => {
     const o = (await A.connexion(net(() => ok(OUV)).n, { email: "a", aAuth: B(32), persistante: false, etiquette: null })) as A.Ouverture;
     expect(o.envMdp).toEqual(B(60, 4));
