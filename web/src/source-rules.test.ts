@@ -76,7 +76,7 @@ describe("règles de sources", () => {
     expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, inUiDir)).toEqual([]));
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts"),
     ).toEqual([]));
   // Spec §33, §33.1 : exception écrite, l'historique local chiffré des envois. Seul
   // history/live.svelte.ts lit `indexedDB` (pour le passer à history/store.ts, qui chiffre) ;
@@ -85,7 +85,7 @@ describe("règles de sources", () => {
     const live = files.find((f) => f.rel === "history/live.svelte.ts");
     expect(live?.text).toMatch(/indexedDB/);
     expect(live?.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
-    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/"))).toEqual([]);
+    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/") && !r.startsWith("account/"))).toEqual([]);
   });
   // D42-22 : exception écrite, l'octroi d'ouverture gardé chiffré pour revenir jusqu'à
   // l'échéance (history/returns.ts, voisin de l'historique et même mécanisme : AES-GCM, clé non
@@ -113,6 +113,37 @@ describe("règles de sources", () => {
     const store = files.find((f) => f.rel === "downloads/store.ts")!;
     const type = store.text.match(/export type DownloadEntry = \{([\s\S]*?)\n\};/)![1]!;
     expect([...type.matchAll(/^\s+(\w+):/gm)].map((m) => m[1])).toEqual(["id", "name", "sizeBytes", "format", "source", "savedAt"]);
+  });
+  // Conception compte §8.5, §9, §15 (plan, lot 9) : web/src/account/ est le seul détenteur du jeton
+  // de session, de K_compte et de s_profil. Une seule couche réseau (account/api.ts) : X-Shh-Session
+  // n'est écrit que là ; la base `shhdrop-compte` (« Rester connecté », exception écrite, chiffrée
+  // par une clé non extractible) n'est nommée et lue que par account/persist.ts ; aucun cookie.
+  it("compte : X-Shh-Session seulement dans account/api.ts, seul fichier du compte qui fait des requêtes", () => {
+    expect(offenders(/X-Shh-Session/i, (r) => r !== "account/api.ts")).toEqual([]);
+    expect(files.find((f) => f.rel === "account/api.ts")?.text).toMatch(/X-Shh-Session/);
+    expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("account/") && r !== "account/api.ts")).toEqual([]);
+    expect(offenders(/XMLHttpRequest|sendBeacon|WebSocket|EventSource|keepalive/, (r) => r === "account/api.ts")).toEqual([]);
+  });
+  it("compte : s_profil et K_compte seulement dans account/", () => {
+    expect(offenders(/s_profil|sProfil|kCompte|K_compte/, (r) => !r.startsWith("account/") && !r.startsWith("engine/"))).toEqual([]);
+  });
+  it("compte : base shhdrop-compte nommée et lue seulement par account/persist.ts, sans localStorage ni sessionStorage", () => {
+    expect(offenders(/shhdrop-compte/, (r) => r !== "account/persist.ts")).toEqual([]);
+    const p = files.find((f) => f.rel === "account/persist.ts")!;
+    expect(p.text).toMatch(/shhdrop-compte/);
+    expect(p.text).toMatch(/indexedDB/);
+    expect(offenders(/localStorage|sessionStorage|document\.cookie/, (r) => r.startsWith("account/"))).toEqual([]);
+  });
+  // Les écrans ne voient du compte que son état (account/session.svelte.ts), et seulement derrière
+  // le drapeau de construction __COMPTES__ (faux par défaut : aucun code du compte dans le site).
+  it("compte : les écrans n'importent que account/session.svelte, et tout import du compte est derrière __COMPTES__", () => {
+    const RE_ACCOUNT = new RegExp(`(?:from\\s*|import\\s*\\(\\s*|import\\s+)${Q}${NQ}*\\/account\\/(${NQ}*)${Q}`, "g");
+    for (const f of files.filter((x) => !x.rel.startsWith("account/"))) {
+      const targets = [...f.text.matchAll(RE_ACCOUNT)].map((m) => m[1]);
+      if (targets.length === 0) continue;
+      expect(targets.filter((t) => !/^session\.svelte(?:\.ts|\.js)?$/.test(t!)), f.rel).toEqual([]);
+      expect(f.text, f.rel).toMatch(/__COMPTES__/);
+    }
   });
   it("historique : aucun secret de partage ni nom d'élément dans HistoryEntry", () => {
     const store = files.find((f) => f.rel === "history/store.ts")!;
@@ -147,6 +178,8 @@ describe("règles de sources", () => {
     .map((f) => ({ ...f, text: readFileSync(f.abs, "utf8") }));
   it("jamais setAttribute(\"style\") (CSSOM seulement, S6), dans tout src/", () =>
     expect(everySource.filter((f) => /setAttribute\s*\(\s*["'`]style["'`]/.test(f.text)).map((f) => f.rel)).toEqual([]));
+  it("aucun document.cookie, dans tout src/ (démo comprise)", () =>
+    expect(everySource.filter((f) => /document\.cookie/.test(f.text)).map((f) => f.rel)).toEqual([]));
   it("getImageData seulement sous viewers/ (aucune lecture des pixels du contenu)", () =>
     expect(
       everySource.filter((f) => !f.rel.startsWith("viewers/") && /getImageData/.test(f.text)).map((f) => f.rel),
@@ -269,6 +302,28 @@ describe("vite.config.ts résolu", () => {
     const names = cfg.plugins.map((p) => p.name);
     expect(names).toContain("shh-demo-guard");
     expect(names).not.toContain("shh-demo-meta");
+  });
+
+  // Plan du compte, lot 9 : drapeau de construction __COMPTES__, faux par défaut et toujours faux
+  // dans la démo (aucun serveur) ; vrai seulement si SHH_SITE_COMPTES=1 au build de production.
+  it("__COMPTES__ : false par défaut et dans la démo, true seulement avec SHH_SITE_COMPTES=1 (production)", async () => {
+    const define = async (mode: string | undefined, env: string | undefined) => {
+      const was = process.env.SHH_SITE_COMPTES;
+      if (env === undefined) delete process.env.SHH_SITE_COMPTES;
+      else process.env.SHH_SITE_COMPTES = env;
+      try {
+        return (await resolveConfig({ configFile: join(webDir, "vite.config.ts"), root: webDir, mode }, "build")).define?.__COMPTES__;
+      } finally {
+        if (was === undefined) delete process.env.SHH_SITE_COMPTES;
+        else process.env.SHH_SITE_COMPTES = was;
+      }
+    };
+    expect(await define(undefined, undefined)).toBe("false");
+    expect(await define(undefined, "0")).toBe("false");
+    expect(await define(undefined, "true")).toBe("false");
+    expect(await define(undefined, "1")).toBe("true");
+    expect(await define("demo", undefined)).toBe("false");
+    expect(await define("demo", "1")).toBe("false");
   });
 
   it("mode demo : base /shhdrop/, sortie dist-demo, demoMeta", async () => {

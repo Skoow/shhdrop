@@ -3,6 +3,7 @@
 // la démo porte bien ses protections. Lancé par `make test-web` et la CI après les builds.
 //   node scripts/check-dist.mjs [dossier]          production (défaut : web/dist)
 //   node scripts/check-dist.mjs --demo [dossier]   démo (défaut : web/dist-demo)
+//   --comptes : build de production fait avec SHH_SITE_COMPTES=1 (module de compte admis)
 // Sortie 0 si tout va bien ; sinon 1, une ligne par problème sur stderr.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -85,8 +86,14 @@ const metaRe = (attrs) => {
   return new RegExp(`^<meta ${parts.join(" ")}\\s*/?>`);
 };
 
-/** Rend la liste des problèmes (vide si tout va bien). */
-export function checkDist(dir, demo) {
+/**
+ * Traces du module de compte (web/src/account/ : routes et base IndexedDB) : interdites dans un
+ * build sans __COMPTES__ (plan du compte, lot 9 : le site public ne change pas) et dans la démo.
+ */
+const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
+
+/** Rend la liste des problèmes (vide si tout va bien). `comptes` : build avec __COMPTES__ (jamais pour la démo). */
+export function checkDist(dir, demo, comptes = false) {
   const problems = [];
   if (!existsSync(join(dir, "index.html"))) return [`${dir} : index.html absent (build manquant ?)`];
   const raw = files(dir).map((p) => ({ rel: relative(dir, p), data: readFileSync(p) }));
@@ -129,6 +136,12 @@ export function checkDist(dir, demo) {
     for (const w of findAnalytics(text)) problems.push(`${f.rel} : statistique « ${w} » (spec §35.1)`);
     for (const m of findErrorListeners(text)) problems.push(`${f.rel} : écouteur global d'erreurs « ${m} » (spec §35.1)`);
   }
+
+  if (demo || !comptes)
+    for (const f of all) {
+      if (/\.(woff2?|png|jpe?g|gif|ico|webp|avif|wasm)$/i.test(f.rel)) continue;
+      for (const t of ACCOUNT_TRACES) if (f.data.includes(t)) problems.push(`${f.rel} : module de compte « ${t} » dans un build sans __COMPTES__`);
+    }
 
   if (!demo) {
     for (const f of all)
@@ -233,10 +246,11 @@ export function checkDist(dir, demo) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const args = process.argv.slice(2);
   const demo = args.includes("--demo");
-  const rest = args.filter((a) => a !== "--demo");
+  const comptes = args.includes("--comptes");
+  const rest = args.filter((a) => a !== "--demo" && a !== "--comptes");
   const web = fileURLToPath(new URL("..", import.meta.url));
   const dir = rest[0] ?? join(web, demo ? "dist-demo" : "dist");
-  const problems = checkDist(dir, demo);
+  const problems = checkDist(dir, demo, comptes);
   if (problems.length > 0) {
     for (const p of problems) console.error(`check-dist${demo ? " --demo" : ""} : ${p}`);
     process.exit(1);

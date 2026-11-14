@@ -292,12 +292,24 @@ export function precompress(): Plugin {
   };
 }
 
+/**
+ * Compte par e-mail (plan du compte, lot 9) : drapeau de construction __COMPTES__, `false` par
+ * défaut. Vrai seulement si SHH_SITE_COMPTES vaut exactement « 1 » au build de production ; jamais
+ * dans la démo (aucun serveur). Faux, aucun écran n'importe src/account/ (source-rules.test.ts) :
+ * aucun code du compte dans le site (contrôle : scripts/check-dist.mjs sans --comptes).
+ * Activation publique : décision D8 du propriétaire (conception du compte §20), avec SHH_COMPTES=1
+ * côté serveur.
+ */
+export function comptesActifs(demo: boolean): boolean {
+  return !demo && process.env.SHH_SITE_COMPTES === "1";
+}
+
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
     plugins: [svelte(), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
-    define: { __SHH_BUILD__: JSON.stringify(buildId(command)) },
+    define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)) },
     build: {
       outDir: demo ? "dist-demo" : "dist",
       assetsInlineLimit: 0,

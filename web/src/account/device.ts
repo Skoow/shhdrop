@@ -1,0 +1,54 @@
+// Nom d'appareil d'une session (conception compte §8.5) : calculé sur l'appareil à partir du seul
+// navigateur et de la sorte d'appareil (« Firefox · ordinateur »), jamais la version ni le système
+// précis ; chiffré par K_etiquette avant d'être envoyé (64 octets fixes : le serveur n'en apprend
+// pas la longueur) :
+//   nonce (12) ‖ AES-256-GCM(K_etiquette, nonce, clair (36), AD = « SHH-CETQ1 » ‖ h),
+//   clair = longueur (1) ‖ nom en UTF-8 (35 octets au plus, coupé sur un caractère) ‖ zéros.
+// Format défini ici (la conception ne le fixait pas) : à ajouter aux vecteurs communs
+// (engine/vectors/compte.json) avant les apps (D42-20).
+import { concat, utf8 } from "../engine/pure";
+
+type Bytes = Uint8Array<ArrayBuffer>;
+export const ETIQUETTE_LEN = 64;
+const CLAIR = ETIQUETTE_LEN - 12 - 16;
+const NOM_MAX = CLAIR - 1;
+const ad = (h: Uint8Array) => concat(utf8("SHH-CETQ1"), h);
+
+export function nomAppareil(ua: string): string {
+  const nav = /Edg\//.test(ua) ? "Edge" : /Firefox\/|FxiOS\//.test(ua) ? "Firefox" : /Chrome\/|CriOS\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Navigateur";
+  const sorte = /iPad|Tablet/.test(ua) ? "tablette" : /Mobile|iPhone|Android/.test(ua) ? "téléphone" : "ordinateur";
+  return `${nav} · ${sorte}`;
+}
+
+function tronquer(nom: string): Bytes {
+  let out = new Uint8Array(0);
+  for (const ch of nom) {
+    const next = concat(out, utf8(ch));
+    if (next.length > NOM_MAX) break;
+    out = next;
+  }
+  return out;
+}
+
+export async function scellerEtiquette(cle: CryptoKey, h: Uint8Array, nom: string): Promise<Bytes> {
+  const n = tronquer(nom);
+  const clair = new Uint8Array(CLAIR);
+  clair[0] = n.length;
+  clair.set(n, 1);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: ad(h) }, cle, clair));
+  return concat(iv, ct);
+}
+
+/** Nom d'appareil, ou null si l'étiquette ne s'ouvre pas. */
+export async function ouvrirEtiquette(cle: CryptoKey, h: Uint8Array, e: Uint8Array): Promise<string | null> {
+  if (e.length !== ETIQUETTE_LEN) return null;
+  try {
+    const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: e.slice(0, 12), additionalData: ad(h) }, cle, e.slice(12)));
+    const n = pt[0]!;
+    if (n > NOM_MAX || !pt.subarray(1 + n).every((x) => x === 0)) return null;
+    return new TextDecoder("utf-8", { fatal: true }).decode(pt.subarray(1, 1 + n));
+  } catch {
+    return null;
+  }
+}

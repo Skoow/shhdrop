@@ -1,0 +1,410 @@
+// État du compte sur l'appareil (conception compte §9, §10, §21.2) contre un faux serveur en
+// mémoire : inscription, connexion (avec étape TOTP), récupération, pseudo, deux coffres,
+// écriture différée du coffre privé, « Rester connecté », déconnexion qui efface tout.
+import { randomFillSync } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fakeIndexedDB, type FakeIdb } from "../history/fake-idb.test-helper";
+import { b64u, unb64u } from "../engine/pure";
+import { clesDuCompte, ouvrirEnveloppe } from "./keys";
+import { deriverCompte } from "../engine/index";
+import { ouvrir, priveDeJson, profilDeJson, REGLAGES_DEFAUT, type Profil } from "./vaults";
+import { ouvrirEtiquette } from "./device";
+import * as C from "./session.svelte";
+
+const MDP = "correct horse battery";
+const CODE = "123456";
+const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
+const profil = (p: Partial<Profil> = {}): Profil => ({ pseudo: "Léa", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null, ...p });
+
+type Compte = { h: Uint8Array; aAuth: string; envMdp: Uint8Array; sProfil: Uint8Array; pCanon: string; coffres: Record<"profil" | "prive", { blob: Uint8Array; gen: number }>; totp: boolean };
+
+/** Faux serveur : routes du compte utilisées par le lot 9, mêmes formes que handlers_compte.go. */
+function fauxServeur() {
+  const comptes = new Map<string, Compte>(); // e-mail exact → compte
+  const etapes = new Map<string, { email: string; h: Uint8Array; sorte: "inscription" | "oubli" | "totp"; verifie?: boolean }>();
+  const sessions = new Map<string, string>(); // jeton → e-mail
+  const pseudos = new Set<string>();
+  const requetes: { method: string; path: string; headers: Record<string, string>; body: Record<string, unknown> }[] = [];
+  const etiquettes: string[] = [];
+  const rnd = (n: number) => randomFillSync(new Uint8Array(n)); // pas crypto.getRandomValues : `tires` ne voit que l'appareil
+  const ok = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
+  const err = (status: number, error: string, extra = {}) => ok({ error, ...extra }, status);
+  const ouvrirSession = (email: string) => {
+    const t = b64u(rnd(32));
+    sessions.set(t, email);
+    return t;
+  };
+  const ouverture = (email: string) => {
+    const c = comptes.get(email)!;
+    return { session: ouvrirSession(email), h: b64u(c.h as Uint8Array<ArrayBuffer>), env_mdp: b64u(c.envMdp as Uint8Array<ArrayBuffer>), s_profil: b64u(c.sProfil as Uint8Array<ArrayBuffer>), blob_profil: b64u(c.coffres.profil.blob as Uint8Array<ArrayBuffer>), gen_profil: c.coffres.profil.gen, blob_prive: b64u(c.coffres.prive.blob as Uint8Array<ArrayBuffer>), gen_prive: c.coffres.prive.gen };
+  };
+  const fetch = (async (url: string, init: RequestInit) => {
+    const path = new URL(url).pathname;
+    const headers = { ...(init.headers as Record<string, string>) };
+    const body = init.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {};
+    requetes.push({ method: init.method ?? "GET", path, headers, body });
+    const qui = sessions.get(headers["X-Shh-Session"] ?? "");
+    const r = path.replace(/^\/api\/compte\/?/, "");
+    switch (`${init.method} ${r}`) {
+      case "POST inscription/debut": {
+        const e = b64u(rnd(32)), h = rnd(16);
+        etapes.set(e, { email: body.email as string, h, sorte: "inscription" });
+        return ok({ h: b64u(h), etape: e });
+      }
+      case "POST inscription/fin": {
+        const e = etapes.get(body.etape as string);
+        if (!e) return err(404, "not_found");
+        if (body.code !== CODE) return err(403, "code_faux", { attempts_left: 4 });
+        if (pseudos.has(body.p_canon as string)) return err(409, "pseudo_pris");
+        pseudos.add(body.p_canon as string);
+        if (body.etiquette) etiquettes.push(body.etiquette as string);
+        comptes.set(e.email, { h: e.h, aAuth: body.a_auth as string, envMdp: unb64u(body.env_mdp as string), sProfil: unb64u(body.s_profil as string), pCanon: body.p_canon as string, coffres: { profil: { blob: unb64u(body.blob_profil as string), gen: 1 }, prive: { blob: unb64u(body.blob_prive as string), gen: 1 } }, totp: false });
+        etapes.delete(body.etape as string);
+        return ok({ session: ouvrirSession(e.email) }, 201);
+      }
+      case "POST connexion": {
+        const c = comptes.get(body.email as string);
+        if (!c || c.aAuth !== body.a_auth) return err(403, "identifiants");
+        if (c.totp) {
+          const e = b64u(rnd(32));
+          etapes.set(e, { email: body.email as string, h: c.h, sorte: "totp" });
+          return ok({ totp_requis: true, etape: e });
+        }
+        return ok(ouverture(body.email as string));
+      }
+      case "POST connexion/totp": {
+        const e = etapes.get(body.etape as string);
+        if (!e || e.sorte !== "totp") return err(404, "not_found");
+        if (body.code !== "654321") return err(403, "totp_faux");
+        return ok(ouverture(e.email));
+      }
+      case "POST oubli/debut": {
+        const e = b64u(rnd(32));
+        etapes.set(e, { email: body.email as string, h: comptes.get(body.email as string)?.h ?? rnd(16), sorte: "oubli" });
+        return ok({ etape: e });
+      }
+      case "POST oubli/verifier": {
+        const e = etapes.get(body.etape as string);
+        const c = e && comptes.get(e.email);
+        if (!e || !c || body.code !== CODE) return err(403, "code_faux", { attempts_left: 4 });
+        e.verifie = true;
+        return ok({ h: b64u(c.h as Uint8Array<ArrayBuffer>), gen_prive: c.coffres.prive.gen });
+      }
+      case "POST oubli/fin": {
+        const e = etapes.get(body.etape as string);
+        if (!e?.verifie) return err(404, "not_found");
+        const c = comptes.get(e.email)!;
+        const blob = unb64u(body.blob_prive as string);
+        if (new DataView(blob.buffer, 9, 8).getBigUint64(0) !== BigInt(c.coffres.prive.gen + 1)) return err(400, "bad_request");
+        c.aAuth = body.a_auth as string;
+        c.envMdp = unb64u(body.env_mdp as string);
+        c.coffres.prive = { blob, gen: c.coffres.prive.gen + 1 };
+        for (const [t, m] of sessions) if (m === e.email) sessions.delete(t);
+        const o = ouverture(e.email);
+        return ok({ session: o.session, h: o.h, s_profil: o.s_profil, blob_profil: o.blob_profil, gen_profil: o.gen_profil, gen_prive: o.gen_prive });
+      }
+      case "POST pseudo/verifier":
+        if (!qui && !(body.etape && etapes.has(body.etape as string))) return err(401, "session");
+        return ok({ libre: !pseudos.has(body.p_canon as string) });
+      case "POST pseudo": {
+        if (!qui) return err(401, "session");
+        if (pseudos.has(body.p_canon as string)) return err(409, "pseudo_pris");
+        const c = comptes.get(qui)!;
+        pseudos.delete(c.pCanon);
+        pseudos.add((c.pCanon = body.p_canon as string));
+        return ok({});
+      }
+      case "GET coffre/profil":
+      case "GET coffre/prive": {
+        if (!qui) return err(401, "session");
+        const v = comptes.get(qui)!.coffres[r.slice(7) as "profil" | "prive"];
+        return ok({ blob: b64u(v.blob as Uint8Array<ArrayBuffer>), gen: v.gen });
+      }
+      case "PUT coffre/profil":
+      case "PUT coffre/prive": {
+        if (!qui) return err(401, "session");
+        const v = comptes.get(qui)!.coffres[r.slice(7) as "profil" | "prive"];
+        if (body.if_gen !== v.gen) return err(409, "conflict", { gen: v.gen });
+        v.blob = unb64u(body.blob as string);
+        v.gen++;
+        return ok({ gen: v.gen });
+      }
+      case "POST deconnexion":
+        if (!qui) return err(401, "session");
+        sessions.delete(headers["X-Shh-Session"]!);
+        return ok({});
+    }
+    return err(404, "not_found");
+  }) as unknown as typeof globalThis.fetch;
+  return { comptes, sessions, requetes, etiquettes, fetch };
+}
+
+let srv: ReturnType<typeof fauxServeur>;
+let idb: FakeIdb;
+let planifies: { ms: number; f: () => void; annule: boolean }[];
+/** Tableaux de 32 octets tirés par crypto.getRandomValues (K_compte, s_profil) côté appareil. */
+let tires: Uint8Array[];
+const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
+
+/** Vraie dérivation (moteur), gardée par mot de passe et adresse : moins d'Argon2id de 64 Mio par test. */
+const derives = new Map<string, { aAuth: Uint8Array; kekMdp: Uint8Array }>();
+async function deriver(mdp: string, canon: string) {
+  const k = `${mdp}\0${canon}`;
+  if (!derives.has(k)) derives.set(k, await deriverCompte(mdp, canon));
+  const d = derives.get(k)!;
+  return { aAuth: d.aAuth.slice(), kekMdp: d.kekMdp.slice() }; // copies : la session les efface
+}
+
+function configurer() {
+  C.configurerCompte({
+    deriver,
+    net: { origin: "https://shh.test", fetch: srv.fetch },
+    idb: () => idb,
+    agent: () => UA,
+    planifier: (ms, f) => {
+      const p = { ms, f, annule: false };
+      planifies.push(p);
+      return () => (p.annule = true);
+    },
+  });
+}
+
+beforeEach(() => {
+  srv = fauxServeur();
+  idb = fakeIndexedDB();
+  planifies = [];
+  tires = [];
+  const real = crypto.getRandomValues.bind(crypto);
+  vi.spyOn(crypto, "getRandomValues").mockImplementation(<T extends ArrayBufferView | null>(a: T): T => {
+    const out = real(a as never) as T;
+    if (a instanceof Uint8Array && a.length === 32) tires.push(a);
+    return out;
+  });
+  configurer();
+});
+afterEach(async () => {
+  await C.seDeconnecter();
+  vi.restoreAllMocks();
+});
+
+async function inscription(email = "Lea.Dupont@exemple.fr", persistante = false, p = profil()) {
+  await C.inscrire(email, "fr", PREUVE);
+  await C.confirmer(CODE, MDP, p, persistante);
+}
+
+describe("inscription", () => {
+  it("le mot de passe ne part jamais ; le compte s'ouvre avec les deux coffres", async () => {
+    await inscription();
+    expect(C.account.etat).toBe("ouvert");
+    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.prive).toEqual({ salons: [], recus: [], rejoints: [], envois: [] });
+    const tout = JSON.stringify(srv.requetes);
+    expect(tout).not.toContain(MDP);
+    expect(tout).not.toContain(b64u(new TextEncoder().encode(MDP)));
+    // Le serveur reçoit l'adresse exacte ; le pseudo seulement en p_canon.
+    const fin = srv.requetes.find((r) => r.path.endsWith("inscription/fin"))!;
+    expect(fin.body.p_canon).toBe("léa");
+    expect(tout).not.toContain("Léa");
+    expect(srv.requetes[0]!.body).toEqual({ email: "lea.dupont@exemple.fr", langue: "fr", ...PREUVE });
+  });
+
+  it("l'enveloppe ouvre K_compte, le profil s'ouvre par s_profil, l'étiquette nomme l'appareil", async () => {
+    await inscription();
+    const c = srv.comptes.get("lea.dupont@exemple.fr")!;
+    const { aAuth, kekMdp } = await deriverCompte(MDP, "lea.dupont@exemple.fr"); // calcul neuf, hors cache
+    expect(b64u(aAuth)).toBe(c.aAuth);
+    const kCompte = await ouvrirEnveloppe(kekMdp, c.h, c.envMdp);
+    const k = await clesDuCompte(kCompte, c.sProfil);
+    expect(profilDeJson(await ouvrir("profil", k.profil, c.h, c.coffres.profil.blob, 1)).pseudo).toBe("Léa");
+    expect(priveDeJson(await ouvrir("prive", k.prive, c.h, c.coffres.prive.blob, 1)).salons).toEqual([]);
+    // Le coffre de profil ne s'ouvre pas avec K_prive (le séquestre n'ouvre que le profil).
+    await expect(ouvrir("prive", k.profil, c.h, c.coffres.prive.blob, 1)).rejects.toThrow("coffre_illisible");
+    expect(await ouvrirEtiquette(k.etiquette, c.h, unb64u(srv.etiquettes[0]!))).toBe("Firefox · ordinateur");
+  });
+
+  it("mot de passe trop court, pseudo invalide ou réservé : refus avant toute requête de fin", async () => {
+    await C.inscrire("lea@exemple.fr", "fr", PREUVE);
+    await expect(C.confirmer(CODE, "court", profil(), false)).rejects.toThrow("mdp_court");
+    await expect(C.confirmer(CODE, MDP, profil({ pseudo: "a" }), false)).rejects.toThrow(/pseudo/);
+    await expect(C.confirmer(CODE, MDP, profil({ pseudo: "Admin" }), false)).rejects.toThrow("pseudo_reserve");
+    expect(srv.requetes.filter((r) => r.path.endsWith("inscription/fin"))).toEqual([]);
+  });
+
+  it("code faux : l'erreur du serveur passe (essais restants), l'inscription reste en cours", async () => {
+    await C.inscrire("lea@exemple.fr", "fr", PREUVE);
+    await expect(C.confirmer("000000", MDP, profil(), false)).rejects.toMatchObject({ code: "code_faux", attemptsLeft: 4 });
+    expect(C.account.etat).toBe("absent");
+    await C.confirmer(CODE, MDP, profil(), false);
+    expect(C.account.etat).toBe("ouvert");
+  });
+
+  it("pseudoLibre : pendant l'inscription par l'étape, ensuite par la session ; réservé : jamais libre, sans requête", async () => {
+    await C.inscrire("lea@exemple.fr", "fr", PREUVE);
+    expect(await C.pseudoLibre("Léa")).toBe(true);
+    const n = srv.requetes.length;
+    expect(await C.pseudoLibre("Support")).toBe(false);
+    expect(srv.requetes.length).toBe(n);
+    await C.confirmer(CODE, MDP, profil(), false);
+    expect(await C.pseudoLibre("LÉA")).toBe(false);
+    const last = srv.requetes.at(-1)!;
+    expect(last.headers["X-Shh-Session"]).toBeTruthy();
+    expect(last.body).toEqual({ p_canon: "léa" });
+  });
+});
+
+describe("connexion et TOTP", () => {
+  it("connexion : coffres ouverts ; variante d'adresse acceptée par le même sel", async () => {
+    await inscription("lea.dupont@gmail.com");
+    await C.seDeconnecter();
+    srv.comptes.set("leadupont+x@gmail.com", srv.comptes.get("lea.dupont@gmail.com")!); // le vrai serveur compare e_canon
+    await C.seConnecter("LeaDupont+x@GMAIL.com", MDP, false);
+    expect(C.account.etat).toBe("ouvert");
+    expect(C.account.profil?.pseudo).toBe("Léa");
+  });
+
+  it("mot de passe faux : identifiants, rien d'ouvert", async () => {
+    await inscription();
+    await C.seDeconnecter();
+    await expect(C.seConnecter("lea.dupont@exemple.fr", "mauvais mot de passe", false)).rejects.toMatchObject({ code: "identifiants" });
+    expect(C.account.etat).toBe("absent");
+  });
+
+  it("étape TOTP : seConnecter rend « totp », validerTotp ouvre", async () => {
+    await inscription();
+    await C.seDeconnecter();
+    srv.comptes.get("lea.dupont@exemple.fr")!.totp = true;
+    expect(await C.seConnecter("lea.dupont@exemple.fr", MDP, false)).toBe("totp");
+    expect(C.account.etat).toBe("absent");
+    await expect(C.validerTotp("111111")).rejects.toMatchObject({ code: "totp_faux" });
+    await C.validerTotp("654321");
+    expect(C.account.etat).toBe("ouvert");
+  });
+});
+
+describe("coffres", () => {
+  it("ecrireProfil : écrit tout de suite ; fusion si un autre appareil a écrit entre-temps", async () => {
+    await inscription();
+    const c = srv.comptes.get("lea.dupont@exemple.fr")!;
+    // Un autre appareil a écrit (gen 2) : on recopie son coffre tel quel avec un gen plus grand.
+    const old = c.coffres.profil.blob;
+    await C.ecrireProfil({ langue: "en" });
+    expect(c.coffres.profil.gen).toBe(2);
+    c.coffres.profil = { blob: old, gen: 1 }; // retour en arrière du serveur
+    await expect(C.ecrireProfil({ pseudo: "Zoé" })).rejects.toThrow("coffre_recule");
+    expect(C.account.erreur).toBe("coffre_illisible");
+  });
+
+  it("ecrirePrive différé : un seul envoi, 2 à 12 min après le premier événement, avec tous les ajouts", async () => {
+    await inscription();
+    const c = srv.comptes.get("lea.dupont@exemple.fr")!;
+    await C.ecrirePrive((p) => ({ ...p, recus: [...p.recus, { id: "r1" }] }), { differe: true });
+    await C.ecrirePrive((p) => ({ ...p, recus: [...p.recus, { id: "r2" }] }), { differe: true });
+    expect(c.coffres.prive.gen).toBe(1);
+    expect(planifies.length).toBe(1);
+    expect(planifies[0]!.ms).toBeGreaterThanOrEqual(120_000);
+    expect(planifies[0]!.ms).toBeLessThanOrEqual(720_000);
+    planifies[0]!.f();
+    await vi.waitFor(() => expect(c.coffres.prive.gen).toBe(2));
+    expect(C.account.prive?.recus.map((e) => e.id)).toEqual(["r1", "r2"]);
+    // Écriture immédiate : part tout de suite.
+    await C.ecrirePrive((p) => ({ ...p, salons: [{ id: "s1" }] }), { differe: false });
+    expect(c.coffres.prive.gen).toBe(3);
+  });
+
+  it("le délai de l'écriture différée est tiré au hasard", async () => {
+    await inscription();
+    const vus = new Set<number>();
+    for (let i = 0; i < 8; i++) {
+      await C.ecrirePrive((p) => p, { differe: true });
+      vus.add(planifies.at(-1)!.ms);
+      planifies.at(-1)!.f();
+      await vi.waitFor(() => expect(srv.requetes.at(-1)!.method).toBe("PUT"));
+    }
+    expect(vus.size).toBeGreaterThan(1);
+  });
+
+  it("changerPseudo : p_canon envoyé, puis le profil chiffré porte le nouveau pseudo", async () => {
+    await inscription();
+    await C.changerPseudo("Zoé");
+    expect(srv.requetes.find((r) => r.path.endsWith("/pseudo"))!.body).toEqual({ p_canon: "zoé" });
+    expect(C.account.profil?.pseudo).toBe("Zoé");
+    expect(srv.comptes.get("lea.dupont@exemple.fr")!.coffres.profil.gen).toBe(2);
+  });
+});
+
+describe("mot de passe oublié", () => {
+  it("profil gardé, coffre privé neuf (gen qui continue), nouveau mot de passe valable", async () => {
+    await inscription();
+    await C.ecrirePrive((p) => ({ ...p, salons: [{ id: "perdu" }] }), { differe: false });
+    await C.seDeconnecter();
+    await C.oubli.debut("lea.dupont@exemple.fr", "fr", PREUVE);
+    expect(await C.oubli.verifier(CODE, "", false)).toBe("ok");
+    await C.oubli.fin("nouveau mot de passe", false);
+    expect(C.account.etat).toBe("ouvert");
+    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.prive?.salons).toEqual([]);
+    expect(srv.comptes.get("lea.dupont@exemple.fr")!.coffres.prive.gen).toBe(3);
+    await C.seDeconnecter();
+    await C.seConnecter("lea.dupont@exemple.fr", "nouveau mot de passe", false);
+    expect(C.account.etat).toBe("ouvert");
+  });
+});
+
+describe("session et déconnexion", () => {
+  it("par défaut rien n'est écrit dans IndexedDB", async () => {
+    await inscription();
+    expect([...idb.raw().keys()]).toEqual([]);
+  });
+
+  it("« Rester connecté » : restaurer après un rechargement rouvre le compte sans mot de passe", async () => {
+    await inscription(undefined, true);
+    expect([...idb.raw().keys()]).toEqual(["shhdrop-compte"]);
+    C._oublierMemoire(); // ce que fait un rechargement de la page
+    expect(C.account.etat).toBe("absent");
+    await C.restaurer();
+    expect(C.account.etat).toBe("ouvert");
+    expect(C.account.profil?.pseudo).toBe("Léa");
+  });
+
+  it("restaurer avec une session échue : base effacée, état absent", async () => {
+    await inscription(undefined, true);
+    srv.sessions.clear();
+    C._oublierMemoire();
+    await C.restaurer();
+    expect(C.account.etat).toBe("absent");
+    expect([...idb.raw().keys()]).toEqual([]);
+  });
+
+  it("déconnexion : le serveur oublie la session, shhdrop-compte effacée, K_compte et s_profil mis à zéro", async () => {
+    await inscription(undefined, true);
+    expect(tires.length).toBeGreaterThanOrEqual(2);
+    expect(tires.every((t) => t.some((x) => x !== 0))).toBe(true);
+    await C.ecrirePrive((p) => p, { differe: true });
+    await C.seDeconnecter();
+    expect(srv.sessions.size).toBe(0);
+    expect([...idb.raw().keys()]).toEqual([]);
+    expect(C.account.etat).toBe("absent");
+    expect(C.account.profil).toBeUndefined();
+    expect(C.account.prive).toBeUndefined();
+    expect(tires.every((t) => t.every((x) => x === 0))).toBe(true);
+    expect(planifies[0]!.annule).toBe(true);
+  });
+
+  it("déconnexion sans réseau : l'appareil efface quand même tout", async () => {
+    await inscription(undefined, true);
+    C.configurerCompte({ net: { origin: "https://shh.test", fetch: (async () => Promise.reject(new TypeError("x"))) as unknown as typeof fetch } });
+    await C.seDeconnecter();
+    expect(C.account.etat).toBe("absent");
+    expect([...idb.raw().keys()]).toEqual([]);
+  });
+
+  it("aucune requête hors de /api/compte/* ; jeton seulement en X-Shh-Session", async () => {
+    await inscription(undefined, true);
+    await C.ecrireProfil({ langue: "en" });
+    await C.seDeconnecter();
+    for (const r of srv.requetes) {
+      expect(r.path).toMatch(/^\/api\/compte(\/|$)/);
+      expect(JSON.stringify(r.body)).not.toMatch(/session/);
+    }
+  });
+});

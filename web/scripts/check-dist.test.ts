@@ -90,6 +90,16 @@ describe("check-dist.mjs, production", () => {
     expect(run([d])).toEqual({ code: 0, err: "" });
   });
 
+  it("compte (plan du compte, lot 9) : sans --comptes, aucune trace du module de compte (/api/compte, shhdrop-compte) ; avec --comptes, admise", () => {
+    for (const trace of ['fetch(o+"/api/compte/connexion")', 'indexedDB.open("shhdrop-compte")']) {
+      const d = site({ "index.html": PROD_INDEX, "assets/index-a.js": trace });
+      const r = run([d]);
+      expect(r.code, trace).toBe(1);
+      expect(r.err, trace).toMatch(/assets\/index-a\.js : module de compte « (\/api\/compte|shhdrop-compte) » dans un build sans __COMPTES__/);
+      expect(run(["--comptes", d]), trace).toEqual({ code: 0, err: "" });
+    }
+  });
+
   it("échoue si un fichier contient __SHH_DEMO__", () => {
     const d = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const MARK="__SHH_DEMO__"' });
     const r = run([d]);
@@ -322,6 +332,12 @@ describe("check-dist.mjs --demo", () => {
 
   it("passe avec la marque, les balises en tête de <head> et 404.html", () => {
     expect(run(["--demo", site(good())])).toEqual({ code: 0, err: "" });
+  });
+
+  it("compte : jamais dans la démo (aucun serveur), même avec --comptes", () => {
+    const r = run(["--demo", "--comptes", site({ ...good(), "assets/install-a.js": good()["assets/install-a.js"] + 'x="/api/compte"' })]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("module de compte « /api/compte »");
   });
 
   it("échoue sans la marque", () => {
