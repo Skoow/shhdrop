@@ -228,8 +228,11 @@ func TestParcoursCompteHTTP(t *testing.T) {
 		body: []byte(`{"p_canon":"connard"}`)}), 200, `{"libre":false}`)
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo/verifier", hdr: sess(s2),
 		body: []byte(`{"p_canon":"leo"}`)}), 200, `{"libre":true}`)
+	// Premier changement permis le jour de l'inscription (faute de frappe), le suivant attend demain.
 	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo", hdr: sess(s2),
-		body: []byte(`{"p_canon":"leo"}`)}), 429, "")
+		body: []byte(`{"p_canon":"leo"}`)}), 200, `{}`)
+	expect(t, e.do(req{method: "POST", path: "/api/compte/pseudo", hdr: sess(s2),
+		body: []byte(`{"p_canon":"lea"}`)}), 429, "")
 	// Fermer les autres, puis se déconnecter.
 	expect(t, e.do(req{method: "POST", path: "/api/compte/sessions/fermer", hdr: sess(s2),
 		body: []byte(`{"autres":true}`)}), 200, `{}`)

@@ -17,7 +17,8 @@ import (
 //
 // comptes : h (16, tiré par le serveur) ; e_canon, e_envoi (empreintes à clé de l'adresse) ;
 // v_mdp (HMAC de A_auth) ; env_mdp (Env_mdp, 60) ; cle_profil (séquestre de s_profil, 60) ;
-// p_empreinte (empreinte à clé du pseudo) ; coffres de profil et privé au palier exact
+// p_empreinte (empreinte à clé du pseudo) ; pseudo_jour (jour du dernier changement de pseudo,
+// 0 tant qu'il n'a jamais changé) ; coffres de profil et privé au palier exact
 // (4, 16, 64 ou 256 Kio + 45 octets d'en-tête, de nonce et d'étiquette) avec leur gen ; totp
 // (secret chiffré, 48) ; attentes de sécurité (R3, R4) ; ancienneté. Pas de colonne « banni »
 // (version 1 du schéma, retirée au lot 7) : le statut se lit dans bannis (actif, non échu),

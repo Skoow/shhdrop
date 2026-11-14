@@ -4,6 +4,9 @@
 // §41.8, D41-28, D41-29). Règles : jamais « 100 % », aucune allégation d'audit ni de pays
 // d'hébergement (plan B3), aucune identité d'éditeur ni d'hébergeur inventée (champs « à
 // compléter par le propriétaire »), aucune adresse e-mail. Chiffres lus dans les constantes.
+// Compte par e-mail (plan du compte, lot 16 ; conception compte §16, §21.18) : les textes qui
+// DÉCRIVENT le compte ne s'ajoutent qu'avec __COMPTES__ (COMPTE_FR, COMPTE_EN) : le site public
+// n'annonce pas une fonction absente. Les phrases communes restent vraies dans les deux cas.
 import { CONTENT_MAX, MAX_ITEMS, MAX_OPENS, PW_TRIES, TTL_MAX_HOURS } from "../../limits";
 import { formatBytes, type Lang } from "../../i18n/format";
 
@@ -18,10 +21,22 @@ export const SOURCE_URL = "https://github.com/Skoow/shhdrop";
 export const LICENSE_URL = "https://github.com/Skoow/shhdrop/blob/main/LICENSE";
 export const SPEC_URL = "https://github.com/Skoow/shhdrop/blob/main/docs/superpowers/specs/2026-11-03-shhdrop-design.md";
 
-export function infoPage(name: InfoName, lang: Lang): InfoPage {
+/** `comptes` : drapeau de construction __COMPTES__ (paramètre pour les tests). */
+export function infoPage(name: InfoName, lang: Lang, comptes: boolean = __COMPTES__): InfoPage {
   const size = formatBytes(CONTENT_MAX, lang);
   const v = { size, n: MAX_ITEMS, h: TTL_MAX_HOURS, tries: PW_TRIES, opens: MAX_OPENS };
-  return (lang === "fr" ? FR : EN)[name](v);
+  const page = (lang === "fr" ? FR : EN)[name](v);
+  const f = comptes ? (lang === "fr" ? COMPTE_FR : COMPTE_EN)[name] : undefined;
+  return f ? f(page) : page;
+}
+
+/** Insère `ajout` après le bloc de titre `apres` (à la fin s'il n'existe pas). */
+function inserer(blocks: Block[], apres: string, ajout: Block): Block[] {
+  const i = blocks.findIndex((b) => b.h === apres);
+  return i < 0 ? [...blocks, ajout] : [...blocks.slice(0, i + 1), ajout, ...blocks.slice(i + 1)];
+}
+function remplacer(blocks: Block[], h: string, nouveau: Block): Block[] {
+  return blocks.map((b) => (b.h === h ? nouveau : b));
 }
 
 type V = { size: string; n: number; h: number; tries: number; opens: number };
@@ -137,6 +152,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Le lien et un jeton d'ouverture restent dans le stockage de l'onglet le temps de l'ouverture, pour qu'un rechargement ne coûte pas une ouverture.",
           "Vos préférences (langue) restent sur votre appareil.",
           "Si vous cochez « Garder ce partage », le lien reçu (avec sa clé), sa taille et son échéance sont gardés chiffrés sur cet appareil, jamais le mot de passe. Ils s'effacent 7 jours après l'échéance, ou quand vous les retirez.",
+          "L'historique des téléchargements (nom, taille et sorte de chaque fichier enregistré, sa provenance et l'heure) reste chiffré sur cet appareil et n'est jamais envoyé ; jamais le lien ni le mot de passe. Chaque entrée s'efface après 30 jours ; la page Téléchargements permet de le couper ou de tout effacer.",
         ],
       },
       {
@@ -183,14 +199,14 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Depuis le partage",
         list: [
           "Ouvrez le partage avec son lien et son mot de passe.",
-          "Le partage ouvert, touchez « Signaler ce partage » en bas de la page, dans le pied (colonne « Confiance »), puis confirmez.",
+          "Le partage ouvert, touchez « Signaler ce partage » en bas de la page, dans le pied (colonne « Confiance »), choisissez ce qui se passe, puis touchez « Signaler et détruire ».",
           "Le partage est détruit aussitôt pour tout le monde : les téléchargements en cours sont coupés, aucune ouverture ne reste possible.",
         ],
       },
       {
         h: "Ce que nous recevons",
         p: [
-          "Le signalement ne contient ni le contenu, ni le motif, ni qui vous êtes : nous ne pouvons pas lire le partage. Nous comptons seulement le nombre de signalements dans l'heure, pour repérer un abus massif.",
+          "Le signalement ne contient que la catégorie choisie (par exemple « Arnaque ») : ni le contenu, ni qui vous êtes. Nous ne pouvons pas lire le partage. Nous comptons, en mémoire seulement, les signalements par catégorie depuis le dernier démarrage du serveur et leur nombre dans l'heure, pour repérer un abus massif ; rien n'est écrit sur disque.",
           `Sans le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit).`,
         ],
       },
@@ -309,6 +325,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "The link and an open token stay in the tab's storage while the share is open, so a reload doesn't cost an open.",
           "Your preferences (language) stay on your device.",
           "If you tick “Keep this share”, the received link (with its key), its size and its expiry are kept encrypted on this device, never the password. They are erased 7 days after expiry, or when you remove them.",
+          "The downloads history (name, size and kind of each saved file, where it came from and the time) stays encrypted on this device and is never sent; never the link or the password. Each entry is erased after 30 days; the Downloads page lets you turn it off or erase it all.",
         ],
       },
       {
@@ -355,17 +372,139 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "From the share",
         list: [
           "Open the share with its link and password.",
-          "With the share open, tap “Report this share” at the bottom of the page, in the footer (“Trust” column), then confirm.",
+          "With the share open, tap “Report this share” at the bottom of the page, in the footer (“Trust” column), choose what is going on, then tap “Report and destroy”.",
           "The share is destroyed at once for everyone: downloads in progress are cut, no open remains possible.",
         ],
       },
       {
         h: "What we receive",
         p: [
-          "A report holds neither the content, nor the reason, nor who you are: we cannot read the share. We only count reports per hour, to spot mass abuse.",
+          "A report holds only the category you chose (for example “Scam”): neither the content nor who you are. We cannot read the share. We count, in memory only, reports per category since the server last started and their number per hour, to spot mass abuse; nothing is written to disk.",
           `Without the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan).`,
         ],
       },
     ],
+  }),
+};
+
+// --- Avec le compte (__COMPTES__ seulement ; conception compte §16, §21.18 ; à relire par le juriste) ---
+
+const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
+  confidentialite: (p) => ({
+    ...p,
+    lede: "Sans compte pour envoyer, recevoir ou rejoindre un salon. Aucun traceur, aucune mesure d'audience, aucune publicité.",
+    blocks: remplacer(
+      inserer(p.blocks, "Ce que nous ne gardons pas", {
+        id: "compte",
+        h: "Si vous créez un compte (pour créer des salons)",
+        list: [
+          "Votre adresse e-mail n'est gardée qu'en empreinte (un calcul à sens unique, avec une clé secrète du serveur) : nous ne la gardons pas en clair. Elle passe par notre serveur le temps d'envoyer un code, et par notre fournisseur d'envoi d'e-mails (nom à compléter par le propriétaire), qui voit l'adresse, l'heure et le code. L'e-mail ne contient que le code.",
+          "Votre mot de passe ne quitte jamais votre appareil : le serveur reçoit seulement une valeur qui en est tirée, et n'en garde qu'une empreinte.",
+          "Votre pseudo, votre photo, votre langue et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe : le service peut donc les lire. Votre pseudo n'est gardé qu'en empreinte, pour qu'il reste unique.",
+          "Vos liens, les salons que vous rejoignez et la gestion de vos salons et partages sont dans un second coffre, chiffré par votre mot de passe seulement : nous ne pouvons pas les lire. Après un mot de passe oublié, ce coffre est perdu, sauf ce qui est encore sur un de vos appareils.",
+          "Nous savons quels salons votre compte a créés, le temps de leur vie, pour pouvoir bannir un compte qui nuit ; jamais quels partages.",
+          "Dates gardées au jour (création, ancienneté), dernière connexion au mois : aucune heure, aucune adresse IP, aucun nom d'appareil en clair.",
+          "Signalements : seulement leur catégorie, comptée en mémoire. Un bannissement garde l'empreinte de l'adresse, sa durée (3 ans par défaut) et sa catégorie, montrée à la personne ; un recours est possible.",
+          "Après une récupération par e-mail, l'adresse ne peut pas être changée ni le compte supprimé pendant 7 jours, par sécurité.",
+          "La base des comptes est sauvegardée chaque jour, chiffrée, chez un autre hébergeur ; chaque copie est effacée après 30 jours. Un compte supprimé peut donc rester jusqu'à 30 jours dans ces copies.",
+          "Sans connexion pendant 13 mois, le compte est effacé. Nous ne pouvons pas vous prévenir : nous n'avons pas votre adresse.",
+        ],
+      }),
+      "Vos droits",
+      {
+        h: "Vos droits",
+        p: [
+          "Sans compte, nous ne savons pas qui vous êtes : il n'y a pas de données personnelles à vous rendre ou à corriger. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
+          "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo, votre photo et votre adresse, et supprimer votre compte à tout moment depuis ses paramètres. L'empreinte de votre adresse reste une donnée personnelle : pour une demande faite par adresse ou un recours contre un bannissement, écrivez-nous (contact des mentions légales).",
+        ],
+      },
+    ),
+  }),
+  conditions: (p) => ({
+    ...p,
+    blocks: inserer(p.blocks, "Signalement", {
+      id: "compte",
+      h: "Compte",
+      p: [
+        "Un compte gratuit sert seulement à créer des salons ; partager, ouvrir un lien et rejoindre un salon restent sans compte. Il faut avoir au moins 15 ans.",
+        "Un compte qui crée des salons pour nuire peut être banni : il ne peut plus créer de salon, ses salons sont fermés, et la même adresse ne peut pas en recréer un pendant la durée du bannissement (3 ans par défaut). Le motif est montré à la connexion ; un recours est possible par le contact des mentions légales.",
+        "Un compte sans connexion pendant 13 mois est effacé.",
+      ],
+    }),
+  }),
+  securite: (p) => ({
+    ...p,
+    blocks: inserer(p.blocks, "Ce que Shhgone ne peut pas faire", {
+      id: "compte",
+      h: "Ce que le compte ne protège pas",
+      list: [
+        "Votre boîte mail est la clé du compte : qui la lit peut le récupérer (avec la double authentification, il lui faut aussi votre application). Protégez-la bien.",
+        "Le service peut lire votre profil (pseudo, photo, langue, abonnement) : c'est ce qui permet de vous le rendre après un mot de passe oublié.",
+        "Qui a votre mot de passe a aussi vos liens et la gestion de vos salons et partages.",
+        "Votre fournisseur d'e-mails voit que vous recevez des codes Shhgone.",
+        "Notre serveur sait quels salons votre compte a créés, le temps de leur vie.",
+        "Un pseudo ne prouve pas une identité : dans un salon, n'importe qui peut choisir le même.",
+      ],
+    }),
+  }),
+};
+
+const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
+  confidentialite: (p) => ({
+    ...p,
+    lede: "No account to send, to receive or to join a room. No trackers, no audience measurement, no ads.",
+    blocks: remplacer(
+      inserer(p.blocks, "What we don't keep", {
+        id: "compte",
+        h: "If you create an account (to create rooms)",
+        list: [
+          "Your email address is kept only as a fingerprint (a one-way computation with a secret server key): we do not keep it in readable form. It passes through our server while a code is sent, and through our email delivery provider (name to be completed by the owner), which sees the address, the time and the code. The email holds only the code.",
+          "Your password never leaves your device: the server only receives a value derived from it, and keeps only a fingerprint of that.",
+          "Your nickname, photo, language and subscription are encrypted, but kept so that they can be given back if you forget your password: the service can therefore read them. Your nickname is kept only as a fingerprint, so that it stays unique.",
+          "Your links, the rooms you join and the management of your rooms and shares are in a second vault, encrypted by your password only: we cannot read them. After a forgotten password, this vault is lost, except what is still on one of your devices.",
+          "We know which rooms your account created, for as long as they live, so that an account that does harm can be banned; never which shares.",
+          "Dates kept to the day (creation, seniority), last sign-in to the month: no time of day, no IP address, no readable device name.",
+          "Reports: only their category, counted in memory. A ban keeps the fingerprint of the address, its length (3 years by default) and its category, shown to the person; an appeal is possible.",
+          "After a recovery by email, the address cannot be changed and the account cannot be deleted for 7 days, for safety.",
+          "The accounts database is backed up every day, encrypted, with another host; each copy is erased after 30 days. A deleted account can therefore remain in these copies for up to 30 days.",
+          "With no sign-in for 13 months, the account is erased. We cannot warn you: we do not have your address.",
+        ],
+      }),
+      "Your rights",
+      {
+        h: "Your rights",
+        p: [
+          "Without an account, we do not know who you are: there is no personal data to give back or correct. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+          "With an account: you can export your data (the file is made on your device), correct your nickname, photo and address, and delete your account at any time from its settings. The fingerprint of your address is still personal data: for a request made by address or an appeal against a ban, write to us (contact in the legal notice).",
+        ],
+      },
+    ),
+  }),
+  conditions: (p) => ({
+    ...p,
+    blocks: inserer(p.blocks, "Reporting", {
+      id: "compte",
+      h: "Account",
+      p: [
+        "A free account is only used to create rooms; sharing, opening a link and joining a room need no account. You must be at least 15.",
+        "An account that creates rooms to do harm can be banned: it can no longer create rooms, its rooms are closed, and the same address cannot create another one for the length of the ban (3 years by default). The reason is shown at sign-in; an appeal is possible through the contact in the legal notice.",
+        "An account with no sign-in for 13 months is erased.",
+      ],
+    }),
+  }),
+  securite: (p) => ({
+    ...p,
+    blocks: inserer(p.blocks, "What Shhgone cannot do", {
+      id: "compte",
+      h: "What the account does not protect",
+      list: [
+        "Your mailbox is the key to the account: whoever reads it can recover it (with two-factor authentication, they also need your app). Protect it well.",
+        "The service can read your profile (nickname, photo, language, subscription): that is what lets it give it back after a forgotten password.",
+        "Whoever has your password also has your links and the management of your rooms and shares.",
+        "Your email provider sees that you receive Shhgone codes.",
+        "Our server knows which rooms your account created, for as long as they live.",
+        "A nickname does not prove an identity: in a room, anyone can pick the same one.",
+      ],
+    }),
   }),
 };

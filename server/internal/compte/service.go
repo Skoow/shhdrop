@@ -351,8 +351,8 @@ func (s *Service) InscriptionFin(jeton [32]byte, code string, d Donnees, o Optio
 		j := jourDe(now)
 		if _, err := tx.Exec(`INSERT INTO comptes(h, e_canon, e_envoi, v_mdp, env_mdp, cle_profil, p_empreinte,
 			pseudo_jour, blob_profil, gen_profil, blob_prive, gen_prive, totp, totp_retrait_jour, recup_jour,
-			cree_jour, compte_des, vu_mois) VALUES(?,?,?,?,?,?,?,?,?,1,?,1,NULL,NULL,NULL,?,?,?)`,
-			e.h[:], e.canon[:], e.envoi[:], v[:], d.EnvMdp[:], cle[:], pe[:], j, d.BlobProfil, d.BlobPrive,
+			cree_jour, compte_des, vu_mois) VALUES(?,?,?,?,?,?,?,0,?,1,?,1,NULL,NULL,NULL,?,?,?)`,
+			e.h[:], e.canon[:], e.envoi[:], v[:], d.EnvMdp[:], cle[:], pe[:], d.BlobProfil, d.BlobPrive,
 			j, j, moisDe(now)); err != nil {
 			return err
 		}
@@ -575,9 +575,11 @@ func (s *Service) PseudoVerifier(c Courante, pCanon []byte) (bool, error) {
 	return s.pseudoLibre(pCanon)
 }
 
-// ChangerPseudo : une fois par jour UTC (le jour de l'inscription compte : « Vous pourrez
-// changer de pseudo demain. ») ; l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé
-// ou interdit : ErrPseudoPris. Le même pseudo que le sien : rien à faire.
+// ChangerPseudo : une fois par jour UTC, l'attente ne courant qu'à partir d'un premier
+// changement (décision du propriétaire, 14 novembre : une faute de frappe se corrige tout de
+// suite ; pseudo_jour vaut 0 tant que le pseudo n'a jamais changé) ; « Vous pourrez changer de
+// pseudo demain. » ; l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé ou interdit :
+// ErrPseudoPris. Le même pseudo que le sien : rien à faire.
 func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 	pe, err := s.cles.EmpreintePseudo(pCanon)
 	switch {

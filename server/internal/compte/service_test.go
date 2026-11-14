@@ -225,7 +225,8 @@ func TestInscriptionComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	jour := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC).Unix()
-	if cree != jour || des != jour || pj != jour || vu != time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC).Unix() {
+	// pseudo_jour = 0 : pseudo jamais changé (la première correction est permise tout de suite).
+	if cree != jour || des != jour || pj != 0 || vu != time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC).Unix() {
 		t.Fatal("dates", cree, des, vu, pj)
 	}
 }
@@ -959,15 +960,26 @@ func TestPseudoReserveRefuse(t *testing.T) {
 	}
 }
 
-// §21.5 : changement une fois par jour UTC (le jour de l'inscription compte) ; l'ancien
-// pseudo est libéré aussitôt.
+// §21.5 et relecture des lots 13-14 (décision du propriétaire, 14 novembre) : une faute de
+// frappe se corrige tout de suite ; l'attente (jusqu'au jour UTC suivant) ne court qu'à partir
+// d'un premier changement. L'ancien pseudo est libéré aussitôt.
 func TestPseudoUneFoisPar24h(t *testing.T) {
 	b := nouveauBanc(t)
 	_, j, d := b.inscrire(t, ipN(1), "lea@exemple.fr", "lea")
 	c, _ := b.s.Session(j)
 	var lim ErrLimit
-	if err := b.s.ChangerPseudo(c, []byte("lea2")); !errors.As(err, &lim) {
-		t.Fatal("le jour de l'inscription :", err)
+	if err := b.s.ChangerPseudo(c, []byte("lae")); err != nil {
+		t.Fatal("première correction, le jour de l'inscription :", err)
+	}
+	if err := b.s.ChangerPseudo(c, []byte("lea4")); !errors.As(err, &lim) {
+		t.Fatal("deuxième changement le même jour :", err)
+	}
+	if lim.Retry != 14*time.Hour { // inscrit le 14 à 10 h : jusqu'au 15 à 0 h
+		t.Fatal("attente jusqu'au jour suivant :", lim.Retry)
+	}
+	var pj int64
+	if err := b.db.QueryRow(`SELECT pseudo_jour FROM comptes`).Scan(&pj); err != nil || pj != time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC).Unix() {
+		t.Fatal("pseudo_jour après le premier changement", pj, err)
 	}
 	b.clk.Add(14 * time.Hour) // le 15 à 0 h
 	o, err := b.s.Connexion(ipN(1), "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
@@ -985,6 +997,7 @@ func TestPseudoUneFoisPar24h(t *testing.T) {
 		t.Fatal("deux fois le même jour :", err)
 	}
 	b.inscrire(t, ipN(2), "leo@exemple.fr", "lea") // l'ancien est libre
+	b.inscrire(t, ipN(3), "lou@exemple.fr", "lae") // le premier corrigé aussi
 	if libre, err := b.s.PseudoVerifier(c, []byte("lea2")); err != nil || libre {
 		t.Fatal("le sien n'est pas libre", libre, err)
 	}

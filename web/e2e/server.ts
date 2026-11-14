@@ -1,11 +1,11 @@
 // Lance le vrai binaire `server/shhdrop serve` pour les tests d'intégration :
-// dossier de données temporaire, port libre (SHH_LISTEN=127.0.0.1:0, lu sur stdout ; salon
-// activé : port choisi avant, voir StartOpts.salons),
+// dossier de données temporaire, port libre (SHH_LISTEN=127.0.0.1:0, lu sur stdout ; salon ou
+// compte activé : port choisi avant, voir StartOpts.salons et StartOpts.comptes),
 // stdout et stderr capturés en octets bruts (fouillés par le test « le serveur ne voit rien »).
 // SHH_STORAGE_MAX = 4 Gio : le serveur refuse de démarrer si le plafond dépasse l'espace
 // disque libre moins 1 Gio (audit F6), et le défaut de 200 Gio dépasse souvent un poste de test.
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +15,8 @@ export const BINARY = fileURLToPath(new URL("../../server/shhdrop", import.meta.
 
 export type TestServer = {
   origin: string;
+  /** Tableau de bord d'administration (StartOpts.comptes.admin) : origine de son écouteur. */
+  adminOrigin?: string;
   pid: number;
   dataDir: string;
   stdout(): Buffer;
@@ -49,6 +51,14 @@ export type StartOpts = {
    * lancement (port libre, puis SHH_LISTEN=127.0.0.1:<port>, SHH_ORIGIN=http://127.0.0.1:<port>).
    */
   salons?: boolean;
+  /**
+   * Compte activé (SHH_COMPTES=1, salon compris) : K_serveur et le mot de passe SMTP sont
+   * écrits dans un dossier à part (hors du dossier de données, 0400), supprimé par dispose() ;
+   * envoi en texte clair vers le faux SMTP de la boucle locale (`smtpPort`, e2e/smtp.ts).
+   * `admin` : jeton du tableau de bord (SHH_ADMIN_TOKEN, développement local), écouteur sur un
+   * second port libre.
+   */
+  comptes?: { cle: Uint8Array; smtpPort: number; smtpMdp: string; from: string; admin?: string };
 };
 
 /** Port TCP libre sur 127.0.0.1 (ouvert puis refermé : une course est possible, sans conséquence en test). */
@@ -64,10 +74,39 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   const bin = opts.binary ?? BINARY;
   if (!existsSync(bin)) throw new Error(`binaire absent : ${bin} (lancer make test-e2e)`);
   let salons: Record<string, string> = {};
-  if (opts.salons) {
+  let secrets: string | undefined;
+  let adminOrigin: string | undefined;
+  if (opts.salons || opts.comptes) {
     const port = await portLibre();
     salons = { SHH_LISTEN: `127.0.0.1:${port}`, SHH_ORIGIN: `http://127.0.0.1:${port}`, SHH_SALONS: "1" };
   }
+  if (opts.comptes) {
+    const c = opts.comptes;
+    secrets = mkdtempSync(join(tmpdir(), "shh-e2e-secrets-"));
+    const cle = join(secrets, "cle");
+    const mdp = join(secrets, "smtp");
+    writeFileSync(cle, c.cle);
+    writeFileSync(mdp, c.smtpMdp);
+    chmodSync(cle, 0o400);
+    chmodSync(mdp, 0o400);
+    Object.assign(salons, {
+      SHH_COMPTES: "1",
+      SHH_COMPTES_CLE_FILE: cle,
+      SHH_SMTP_HOST: "127.0.0.1",
+      SHH_SMTP_PORT: String(c.smtpPort),
+      SHH_SMTP_USER: "shhgone-test",
+      SHH_SMTP_PASSWORD_FILE: mdp,
+      SHH_MAIL_FROM: c.from,
+    });
+    if (c.admin !== undefined) {
+      const p = await portLibre();
+      adminOrigin = `http://127.0.0.1:${p}`;
+      Object.assign(salons, { SHH_ADMIN_LISTEN: `127.0.0.1:${p}`, SHH_ADMIN_TOKEN: c.admin });
+    }
+  }
+  const retirerSecrets = () => {
+    if (secrets) rmSync(secrets, { recursive: true, force: true });
+  };
   const dataDir = mkdtempSync(join(tmpdir(), "shh-e2e-"));
   const env: Record<string, string> = {};
   // SHH_DISABLE_DUMPABLE_HARDENING : le test « le serveur ne voit rien » lit /proc/<pid>/mem du
@@ -105,6 +144,7 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
     if (alive()) proc.kill("SIGKILL");
     await closed;
     rmSync(dataDir, { recursive: true, force: true });
+    retirerSecrets();
     const stderr = Buffer.concat(err);
     throw new ServerStartError(`${(e as Error).message} : ${stderr.toString("utf8")}`, dataDir, Buffer.concat(out), stderr);
   }
@@ -120,6 +160,7 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   };
   return {
     origin: `http://${addr}`,
+    adminOrigin,
     pid: proc.pid!,
     dataDir,
     stdout: () => Buffer.concat(out),
@@ -128,6 +169,7 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
     async dispose() {
       await stop();
       rmSync(dataDir, { recursive: true, force: true });
+      retirerSecrets();
     },
   };
 }

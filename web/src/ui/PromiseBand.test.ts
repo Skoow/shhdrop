@@ -34,7 +34,7 @@ describe("PromiseBand", () => {
     const read = [...band.querySelectorAll("ul:not([aria-hidden]) li")].map((l) => l.textContent!.trim());
     expect(read).toEqual([
       "Chiffré dans votre appareil",
-      "Sans compte",
+      "Partage sans compte",
       "Effacé après ouverture ou à l'échéance",
       "Aucune adresse IP écrite sur disque",
       "Ni nom de fichier ni mot de passe sur le serveur",

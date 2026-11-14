@@ -41,7 +41,7 @@ describe("Home (UI §9.1)", () => {
     expect(room.textContent).toContain("bientôt");
     expect(room.getAttribute("aria-disabled")).toBe("true");
     const meta = [...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim());
-    expect(meta).toEqual(["Gratuit jusqu'à 2\u202fGo", "Sans compte", "S'efface après ouverture"]);
+    expect(meta).toEqual(["Gratuit jusqu'à 2\u202fGo", "Partage sans compte", "S'efface après ouverture"]);
     expect(document.querySelector("[data-demo]")).not.toBeNull();
     const a = [...document.querySelectorAll("a")].find((x) => x.textContent?.trim() === "Tous les détails de sécurité")!;
     expect(a.getAttribute("href")).toBe("/securite");
@@ -60,7 +60,7 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
-    expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Sans compte", "Rien de lisible sur le serveur", "Photos nettoyées", "Salon éphémère bientôt"]);
+    expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-how-card], [data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
     // La clé après le « # » (retirée par la refonte, remise le 12 novembre) : une ligne courte et vraie.
     const key = document.querySelector("section.priv [data-key-note]")!;
@@ -234,6 +234,6 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector("[data-eyebrow]")!.textContent).toBe("End-to-end encrypted · Hosted in Europe");
     expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
     expect(document.querySelector("[data-key-note]")!.textContent!.trim()).toBe("The link's key comes after the “#”: browsers never send that part to the server.");
-    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "No account", "Erased after opening"]);
+    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Erased after opening"]);
   });
 });

@@ -152,7 +152,8 @@ export class ClientSalon {
    * la main, mais c'est **ce que le serveur reçoit** (`X-Shh-Manage`) : depuis le 14 novembre,
    * `J_gestion` = `jetonGestion(S_gestion)`, jamais `S_gestion` (spec salon v3 §15.2).
    */
-  static async creer(srv: Srv, opts: { maxMembers?: number; membersCanDestroy?: boolean; mdp?: string } = {}): Promise<{ createur: ClientSalon; lien: Uint8Array; mdp: string; sGestion: Uint8Array; secretGestion: Uint8Array }> {
+  /** `session` : jeton du compte (SHH_COMPTES=1), envoyé en X-Shh-Session sur POST /api/salons seulement. */
+  static async creer(srv: Srv, opts: { maxMembers?: number; membersCanDestroy?: boolean; mdp?: string; session?: string } = {}): Promise<{ createur: ClientSalon; lien: Uint8Array; mdp: string; sGestion: Uint8Array; secretGestion: Uint8Array }> {
     const mdp = opts.mdp ?? MDP;
     const eng = await loadSalonEngine();
     const lien = alea(32);
@@ -174,7 +175,7 @@ export class ClientSalon {
       srv,
       "POST",
       "/api/salons",
-      { "X-Shh-Access": b64u(acces.k), "X-Shh-Manage": b64u(sGestion) },
+      { "X-Shh-Access": b64u(acces.k), "X-Shh-Manage": b64u(sGestion), ...(opts.session === undefined ? {} : { "X-Shh-Session": opts.session }) },
       {
         ttl_hours: 1,
         max_members: opts.maxMembers ?? 4,

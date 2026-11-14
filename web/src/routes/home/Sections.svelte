@@ -57,7 +57,8 @@
           {#if c.k === "account"}<UserX size={22} strokeWidth={1.8} />{:else if c.k === "server"}<EyeOff size={22} strokeWidth={1.8} />{:else if c.k === "clean"}<Broom size={22} strokeWidth={1.8} />{:else}<TabIcon id="chat" size={22} />{/if}
         </span>
         <h3>{t(`home.priv.${c.k}.t` as Key)}{#if c.k === "room"}{" "}<span class="pill">{t("foot.soon")}</span>{/if}</h3>
-        <p>{t(`home.priv.${c.k}.p` as Key)}</p>
+        <!-- Avec le compte (__COMPTES__) seulement, la carte dit ce que garde le compte (conception compte §16). -->
+        <p>{t((__COMPTES__ && c.k === "account" ? "home.priv.account.p.comptes" : `home.priv.${c.k}.p`) as Key)}</p>
       </li>
     {/each}
   </ul>
