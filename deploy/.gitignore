@@ -4,3 +4,9 @@
 /.release
 /.release.prev
 /.deploy.lock
+# Garde-fou : secrets et sauvegardes n'ont rien à faire dans la copie du dépôt (README §12).
+/secrets/
+/shh_comptes_cle
+/shh_smtp_mdp
+*.age
+*.curl

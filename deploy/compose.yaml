@@ -12,11 +12,20 @@
 #                    (défaut : calculée d'après GOMEMLIMIT et nofile, README §11)
 #   SHH_SALONS_MAX   salons vivants au plus (défaut : 200 ; 50 proposé pour un usage personnel),
 #                    sans effet tant que le salon est désactivé (SHH_SALONS, ci-dessous)
+#   SHH_SMTP_HOST, SHH_SMTP_USER, SHH_MAIL_FROM, SHH_COMPTES_MAX : compte par e-mail
+#                    (README §12), sans effet tant que le compte est désactivé (SHH_COMPTES)
 #
 # Réseau : Caddy utilise le réseau de la machine (il voit donc toujours la vraie adresse
 # du client, en IPv4 comme en IPv6, sans dépendre de la traduction d'adresses de Docker).
 # Le serveur Go est sur un réseau Docker interne, sans route vers Internet et sans port
-# publié : seul Caddy, depuis la machine, peut le joindre.
+# publié : seul Caddy, depuis la machine, peut le joindre. Compte activé seulement : le relais
+# SMTP (même image, « shhcheck relais ») est sur ce réseau interne ET sur le réseau « sortie » ;
+# il recopie chaque connexion du serveur vers le seul SHH_SMTP_HOST:465, sans le laisser
+# choisir. Le serveur n'a donc AUCUNE route vers Internet, même compte activé (README §12).
+#
+# Secrets du compte : fichiers de <SHH_DATA_ROOT>/secrets, montés en lecture seule dans
+# /run/secrets, hors de /data (jamais sauvegardés avec la base, jamais en variable
+# d'environnement : docker inspect ne montre que leurs chemins).
 
 name: shhdrop
 
@@ -87,9 +96,28 @@ services:
       SHH_SEGMENTS_PER_MIN: ${SHH_SEGMENTS_PER_MIN:-}
       # Trames non volatiles rangées au plus par salon (100 000 ≈ 417 Mo de disque).
       SHH_SALON_FRAMES_MAX: ${SHH_SALON_FRAMES_MAX:-}
+      # Compte par e-mail (conception du compte, plan lot 8) : DÉSACTIVÉ, sans variable pour
+      # l'ouvrir, jusqu'à la décision D8 (avis du juriste, test bloquant du lot 16). Pour
+      # l'activer : "1" ici (fichier relu, commité), avec SHH_SALONS: "1" ; deploy.sh démarre
+      # alors le relais SMTP (profil « comptes ») et vérifie les secrets (README §12).
+      SHH_COMPTES: "0"
+      SHH_COMPTES_MAX: ${SHH_COMPTES_MAX:-}
+      SHH_COMPTES_CLE_FILE: /run/secrets/shh_comptes_cle
+      # Nom du fournisseur : le serveur le résout par son /etc/hosts (extra_hosts, plus bas)
+      # vers le relais, et vérifie le certificat TLS pour ce nom (TLS de bout en bout).
+      SHH_SMTP_HOST: ${SHH_SMTP_HOST:-}
+      # 465 (TLS implicite) seulement : c'est aussi le port du relais et de sa cible.
+      SHH_SMTP_PORT: "465"
+      SHH_SMTP_USER: ${SHH_SMTP_USER:-}
+      SHH_SMTP_PASSWORD_FILE: /run/secrets/shh_smtp_mdp
+      SHH_MAIL_FROM: ${SHH_MAIL_FROM:-}
     networks:
       interne:
         ipv4_address: 172.30.53.2
+    # Le nom du fournisseur d'envoi désigne le relais, seule adresse joignable. Sans
+    # SHH_SMTP_HOST : une ligne inoffensive (nom réservé .invalid).
+    extra_hosts:
+      - "${SHH_SMTP_HOST:-smtp.invalid}:172.30.53.3"
     volumes:
       # Sous-dossier du volume chiffré, jamais créé par Docker : si le volume n'est pas
       # déverrouillé et monté, le conteneur ne démarre pas, au lieu d'écrire sur le disque
@@ -97,6 +125,16 @@ services:
       - type: bind
         source: ${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant (point de montage du volume chiffré)}/data
         target: /data
+        bind:
+          create_host_path: false
+      # Secrets du compte (clé du serveur, mot de passe SMTP) : dossier du volume chiffré,
+      # root:65532 0750, fichiers 65532 0400 (README §12), lecture seule, hors de /data.
+      # Exigé même compte désactivé (dossier vide) : jamais créé par Docker sur le disque
+      # système.
+      - type: bind
+        source: ${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant}/secrets
+        target: /run/secrets
+        read_only: true
         bind:
           create_host_path: false
     # Fichiers temporaires éventuels : en mémoire, jamais sur disque.
@@ -116,6 +154,42 @@ services:
       retries: 3
       start_period: 30s
       start_interval: 2s
+
+  # Relais SMTP : seule sortie vers Internet, et seulement compte activé (profil « comptes »,
+  # posé par deploy.sh quand SHH_COMPTES vaut "1" ci-dessus). Même image que le serveur
+  # (binaire /shhcheck, deploy/shhcheck/relais.go) : aucune image de plus à épingler. Il recopie
+  # chaque connexion reçue sur 172.30.53.3:465 vers SHH_SMTP_HOST:465, résolu à chaque
+  # connexion, sans rien laisser choisir au client ; TLS reste de bout en bout entre le serveur
+  # et le fournisseur (le relais ne voit que des octets chiffrés). 4 connexions à la fois, 60 s
+  # chacune au plus ; rien n'est écrit.
+  relais-smtp:
+    image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
+    profiles: ["comptes"]
+    restart: unless-stopped
+    entrypoint: ["/shhcheck"]
+    command: ["relais", "172.30.53.3:465", "${SHH_SMTP_HOST:-}:465"]
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Écouter sur 465 sans capacité : réglage par défaut de Docker, rendu explicite.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    ulimits:
+      core: 0
+      nofile: 1024
+    pids_limit: 64
+    mem_limit: 64m
+    memswap_limit: 64m
+    cpus: 0.25
+    environment:
+      GOMEMLIMIT: 48MiB
+    networks:
+      interne:
+        ipv4_address: 172.30.53.3
+      sortie: {}
+    logging:
+      driver: none
 
   caddy:
     # Caddy 2.11.9 officiel (2.10 au minimum pour x25519mlkem768), épinglé par empreinte,
@@ -169,9 +243,17 @@ services:
 
 networks:
   interne:
-    # Aucune sortie vers Internet depuis le serveur Go : il n'en a pas besoin.
+    # Aucune sortie vers Internet depuis le serveur Go, même compte activé : il ne joint que
+    # le relais SMTP (172.30.53.3), sur ce réseau.
     internal: true
     ipam:
       config:
         - subnet: 172.30.53.0/29
           gateway: 172.30.53.1
+  # Sortie du seul relais SMTP (réseau créé seulement avec le profil « comptes »). Aucun autre
+  # conteneur n'y est ; aucun port publié.
+  sortie:
+    ipam:
+      config:
+        - subnet: 172.30.53.8/29
+          gateway: 172.30.53.9

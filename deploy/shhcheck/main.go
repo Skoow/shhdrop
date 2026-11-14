@@ -1,4 +1,4 @@
-// Commande shhcheck : deux contrôles pour l'exploitation, bibliothèque standard seulement.
+// Commande shhcheck : contrôles pour l'exploitation et relais SMTP, bibliothèque standard seulement.
 //
 //	shhcheck health [hôte:port]
 //	    Santé du serveur Go, de l'intérieur du conteneur (l'image n'a ni shell ni curl) :
@@ -10,6 +10,16 @@
 //	    Test bloquant de la spec §30 : un client qui ne propose que X25519MLKEM768, en
 //	    TLS 1.3, doit réussir la poignée de main avec un certificat valide pour ce nom.
 //	    Autorités : celles du système, ou le fichier désigné par SSL_CERT_FILE.
+//
+//	shhcheck relais <écoute IP:port> <cible hôte:port>
+//	    Relais SMTP, seule sortie du serveur Go vers Internet (plan du compte, lot 8) : recopie
+//	    chaque connexion reçue vers la seule cible fixée ici (relais.go). Ne rend la main
+//	    qu'en cas d'erreur.
+//
+//	shhcheck smtp <hôte:port>
+//	    Contrôle d'exploitation : TLS implicite vers hôte:port, certificat valide pour hôte,
+//	    accueil SMTP « 220 », puis QUIT ; aucune authentification, aucun e-mail. Lancé dans le
+//	    conteneur du serveur, il passe par le relais (deploy.sh, compte activé).
 //
 // Codes de sortie : 0 réussite, 1 échec, 2 erreur d'usage. Rien n'est écrit sur disque.
 package main
@@ -36,9 +46,14 @@ func main() {
 			exit(health(addr))
 		case os.Args[1] == "tls" && len(os.Args) == 4:
 			exit(tlsHybrid(os.Args[2], os.Args[3]))
+		case os.Args[1] == "relais" && len(os.Args) == 4:
+			exit(relaisMain(os.Args[2], os.Args[3]))
+		case os.Args[1] == "smtp" && len(os.Args) == 3:
+			exit(smtpMain(os.Args[2]))
 		}
 	}
-	fmt.Fprintln(os.Stderr, "usage: shhcheck health [hôte:port] | shhcheck tls <hôte:port> <nom du site>")
+	fmt.Fprintln(os.Stderr, "usage: shhcheck health [hôte:port] | shhcheck tls <hôte:port> <nom du site>\n"+
+		"       shhcheck relais <écoute IP:port> <cible hôte:port> | shhcheck smtp <hôte:port>")
 	os.Exit(2)
 }
 

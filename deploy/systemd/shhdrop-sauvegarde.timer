@@ -1,0 +1,14 @@
+# Déclenche deploy/sauvegarder.sh une fois par jour (README §12). L'heure exacte varie dans
+# la demi-heure (RandomizedDelaySec) ; une sauvegarde manquée (machine arrêtée) est faite au
+# démarrage suivant, puis refusée par le script tant que le volume chiffré n'est pas monté :
+# la suivante a lieu le lendemain.
+[Unit]
+Description=Sauvegarde quotidienne chiffrée de comptes.db (Shhdrop)
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 UTC
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

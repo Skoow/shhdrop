@@ -13,7 +13,11 @@
 #
 # Réglages : deploy/.env (modèle : deploy/env.example). Aucun secret qui ouvre quoi que ce soit :
 # le tableau de bord n'y a que l'EMPREINTE de son jeton (SHH_ADMIN_TOKEN_SHA256, README §4), le
-# jeton reste chez l'exploitant. Tout deploy/.env est exporté aux commandes de ce script (set -a).
+# jeton reste chez l'exploitant ; la clé du serveur et le mot de passe SMTP du compte sont des
+# fichiers de <SHH_DATA_ROOT>/secrets (README §12), jamais des variables. Tout deploy/.env est
+# exporté aux commandes de ce script (set -a). Compte activé (SHH_COMPTES: "1" dans
+# compose.yaml) : relais SMTP démarré, secrets vérifiés avant l'installation, fournisseur
+# d'envoi contrôlé après (avertissement seulement).
 # État : deploy/.release (empreinte en service) et deploy/.release.prev (la précédente).
 #
 # Limites, dites aussi dans le README :
@@ -56,15 +60,28 @@ cur=$(cat .release 2>/dev/null || true)
 prev=$(cat .release.prev 2>/dev/null || true)
 valid() { [[ $1 =~ ^sha256:[0-9a-f]{64}$ ]]; }
 
+# Compte par e-mail (README §12) : activé seulement par compose.yaml (SHH_COMPTES: "1", fichier
+# relu et commité), jamais par deploy/.env. Activé, le relais SMTP (profil « comptes ») est
+# démarré ; désactivé, il est arrêté s'il tournait encore.
+[ "$(grep -cE '^ +SHH_COMPTES:' compose.yaml)" = 1 ] ||
+	die "compose.yaml : une seule ligne SHH_COMPTES attendue"
+comptes=$(sed -nE 's/^ +SHH_COMPTES: "([01])"$/\1/p' compose.yaml)
+[ "$comptes" = 0 ] || [ "$comptes" = 1 ] || die "compose.yaml : SHH_COMPTES doit valoir \"0\" ou \"1\""
+profils=
+if [ "$comptes" = 1 ]; then profils=comptes; fi
+secrets=$SHH_DATA_ROOT/secrets
+
 # dc <empreinte> <arguments de docker compose…>
 # « -f compose.yaml » explicite : sans lui, docker compose fusionne de lui-même un
 # compose.override.yaml posé à côté et suit COMPOSE_FILE (deploy/.env), qui pourraient changer
 # l'environnement du serveur sans rien dire (audit adverse du 13 novembre, stockage, H1). Un
 # seul fichier fait foi : celui de la copie du dépôt.
+# Même raison pour COMPOSE_PROFILES : posé ici, d'après compose.yaml seulement (une valeur venue
+# de deploy/.env démarrerait le relais SMTP compte désactivé).
 dc() {
 	local digest=$1
 	shift
-	SHH_IMAGE="$SHH_IMAGE_REPO@$digest" docker compose -f compose.yaml "$@"
+	COMPOSE_PROFILES="$profils" SHH_IMAGE="$SHH_IMAGE_REPO@$digest" docker compose -f compose.yaml "$@"
 }
 need_current() { valid "$cur" || die "aucune version installée (deploy/.release absent)"; }
 
@@ -81,6 +98,22 @@ preflight() {
 		die "$SHH_DATA_ROOT doit contenir data/ (compte 65532) et caddy/ (root) : voir le README"
 	[ "$(wc -l </proc/swaps)" -le 1 ] ||
 		die "mémoire d'échange active (swapon --show) : la désactiver (spec §22)"
+	# Secrets du compte (README §12) : dossier exigé même compte désactivé (monté dans le
+	# conteneur, jamais créé par Docker).
+	[ -d "$secrets" ] && [ ! -L "$secrets" ] && [ "$(stat -c '%u:%g %a' "$secrets")" = "0:65532 750" ] ||
+		die "$secrets absent ou mal réglé : install -d -o root -g 65532 -m 0750 $secrets (README §12)"
+	if [ "$comptes" = 1 ]; then
+		grep -qE '^ +SHH_SALONS: "1"$' compose.yaml || die "SHH_COMPTES=1 exige SHH_SALONS: \"1\" dans compose.yaml"
+		[ -n "${SHH_SMTP_HOST:-}" ] && [ -n "${SHH_SMTP_USER:-}" ] && [ -n "${SHH_MAIL_FROM:-}" ] ||
+			die "compte activé : SHH_SMTP_HOST, SHH_SMTP_USER et SHH_MAIL_FROM manquent dans deploy/.env (README §12)"
+		local f
+		for f in shh_comptes_cle shh_smtp_mdp; do
+			[ -f "$secrets/$f" ] && [ ! -L "$secrets/$f" ] && [ "$(stat -c '%u %a' "$secrets/$f")" = "65532 400" ] ||
+				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §12)"
+		done
+		[ "$(stat -c %s "$secrets/shh_comptes_cle")" = 32 ] ||
+			die "$secrets/shh_comptes_cle : 32 octets attendus (README §12)"
+	fi
 	# Simple avertissement : la détection ne connaît que dm-crypt (LUKS), pas d'autre montage.
 	src=$(findmnt -no SOURCE -T "$SHH_DATA_ROOT")
 	if ! lsblk -s -n -o TYPE "$src" 2>/dev/null | grep -qx crypt; then
@@ -123,6 +156,14 @@ check() {
 		echo "contrôle : pas d'échange de clés X25519MLKEM768 en TLS 1.3" >&2
 		return 1
 	}
+	# 5. Compte activé : le fournisseur d'envoi répond, à travers le relais, en TLS vérifié pour
+	#    SHH_SMTP_HOST (accueil SMTP puis QUIT ; ni connexion au compte, ni e-mail). Simple
+	#    avertissement : une panne du fournisseur ne doit pas faire revenir à l'image d'avant,
+	#    mais sans lui, aucun code n'arrive et rien d'autre ne le dit (aucun journal).
+	if [ "$comptes" = 1 ]; then
+		dc "$1" exec -T shhdrop /shhcheck smtp "$SHH_SMTP_HOST:465" ||
+			echo "AVERTISSEMENT : $SHH_SMTP_HOST:465 injoignable depuis le serveur (relais SMTP, README §12) : aucun e-mail ne partira." >&2
+	fi
 }
 
 install_version() {
@@ -138,6 +179,9 @@ install_version() {
 
 	echo "installation de $new"
 	dc "$new" up -d --remove-orphans || true # l'échec éventuel est constaté par check
+	# Compte désactivé : le relais SMTP d'une activation précédente ne doit pas rester (un
+	# service hors profil n'est pas un « orphelin » pour --remove-orphans).
+	if [ "$comptes" = 0 ]; then dc "$new" rm -sf relais-smtp >/dev/null 2>&1 || true; fi
 	if check "$new"; then
 		if [ "$new" != "$cur" ]; then
 			if valid "$cur"; then printf '%s\n' "$cur" >.release.prev; fi

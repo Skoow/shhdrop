@@ -1,4 +1,4 @@
-.PHONY: test test-engine test-go test-web test-e2e test-ui test-repro lint-deploy test-proxy
+.PHONY: test test-engine test-go test-web test-e2e test-ui test-repro lint-deploy test-proxy test-sortie test-restauration
 
 test: test-engine test-go test-web test-e2e
 
@@ -32,15 +32,27 @@ test-repro:
 	web/scripts/repro.sh
 
 # Scripts de déploiement et de build : syntaxe, ShellCheck (0.11.0 en CI, job deploy-lint),
-# go vet de deploy/shhcheck (module à part, hors de test-go).
+# go vet et tests unitaires de deploy/shhcheck (module à part, hors de test-go : relais SMTP,
+# contrôle SMTP ; les essais de banc, sans leurs variables, sont sautés).
 lint-deploy:
-	bash -n deploy/deploy.sh && bash -n deploy/test-proxy.sh
-	for f in web/scripts/*.sh; do bash -n "$$f" || exit 1; done
+	for f in deploy/*.sh web/scripts/*.sh; do bash -n "$$f" || exit 1; done
 	shellcheck deploy/*.sh web/scripts/*.sh
-	cd deploy/shhcheck && go vet ./...
+	cd deploy/shhcheck && go vet ./... && go test -race -count=1 ./...
 
 # Test du proxy (deploy/test-proxy.sh) : Caddy 2.10 ou plus dans le PATH (ou CADDY=…), site
 # construit. La CI le lance avec l'image complète et le Caddy de compose.yaml (job repro-docker).
 test-proxy:
 	cd web && npm run build
 	deploy/test-proxy.sh
+
+# Sortie SMTP (deploy/test-sortie.sh) : configuration résolue de compose.yaml (docker compose
+# config) ; puis, avec un démon Docker et SHH_IMAGE (image de cet arbre), le réseau réel. Code 3 :
+# partie réseau non faite (aucun démon).
+test-sortie:
+	deploy/test-sortie.sh
+
+# Sauvegarde et restauration de comptes.db (deploy/test-restauration.sh) : en root (montage
+# tmpfs, serveur sous le compte 65532), age, sqlite3, Go. Aussi à chaque changement de schéma
+# de comptes.db (conception du compte §21.13).
+test-restauration:
+	deploy/test-restauration.sh

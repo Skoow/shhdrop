@@ -1,0 +1,35 @@
+# Sauvegarde quotidienne chiffrée de comptes.db (deploy/sauvegarder.sh ; README §12).
+# Installation : copier ce fichier et shhdrop-sauvegarde.timer dans /etc/systemd/system/, en
+# remplaçant /opt/shhdrop par le chemin de la copie du dépôt sur la machine, puis :
+#   systemctl daemon-reload && systemctl enable --now shhdrop-sauvegarde.timer
+# Sortie : journald, en mémoire (Storage=volatile, README §1) ; elle ne contient que le nom et
+# la taille du fichier envoyé, ou la raison d'un refus.
+[Unit]
+Description=Sauvegarde chiffrée de comptes.db (Shhdrop)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/shhdrop/deploy/sauvegarder.sh
+UMask=0077
+# root : lit comptes.db (compte 65532) et le fichier d'accès au stockage (root 0600) ; SQLite
+# tourne sous le compte 65532 (setpriv). Le reste du système est en lecture seule ou caché.
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_SETUID CAP_SETGID
+TimeoutStartSec=2h
+Nice=10
+IOSchedulingClass=idle

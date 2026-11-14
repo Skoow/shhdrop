@@ -6,10 +6,14 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 |---|---|
 | `Caddyfile` | TLS 1.3, échange de clés hybride, remplacement de `X-Shh-Client-IP`, aucun journal |
 | `Dockerfile` | image du serveur : binaire Go statique + site, sur `scratch`, compte 65532 |
-| `compose.yaml` | les deux conteneurs, en lecture seule, sans capacité, sans journal |
+| `compose.yaml` | les deux conteneurs (trois avec le compte : relais SMTP), en lecture seule, sans capacité, sans journal |
 | `deploy.sh` | installe une version par empreinte, contrôle, revient en arrière ; commandes d'administration |
-| `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride ; `salonws_test.go` : essai du WebSocket du salon à travers Caddy (test seulement, hors du binaire) |
+| `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais SMTP et contrôle SMTP du compte (§12) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
 | `test-proxy.sh` | test du proxy : le Caddyfile devant le vrai serveur (salon activé), sur la boucle locale |
+| `test-sortie.sh` | test de la sortie SMTP : configuration résolue de `compose.yaml`, puis réseau réel avec Docker (§12.1) |
+| `sauvegarder.sh`, `systemd/` | sauvegarde quotidienne chiffrée (age) de `comptes.db` seule, et son minuteur (§12.4) |
+| `restaurer.sh` | vérification mensuelle et restauration d'une sauvegarde (§12.5) |
+| `test-restauration.sh` | sauvegarde, effacement, restauration et reconnexion d'un compte de test, en mémoire (§12.5) |
 | `env.example` | modèle de `deploy/.env` |
 
 Ce kit réduit les risques ; il ne rend pas le service invulnérable. Les limites sont listées en fin de page.
@@ -20,7 +24,7 @@ Chez l'hébergeur et le registraire :
 
 - serveur loué **hors UE** (Suisse ou Islande, §15.1), trafic sortant inclus vérifié, aucun CDN ni proxy devant ;
 - instantanés et sauvegardes de la machine **désactivés** chez l'hébergeur, aucun agent de surveillance de l'hébergeur ;
-- **aucun outil qui ouvre `shares.db` pendant que le serveur tourne** (sauvegarde à chaud, réplication de type Litestream, `sqlite3` pour « regarder ») : un lecteur d'un autre processus empêche le vidage du journal de la base (`shares.db-wal`), qui garde alors les lignes des partages et des salons déjà effacés. Le tableau de bord d'administration l'affiche (« Vidages de la base ratés ») ; le compte doit rester à 0 (audit adverse du 13 novembre, stockage, F3) ;
+- **aucun outil qui ouvre `shares.db` pendant que le serveur tourne** (seule exception, pour `comptes.db` et non `shares.db` : la sauvegarde quotidienne du compte, §12.4, qui la lit une seconde environ) (sauvegarde à chaud, réplication de type Litestream, `sqlite3` pour « regarder ») : un lecteur d'un autre processus empêche le vidage du journal de la base (`shares.db-wal`), qui garde alors les lignes des partages et des salons déjà effacés. Le tableau de bord d'administration l'affiche (« Vidages de la base ratés ») ; le compte doit rester à 0 (audit adverse du 13 novembre, stockage, F3) ;
 - DNS : `A` et `AAAA` vers le serveur ; **DNSSEC** activé ; `CAA 0 issue "letsencrypt.org"` ; double authentification et verrou de transfert (§15.4).
 
 Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plus) :
@@ -35,6 +39,7 @@ Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plu
 - **journald en mémoire** : `Storage=volatile` dans `/etc/systemd/journald.conf` (sinon `sshd` et le pare-feu écrivent des adresses sur disque) ; pas de journal des paquets refusés par le pare-feu (`ufw logging off`) ;
 - **heure** synchronisée (NTP : `timedatectl set-ntp true`) ;
 - **mises à jour de sécurité automatiques**, sans redémarrage automatique de la machine (`unattended-upgrades`, `Automatic-Reboot "false"`, §22) ;
+- compte par e-mail seulement (§12) : paquets `sqlite3` et `age` (version exacte, notée dans `deploy/.env`), `curl` ;
 - **SSH par clé seulement** (`PasswordAuthentication no`), **pare-feu** : 22, 80 et 443 en TCP, **443 en UDP** (HTTP/3, QUIC, décision du 13 novembre), rien d'autre. Avec ufw : `ufw allow 22/tcp`, `ufw allow 80/tcp`, `ufw allow 443/tcp`, `ufw allow 443/udp`. Sans l'ouverture UDP, les navigateurs restent en HTTP/2 (rien ne casse). Tampons UDP conseillés par la bibliothèque QUIC de Caddy, dans `/etc/sysctl.d/` : `net.core.rmem_max=7500000` et `net.core.wmem_max=7500000` (sinon HTTP/3 marche, plus lentement).
 
 ## 2. Première installation
@@ -47,9 +52,11 @@ mkfs.ext4 /dev/mapper/shhdrop
 mkdir -p /srv/shhdrop
 mount -o noatime,nodev,nosuid,noexec /dev/mapper/shhdrop /srv/shhdrop
 
-# Dossiers attendus par compose.yaml (jamais créés par Docker).
+# Dossiers attendus par compose.yaml (jamais créés par Docker). secrets/ : exigé même compte
+# désactivé (vide), monté en lecture seule dans le serveur (§12.2).
 install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/data
 install -d -o root -g root -m 0700 /srv/shhdrop/caddy
+install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets
 
 # Réglages, puis installation d'une version (empreinte de l'image, voir §3).
 cp deploy/env.example deploy/.env && editor deploy/.env
@@ -57,6 +64,8 @@ deploy/deploy.sh sha256:<empreinte>
 ```
 
 Ne pas inscrire le volume dans `/etc/fstab` ni `/etc/crypttab` avec une clé : il se déverrouille à la main (§5).
+
+**Machine déjà installée avant le lot 8 du compte** : créer `secrets/` (dernière ligne ci-dessus) avant le prochain `deploy.sh`, qui refuse sinon.
 
 ## 3. Mise à jour et retour arrière
 
@@ -154,7 +163,7 @@ En cas de doute sur la sécurité du serveur ou du code :
 
 1. `deploy/deploy.sh admin freeze`, puis `deploy/deploy.sh admin wipe --yes` si nécessaire.
 2. Changer les accès : clés SSH, GitHub, registraire, registre d'images.
-3. Réinstaller le serveur depuis zéro (nouvelle machine, nouveau volume chiffré, §1 et §2). Ne pas reprendre `/srv/shhdrop/caddy` : nouvelles clés TLS, et révoquer les anciens certificats.
+3. Réinstaller le serveur depuis zéro (nouvelle machine, nouveau volume chiffré, §1 et §2). Ne pas reprendre `/srv/shhdrop/caddy` : nouvelles clés TLS, et révoquer les anciens certificats. Compte activé : la **clé du serveur** (§12.2) est à tenir pour connue de l'attaquant, avec `comptes.db` (profils séquestrés lisibles, adresses testables une à une) ; elle ne peut pas être changée sans perdre tous les comptes (conception §5.2) : décision du propriétaire, à prendre avant de reprendre la base ; changer aussi le mot de passe SMTP et l'accès au stockage des sauvegardes.
 4. Publier un avis sur le site.
 
 ## 7. Vérifications après chaque mise en ligne
@@ -213,7 +222,9 @@ docker run --rm --network host --log-driver none -v /etc/ssl/certs/ca-certificat
 
 ```sh
 CADDY=/chemin/vers/caddy deploy/test-proxy.sh     # Caddy 2.10 ou plus, curl 7.83 ou plus, Go, web/dist construit (≈ 2 min 30 : WebSocket gardé 75 s)
-make lint-deploy                                  # bash -n, ShellCheck, go vet de shhcheck
+make lint-deploy                                  # bash -n, ShellCheck, go vet et tests unitaires de shhcheck (relais SMTP)
+SHH_IMAGE=shhdrop:ci make test-sortie             # sortie SMTP : configuration, puis réseau réel (démon Docker ; code 3 sans démon)
+sudo make test-restauration                       # sauvegarde et restauration d'un compte de test, en mémoire (≈ 45 s)
 ```
 
 Le binaire Caddy à donner est celui de l'image épinglée par empreinte dans `compose.yaml` : `docker create` de cette image puis `docker cp …:/usr/bin/caddy` (ce que fait la CI), ou, sans démon Docker, l'index de l'image, son manifeste linux/amd64 et ses couches lus dans le registre, chacun contrôlé par son empreinte SHA-256 avant d'extraire `/usr/bin/caddy`. L'essai long du WebSocket du salon (condition d'activation, §10) : `SALON_GARDE=660` (≈ 14 min en tout).
@@ -235,7 +246,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 - **Surveillance (§15.2)** : ni sonde externe (site injoignable, **date de fin du certificat** : Caddy ne journalise rien, un renouvellement raté ne se voit pas autrement), ni script horaire d'alerte (disque à 80 %, signalements). Pour ce script : `df` pour le disque ; `docker exec shhdrop-shhdrop-1 /shhcheck health` affiche `reports_alert`.
 - **Déverrouillage (§22)** : pas de `deploy/unlock.sh` ; les trois commandes du §5 en tiennent lieu. Pas d'alerte « redémarrage nécessaire ».
 - **Dates et tailles des fichiers** (audit adverse du 13 novembre, stockage, F4). Les dates de contenu et d'accès sont au 1er janvier 1970 ; la date de changement d'inode (`ctime`) de tous les fichiers est ramenée, une fois par minute, à l'heure de ce passage. Restent lisibles par qui lit le disque déverrouillé : la **date de création** (`btime`, sur ext4) de chaque fichier de partage, de pièce et de conversation, qu'aucun appel système ne permet de changer, donc l'heure de création de chaque partage vivant et du premier message de chaque salon ; pendant une minute au plus, le `ctime` d'un fichier qui vient d'être écrit ; la taille d'une conversation, par paliers de 64 messages (plus le nombre exact) ; l'ordre de création (numéros d'inode). Le dossier de données lui-même, `frozen`, `kill/`, `kill.key`, `shares.db`, `shares.db-wal` et `shares.db-shm` ont, depuis la 3ᵉ campagne de l'audit adverse (stockage, F5), leurs dates de contenu et d'accès remises à l'epoch à chaque passage du janitor (une fois par minute) et leur `ctime` ramené à l'heure de ce passage : l'heure du dernier gel, dégel, destruction par l'administrateur ou écriture en base ne se lit plus qu'à la minute près ; un gel et un dégel remettent aussi les dates aussitôt. Restent : la **date de création de `frozen`**, qui donne l'heure du gel en cours tant qu'il dure, et celle de `kill/`, créé au premier passage du serveur (heure du démarrage, sans rapport avec une destruction). Seuls le volume chiffré et l'absence d'instantanés les protègent.
-- **Sauvegardes** : aucune, et c'est voulu. La spécification les interdit pour les données (§9.2 : « aucune sauvegarde de ce dossier ») : des partages chiffrés qui vivent 24 h n'ont rien à restaurer, et une sauvegarde garderait ce qui doit disparaître. À sauvegarder ailleurs que sur le serveur : `deploy/.env` et la phrase du volume, c'est tout. `deploy/.env` ne contient aucun secret qui ouvre quoi que ce soit : avec le tableau de bord, seulement l'**empreinte** du jeton (§4), qui ne permet pas de le retrouver ; le jeton lui-même se garde dans le gestionnaire de mots de passe de l'exploitant, jamais avec cette sauvegarde. Un `SHH_ADMIN_TOKEN` en clair n'y a pas sa place (le serveur refuse de démarrer avec lui, §4). Le dossier `caddy/` se recrée seul (nouveau certificat).
+- **Sauvegardes** : aucune pour les partages et les salons, et c'est voulu. La spécification les interdit pour les données (§9.2 : « aucune sauvegarde de ce dossier ») : des partages chiffrés qui vivent 24 h n'ont rien à restaurer, et une sauvegarde garderait ce qui doit disparaître. **Seule exception, compte activé : `comptes.db`**, et elle seule, chiffrée chaque jour (§12.4 ; conception du compte §21.13, décision du propriétaire du 14 novembre). À sauvegarder ailleurs que sur le serveur : `deploy/.env` et la phrase du volume, plus, compte activé, la **clé du serveur** (§12.2), chacun à part. `deploy/.env` ne contient aucun secret qui ouvre quoi que ce soit : avec le tableau de bord, seulement l'**empreinte** du jeton (§4), qui ne permet pas de le retrouver ; le jeton lui-même se garde dans le gestionnaire de mots de passe de l'exploitant, jamais avec cette sauvegarde. Un `SHH_ADMIN_TOKEN` en clair n'y a pas sa place (le serveur refuse de démarrer avec lui, §4). Le dossier `caddy/` se recrée seul (nouveau certificat).
 - **Durcissement de la machine** : les réglages du §1 (journald, pare-feu, SSH, mises à jour) sont à faire à la main ; aucun script ne les pose ni ne les vérifie, sauf `noatime` et la mémoire d'échange, contrôlés par `deploy.sh`.
 - **Hébergeur** : il voit les adresses IP et peut lire la mémoire de la machine. Hors de portée (§18.3).
 - **Caddy tourne en root dans son conteneur** (audit du 13 novembre, D9 ; non corrigé, décision à prendre). Il n'a aucune capacité sauf `NET_BIND_SERVICE` (écouter sur 80 et 443), sous `no-new-privileges`, avec un système de fichiers en lecture seule. Le passer en `user: "65532:65532"` ne marche pas avec l'image officielle épinglée : son binaire porte la capacité de fichier `cap_net_bind_service=+p` (lu dans la couche `sha256:5000c332…` de `caddy:2.11.9` : attribut `security.capability`, bit « effectif » absent), et `no-new-privileges` fait de toute façon ignorer les capacités de fichier. Un Caddy non root ne pourrait donc pas écouter sur 443. Deux voies, à choisir : (a) `sysctl net.ipv4.ip_unprivileged_port_start=80` sur la machine (réglage global : tout processus de la machine pourrait alors prendre 80 ou 443 pendant un redémarrage de Caddy ; `network_mode: host` interdit de le poser pour le seul conteneur), puis `user: "65532:65532"` et le dossier `caddy/` donné à 65532 ; (b) garder root, comme aujourd'hui.
@@ -293,3 +304,127 @@ Aucune limite de capacité n'est fixée en dur (décision du propriétaire du 13
 **Mémoire du salon** (audit adverse du 13 novembre) : l'index des trames en mémoire est borné **globalement** par `SHH_SALON_FRAMES_TOTAL` (calé sur `GOMEMLIMIT`), tous salons confondus, en plus du plafond par salon. Monter `SHH_SALONS_MAX` ne peut donc plus faire tuer le serveur faute de mémoire : au pire, des salons reçoivent `0x0C` « plein » plus tôt. **Part de chaque salon** (2ᵉ passage de l'audit, F3) : la moitié de ce plafond est réservée à parts égales entre les `SHH_SALONS_MAX` salons possibles (4 915 trames par salon avec les valeurs livrées) ; un salon n'est jamais refusé sous sa part, quoi que fassent les autres ; l'autre moitié est un pot commun. **Limite connue du pot commun** (audit adverse du 13 novembre, 3ᵉ campagne, F) : un salon plein en prend 95 085 trames ; **11 salons pleins le vident** (3 blocs /48 ou 3 adresses IPv4 à 5 salons chacune, environ 7 h de remplissage à 10 sièges). Les autres salons retombent alors à leur part (4 915 trames depuis leur dernier renouvellement, **trames effacées comprises** : l'index ne rétrécit pas tant que le salon vit), qu'un salon de 10 membres au débit permis épuise dans sa première rafale ; ils reçoivent `0x0C` « plein » jusqu'à la fin ou au renouvellement des salons pleins. Aucune correction simple et sûre n'existe dans le code actuel : retirer de l'index les trames effacées changerait le rattrapage, et borner la part d'un bloc dans le pot demande un compte par bloc tenu sous les verrous de chaque salon. Choix du propriétaire, à reprendre dans la spécification (§18). Parades d'exploitation : `SHH_SALONS_MAX` plus bas (part plus grande) ou `GOMEMLIMIT` plus haut. Le journal des annonces de chaque salon (256 Kio au pire) est hors de ce plafond : c'est le contrôle de démarrage de `SHH_SALONS_MAX` qui le borne (§1). Comme pour les envois, c'est `GOMEMLIMIT` qui fait monter ce plafond avec la machine.
 
 **Part équitable** (audit du 13 novembre, D2) : en plus de ses propres limites, une connexion ou un bloc /48 (une adresse en IPv4) prend au plus **1/8** de chaque plafond global, et le **dernier quart** des places (envois, lectures, surveillances, WebSocket, salons) ne va qu'à un bloc qui n'en tient aucune. Le **dernier huitième du stockage** ne va qu'à une adresse qui n'a rien créé ni envoyé aujourd'hui (UTC) ; un agrandissement et une pièce du salon n'y entrent jamais ; une adresse ne réserve pas plus de `SHH_STORAGE_MAX / 8` octets par jour. Un salon où personne n'est entré est effacé 15 min après sa création. Adresses IPv4 nécessaires pour tout prendre, avec `compose.yaml` : envois 23 (8 avant), lectures 107 (16 avant), salons (200) 80 qui y entrent (40 avant, sans y entrer), stockage environ 43 (34 avant). Ces seuils restent atteignables par un attaquant qui dispose de beaucoup d'adresses : ce sont des limites assumées, à reporter dans la spécification (§18).
+
+## 12. Compte par e-mail (désactivé) : sortie SMTP, secrets, sauvegarde
+
+Le compte (conception `docs/superpowers/specs/2026-11-14-compte-email-design.md`) est livré **désactivé** : `compose.yaml` pose `SHH_COMPTES: "0"`, sans variable dans `.env` pour l'ouvrir. Avec `0`, aucune route `/api/compte/*`, aucun fichier lu dans `secrets/`, aucun relais SMTP, aucune connexion sortante. **Conditions bloquantes d'activation** : décision D8 du propriétaire après l'avis du juriste (conservation des données de création de compte, LCEN et décret 2021-1362 ; conception §16, §21.18), test bloquant « le serveur ne voit rien » étendu au compte (plan du compte, lot 16), salon activé (`SHH_SALONS: "1"`), puis tout ce qui suit.
+
+### 12.1 Sortie SMTP : le seul relais
+
+Le serveur Go reste sur le réseau Docker `interne` (`internal: true`), **sans aucune route vers Internet, même compte activé**. Compte activé, `deploy.sh` démarre un troisième conteneur, `relais-smtp` (profil Compose `comptes`, même image que le serveur, programme `/shhcheck relais`, `shhcheck/relais.go`) :
+
+- il est sur `interne` (172.30.53.3) et sur un réseau `sortie` à lui seul (172.30.53.8/29), sans port publié ;
+- dans le conteneur du serveur, `extra_hosts` fait pointer le nom `SHH_SMTP_HOST` vers 172.30.53.3 : le serveur se connecte « au fournisseur », arrive sur le relais, qui recopie les octets vers **`SHH_SMTP_HOST:465` et rien d'autre** (cible fixée à son démarrage ; le serveur ne peut rien choisir : ni hôte, ni port) ;
+- TLS est de bout en bout entre le serveur et le fournisseur : le serveur vérifie le certificat pour `SHH_SMTP_HOST` (certificats racine de l'image) ; le relais ne voit que des octets chiffrés, leur taille et l'heure. Il n'écrit rien (journal `none`) ; 4 connexions à la fois, 60 s chacune au plus ; compte 65532, lecture seule, sans capacité ;
+- il résout `SHH_SMTP_HOST` à chaque connexion (résolveur de Docker, donc celui de la machine) : un changement d'adresse du fournisseur ne demande rien.
+
+**Écart au plan, voulu** : le plan prévoyait le serveur sur un réseau non interne et une règle de pare-feu de la machine (TCP 465 vers les adresses de `SHH_SMTP_HOST`). Refusé parce qu'il échoue **ouvert** : sans la règle (pare-feu vidé, `iptables -F`, Docker en mode nftables où `DOCKER-USER` n'existe pas, adresses du fournisseur changées puis élargies à la main), le serveur aurait eu une sortie complète vers Internet. Avec le relais, c'est Docker (`internal: true`) qui garantit l'absence de route, comme avant le compte. **Limite** : le conteneur du relais, lui, a une sortie ordinaire (réseau `sortie`) ; c'est son code, fixe et testé (`go test` de `shhcheck`), qui la borne à une seule cible. Défense de plus, facultative, à poser par l'exploitant selon son pare-feu : n'autoriser depuis 172.30.53.8/29 que TCP 465 et la résolution DNS par la machine.
+
+Contrôles : `deploy.sh` vérifie, après chaque installation compte activé, que le fournisseur répond à travers le relais en TLS vérifié (`shhcheck smtp` : accueil SMTP puis `QUIT`, ni authentification ni e-mail) ; un échec n'est qu'un **avertissement** (une panne du fournisseur ne fait pas revenir à l'image d'avant), mais il veut dire qu'**aucun code n'arrive** et rien d'autre ne le dit (aucun journal). Tests : `make test-sortie` (configuration résolue ; réseau réel avec un démon Docker), `make lint-deploy` (tests du relais).
+
+**Fournisseur d'envoi** (décision D1, encore ouverte : la conception recommande un fournisseur dans l'UE, SMTP standard) : SMTP authentifié en **TLS implicite sur 465** ; suivi des ouvertures et des clics **désactivé** ; contrat de sous-traitance (RGPD art. 28) ; durée de conservation de ses journaux la plus courte possible (ils gardent adresse, heure et code, conception §21.3). Il apprend l'adresse IP de la machine.
+
+**DNS du domaine d'envoi** (celui de `SHH_MAIL_FROM`), sans quoi les codes finissent en indésirables (conception §18) : les enregistrements que donne le fournisseur, exactement :
+
+- **SPF** : un seul enregistrement `TXT` à la racine, `v=spf1 include:<valeur du fournisseur> -all` (fusionner avec un SPF existant, jamais deux) ;
+- **DKIM** : l'enregistrement `TXT` (ou `CNAME`) `<sélecteur>._domainkey` du fournisseur ;
+- **DMARC** : `_dmarc TXT "v=DMARC1; p=quarantine; adkim=s; aspf=r"` pour commencer, puis `p=reject` une fois les envois vérifiés. Aucune adresse `rua`/`ruf` n'est nécessaire (les rapports contiendraient les adresses IP des serveurs d'envoi, pas celles des personnes ; à décider) ;
+- vérifier depuis un autre poste : `dig +short TXT <domaine>`, `dig +short TXT <sélecteur>._domainkey.<domaine>`, `dig +short TXT _dmarc.<domaine>`, puis un envoi réel vers une boîte de test (en-têtes `spf=pass`, `dkim=pass`, `dmarc=pass`).
+
+### 12.2 Secrets : clé du serveur et mot de passe SMTP
+
+Deux fichiers dans `/srv/shhdrop/secrets/` (volume chiffré, **hors** de `data/`, donc hors de la sauvegarde), montés en lecture seule dans `/run/secrets` du serveur. Le dépôt, `deploy/.env`, la configuration du conteneur (`docker inspect`) et l'environnement du processus n'en contiennent que les **chemins**. `deploy.sh` refuse d'installer, compte activé, si un fichier manque ou n'a pas exactement ces droits ; le serveur refuse aussi de démarrer (clé de 32 octets, 0400 ou 0600).
+
+```sh
+install -d -o root -g 65532 -m 0750 /srv/shhdrop/secrets   # déjà fait au §2
+cd /srv/shhdrop/secrets
+# Clé du serveur K_serveur : 32 octets tirés au hasard, une fois pour toutes.
+(umask 077 && head -c 32 /dev/urandom > shh_comptes_cle)
+# Mot de passe SMTP du fournisseur : tapé sans écho, jamais en argument ni dans l'historique.
+(umask 077 && IFS= read -rs MDP && printf '%s' "$MDP" > shh_smtp_mdp; unset MDP)
+chown 65532:65532 shh_comptes_cle shh_smtp_mdp && chmod 0400 shh_comptes_cle shh_smtp_mdp
+```
+
+**La clé du serveur ne se perd pas** : sans elle, **tous les comptes sont perdus**, sans recours (plus aucune adresse ne retrouve son compte, plus aucun mot de passe ne se vérifie, les profils séquestrés ne s'ouvrent plus) ; elle ne se change pas non plus (conception §5.2). Une sauvegarde de `comptes.db` sans elle ne sert à rien. Donc, dès sa création :
+
+- **copie hors ligne obligatoire**, par exemple sur papier : `base64 < shh_comptes_cle` (44 caractères, à recopier puis à relire ; effacer ensuite l'écran : `clear`), ou sur une clé USB chiffrée ; restauration : `base64 -d > shh_comptes_cle`, puis les droits ci-dessus ;
+- cette copie est rangée **à part** de la clé privée age des sauvegardes (§12.4) : qui a les deux et une sauvegarde lit les profils séquestrés et peut essayer des adresses une à une (conception R19) ;
+- elle ne va jamais dans le dépôt, dans `deploy/.env`, dans un gestionnaire de mots de passe synchronisé avec la machine, ni dans la sauvegarde.
+
+Le mot de passe SMTP, lui, se remplace (nouveau mot de passe chez le fournisseur, nouveau fichier, `deploy.sh`) : pas de copie hors ligne nécessaire.
+
+### 12.3 Activer le compte (décision D8 prise)
+
+1. Fournisseur choisi (D1), DNS du §12.1 posés et vérifiés.
+2. Secrets du §12.2 créés ; copie hors ligne de la clé faite.
+3. `deploy/.env` : `SHH_SMTP_HOST`, `SHH_SMTP_USER`, `SHH_MAIL_FROM` (entre apostrophes), modèle dans `env.example`.
+4. `compose.yaml` : `SHH_SALONS: "1"` et `SHH_COMPTES: "1"` (fichier relu et commité, comme le salon).
+5. `deploy/deploy.sh sha256:<empreinte>` : relais démarré, secrets contrôlés, fournisseur contrôlé.
+6. Sauvegarde du §12.4 installée **le même jour**, puis une restauration essayée (§12.5).
+
+Désactiver : `SHH_COMPTES: "0"`, `deploy.sh` (le relais est arrêté). `comptes.db` reste sur le volume, intacte.
+
+### 12.4 Sauvegarde quotidienne chiffrée de `comptes.db`
+
+Ce qui est sauvegardé : **`comptes.db` seule** (comptes, sessions, bannis). Jamais `shares.db`, les fichiers des partages, les salons, les conversations, ni la clé du serveur. Comment (`sauvegarder.sh`, minuteur `systemd/shhdrop-sauvegarde.timer`, chaque jour vers 03:17 UTC) : copie cohérente par `sqlite3 .backup`, serveur en marche (sous le compte 65532, dans `/srv/shhdrop/sauvegarde/` : le clair ne quitte jamais le volume chiffré, refus sinon) ; `PRAGMA integrity_check` ; chiffrement par **age** (`age-encryption.org/v1`, X25519) vers la clé **publique** de l'exploitant ; clair effacé aussitôt ; envoi du seul chiffré, nommé `comptes-AAAA-MM-JJTHHMMSSZ.db.age`. Aucune crypto maison, rien dans le serveur Go. La lecture de la base dure environ une seconde ; si une suppression de compte tombe pendant ce temps, son vidage du journal (`comptes.db-wal`) attend le suivant (au plus la passe quotidienne).
+
+Mise en place, une fois :
+
+1. **Outils** sur la machine : `apt install sqlite3 age curl` (ou `age` construit depuis ses sources ou paquet signé), puis `age --version` recopié dans `deploy/.env` (`SHH_AGE_VERSION`) : le script refuse une autre version.
+2. **Clés age, sur le poste de l'exploitant** (jamais sur la machine) : `age-keygen -o sauvegarde.cle` (la ligne `Public key: age1…` est la clé publique), idéalement protégée par une phrase : `age-keygen | age -p > sauvegarde.cle.age` (age demandera la phrase à chaque restauration). Clé publique dans `deploy/.env` (`SHH_SAUVEGARDE_DESTINATAIRE`). Clé privée **hors ligne** (papier ou clé USB chiffrée), **à part** de la copie de la clé du serveur (§12.2) : les deux sont nécessaires à une restauration.
+3. **Stockage objet** chez un **autre fournisseur** que l'hébergeur, **dans l'UE** (contrat de sous-traitance) : un seau dédié ; **gestion des versions activée** (ou verrouillage d'objet, « Object Lock », 30 jours) : l'accès en écriture seule ne peut ni lire ni effacer, mais sans versions il pourrait **écraser** une copie sous le même nom ; **règle de cycle de vie : effacer les objets (et leurs anciennes versions) après 30 jours** (rotation de 30 copies, dite dans la page Confidentialité, conception R18) ; un **compte d'accès en écriture seule** (droit `PutObject` sur ce seau seulement : ni lecture, ni liste, ni effacement), pour qu'un pirate de la machine ne puisse ni lire ni détruire les copies. Un **second accès, en lecture**, reste sur le poste de l'exploitant, pour les restaurations.
+4. **Accès d'écriture** sur la machine, dans `/srv/shhdrop/sauvegarde-acces.curl` (root 0600, sur le volume chiffré, hors de `secrets/` que le serveur voit) : un fichier de configuration curl, pour que les identifiants n'apparaissent jamais dans la liste des processus :
+
+   ```sh
+   (umask 077 && cat > /srv/shhdrop/sauvegarde-acces.curl) <<'FIN'
+   user = "<clé d'accès>:<secret>"
+   aws-sigv4 = "aws:amz:<région>:s3"
+   FIN
+   ```
+
+   et dans `deploy/.env` : `SHH_SAUVEGARDE_URL=https://<seau>.<point d'accès S3>/comptes/` (barre finale comprise).
+5. **Dossier temporaire et minuteur** :
+
+   ```sh
+   install -d -o 65532 -g 65532 -m 0700 /srv/shhdrop/sauvegarde
+   cp deploy/systemd/shhdrop-sauvegarde.service deploy/systemd/shhdrop-sauvegarde.timer /etc/systemd/system/
+   # Remplacer /opt/shhdrop par le chemin de la copie du dépôt, dans le .service.
+   systemctl daemon-reload && systemctl enable --now shhdrop-sauvegarde.timer
+   systemctl start shhdrop-sauvegarde.service && journalctl -u shhdrop-sauvegarde.service -n 5   # « sauvegarde envoyée : … »
+   ```
+
+À savoir : le volume doit avoir deux fois la taille de `comptes.db` de libre (clair puis chiffré, un instant) ; au pire 10 000 comptes × deux coffres de 256 Kio ≈ 5 Go. Une sauvegarde ratée ne se voit que dans `systemctl status shhdrop-sauvegarde.service` (journald en mémoire, aucune alerte : §9, « Surveillance ») ; vérifier aussi chaque semaine qu'un objet du jour est arrivé (accès en lecture). Machine redémarrée : rien n'est sauvegardé tant que le volume n'est pas déverrouillé (refus du script).
+
+**Ce que voit le fournisseur de stockage** : la taille de chaque copie et l'heure d'envoi (conception S79), jamais le contenu. **Effet sur le droit à l'effacement** : un compte supprimé reste dans les copies jusqu'à 30 jours (dit dans la page Confidentialité, conception §21.13).
+
+### 12.5 Restauration
+
+**Essai mensuel** (décision du propriétaire du 14 novembre), sur le poste de l'exploitant (Linux : `age`, `sqlite3`, `/dev/shm`) : télécharger la copie la plus récente avec l'accès en lecture, puis
+
+```sh
+deploy/restaurer.sh verifier comptes-<date>.db.age sauvegarde.cle   # « intégrité : ok ; schéma 2 ; N comptes »
+```
+
+(déchiffrée en mémoire, `/dev/shm`, puis effacée ; rien n'est installé). À chaque changement du schéma de `comptes.db`, et à chaque changement des scripts : `sudo make test-restauration` (compte de test créé par le vrai serveur, sauvegarde serveur en marche, effacement, restauration, reconnexion réussie ; avec une autre clé du serveur, connexion refusée).
+
+**Restauration réelle** (base perdue ou abîmée, nouvelle machine) :
+
+1. Machine prête (§1, §2), volume monté, **clé du serveur remise** depuis sa copie hors ligne dans `secrets/` (§12.2). Une image **au moins aussi récente** que celle qui a écrit la sauvegarde (une plus ancienne refuse la base : « créée par une version plus récente »).
+2. Serveur **arrêté** : `docker stop shhdrop-shhdrop-1` (le script refuse si un processus a encore la base ouverte).
+3. Copier la **plus récente** des sauvegardes sur la machine, et l'identité age le temps de la restauration (protégée par sa phrase, §12.4 : seule sa forme chiffrée passe sur la machine), puis :
+
+   ```sh
+   deploy/restaurer.sh installer [--remplacer] comptes-<date>.db.age sauvegarde.cle /srv/shhdrop/data
+   shred -u sauvegarde.cle   # l'identité ne reste pas sur la machine (au mieux : ext4, SSD)
+   deploy/deploy.sh "$(cat deploy/.release)"
+   ```
+
+   Le clair est déchiffré dans le dossier de données lui-même (volume chiffré), vérifié (`integrity_check`, tables), installé (compte 65532, 0600). `--remplacer` garde l'ancienne base à côté (`comptes.db.avant-restauration`, avec son `-wal`) : l'effacer une fois un compte de contrôle reconnecté.
+4. Se connecter avec un compte de contrôle.
+
+Règles et effets :
+
+- **toujours la plus récente** : les suppressions de comptes antérieures y sont appliquées ; une copie plus ancienne ferait revenir des comptes supprimés (interdit par la procédure, conception §21.13) ;
+- **toutes les sessions sont effacées** à la restauration : chacun se reconnecte (une session fermée depuis la sauvegarde, après un vol par exemple, ne revient pas) ;
+- **ce qui a changé depuis la sauvegarde est perdu** (24 h au plus) : un mot de passe changé **revient à l'ancien**, une adresse changée aussi, un compte créé disparaît, **un compte supprimé depuis revient**, un bannissement posé depuis disparaît ; aucun e-mail ne peut prévenir les personnes (le serveur ne garde pas les adresses). À noter dans le registre de l'incident ; un bannissement se repose depuis le tableau de bord ;
+- partages et salons d'avant la perte sont perdus (éphémères, jamais sauvegardés), le lien compte ↔ salon aussi.
