@@ -523,7 +523,11 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	}
 	// Tableau de bord d'administration : écouteur à part, après l'écouteur public ; s'il ne
 	// s'ouvre pas, le serveur public tourne quand même.
-	defer startAdmin(cfg, out, adminDeps{svc: svc, sm: sm, db: db, gate: gate, lim: lim, probes: probes, start: start})()
+	ad := adminDeps{svc: svc, sm: sm, db: db, gate: gate, lim: lim, probes: probes, start: start}
+	if cpt != nil {
+		ad.cpt, ad.env = cpt.svc, cpt.env
+	}
+	defer startAdmin(cfg, out, ad)()
 	jctx, jcancel := context.WithCancel(ctx)
 	jdone := make(chan struct{})
 	wdone := make(chan struct{})

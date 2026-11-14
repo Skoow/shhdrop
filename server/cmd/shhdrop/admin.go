@@ -4,16 +4,21 @@ import (
 	"bytes"
 	"crypto/hkdf"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/blob"
+	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
+	"github.com/skoow/shhdrop/server/internal/courriel"
+	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
 	"github.com/skoow/shhdrop/server/internal/store"
@@ -31,6 +36,8 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	usage := func(msg string) int {
 		fmt.Fprintln(stderr, msg)
 		fmt.Fprintln(stderr, "usage: shhdrop admin freeze|unfreeze|destroy - (lien lu sur l'entrée standard)|wipe --yes")
+		fmt.Fprintln(stderr, "       shhdrop admin bannir - [--duree 30|365|1095] [--motif 1..10] (lien de salon ou adresse sur l'entrée standard)")
+		fmt.Fprintln(stderr, "       shhdrop admin bannis liste [actifs|suspendus|bientot] | suspendre|reactiver|lever|annuler <B-…> | echeance <B-…> <AAAA-MM-JJ>")
 		return 2
 	}
 	fail := func(err error) int {
@@ -39,6 +46,9 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	}
 	if len(args) == 0 {
 		return usage("commande admin manquante")
+	}
+	if args[0] == "bannir" || args[0] == "bannis" {
+		return runBannis(args, cfg, stdin, stdout, stderr, usage, fail)
 	}
 	switch args[0] {
 	case "freeze", "unfreeze":
@@ -167,6 +177,237 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 				"S'il tourne, le redémarrer maintenant : sinon, un téléchargement déjà commencé peut encore finir (jusqu'à 2 h). "+
 				"S'il est arrêté, il n'y a rien à couper.")
 		}
+	}
+	return 0
+}
+
+// postierNul : la ligne de commande n'envoie aucun e-mail (aucune connexion sortante).
+type postierNul struct{}
+
+func (postierNul) Mettre(courriel.Message) error { return courriel.ErrPlein }
+func (postierNul) Plein() bool                   { return true }
+
+// runBannis : « bannir - » et « bannis … » (conception du compte §13, §21.11, §21.14.5 ;
+// plan lot 7). Exige SHH_COMPTES=1 (clé du serveur) et une comptes.db existante. Le lien ou
+// l'adresse se lit sur l'entrée standard, jamais en argument (historique du shell,
+// /proc/<pid>/cmdline) ; la sortie ne les reprend jamais : seulement l'identifiant B-….
+// Les salons du compte sont détruits hors ligne (le serveur en marche ferme leurs connexions
+// à sa passe suivante). La limite de 20 bannissements par heure ne vaut ici que pour cette
+// commande (mémoire du processus) : qui l'exécute a déjà la machine.
+func runBannis(args []string, cfg config.Config, stdin io.Reader, stdout, stderr io.Writer,
+	usage func(string) int, fail func(error) int) int {
+	duree, motif := compte.DureeBanDefaut, uint8(10)
+	var filtre, id, jusqu, action string
+	if args[0] == "bannir" {
+		if len(args) < 2 || args[1] != "-" {
+			return usage("bannir lit le lien du salon ou l'adresse sur l'entrée standard : shhdrop admin bannir -")
+		}
+		for r := args[2:]; len(r) > 0; r = r[2:] {
+			if len(r) < 2 {
+				return usage("option sans valeur")
+			}
+			n, err := strconv.Atoi(r[1])
+			switch {
+			case err != nil:
+				return usage("valeur non numérique")
+			case r[0] == "--duree" && (n == 30 || n == 365 || n == 1095):
+				duree = n
+			case r[0] == "--motif" && n >= 1 && n <= 10:
+				motif = uint8(n)
+			default:
+				return usage("--duree 30, 365 ou 1095 ; --motif 1 à 10")
+			}
+		}
+	} else {
+		if len(args) < 2 {
+			return usage("bannis : action manquante")
+		}
+		action = args[1]
+		switch {
+		case action == "liste" && len(args) <= 3:
+			if len(args) == 3 {
+				filtre = args[2]
+			}
+		case (action == "suspendre" || action == "reactiver" || action == "lever" || action == "annuler") && len(args) == 3:
+			id = args[2]
+		case action == "echeance" && len(args) == 4:
+			id, jusqu = args[2], args[3]
+		default:
+			return usage("bannis : action ou arguments inconnus")
+		}
+	}
+	if !cfg.Comptes {
+		return usage("bannir et bannis exigent SHH_COMPTES=1 (et SHH_COMPTES_CLE_FILE)")
+	}
+	var lu []byte
+	if args[0] == "bannir" {
+		var err error
+		if lu, err = lireLien(stdin); err != nil {
+			return usage(err.Error())
+		}
+		defer clear(lu)
+	}
+	dir, err := adminDataDir(cfg.DataDir)
+	if err != nil {
+		return fail(err)
+	}
+	cles, err := compte.LireCles(cfg.ComptesCleFile)
+	if err != nil {
+		return fail(shown(err.Error()))
+	}
+	chemin := filepath.Join(dir, "comptes.db")
+	if fi, err := os.Stat(chemin); err != nil || !fi.Mode().IsRegular() {
+		return fail(shownf("%s ne contient pas comptes.db : aucun compte (rien n'a été fait)", dir))
+	}
+	cdb, err := compte.OuvrirBase(chemin)
+	if errors.Is(err, compte.ErrBasePlusRecente) {
+		return fail(shown(err.Error()))
+	}
+	if err != nil {
+		return fail(err)
+	}
+	defer cdb.Close()
+	svc, closeFn, err := openService(cfg, dir)
+	if err != nil {
+		return fail(err)
+	}
+	defer closeFn()
+	pieces, conv := &blob.Store{Dir: filepath.Join(dir, dirSalonPieces)}, filepath.Join(dir, dirSalons)
+	now := cfg.Now
+	if now == nil {
+		now = time.Now
+	}
+	cs, err := compte.NewService(compte.Config{DB: cdb, Cles: cles, Courriel: postierNul{}, Limites: limits.New(now), Now: now,
+		Max: max(1, cfg.ComptesMax),
+		FermerSalons: func(h [16]byte) (int, error) {
+			if err := store.RequireCurrent(svc.DB); err != nil {
+				return 0, err
+			}
+			n, err := salon.FermerDuCompteHorsLigne(svc.DB, pieces, conv, h, now())
+			if err == nil {
+				err = store.Checkpoint(svc.DB)
+			}
+			return n, err
+		}})
+	if err != nil {
+		return fail(err)
+	}
+	if args[0] == "bannis" {
+		return bannisCmd(cs, action, filtre, id, jusqu, dir, stdout, stderr, usage, fail)
+	}
+	return bannirCmd(cs, svc, lu, duree, motif, dir, stdout, stderr, usage, fail)
+}
+
+func etatBan(v compte.BanVue) string {
+	e := "actif"
+	if !v.Actif {
+		e = "suspendu"
+	}
+	return fmt.Sprintf("%s %s, du %s au %s, motif %d, salons fermés : %d", v.ID, e, v.Debut, v.Jusqu, v.Motif, v.SalonsFermes)
+}
+
+// bannirCmd : lien de salon (#c<43>) ou adresse (tout ce qui contient « @ »).
+func bannirCmd(cs *compte.Service, svc *share.Service, lu []byte, duree int, motif uint8, dir string,
+	stdout, stderr io.Writer, usage func(string) int, fail func(error) int) int {
+	ligne, ok := seuleLigne(lu)
+	if !ok {
+		return usage(errUneLigne.Error())
+	}
+	var c compte.Cible
+	if bytes.IndexByte(ligne, '@') >= 0 {
+		c.Email = ligne
+	} else {
+		k, estSalon, err := cleAccesDuLien(ligne)
+		if err != nil || !estSalon {
+			clear(k)
+			return usage("lien de salon (#c<clé>) ou adresse e-mail attendus")
+		}
+		if err := store.RequireCurrent(svc.DB); err != nil {
+			clear(k)
+			return fail(err)
+		}
+		var cb []byte
+		err = svc.DB.QueryRow(`SELECT compte FROM salons WHERE access_v=?`, share.Verifier(k)).Scan(&cb)
+		clear(k)
+		if errors.Is(err, sql.ErrNoRows) {
+			fmt.Fprintf(stderr, "introuvable : aucun salon pour ce lien (%s ; rien n'a été fait)\n", dir)
+			return 1
+		}
+		if err != nil {
+			return fail(err)
+		}
+		if len(cb) != 16 {
+			fmt.Fprintf(stderr, "aucun compte à bannir : salon créé sans compte ; « shhdrop admin destroy - » le détruit (%s)\n", dir)
+			return 1
+		}
+		h := [16]byte(cb)
+		c.H = &h
+	}
+	b, err := cs.Bannir(c, duree, motif)
+	var deja compte.ErrDejaBanni
+	switch {
+	case errors.As(err, &deja):
+		fmt.Fprintf(stderr, "déjà banni : %s (agir sur lui : shhdrop admin bannis …)\n", etatBan(deja.Vue))
+		return 1
+	case errors.Is(err, compte.ErrAdresse):
+		return usage("adresse e-mail invalide")
+	case errors.Is(err, compte.ErrEtape):
+		fmt.Fprintf(stderr, "aucun compte à bannir : le compte du salon n'existe plus (%s)\n", dir)
+		return 1
+	case err != nil:
+		return fail(err)
+	}
+	if !b.Compte {
+		fmt.Fprintf(stdout, "adresse bannie %s jusqu'au %s (motif %d) : aucun compte, l'inscription est refusée (%s)\n",
+			b.Vue.ID, b.Vue.Jusqu, b.Vue.Motif, dir)
+		return 0
+	}
+	pl := "salons fermés"
+	if b.SalonsFermes == 1 {
+		pl = "salon fermé"
+	}
+	fmt.Fprintf(stdout, "compte banni %s jusqu'au %s (motif %d) ; %d %s ; sessions fermées (%s)\n", b.Vue.ID, b.Vue.Jusqu,
+		b.Vue.Motif, b.SalonsFermes, pl, dir)
+	return 0
+}
+
+// bannisCmd : liste (toutes les pages) ou action sur un bannissement ; l'état d'avant est
+// affiché, pour pouvoir revenir en arrière.
+func bannisCmd(cs *compte.Service, action, filtre, id, jusqu, dir string, stdout, stderr io.Writer,
+	usage func(string) int, fail func(error) int) int {
+	if action == "liste" {
+		for page := 0; ; page++ {
+			l, total, err := cs.ListeBans(filtre, page)
+			if errors.Is(err, compte.ErrRequete) {
+				return usage("filtre : actifs, suspendus ou bientot")
+			}
+			if err != nil {
+				return fail(err)
+			}
+			for _, v := range l {
+				fmt.Fprintln(stdout, etatBan(v))
+			}
+			if (page+1)*50 >= total {
+				fmt.Fprintf(stdout, "%d bannissements (%s)\n", total, dir)
+				return 0
+			}
+		}
+	}
+	avant, apres, err := cs.ActionBan(id, action, jusqu)
+	switch {
+	case errors.Is(err, compte.ErrRequete):
+		return usage("identifiant B-XXXX-XXXX-XXXXX, ou date (demain à aujourd'hui + 5 ans, AAAA-MM-JJ) invalides")
+	case errors.Is(err, compte.ErrEtape):
+		fmt.Fprintf(stderr, "introuvable : aucun bannissement en cours sous cet identifiant (%s)\n", dir)
+		return 1
+	case err != nil:
+		return fail(err)
+	}
+	fmt.Fprintln(stdout, "avant :", etatBan(avant))
+	if apres == nil {
+		fmt.Fprintf(stdout, "après : effacé (%s)\n", dir)
+	} else {
+		fmt.Fprintf(stdout, "après : %s (%s)\n", etatBan(*apres), dir)
 	}
 	return 0
 }

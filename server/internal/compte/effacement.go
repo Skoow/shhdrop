@@ -72,6 +72,7 @@ func (s *Service) Supprimer(c Courante) (int, error) {
 	}
 	s.mu.Unlock()
 	s.vider()
+	s.cpt.suppressions.Add(1)
 	return n, nil
 }
 
@@ -104,5 +105,6 @@ func (s *Service) Effacer(now time.Time) (int, error) {
 		return 0, err
 	}
 	s.vider()
+	s.cpt.effaces.Store(n)
 	return int(n), nil
 }

@@ -354,11 +354,14 @@ func (m *Manager) quitter(mb Membre, signaler bool, categorie uint8) (premier bo
 }
 
 // SalonSignale : un salon vivant signalé au moins une fois : identifiant interne (jamais
-// montré : le tableau de bord n'en montrera qu'une ref éphémère, lot 7) et signalements par
-// catégorie (indice = code − 1).
+// montré : le tableau de bord n'en montre qu'une ref éphémère, lot 7), signalements par
+// catégorie (indice = code − 1), échéance (au quart d'heure ; la page n'en dit que « moins de
+// 6 h » ou « 6 à 24 h »), places (max_members) et sièges occupés.
 type SalonSignale struct {
-	ID         string
-	Categories [NbCategories]int
+	ID             string
+	Categories     [NbCategories]int
+	Expire         time.Time
+	Places, Sieges int
 }
 
 // Signalements : salons vivants de ce processus signalés au moins une fois (mémoire seulement).
@@ -367,7 +370,8 @@ func (m *Manager) Signalements() []SalonSignale {
 	for _, s := range m.copieSalons(nil) {
 		s.mu.Lock()
 		if !s.fini && s.signalements != ([NbCategories]int{}) {
-			out = append(out, SalonSignale{ID: s.id, Categories: s.signalements})
+			out = append(out, SalonSignale{ID: s.id, Categories: s.signalements, Expire: s.expires,
+				Places: s.maxMembers, Sieges: s.occupesLocked()})
 		}
 		s.mu.Unlock()
 	}

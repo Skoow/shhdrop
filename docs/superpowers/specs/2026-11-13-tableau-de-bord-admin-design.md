@@ -191,3 +191,15 @@ Remplacent les passages correspondants plus haut (jeton, hôte, lien collé) :
 - **Empreinte de compilation** : gravée dans le binaire à la construction de l'image (`SHH_BUILD_ID`).
 
 Proposé, non codé (décisions du propriétaire) : écouteur d'administration sur une socket Unix réservée à root ; valeurs de `/api/etat` arrondies et au plus une lecture par seconde, pour ôter le capteur d'activité en temps réel à qui volerait le jeton.
+
+## Tableau de bord finalisé (14 novembre, lot 7 du plan du compte)
+
+Renvoi : la page finalisée (onglets État, Signalements, Bannissements, Comptes, Usage, Actions ; salons signalés par référence de 10 min ; bannissements ; agrégats des comptes) est décrite dans `2026-11-14-compte-email-design.md` §21.14 et codée au lot 7 (`server/internal/adminui/comptes.go`, `server/internal/compte/{bannir,agregats}.go`, `server/cmd/shhdrop/admin_serve.go`, `shhdrop admin bannir -` et `shhdrop admin bannis …`). Les règles de ce document restent : écouteur local, jeton en empreinte, frein, contrôle de l'hôte, refus uniforme, aucun `wipe`, rien sur disque.
+
+Écarts à §21.14.5, à valider :
+
+1. **Liste des bannissements en `POST /api/bannis { filtre, page }`** (au lieu de `GET /api/bannis?filtre=&page=`) : la page refuse tout paramètre d'URL (règle de ce document, test `TestRefusUniforme`) ; la garder est plus simple et plus sûr qu'une exception.
+2. **Compteurs par catégorie lus dans `GET /api/etat`** (`usage.signalements_partage`, `usage.signalements_salon`, déjà là depuis le lot 6) ; `GET /api/signalements` ne rend que la liste des salons signalés.
+3. **« Introuvable » répond 200 `{"introuvable":true}`**, pas 404 : un 404 est le refus uniforme, qui fait oublier le jeton à la page.
+4. **Sans `SHH_COMPTES=1`**, les routes du compte répondent comme une route inconnue ; la liste des salons signalés reste (destruction), sans créateur.
+5. `GET /api/etat` gagne le booléen `sante.comptes_actif` (la page montre ou cache les onglets du compte).

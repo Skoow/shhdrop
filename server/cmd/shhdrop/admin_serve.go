@@ -14,7 +14,9 @@ import (
 	"github.com/skoow/shhdrop/server/internal/adminui"
 	"github.com/skoow/shhdrop/server/internal/api"
 	"github.com/skoow/shhdrop/server/internal/blob"
+	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/config"
+	"github.com/skoow/shhdrop/server/internal/courriel"
 	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
@@ -31,6 +33,9 @@ type adminDeps struct {
 	lim    *limits.Limiter
 	probes api.Probes // alerte des signalements, compteurs d'usage, transferts en cours
 	start  time.Time  // démarrage du processus, en mémoire seulement
+	// Lot 7 : service du compte et envoyeur d'e-mails (SHH_COMPTES=1 ; nil sinon).
+	cpt *compte.Service
+	env *courriel.Envoyeur
 }
 
 // buildID : empreinte du commit compilé, posée à la compilation (-ldflags "-X main.buildID=…",
@@ -55,18 +60,180 @@ func startAdmin(cfg config.Config, out io.Writer, d adminDeps) (stop func()) {
 		fmt.Fprintln(out, "SHH_ADMIN_INDISPONIBLE")
 		return func() {}
 	}
-	hote, _, _ := net.SplitHostPort(cfg.AdminListen) // forme vérifiée par config
-	srv := adminui.Server(adminui.New(adminui.Config{
-		TokenHash: cfg.AdminTokenHash, Peers: cfg.TrustedProxies, Host: hote,
-		State:    func() (adminui.State, error) { return adminState(cfg, d) },
-		Freeze:   func() error { return freeze(d.svc.FrozenFile) },
-		Unfreeze: func() error { return unfreeze(d.svc.FrozenFile) },
-		Destroy:  func(link []byte) (string, error) { return adminDestroy(cfg, d, link) },
-	}))
+	srv := adminui.Server(adminui.New(adminConfig(cfg, d)))
 	fmt.Fprintf(out, "SHH_ADMIN_LISTENING %s\n", ln.Addr())
 	done := make(chan struct{})
 	go func() { srv.Serve(ln); close(done) }()
 	return func() { srv.Close(); <-done }
+}
+
+// adminConfig : ce que la page lit et commande. Salons signalés : avec SHH_SALONS=1 ;
+// bannissements et comptes : avec SHH_COMPTES=1 (sinon ces routes répondent comme une route
+// inconnue).
+func adminConfig(cfg config.Config, d adminDeps) adminui.Config {
+	hote, _, _ := net.SplitHostPort(cfg.AdminListen) // forme vérifiée par config
+	c := adminui.Config{
+		TokenHash: cfg.AdminTokenHash, Peers: cfg.TrustedProxies, Host: hote, Now: cfg.Now,
+		State:    func() (adminui.State, error) { return adminState(cfg, d) },
+		Freeze:   func() error { return freeze(d.svc.FrozenFile) },
+		Unfreeze: func() error { return unfreeze(d.svc.FrozenFile) },
+		Destroy:  func(link []byte) (string, error) { return adminDestroy(cfg, d, link) },
+	}
+	if d.sm != nil {
+		c.Signales = func() ([]adminui.Signale, error) { return adminSignales(d) }
+		c.ActionSalon = func(cle, action string, duree int, motif uint8) (adminui.Resultat, error) {
+			return adminActionSalon(d, cle, action, duree, motif)
+		}
+	}
+	if d.cpt != nil {
+		c.Comptes = &adminui.Comptes{
+			Agregats: func() (adminui.Agregats, error) { return adminAgregats(d) },
+			Liste:    d.cpt.ListeBans,
+			Action:   d.cpt.ActionBan,
+			Chercher: d.cpt.ChercherBan,
+			Bannir: func(email, lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
+				return adminBannir(d, email, lien, duree, motif)
+			},
+		}
+	}
+	return c
+}
+
+// adminSignales : salons vivants signalés (mémoire du gestionnaire), avec leur créateur :
+// palier, ancienneté, bannissement, nombre de ses autres salons vivants ; jamais son identité.
+func adminSignales(d adminDeps) ([]adminui.Signale, error) {
+	out := []adminui.Signale{}
+	for _, s := range d.sm.Signalements() {
+		v := adminui.Signale{Cle: s.ID, Categories: s.Categories, Expire: s.Expire, Places: s.Places, Sieges: s.Sieges}
+		h, err := d.sm.CompteDuSalonID(s.ID)
+		if errors.Is(err, salon.ErrNotFound) {
+			continue // fini entre-temps
+		}
+		if err != nil {
+			return nil, err
+		}
+		if h != nil && d.cpt != nil {
+			cv, err := d.cpt.VueCompte(*h)
+			if err != nil {
+				return nil, err
+			}
+			if cv.Existe {
+				v.Createur = &cv
+				n, err := d.sm.SalonsDuCompte(*h)
+				if err != nil {
+					return nil, err
+				}
+				v.AutresSalons = max(0, n-1)
+			}
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// adminActionSalon : action sur un salon signalé désigné par sa ref (identifiant interne
+// retrouvé par la page) : « detruire » (comme par un lien), « bannir » (le compte créateur ;
+// salon sans compte, ou comptes désactivés : « aucun »), « anciennete » (rendue au créateur).
+func adminActionSalon(d adminDeps, id, action string, duree int, motif uint8) (adminui.Resultat, error) {
+	if action == "detruire" {
+		complet, err := d.sm.DetruireAdminID(id)
+		if errors.Is(err, salon.ErrNotFound) {
+			return adminui.Resultat{}, adminui.ErrIntrouvable
+		}
+		if err != nil {
+			return adminui.Resultat{}, err
+		}
+		return adminui.Resultat{Detruit: "salon", Reste: !complet}, nil
+	}
+	h, err := d.sm.CompteDuSalonID(id)
+	if errors.Is(err, salon.ErrNotFound) {
+		return adminui.Resultat{}, adminui.ErrIntrouvable
+	}
+	if err != nil {
+		return adminui.Resultat{}, err
+	}
+	switch action {
+	case "bannir":
+		return bannirCompte(d, h, duree, motif)
+	case "anciennete":
+		if h == nil || d.cpt == nil {
+			return adminui.Resultat{Anciennete: "aucun"}, nil
+		}
+		switch err := d.cpt.RendreAnciennete(*h); {
+		case errors.Is(err, compte.ErrEtape):
+			return adminui.Resultat{Anciennete: "aucun"}, nil
+		case err != nil:
+			return adminui.Resultat{}, err
+		}
+		return adminui.Resultat{Anciennete: "rendue"}, nil
+	}
+	return adminui.Resultat{}, compte.ErrRequete
+}
+
+// bannirCompte : bannissement du compte h (nil : salon sans compte → « aucun »).
+func bannirCompte(d adminDeps, h *[16]byte, duree int, motif uint8) (adminui.Resultat, error) {
+	if h == nil || d.cpt == nil {
+		return adminui.Resultat{Banni: "aucun"}, nil
+	}
+	b, err := d.cpt.Bannir(compte.Cible{H: h}, duree, motif)
+	if errors.Is(err, compte.ErrEtape) {
+		return adminui.Resultat{Banni: "aucun"}, nil // compte supprimé entre-temps
+	}
+	if err != nil {
+		return adminui.Resultat{}, err
+	}
+	return adminui.Resultat{Banni: "compte", Ban: &b.Vue, SalonsFermes: b.SalonsFermes}, nil
+}
+
+// adminBannir : par adresse (recours, page de contact) ou par lien d'invitation d'un salon
+// (traité en octets : seule K_accès_s en est tirée, effacée au retour).
+func adminBannir(d adminDeps, email, lien []byte, duree int, motif uint8) (adminui.Resultat, error) {
+	if email != nil {
+		b, err := d.cpt.Bannir(compte.Cible{Email: email}, duree, motif)
+		if err != nil {
+			return adminui.Resultat{}, err
+		}
+		r := adminui.Resultat{Banni: "adresse", Ban: &b.Vue, SalonsFermes: b.SalonsFermes}
+		if b.Compte {
+			r.Banni = "compte"
+		}
+		return r, nil
+	}
+	k, estSalon, err := cleAccesDuLien(lien)
+	if err != nil || !estSalon {
+		clear(k)
+		return adminui.Resultat{}, adminui.ErrLienInvalide
+	}
+	defer clear(k)
+	if d.sm == nil {
+		return adminui.Resultat{}, adminui.ErrIntrouvable
+	}
+	h, err := d.sm.CompteDuSalon(k)
+	if errors.Is(err, salon.ErrNotFound) {
+		return adminui.Resultat{}, adminui.ErrIntrouvable
+	}
+	if err != nil {
+		return adminui.Resultat{}, err
+	}
+	return bannirCompte(d, h, duree, motif)
+}
+
+// adminAgregats : agrégats des comptes, salons vivants créés par un compte, envois d'e-mails.
+func adminAgregats(d adminDeps) (adminui.Agregats, error) {
+	a, err := d.cpt.Agregats()
+	if err != nil {
+		return adminui.Agregats{}, err
+	}
+	r := adminui.Agregats{AgregatsComptes: a}
+	if d.sm != nil {
+		if r.SalonsDeComptes, err = d.sm.SalonsAvecCompte(); err != nil {
+			return adminui.Agregats{}, err
+		}
+	}
+	if d.env != nil {
+		r.Courriel = d.env.Stats()
+	}
+	return r, nil
 }
 
 // unfreeze retire le fichier de gel ; idempotent.
@@ -84,7 +251,7 @@ func adminState(cfg config.Config, d adminDeps) (adminui.State, error) {
 	var st adminui.State
 	goVersion, rev := adminui.Build(buildID)
 	st.Sante = adminui.Sante{DepuisS: int64(time.Since(d.start) / time.Second), Go: goVersion, Revision: rev,
-		Gele: d.svc.Frozen(), SalonActif: d.sm != nil, Origine: cfg.Origin, AlerteSignalements: d.probes.Alert(),
+		Gele: d.svc.Frozen(), SalonActif: d.sm != nil, ComptesActif: d.cpt != nil, Origine: cfg.Origin, AlerteSignalements: d.probes.Alert(),
 		VidagesRates: d.svc.Vidage.Rates()}
 
 	partages, err := d.svc.UsedShares()

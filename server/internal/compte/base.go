@@ -19,7 +19,9 @@ import (
 // v_mdp (HMAC de A_auth) ; env_mdp (Env_mdp, 60) ; cle_profil (séquestre de s_profil, 60) ;
 // p_empreinte (empreinte à clé du pseudo) ; coffres de profil et privé au palier exact
 // (4, 16, 64 ou 256 Kio + 45 octets d'en-tête, de nonce et d'étiquette) avec leur gen ; totp
-// (secret chiffré, 48) ; attentes de sécurité (R3, R4) ; ancienneté ; banni.
+// (secret chiffré, 48) ; attentes de sécurité (R3, R4) ; ancienneté. Pas de colonne « banni »
+// (version 1 du schéma, retirée au lot 7) : le statut se lit dans bannis (actif, non échu),
+// seule source, que l'adresse ait un compte ou non.
 // sessions : t_v (SHA-256 du jeton) ; sid (identifiant montré) ; h (effacées avec le compte) ;
 // etiquette (nom d'appareil chiffré par le client, 64) ; mois d'ajout ; jour d'échéance.
 // bannis : id (8, montré au fondateur) ; e_canon ; début et échéance ; actif ; motif
@@ -43,8 +45,7 @@ CREATE TABLE IF NOT EXISTS comptes(
   recup_jour INTEGER CHECK(recup_jour IS NULL OR (` + jourCheck("recup_jour") + `)),
   cree_jour INTEGER NOT NULL CHECK(` + jourCheck("cree_jour") + `),
   compte_des INTEGER NOT NULL CHECK(` + jourCheck("compte_des") + `),
-  vu_mois INTEGER NOT NULL CHECK(` + moisCheck("vu_mois") + `),
-  banni INTEGER NOT NULL CHECK(banni IN (0,1))) WITHOUT ROWID;
+  vu_mois INTEGER NOT NULL CHECK(` + moisCheck("vu_mois") + `)) WITHOUT ROWID;
 CREATE UNIQUE INDEX IF NOT EXISTS comptes_e_canon ON comptes(e_canon);
 CREATE UNIQUE INDEX IF NOT EXISTS comptes_p_empreinte ON comptes(p_empreinte);
 CREATE TABLE IF NOT EXISTS sessions(
@@ -88,8 +89,9 @@ func coffreCheck(col string) string {
 		4096+45, 16384+45, 65536+45, 262144+45)
 }
 
-// VersionBase : version du schéma de comptes.db (PRAGMA user_version).
-const VersionBase = 1
+// VersionBase : version du schéma de comptes.db (PRAGMA user_version). 2 : colonne
+// comptes.banni retirée (lot 7) ; une base de la version 1 est migrée à l'ouverture.
+const VersionBase = 2
 
 // ErrBasePlusRecente : comptes.db écrite par une version plus récente ; message fixe, sans chemin.
 var ErrBasePlusRecente = errors.New("comptes.db créée par une version plus récente de Shhgone : refus d'ouvrir " +
@@ -122,6 +124,12 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 		db.Close()
 		return nil, ErrBasePlusRecente
 	}
+	if v == 1 {
+		if err := migrerV1(db); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("migration de comptes.db : %w", err)
+		}
+	}
 	if _, err := db.Exec(schemaComptes); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("création du schéma de comptes.db : %w", err)
@@ -135,6 +143,17 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+// migrerV1 : version 1 → 2 : colonne comptes.banni effacée (toujours 0 : le statut était déjà
+// lu dans bannis), si elle existe ; pages libérées écrasées (secure_delete).
+func migrerV1(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('comptes') WHERE name='banni'`).Scan(&n); err != nil || n == 0 {
+		return err
+	}
+	_, err := db.Exec(`ALTER TABLE comptes DROP COLUMN banni`)
+	return err
 }
 
 // serrer : base et annexes en 0600 (SQLite crée -wal et -shm avec les droits de la base).

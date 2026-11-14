@@ -51,7 +51,7 @@ func TestSchemaComptes(t *testing.T) {
 	want := map[string]string{
 		"comptes": "h:BLOB,e_canon:BLOB,e_envoi:BLOB,v_mdp:BLOB,env_mdp:BLOB,cle_profil:BLOB,p_empreinte:BLOB," +
 			"pseudo_jour:INTEGER,blob_profil:BLOB,gen_profil:INTEGER,blob_prive:BLOB,gen_prive:INTEGER,totp:BLOB," +
-			"totp_retrait_jour:INTEGER,recup_jour:INTEGER,cree_jour:INTEGER,compte_des:INTEGER,vu_mois:INTEGER,banni:INTEGER",
+			"totp_retrait_jour:INTEGER,recup_jour:INTEGER,cree_jour:INTEGER,compte_des:INTEGER,vu_mois:INTEGER",
 		"sessions": "t_v:BLOB,sid:BLOB,h:BLOB,etiquette:BLOB,cree_mois:INTEGER,expire_jour:INTEGER,persistante:INTEGER",
 		"bannis":   "id:BLOB,e_canon:BLOB,debut_jour:INTEGER,jusqu_jour:INTEGER,actif:INTEGER,motif:INTEGER,salons_fermes:INTEGER",
 	}
@@ -64,12 +64,12 @@ func TestSchemaComptes(t *testing.T) {
 			if ty := c[strings.IndexByte(c, ':')+1:]; ty != "BLOB" && ty != "INTEGER" {
 				t.Errorf("%s.%s : type %s (seuls BLOB et INTEGER)", table, c, ty)
 			}
-			if n := c[:strings.IndexByte(c, ':')]; n == "v_s" || n == "env_s" || n == "blob" || n == "gen" {
+			if n := c[:strings.IndexByte(c, ':')]; n == "v_s" || n == "env_s" || n == "blob" || n == "gen" || n == "banni" {
 				t.Errorf("%s.%s : colonne de la version 1", table, n)
 			}
 		}
 	}
-	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "1" {
+	if v := lignes(t, db, `PRAGMA user_version`); len(v) != 1 || v[0] != "2" {
 		t.Fatalf("user_version = %v", v)
 	}
 	for p, w := range map[string]string{"secure_delete": "1", "journal_mode": "wal", "foreign_keys": "1", "temp_store": "2",
@@ -103,13 +103,13 @@ func insCompte(db *sql.DB, h string, col, v string) error {
 		"env_mdp": "randomblob(60)", "cle_profil": "randomblob(60)", "p_empreinte": "randomblob(32)",
 		"pseudo_jour": itoa(jour), "blob_profil": "randomblob(" + itoa(p4k) + ")", "gen_profil": "1",
 		"blob_prive": "randomblob(" + itoa(p4k) + ")", "gen_prive": "1", "totp": "NULL", "totp_retrait_jour": "NULL",
-		"recup_jour": "NULL", "cree_jour": itoa(jour), "compte_des": itoa(jour), "vu_mois": itoa(mois), "banni": "0",
+		"recup_jour": "NULL", "cree_jour": itoa(jour), "compte_des": itoa(jour), "vu_mois": itoa(mois),
 	}
 	if col != "" {
 		vals[col] = v
 	}
 	cols := []string{"h", "e_canon", "e_envoi", "v_mdp", "env_mdp", "cle_profil", "p_empreinte", "pseudo_jour", "blob_profil",
-		"gen_profil", "blob_prive", "gen_prive", "totp", "totp_retrait_jour", "recup_jour", "cree_jour", "compte_des", "vu_mois", "banni"}
+		"gen_profil", "blob_prive", "gen_prive", "totp", "totp_retrait_jour", "recup_jour", "cree_jour", "compte_des", "vu_mois"}
 	var vs []string
 	for _, c := range cols {
 		vs = append(vs, vals[c])
@@ -149,7 +149,6 @@ func TestDatesAuJour(t *testing.T) {
 		"blob_prive de 512 Kio":   {"blob_prive", "randomblob(" + itoa(524288+45) + ")"},
 		"gen_profil négatif":      {"gen_profil", "-1"},
 		"totp de 47":              {"totp", "randomblob(47)"},
-		"banni 2":                 {"banni", "2"},
 		"h texte":                 {"h", "'0011223344556677'"},
 	}
 	for nom, c := range refus {
@@ -246,7 +245,7 @@ func TestBaseVersionEtDroits(t *testing.T) {
 			t.Errorf("%s : droits %o", filepath.Base(f), st.Mode().Perm())
 		}
 	}
-	if _, err := db.Exec(`PRAGMA user_version=2`); err != nil {
+	if _, err := db.Exec(`PRAGMA user_version=3`); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -259,7 +258,7 @@ func TestBaseVersionEtDroits(t *testing.T) {
 	// Réouverture d'une base existante au bon schéma : le compte est gardé (elle survit aux
 	// redémarrages, contrairement à shares.db).
 	raw, _ := sql.Open("sqlite", "file:"+p)
-	raw.Exec(`PRAGMA user_version=1`)
+	raw.Exec(`PRAGMA user_version=2`)
 	raw.Close()
 	os.Chmod(p, 0o644)
 	db3, err := OuvrirBase(p)
@@ -272,5 +271,53 @@ func TestBaseVersionEtDroits(t *testing.T) {
 	}
 	if st, _ := os.Stat(p); st.Mode().Perm() != 0o600 {
 		t.Errorf("droits non resserrés : %o", st.Mode().Perm())
+	}
+}
+
+// Lot 7 : la colonne comptes.banni (version 1 du schéma) ne disait rien que la table bannis ne
+// dise déjà (statut lu dans bannis depuis le lot 6, toujours 0) : retirée. Une base de la
+// version 1 est migrée à l'ouverture (colonne effacée, user_version 2), lignes gardées.
+func TestMigrationSansColonneBanni(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "comptes.db")
+	db, err := OuvrirBase(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Base de la version 1 refaite à la main : même table, plus la colonne banni.
+	if _, err := db.Exec(`DROP TABLE sessions; DROP TABLE comptes`); err != nil {
+		t.Fatal(err)
+	}
+	v1 := strings.Replace(schemaComptes, "vu_mois INTEGER NOT NULL CHECK("+moisCheck("vu_mois")+")) WITHOUT ROWID",
+		"vu_mois INTEGER NOT NULL CHECK("+moisCheck("vu_mois")+"),\n  banni INTEGER NOT NULL CHECK(banni IN (0,1))) WITHOUT ROWID", 1)
+	if v1 == schemaComptes {
+		t.Fatal("schéma de la version 1 non refait")
+	}
+	if _, err := db.Exec(v1 + `; PRAGMA user_version=1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO comptes(h, e_canon, e_envoi, v_mdp, env_mdp, cle_profil, p_empreinte, pseudo_jour,
+		blob_profil, gen_profil, blob_prive, gen_prive, cree_jour, compte_des, vu_mois, banni) VALUES(x'` + h1 + `',
+		randomblob(32), randomblob(32), randomblob(32), randomblob(60), randomblob(60), randomblob(32), ` + itoa(jour) + `,
+		randomblob(` + itoa(p4k) + `), 1, randomblob(` + itoa(p4k) + `), 1, ` + itoa(jour) + `, ` + itoa(jour) + `, ` +
+		itoa(mois) + `, 0)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	db, err = OuvrirBase(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if v := lignes(t, db, `PRAGMA user_version`); v[0] != "2" {
+		t.Fatal(v)
+	}
+	if c := lignes(t, db, `SELECT name FROM pragma_table_info('comptes') WHERE name='banni'`); len(c) != 0 {
+		t.Fatal("colonne banni gardée")
+	}
+	if n := lignes(t, db, `SELECT hex(h) FROM comptes`); len(n) != 1 {
+		t.Fatal("ligne perdue :", n)
+	}
+	if err := insCompte(db, "ffeeddccbbaa99887766554433221100", "", ""); err != nil {
+		t.Fatal("insertion sans banni :", err)
 	}
 }

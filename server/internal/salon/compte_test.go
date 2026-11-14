@@ -455,3 +455,84 @@ func (b *banc) lignesSalons(t *testing.T) int {
 	}
 	return n
 }
+
+// Lot 7 (tableau de bord, conception du compte §21.14.3) : un salon signalé se montre avec ses
+// places, ses sièges et son échéance (pour « moins de 6 h » ou « 6 à 24 h », jamais l'heure
+// de création) ; son compte créateur se lit par l'identifiant interne (jamais rendu) ; la
+// page le détruit par cet identifiant comme par un lien.
+func TestSalonSignaleVue(t *testing.T) {
+	p := paliersConfirme
+	b := bancCompte(t, &p, nil)
+	h := compteTest(1)
+	c, err := b.creerPour(h, 6, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.entrer(t, c, true)
+	_, mb := b.entrerMembre(t, c, false)
+	_, mb2 := b.entrerMembre(t, c, false)
+	if _, err := b.m.QuitterSignaler(mb, 2); err != nil {
+		t.Fatal(err)
+	}
+	ss := b.m.Signalements()
+	if len(ss) != 1 || ss[0].Places != 6 || ss[0].Sieges != 2 {
+		t.Fatalf("%+v", ss)
+	}
+	if d := ss[0].Expire.Sub(b.m.cfg.Now()); d <= 5*time.Hour || d > 6*time.Hour+15*time.Minute {
+		t.Fatal("échéance :", d)
+	}
+	if x, err := b.m.CompteDuSalonID(ss[0].ID); err != nil || x == nil || *x != *h {
+		t.Fatal(x, err)
+	}
+	if _, err := b.m.CompteDuSalonID("inconnu"); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	sans := b.creer(t, 4)
+	if n, err := b.m.SalonsAvecCompte(); err != nil || n != 1 {
+		t.Fatal("salons créés par un compte :", n, err)
+	}
+	_ = sans
+	_ = mb2
+	complet, err := b.m.DetruireAdminID(ss[0].ID)
+	if err != nil || !complet {
+		t.Fatal(complet, err)
+	}
+	if _, err := b.m.Meta(c.acces); !errors.Is(err, ErrNotFound) {
+		t.Fatal("salon encore vivant :", err)
+	}
+	if len(b.m.Signalements()) != 0 {
+		t.Fatal("signalements gardés")
+	}
+	if _, err := b.m.DetruireAdminID(ss[0].ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal("seconde destruction :", err)
+	}
+	if n, _ := b.m.SalonsAvecCompte(); n != 0 {
+		t.Fatal(n)
+	}
+}
+
+// Bannissement en ligne de commande (serveur en marche ou non) : chaque salon vivant du compte
+// est détruit hors ligne (ligne morte, pièces, conversation, ligne), les autres gardés.
+func TestFermerDuCompteHorsLigne(t *testing.T) {
+	p := paliersConfirme
+	b := bancCompte(t, &p, nil)
+	h := compteTest(1)
+	c1, _ := b.creerPour(h, 4, 24)
+	c2, _ := b.creerPour(h, 4, 24)
+	autre, _ := b.creerPour(compteTest(2), 4, 24)
+	n, err := FermerDuCompteHorsLigne(b.db, b.m.cfg.Pieces, b.m.cfg.DossierConversations, *h, b.m.cfg.Now())
+	if err != nil || n != 2 {
+		t.Fatal(n, err)
+	}
+	for _, c := range []cles{c1, c2} {
+		if _, err := b.m.Meta(c.acces); !errors.Is(err, ErrNotFound) {
+			t.Fatal("salon du compte encore vivant :", err)
+		}
+	}
+	if _, err := b.m.Meta(autre.acces); err != nil {
+		t.Fatal(err)
+	}
+	if b.lignesSalons(t) != 1 {
+		t.Fatal("lignes :", b.lignesSalons(t))
+	}
+}

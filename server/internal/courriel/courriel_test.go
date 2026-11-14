@@ -525,3 +525,28 @@ func TestPleinSuitLaFile(t *testing.T) {
 		t.Fatal("file pleine non vue")
 	}
 }
+
+// Lot 7 : agrégats pour le tableau de bord (conception du compte §21.14.2) : e-mails envoyés,
+// échecs d'envoi (message oublié), file (longueur, plus haut atteint). Des entiers seulement.
+func TestStatsEnvoi(t *testing.T) {
+	f := nouveauFaux(t, func(f *fauxSMTP) { f.implicite = true; f.refuserRcpt = "refusee" })
+	e := envoyeur(t, f, 465)
+	for _, a := range []string{"refusee@exemple.fr", "lea@exemple.fr", "leo@exemple.fr"} {
+		if err := e.Mettre(Message{A: a, Langue: "fr", Code: "111111"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if s := e.Stats(); s != (Stats{File: 3, FileMax: 3}) {
+		t.Fatalf("%+v", s)
+	}
+	lancer(t, e)
+	f.attendre(t, 2)
+	for fin := time.Now().Add(5 * time.Second); e.Stats().Envoyes != 2; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(fin) {
+			t.Fatalf("%+v", e.Stats())
+		}
+	}
+	if s := e.Stats(); s != (Stats{Envoyes: 2, Echecs: 1, File: 0, FileMax: 3}) {
+		t.Fatalf("%+v", s)
+	}
+}

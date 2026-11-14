@@ -525,7 +525,8 @@ func TestConnexionInconnueEtFausseIdentiques(t *testing.T) {
 	b := nouveauBanc(t)
 	_, _, d := b.inscrire(t, ipN(1), "lea@exemple.fr", "lea")
 	_, _, db := b.inscrire(t, ipN(2), "banni@exemple.fr", "banni")
-	if _, err := b.db.Exec(`UPDATE comptes SET banni=1 WHERE p_empreinte=?`, mustPseudo(t, b.cles, "banni")); err != nil {
+	if _, err := b.db.Exec(`INSERT INTO bannis SELECT ?, e_canon, ?, ?, 1, 10, 0 FROM comptes WHERE p_empreinte=?`, alea8(),
+		jourDe(b.clk.Now()), jourDe(b.clk.Now())+30*jourS, mustPseudo(t, b.cles, "banni")); err != nil {
 		t.Fatal(err)
 	}
 	n := 0

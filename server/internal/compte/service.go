@@ -47,6 +47,9 @@ type Service struct {
 	// refs : salons du compte désignés par une ref éphémère (salons.go), sous refsMu.
 	refsMu sync.Mutex
 	refs   map[[16]byte]refSalon
+
+	// cpt : compteurs depuis le démarrage, pour le tableau de bord (agregats.go).
+	cpt compteurs
 }
 
 // Postier : la file d'e-mails (courriel.Envoyeur ; un faux dans les tests). Plein : la file
@@ -348,7 +351,7 @@ func (s *Service) InscriptionFin(jeton [32]byte, code string, d Donnees, o Optio
 		j := jourDe(now)
 		if _, err := tx.Exec(`INSERT INTO comptes(h, e_canon, e_envoi, v_mdp, env_mdp, cle_profil, p_empreinte,
 			pseudo_jour, blob_profil, gen_profil, blob_prive, gen_prive, totp, totp_retrait_jour, recup_jour,
-			cree_jour, compte_des, vu_mois, banni) VALUES(?,?,?,?,?,?,?,?,?,1,?,1,NULL,NULL,NULL,?,?,?,0)`,
+			cree_jour, compte_des, vu_mois) VALUES(?,?,?,?,?,?,?,?,?,1,?,1,NULL,NULL,NULL,?,?,?)`,
 			e.h[:], e.canon[:], e.envoi[:], v[:], d.EnvMdp[:], cle[:], pe[:], j, d.BlobProfil, d.BlobPrive,
 			j, j, moisDe(now)); err != nil {
 			return err
@@ -362,6 +365,7 @@ func (s *Service) InscriptionFin(jeton [32]byte, code string, d Donnees, o Optio
 	if err != nil {
 		return [32]byte{}, err
 	}
+	s.cpt.inscriptions.Add(1)
 	return tok, nil
 }
 
@@ -419,6 +423,7 @@ func (s *Service) Connexion(ip netip.Addr, email string, aAuth [32]byte, o Optio
 	v := hmacMdp(&s.cles.Poivre, &l.h, &aAuth)
 	if subtle.ConstantTimeCompare(v[:], l.vMdp[:])&boolInt(trouve) != 1 {
 		s.lim.NoterEchecConnexion(ip, canon)
+		s.cpt.echecs.Add(1)
 		return Ouverture{}, ErrIdentifiants
 	}
 	if l.totp {
@@ -454,6 +459,7 @@ func (s *Service) ouvrir(l ligneConnexion, o OptionsSession, now time.Time) (Ouv
 	if err != nil {
 		return Ouverture{}, err
 	}
+	s.cpt.connexions.Add(1)
 	return Ouverture{Jeton: tok, H: l.h, EnvMdp: l.envMdp, SProfil: sp, BlobProfil: l.blobProfil,
 		GenProfil: l.genProfil, BlobPrive: l.blobPrive, GenPrive: l.genPrive}, nil
 }

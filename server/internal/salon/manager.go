@@ -579,6 +579,25 @@ func (m *Manager) CompteDuSalon(kAcces []byte) (*[16]byte, error) {
 	return compteDe(c), nil
 }
 
+// CompteDuSalonID : compte créateur du salon d'identifiant interne id (salon signalé désigné
+// par le tableau de bord), vivant ou non ; nil sans compte ; ErrNotFound si aucune ligne.
+func (m *Manager) CompteDuSalonID(id string) (*[16]byte, error) {
+	var c []byte
+	if err := m.cfg.DB.QueryRow(`SELECT compte FROM salons WHERE id=?`, id).Scan(&c); err != nil {
+		return nil, notFound(err)
+	}
+	return compteDe(c), nil
+}
+
+// SalonsAvecCompte : salons vivants créés par un compte, tous comptes confondus (agrégat du
+// tableau de bord, conception du compte §21.14.2).
+func (m *Manager) SalonsAvecCompte() (int, error) {
+	var n int
+	err := m.cfg.DB.QueryRow(`SELECT count(*) FROM salons WHERE compte IS NOT NULL AND expires_at>? AND failed_attempts<?`,
+		m.cfg.Now().Unix(), maxEssais).Scan(&n)
+	return n, base(err)
+}
+
 // compteDe : colonne salons.compte lue (nil, ou 16 octets par la contrainte du schéma).
 func compteDe(c []byte) *[16]byte {
 	if len(c) != 16 {

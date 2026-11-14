@@ -18,6 +18,7 @@ import (
 	"net/mail"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/config"
@@ -62,6 +63,24 @@ type Envoyeur struct {
 	// vérifié sont toujours c.Host.
 	portDial int
 	racines  *x509.CertPool
+
+	// Agrégats depuis le démarrage (tableau de bord, conception du compte §21.14.2) : un
+	// entier chacun, sans adresse ni heure.
+	envoyes, echecs, fileMax atomic.Int64
+}
+
+// Stats : e-mails envoyés (acceptés par le serveur SMTP), échecs (message oublié après ses
+// essais ou un refus définitif), longueur de la file et plus haut atteint, depuis le démarrage.
+type Stats struct {
+	Envoyes int64 `json:"envoyes"`
+	Echecs  int64 `json:"echecs_envoi"`
+	File    int   `json:"file"`
+	FileMax int64 `json:"file_max"`
+}
+
+// Stats lit les agrégats à l'instant.
+func (e *Envoyeur) Stats() Stats {
+	return Stats{Envoyes: e.envoyes.Load(), Echecs: e.echecs.Load(), File: len(e.file), FileMax: e.fileMax.Load()}
 }
 
 // Nouveau prépare l'envoyeur. Refus : hôte, compte, expéditeur, port ou mot de passe absent ;
@@ -120,6 +139,11 @@ func (e *Envoyeur) Mettre(m Message) error {
 	}
 	select {
 	case e.file <- m:
+		for n := int64(len(e.file)); ; {
+			if m := e.fileMax.Load(); n <= m || e.fileMax.CompareAndSwap(m, n) {
+				break
+			}
+		}
 		return nil
 	default:
 		return ErrPlein
@@ -160,10 +184,15 @@ func (e *Envoyeur) traiter(ctx context.Context, m Message) {
 			}
 		}
 		err := e.envoyer(ctx, m.A, brut)
-		if err == nil || definitif(err) || ctx.Err() != nil {
+		if err == nil {
+			e.envoyes.Add(1)
 			return
 		}
+		if definitif(err) || ctx.Err() != nil {
+			break
+		}
 	}
+	e.echecs.Add(1)
 }
 
 func codeOK(c string) bool {

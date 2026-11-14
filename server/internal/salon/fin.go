@@ -646,6 +646,41 @@ func DetruireHorsLigne(db *sql.DB, pieces *blob.Store, dossierConv string, kAcce
 	if err := db.QueryRow(`SELECT id FROM salons WHERE access_v=?`, v).Scan(&id); err != nil {
 		return false, notFound(err)
 	}
+	return detruireHorsLigneID(db, pieces, dossierConv, id)
+}
+
+// FermerDuCompteHorsLigne : bannissement en ligne de commande (shhdrop admin bannir -,
+// lot 7) : chaque salon vivant créé par le compte h est détruit comme par DetruireHorsLigne ;
+// le serveur en marche ferme leurs connexions à sa passe suivante. Rend le nombre de salons
+// rendus inaccessibles (une pièce déposée pendant la commande peut rester à effacer : le
+// serveur en marche le fait).
+func FermerDuCompteHorsLigne(db *sql.DB, pieces *blob.Store, dossierConv string, h [16]byte, now time.Time) (int, error) {
+	rows, err := db.Query(`SELECT id FROM salons WHERE compte=? AND expires_at>? AND failed_attempts<?`, h[:], now.Unix(), maxEssais)
+	if err != nil {
+		return 0, base(err)
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, base(err)
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, base(err)
+	}
+	for i, id := range ids {
+		if _, err := detruireHorsLigneID(db, pieces, dossierConv, id); err != nil {
+			return i, err
+		}
+	}
+	return len(ids), nil
+}
+
+func detruireHorsLigneID(db *sql.DB, pieces *blob.Store, dossierConv, id string) (complet bool, err error) {
 	if !idValide(id) {
 		return false, ErrBase
 	}
@@ -699,6 +734,20 @@ func (m *Manager) DetruireAdmin(kAcces []byte) (complet bool, err error) {
 	if err := m.cfg.DB.QueryRow(`SELECT id FROM salons WHERE access_v=?`, v).Scan(&id); err != nil {
 		return false, notFound(err)
 	}
+	return m.detruireAdmin(id)
+}
+
+// DetruireAdminID : DetruireAdmin d'un salon désigné par son identifiant interne (salon
+// signalé choisi dans le tableau de bord par sa ref éphémère, lot 7) ; mêmes réponses.
+func (m *Manager) DetruireAdminID(id string) (complet bool, err error) {
+	var un int
+	if err := m.cfg.DB.QueryRow(`SELECT 1 FROM salons WHERE id=?`, id).Scan(&un); err != nil {
+		return false, notFound(err)
+	}
+	return m.detruireAdmin(id)
+}
+
+func (m *Manager) detruireAdmin(id string) (complet bool, err error) {
 	_ = m.detruire(id) // partie disque ratée : état lu ci-dessous, reprise par l'entretien
 	// Déjà une tombe (fin commencée avant cet appel) : sa partie disque est reprise ici.
 	if s := func() *salon { m.mu.Lock(); defer m.mu.Unlock(); return m.salons[id] }(); s != nil {

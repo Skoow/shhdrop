@@ -200,6 +200,7 @@ func (s *Service) OubliFin(jeton [32]byte, d DonneesOubli, o OptionsSession) (Ou
 		s.act.oublier(tv)
 	}
 	s.vider()
+	s.cpt.recuperations.Add(1)
 	ov.H = e.h
 	return ov, nil
 }

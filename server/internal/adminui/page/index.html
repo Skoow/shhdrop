@@ -25,54 +25,147 @@
 </form>
 
 <div id="tableau" hidden>
+  <nav class="onglets" aria-label="Sections de la page">
+    <a href="#etat">État</a>
+    <a href="#signalements" id="onglet-signalements">Signalements</a>
+    <a href="#bannissements" id="onglet-bannissements" hidden>Bannissements</a>
+    <a href="#comptes" id="onglet-comptes" hidden>Comptes</a>
+    <a href="#usage">Usage</a>
+    <a href="#actions">Actions</a>
+  </nav>
+
   <p class="bandeau" id="perdu" role="alert" hidden>Serveur injoignable : les valeurs affichées ne sont plus à jour.</p>
 
+  <h2 class="groupe" id="etat">État</h2>
   <section class="carte" aria-labelledby="t-sante">
-    <h2 id="t-sante">Santé</h2>
+    <h3 class="titre" id="t-sante">Santé</h3>
     <ul class="pastilles" id="pastilles"></ul>
     <dl class="faits" id="sante"></dl>
   </section>
 
   <section class="carte" aria-labelledby="t-stockage">
-    <h2 id="t-stockage">Stockage</h2>
+    <h3 class="titre" id="t-stockage">Stockage</h3>
     <div id="stockage"></div>
   </section>
 
   <section class="carte" aria-labelledby="t-activite">
-    <h2 id="t-activite">Activité en ce moment</h2>
+    <h3 class="titre" id="t-activite">Activité en ce moment</h3>
     <p class="note">Ce qui est vivant à l'instant.</p>
     <dl class="chiffres" id="activite"></dl>
   </section>
 
-  <section class="carte large" aria-labelledby="t-usage">
-    <h2 id="t-usage">Usage depuis le démarrage</h2>
-    <p class="note" id="usage-note"></p>
-    <dl class="chiffres" id="usage"></dl>
-    <dl class="faits apres" id="usage-details"></dl>
-  </section>
-
   <section class="carte" aria-labelledby="t-charge">
-    <h2 id="t-charge">Charge et places</h2>
+    <h3 class="titre" id="t-charge">Charge et places</h3>
     <div id="charge"></div>
   </section>
 
   <section class="carte" aria-labelledby="t-memoire">
-    <h2 id="t-memoire">Mémoire et moteur</h2>
+    <h3 class="titre" id="t-memoire">Mémoire et moteur</h3>
     <div id="memoire"></div>
   </section>
 
-  <section class="carte" aria-labelledby="t-actions">
-    <h2 id="t-actions">Actions</h2>
+  <h2 class="groupe" id="signalements">Signalements</h2>
+  <section class="carte large" aria-labelledby="t-categories">
+    <h3 class="titre" id="t-categories">Par catégorie, depuis le démarrage</h3>
+    <p class="note">Des nombres en mémoire seulement : aucun contenu, aucun lien, rien qui désigne qui a signalé. L'alerte s'allume à 5 signalements dans l'heure.</p>
+    <div class="defile">
+      <table class="categories">
+        <thead><tr><th scope="col">Catégorie</th><th scope="col" class="n">Partages</th><th scope="col" class="n">Salons</th></tr></thead>
+        <tbody id="categories"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="carte large" aria-labelledby="t-signales" id="carte-signales">
+    <div class="entete">
+      <h3 class="titre" id="t-signales">Salons signalés en cours</h3>
+      <button class="discret" type="button" id="signales-actualiser">Actualiser</button>
+    </div>
+    <p class="note">Chaque salon est désigné par une référence qui ne vaut que 10 minutes : ni son lien, ni ses membres, ni l'identité de son créateur. Les plus graves d'abord (terrorisme, abus sur mineurs).</p>
+    <ul class="liste" id="signales"></ul>
+    <p class="resultat" id="signales-resultat" role="status"></p>
+  </section>
+
+  <h2 class="groupe" id="bannissements" hidden>Bannissements</h2>
+  <section class="carte" aria-labelledby="t-bannir" id="carte-bannir" hidden>
+    <h3 class="titre" id="t-bannir">Bannir</h3>
+    <p class="note">Une adresse e-mail (signalement reçu par la page de contact) ou le lien d'invitation d'un salon. Le champ est vidé aussitôt ; rien n'est gardé ni affiché ensuite.</p>
+    <form id="bannir" autocomplete="off">
+      <label for="bannir-cible">Adresse e-mail ou lien d'invitation</label>
+      <input id="bannir-cible" type="password" autocomplete="off" spellcheck="false" required>
+      <div class="rangee">
+        <div>
+          <label for="bannir-duree">Durée</label>
+          <select id="bannir-duree"></select>
+        </div>
+        <div>
+          <label for="bannir-motif">Motif</label>
+          <select id="bannir-motif"></select>
+        </div>
+      </div>
+      <button class="detruire" type="submit" id="bannir-bouton">Bannir</button>
+    </form>
+    <p class="resultat" id="bannir-resultat" role="status"></p>
+  </section>
+
+  <section class="carte" aria-labelledby="t-chercher" id="carte-chercher" hidden>
+    <h3 class="titre" id="t-chercher">Recours : chercher par adresse</h3>
+    <p class="note">La personne donne son adresse ; elle n'est ni gardée ni affichée, le champ est vidé aussitôt.</p>
+    <form id="chercher" autocomplete="off">
+      <label for="chercher-adresse">Adresse e-mail</label>
+      <input id="chercher-adresse" type="password" autocomplete="off" spellcheck="false" required>
+      <button class="agir" type="submit">Chercher</button>
+    </form>
+    <div id="chercher-resultat" role="status"></div>
+  </section>
+
+  <section class="carte large" aria-labelledby="t-bannis" id="carte-bannis" hidden>
+    <div class="entete">
+      <h3 class="titre" id="t-bannis">Bannissements en cours</h3>
+      <button class="discret" type="button" id="bannis-actualiser">Actualiser</button>
+    </div>
+    <div class="segments" role="radiogroup" aria-label="Filtre" id="filtres"></div>
+    <p class="note" id="bannis-total"></p>
+    <ul class="liste" id="bannis"></ul>
+    <div class="pages">
+      <button class="discret" type="button" id="page-avant">Page précédente</button>
+      <button class="discret" type="button" id="page-apres">Page suivante</button>
+    </div>
+    <p class="resultat" id="bannis-resultat" role="status"></p>
+  </section>
+
+  <h2 class="groupe" id="comptes" hidden>Comptes</h2>
+  <section class="carte large" aria-labelledby="t-comptes" id="carte-comptes" hidden>
+    <h3 class="titre" id="t-comptes">Comptes et ancienneté</h3>
+    <p class="note">Lus à l'instant : des nombres, jamais une adresse, un pseudo ni un compte. Avec très peu de comptes, un nombre peut désigner une personne : rien n'est enregistré.</p>
+    <dl class="chiffres" id="comptes-chiffres"></dl>
+    <h4 class="sous-titre">Ancienneté</h4>
+    <dl class="chiffres" id="comptes-anciennete"></dl>
+    <h4 class="sous-titre">Depuis le démarrage</h4>
+    <dl class="chiffres" id="comptes-usage"></dl>
+  </section>
+
+  <h2 class="groupe" id="usage">Usage</h2>
+  <section class="carte large" aria-labelledby="t-usage">
+    <h3 class="titre" id="t-usage">Usage depuis le démarrage</h3>
+    <p class="note" id="usage-note"></p>
+    <dl class="chiffres" id="usage-chiffres"></dl>
+    <dl class="faits apres" id="usage-details"></dl>
+  </section>
+
+  <h2 class="groupe" id="actions">Actions</h2>
+  <section class="carte large" aria-labelledby="t-actions">
+    <h3 class="titre" id="t-actions">Créations et liens signalés</h3>
     <div class="action">
       <div>
-        <h3>Créations</h3>
+        <h4 class="sous-titre">Créations</h4>
         <p class="note" id="gel-etat"></p>
       </div>
       <button class="attention" type="button" id="gel"></button>
     </div>
     <form class="action colonne" id="detruire" autocomplete="off">
       <div>
-        <h3>Détruire un lien signalé</h3>
+        <h4 class="sous-titre">Détruire un lien signalé</h4>
         <p class="note">Partage ou salon. Le lien part dans le corps de la demande, jamais dans l'adresse, et le champ est vidé aussitôt. La destruction est immédiate et définitive.</p>
       </div>
       <label for="lien">Lien signalé</label>

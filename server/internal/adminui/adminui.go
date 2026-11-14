@@ -50,6 +50,16 @@ type Config struct {
 	// fichier reste à finir par l'entretien), ErrLienInvalide ou ErrIntrouvable. link est effacé
 	// par l'appelant au retour : Destroy ne doit en garder aucune copie (ni chaîne ni tranche).
 	Destroy func(link []byte) (string, error)
+
+	// Lot 7 du plan du compte (conception du compte §21.14). Now : horloge des refs (nil :
+	// time.Now). Signales, ActionSalon : salons signalés en cours (SHH_SALONS=1 ; nil sinon :
+	// routes refusées comme inconnues) ; ActionSalon reçoit l'identifiant interne retrouvé par la
+	// ref et l'action « detruire », « bannir » (durée, motif vérifiés) ou « anciennete ».
+	// Comptes : bannissements et agrégats (SHH_COMPTES=1 ; nil sinon).
+	Now         func() time.Time
+	Signales    func() ([]Signale, error)
+	ActionSalon func(cle, action string, dureeJours int, motif uint8) (Resultat, error)
+	Comptes     *Comptes
 }
 
 // maxLink : longueur maximale du lien signalé (comme maxStdinLink de la ligne de commande).
@@ -79,6 +89,7 @@ type admin struct {
 	c     Config
 	files [3]file
 	frein frein
+	refs  refs
 }
 
 // Délai global après un jeton faux (variables : écourtées par les tests).
@@ -151,6 +162,13 @@ type file struct {
 //	GET  /api/etat                  état agrégé (State)
 //	POST /api/geler, /api/degeler   gel et dégel des créations
 //	POST /api/detruire              lien signalé dans le CORPS (text/plain), jamais dans l'URL
+//	GET  /api/signalements          salons signalés en cours, par ref éphémère (lot 7)
+//	POST /api/salons/action         { ref, action, duree_jours?, motif? }
+//	POST /api/bannis                { filtre, page } (liste ; jamais de paramètre d'URL)
+//	POST /api/bannis/action         { id, action, jusqu? }
+//	POST /api/bannis/chercher       { email }
+//	POST /api/bannir                { email | lien, duree_jours, motif }
+//	GET  /api/comptes               agrégats des comptes
 //
 // Tout /api/* exige « Authorization: Bearer <jeton> ». Jeton absent, faux, de mauvaise
 // longueur, route inconnue, mauvaise méthode, pair hors boucle locale, requête relayée, hôte
@@ -268,6 +286,35 @@ func (a *admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.act(w, r, a.c.Unfreeze)
 	case "POST /api/detruire":
 		a.destroy(w, r)
+	case "GET /api/signalements":
+		if a.c.Signales == nil {
+			refuse(w)
+			return
+		}
+		a.signalements(w)
+	case "POST /api/salons/action":
+		if a.c.Signales == nil || a.c.ActionSalon == nil {
+			refuse(w)
+			return
+		}
+		a.actionSalon(w, r)
+	case "POST /api/bannis", "POST /api/bannis/action", "POST /api/bannis/chercher", "POST /api/bannir", "GET /api/comptes":
+		if a.c.Comptes == nil {
+			refuse(w)
+			return
+		}
+		switch r.URL.Path {
+		case "/api/bannis":
+			a.bannisListe(w, r)
+		case "/api/bannis/action":
+			a.bannisAction(w, r)
+		case "/api/bannis/chercher":
+			a.bannisChercher(w, r)
+		case "/api/bannir":
+			a.bannir(w, r)
+		default:
+			a.comptes(w)
+		}
 	default:
 		refuse(w)
 	}

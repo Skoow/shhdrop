@@ -239,6 +239,7 @@ func (s *Service) ConnexionTOTP(jeton [32]byte, code string) (Ouverture, error) 
 		return Ouverture{}, ErrEtape
 	}
 	if err := s.verifierTOTPLocked(e.h, scelle, code, now); err != nil {
+		s.cpt.echecs.Add(1)
 		return Ouverture{}, s.totpEchoue(jeton, e, err)
 	}
 	s.et.retirer(jeton)

@@ -52,7 +52,9 @@ type Sante struct {
 	Revision   string `json:"revision"`
 	Gele       bool   `json:"creations_gelees"`
 	SalonActif bool   `json:"salon_actif"`
-	Origine    string `json:"origine"`
+	// ComptesActif : SHH_COMPTES=1 (la page montre alors bannissements et comptes).
+	ComptesActif bool   `json:"comptes_actif"`
+	Origine      string `json:"origine"`
 	// AlerteSignalements : au moins 5 signalements dans l'heure (le booléen de /healthz) ;
 	// jamais le nombre (spec §15.2, §36 S21).
 	AlerteSignalements bool `json:"alerte_signalements"`

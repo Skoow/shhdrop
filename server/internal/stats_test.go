@@ -91,6 +91,8 @@ var allowedMaps = map[string]string{
 	// Lot 5 : rejeu de la double authentification.
 	"compte/service.go:refs": "conception du compte §21.6.2 salons du compte (GET salons) : ref aléatoire de 16 octets → h et identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants (et finis depuis moins de 10 min) de chaque compte ; perdue au redémarrage",
 	"compte/service.go:pas":  "conception du compte §8.3 dernier pas TOTP accepté par compte (rejeu), clé h, oublié dès qu'aucun code de ce pas ne peut plus passer (± 1 pas) ; perdu au redémarrage",
+	// Lot 7 : tableau de bord finalisé.
+	"adminui/comptes.go:m": "conception du compte §21.14.3 salons signalés en cours (tableau de bord) : ref aléatoire de 16 octets → identifiant interne du salon, 10 min, oubliée à la liste suivante une fois échue ; au plus les salons vivants signalés ; perdue au redémarrage",
 }
 
 type goFile struct {

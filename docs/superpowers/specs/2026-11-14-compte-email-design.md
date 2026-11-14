@@ -646,6 +646,8 @@ Confirmé tel que §5.2 : `e_canon`, `e_envoi` (HMAC à clé), `v_mdp` (HMAC à 
 
 Toutes les colonnes restent BLOB ou INTEGER (test `TestSchemaComptes` : aucune colonne texte) ; toutes les dates au jour (ou au mois pour `vu_mois`).
 
+> **Lot 7 (14 novembre)** : la colonne `comptes.banni` est **retirée** (schéma version 2, migration à l'ouverture) : elle doublait la table `bannis`, seule à dire si une adresse est bannie (actif, non échu), avec ou sans compte ; deux sources auraient pu se contredire (suspension, échéance, compte supprimé puis recréé).
+
 #### 21.6.2 Routes (`/api/compte/`, règles de §8.6 inchangées)
 
 | Route | Changement |
@@ -747,7 +749,7 @@ L'accueil connecté est une **liste unique**, triée par activité, de quatre so
   - **Lever** : fin maintenant (ligne effacée, `banni = 0`) ; l'ancienneté n'est pas rendue ;
   - **Annuler** (erreur de bannissement) : comme Lever, plus `compte_des = cree_jour` (ancienneté rendue).
 - **Motif** : la catégorie du signalement à l'origine (ou « Autre »), choisie par le fondateur ; montrée à la personne à la connexion : « Ce compte ne peut plus créer de salon jusqu'au {date}. Motif : {catégorie}. Recours : {adresse de contact}. » (R16).
-- **Identifiant** : `id` de 8 octets aléatoires, montré « B-7KQ2-M9XA » ; c'est la seule façon de désigner un bannissement dans la page et dans `shhdrop admin bannis …`. Aucune adresse, empreinte, `h` ni pseudo affiché.
+- **Identifiant** : `id` de 8 octets aléatoires, montré « B-7KQ2-M9XA-4PZ3T » (lot 7 : 8 octets s'écrivent en 13 caractères de base32 de Crockford ; l'exemple à 8 caractères n'en portait que 5) ; c'est la seule façon de désigner un bannissement dans la page et dans `shhdrop admin bannis …`. Aucune adresse, empreinte, `h` ni pseudo affiché.
 - Effets inchangés (§13) : sessions fermées, salons du compte fermés, création refusée ; connexion permise pour exporter et supprimer.
 - **Garde-fou** (jeton d'administration volé) : 20 bannissements par heure au plus ; chaque action renvoie l'état d'avant, pour pouvoir annuler.
 
