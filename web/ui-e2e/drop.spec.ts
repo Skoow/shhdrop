@@ -113,7 +113,7 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
 test("page d'envoi vide « /envoyer » : atteinte par « Commencer » ou directement ; cadre compact en tête de liste (ordinateur, retours du 12 novembre), « Ajouter » (téléphone) ; captures", async ({ page, shh, isMobile }) => {
   await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto(shh.origin + "/");
-  await page.getByRole("button", { name: /^Commencer/ }).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: /^(Commencer|Ou créez sur place)/ }).filter({ visible: true }).first().click();
   await expect(page).toHaveURL(shh.origin + "/envoyer");
   await noViewTransition(page);
   await expect(page.getByRole("heading", { name: "Votre envoi" })).toBeVisible();

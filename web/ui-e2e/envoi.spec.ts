@@ -54,7 +54,7 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   const h1 = page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis plus rien." });
   await expect(h1).toBeInViewport();
   expect(await h1.evaluate((e) => e.getBoundingClientRect().height)).toBeGreaterThan(10); // visible, plus caché à l'œil
-  await expect(page.getByRole("list", { name: "En bref" }).getByRole("listitem")).toHaveText(["Chiffré dans votre navigateur", "Sans compte", "Le lien s'autodétruit"]);
+  await expect(page.getByRole("list", { name: "En bref" }).getByRole("listitem")).toHaveText(["Chiffré dans votre navigateur", "Partage sans compte", "Le lien s'autodétruit"]);
   const dz = page.locator(".dropzone").filter({ visible: true });
   await expect(dz).toBeInViewport({ ratio: 1 });
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);
@@ -165,7 +165,7 @@ test.describe("langue du navigateur", () => {
   test("anglais choisi tout seul, sans bouton ; balai nommé « Clean this file: nom »", async ({ page, shh, isMobile }) => {
     await openSend(page, shh.origin);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("list", { name: "In short" }).getByRole("listitem")).toHaveText(["Encrypted in your browser", "No account", "The link self-destructs"]);
+    await expect(page.getByRole("list", { name: "In short" }).getByRole("listitem")).toHaveText(["Encrypted in your browser", "Share without an account", "The link self-destructs"]);
     if (isMobile) return; // sélecteur ouvert par la zone de dépôt : ordinateur
     const chooser = page.waitForEvent("filechooser");
     await page.locator(".dropzone").click();

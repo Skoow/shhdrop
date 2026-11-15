@@ -79,28 +79,37 @@ test.describe("téléphone façon app", () => {
     expect(await page.evaluate(() => navigator.serviceWorker?.controller ?? null)).toBeNull();
   });
 
-  test("accueil : barre d'onglets (Envoyer, Mes partages, Salon bientôt), langue dans le pied, comparatif en cartes, ni rebond ni défilement horizontal", async ({ page, shh }) => {
+  test("accueil : menu ☰ (retours du 15 novembre), plus de barre d'onglets sans compte, pied de page, ni rebond ni défilement horizontal", async ({ page, shh }) => {
     await page.goto(shh.origin + "/");
-    // Règle du 11 novembre (audit M18) : visible dès deux onglets utiles ; Mes partages fonctionne.
-    await expect(tabbar(page)).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.classList.contains("has-tabbar"))).toBe(true);
-    await expect(tabbar(page).getByRole("link", { name: "Envoyer" })).toHaveAttribute("aria-current", "page");
-    const shares = tabbar(page).getByRole("link", { name: "Mes partages" });
-    await expect(shares).not.toHaveAttribute("aria-current", "page");
-    await expect(tabbar(page).getByRole("button", { name: /Salon/ })).toHaveAttribute("aria-disabled", "true");
-    expect(await smallTargets(page, "[data-tabbar]")).toEqual([]);
-    await shot(page, "barre-onglets-accueil");
-    await shares.click();
+    // Sans compte, plus de barre d'onglets : le menu ☰ en haut à droite la remplace.
+    await expect(tabbar(page)).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.classList.contains("has-tabbar"))).toBe(false);
+    const menuButton = page.getByRole("banner").getByRole("button", { name: "Ouvrir le menu" });
+    await expect(menuButton).toBeVisible();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    const mb = (await menuButton.boundingBox())!;
+    expect(mb.x + mb.width).toBeGreaterThan((page.viewportSize()?.width ?? 390) - 24);
+    await menuButton.click();
+    const closeButton = page.getByRole("banner").getByRole("button", { name: "Fermer le menu" });
+    await expect(closeButton).toHaveAttribute("aria-expanded", "true");
+    const menu = page.locator("[data-menu]");
+    await expect(menu.getByRole("link")).toHaveText(["Partager", "Mes partages", "Offres", "Sécurité", "Confidentialité", "Signaler un abus", /^Code source sur GitHub/]);
+    await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
+    expect(await smallTargets(page, "header")).toEqual([]);
+    await shot(page, "menu-ouvert");
+    // Échap ferme et rend le focus au bouton.
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(menuButton).toBeFocused();
+    await menuButton.click();
+    await menu.getByRole("link", { name: "Mes partages" }).click();
     await expect(page).toHaveURL(/\/envois$/);
-    await expect(tabbar(page)).toBeVisible();
-    await expect(shares).toHaveAttribute("aria-current", "page");
-    // Onglet racine : titre « Mes partages », sans bouton Retour (revue du 12 novembre).
+    await expect(menu).toBeHidden();
     await expect(page.getByRole("heading", { level: 1, name: "Mes partages" })).toBeVisible();
-    await expect(page.getByRole("banner").getByRole("button", { name: "Retour" })).toHaveCount(0);
-    await expect(tabbar(page).getByRole("link", { name: "Envoyer" })).not.toHaveAttribute("aria-current", "page");
+    // Plus un onglet racine : Retour en haut à gauche.
+    await expect(page.getByRole("banner").getByRole("button", { name: "Retour" })).toBeVisible();
     expect(await noHScroll(page)).toBe(true);
-    await shot(page, "barre-onglets-mes-partages");
-    await tabbar(page).getByRole("link", { name: "Envoyer" }).click();
+    await page.getByRole("banner").getByRole("button", { name: "Retour" }).click();
     await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
     expect(await smallTargets(page, "body")).toEqual([]);
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).toBe("none");
@@ -110,19 +119,16 @@ test.describe("téléphone façon app", () => {
     await page.locator("footer.foot").scrollIntoViewIfNeeded();
     await expect(page.locator("footer.foot")).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
-    // Plus de sélecteur de langue en haut à droite, plus de roue ni d'onglet Réglages (retours du
-    // 11 novembre) : la langue se change dans le pied de page.
     const banner = page.getByRole("banner");
     await expect(banner.getByRole("button", { name: /English|Français|Réglages/ })).toHaveCount(0);
     await shot(page, "accueil");
 
-    // Pied de page : langue, Sécurité, Confidentialité.
+    // Pied de page : Sécurité, Confidentialité.
     await expect(footLink(page, "Sécurité")).toBeAttached();
     await expect(footLink(page, "Confidentialité")).toBeAttached();
     await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix (12 novembre)
     await footLink(page, "Sécurité").click();
     await expect(page).toHaveURL(/\/securite$/);
-    await expect(tabbar(page)).toBeVisible();
     // En-tête natif : retour en haut à gauche.
     const back = page.getByRole("banner").getByRole("button", { name: "Retour" });
     await expect(back).toBeVisible();
@@ -136,8 +142,8 @@ test.describe("téléphone façon app", () => {
     test.setTimeout(90_000);
     await page.goto(shh.origin + "/");
     await shot(page, "accueil-ajouter");
-    // Une seule action « Commencer » → page d'envoi (D41-37) ; « Ajouter » → feuille du bas en liste groupée, avec poignée.
-    await page.locator(".add-big").click();
+    // « Ou créez sur place » → page d'envoi (retours du 15 novembre) ; « Ajouter » → feuille du bas en liste groupée, avec poignée.
+    await page.locator("[data-more]").click();
     await expect(page).toHaveURL(/\/envoyer$/);
     await page.getByRole("button", { name: "Ajouter", exact: true }).click();
     const add = page.getByRole("dialog", { name: "Ajouter" });

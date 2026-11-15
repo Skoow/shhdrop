@@ -235,29 +235,31 @@
   }
   /* Colonne étroite (ordinateur, au-dessus de l'envoi) : une formule par rangée, nom à gauche,
      limites sur une ligne. */
+  /* Bande compacte seulement : les grandes cartes de l'accueil (.big) gardent leur mise en page
+     (à 320 px et texte à 200 %, ces règles les faisaient déborder). */
   @container (max-width: 330px) {
-    .tiers {
+    .strip .tiers {
       grid-template-columns: minmax(0, 1fr);
       gap: 6px;
     }
-    .tier {
+    .strip .tier {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: baseline;
       column-gap: 10px;
       padding: 7px 10px;
     }
-    .nm {
+    .strip .nm {
       flex-direction: column;
       gap: 0;
     }
-    .lim {
+    .strip .lim {
       display: flex;
       flex-wrap: wrap;
       gap: 0 8px;
       justify-content: flex-end;
       text-align: end;
     }
-    .l:first-child {
+    .strip .l:first-child {
       font-size: var(--fs-micro);
     }
   }

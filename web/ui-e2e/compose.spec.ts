@@ -29,7 +29,7 @@ const MIXED = [...PHOTOS, f("anniversaire-lou.webm"), f("contrat.pdf"), f("archi
 async function open(page: Page, origin: string) {
   await page.goto(origin + "/");
   // Accueil : « Commencer » (mène à la page d'envoi, D41-37).
-  await expect(page.getByRole("button", { name: /^Commencer/ }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Commencer|Ou créez sur place)/ }).filter({ visible: true }).first()).toBeVisible();
 }
 /** Choisit des fichiers par la feuille d'ajout (« Commencer » ou « Ajouter ») ou la zone de dépôt (composeur). */
 async function browse(page: Page, files: string[] | { name: string; mimeType: string; buffer: Buffer }[], wait = true) {

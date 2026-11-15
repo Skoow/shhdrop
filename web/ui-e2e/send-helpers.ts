@@ -18,15 +18,17 @@ export async function noViewTransition(page: Page) {
 }
 
 /**
- * Accueil : « Commencer » mène à la page d'envoi « /envoyer » (retours DROP) ; ailleurs (déjà
- * dans le composeur), rien à faire.
+ * Accueil : « Commencer » (ordinateur) ou « Ou créez sur place » (téléphone, retours du
+ * 15 novembre : la carte de dépôt n'est plus sur l'accueil du téléphone) mène à la page d'envoi
+ * « /envoyer » (retours DROP) ; ailleurs (déjà dans le composeur), rien à faire.
  */
+const START = /^(Commencer|Get started|Ou créez sur place|Or create one here)/;
 export async function enterComposer(page: Page) {
   await noViewTransition(page);
   // L'écran doit être monté avant de choisir le geste (accueil ou composeur, téléphone ou ordinateur).
-  const any = page.getByRole("button", { name: /^(Ajouter|Commencer)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first();
+  const any = page.getByRole("button", { name: /^(Ajouter|Add|Commencer|Get started|Ou créez sur place|Or create one here)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first();
   await expect(any).toBeVisible();
-  const start = page.getByRole("button", { name: /^Commencer/ }).filter({ visible: true }).first();
+  const start = page.getByRole("button", { name: START }).filter({ visible: true }).first();
   if (!(await start.isVisible().catch(() => false))) return;
   await start.click();
   await expect(page).toHaveURL(/\/envoyer$/);

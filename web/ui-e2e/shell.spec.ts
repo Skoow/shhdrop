@@ -24,16 +24,23 @@ for (const p of ["/s/x", "/m/x"]) {
 
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR" });
-test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À propos ; sans traceur ; © ; version du build ; visible en bas de l'accueil, téléphone compris", async ({ page, shh }) => {
+test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À propos ; sans traceur ; © ; version du build ; visible en bas de l'accueil, téléphone compris", async ({ page, shh, isMobile }) => {
   await page.goto(shh.origin + "/");
   const foot = page.locator("footer[data-foot]");
   await foot.scrollIntoViewIfNeeded();
   await expect(foot).toBeVisible();
-  for (const c of ["Produit", "Confiance", "Légal"]) await expect(foot.getByText(c, { exact: true })).toBeVisible();
-  for (const l of ["Envoyer", "Mes partages", "Téléchargements", "Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
+  // Ordinateur : trois colonnes titrées ; téléphone (retours du 15 novembre) : un seul bloc, les
+  // titres restent pour les lecteurs d'écran (chaque liste garde son nom).
+  for (const c of ["Produit", "Confiance", "Légal"]) {
+    if (isMobile) await expect(foot.getByRole("list", { name: c })).toBeVisible();
+    else await expect(foot.getByText(c, { exact: true })).toBeVisible();
+  }
+  // Sans compte, pas de « Téléchargements » (retours du 15 novembre).
+  await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
+  for (const l of ["Envoyer", "Mes partages", "Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();
-  // 11 liens (dont « Mes partages », Task H, et « Téléchargements », lot 15 du compte), plus le logo (retour à l'accueil, UI7).
-  await expect(foot.getByRole("link")).toHaveCount(12);
+  // 10 liens (dont « Mes partages », Task H), plus le logo (retour à l'accueil, UI7).
+  await expect(foot.getByRole("link")).toHaveCount(11);
   await expect(foot.getByRole("link", { name: "Shhgone, accueil" })).toBeVisible();
   await expect(foot.getByText(/^Salon\s+bientôt$/)).toBeVisible(); // pas un lien
   await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
@@ -46,7 +53,9 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await expect(foot.getByRole("combobox")).toHaveCount(0);
   await expect(foot.getByRole("group", { name: "Langue" })).toHaveCount(0);
   await expect(foot.getByRole("switch")).toHaveCount(0);
-  await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toBeVisible();
+  // « À propos » : ordinateur seulement (sur téléphone, il redisait la phrase de la marque).
+  if (isMobile) await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toBeHidden();
+  else await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(600); // fin des apparitions au défilement
   expect(await axe(page)).toEqual([]);

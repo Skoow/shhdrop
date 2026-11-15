@@ -463,6 +463,10 @@
   }
   /* Secondaire : contour, désactivé (bientôt) mais lisible. */
   .room-b.hero-room {
+    /* Texte agrandi sur 320 px : « bientôt » passe dessous au lieu de déborder. */
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding-block: 8px;
     min-height: 52px;
     padding: 0 18px;
     gap: 10px;

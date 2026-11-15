@@ -34,11 +34,12 @@ test.describe("fr-FR", () => {
     await expect(page.getByText(/^Fichiers, photos, vidéos, vocaux et notes, chiffrés sur votre appareil/)).toBeVisible();
     const certs = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
     await expect(certs).toHaveCount(3);
-    // « Commencer » partout (téléphone : une seule action, grande). Plus de « Parcourir ».
-    await expect(page.getByRole("button", { name: /^Commencer/ }).filter({ visible: true }).first()).toBeVisible();
+    // Ordinateur : « Commencer » dans la carte de dépôt ; téléphone (retours du 15 novembre) : la
+    // carte n'est plus sur l'accueil, « Ou créez sur place » mène à la page d'envoi. Plus de « Parcourir ».
+    await expect(page.getByRole("button", { name: isMobile ? /^Ou créez sur place/ : /^Commencer/ }).filter({ visible: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
     // Limites gratuites (spec §41.2), lues des constantes.
-    await expect(page.locator("p.proof")).toHaveText("200\u202féléments · 2\u202fGo au total");
+    if (!isMobile) await expect(page.locator("p.proof")).toHaveText("200\u202féléments · 2\u202fGo au total");
     for (const h of ["Ce qui se passe quand vous partagez", "Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     // Infographie : sept étapes lisibles en liste, le dessin caché.
@@ -58,26 +59,28 @@ test.describe("fr-FR", () => {
     await expect(page).toHaveURL(shh.origin + "/securite");
   });
 
-  test("téléphone 390 × 844 : « Choisir des fichiers » dans le premier écran ; infographie dessous, puis le réceptacle (S4)", async ({ page, shh, isMobile }) => {
+  test("téléphone 390 × 844 : « Choisir des fichiers » et le salon dans le cadre, au premier écran ; infographie dessous ; plus de carte de dépôt (retours du 15 novembre)", async ({ page, shh, isMobile }) => {
     test.skip(!isMobile, "projets téléphone seulement");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(shh.origin + "/");
-    await page.waitForTimeout(900); // positions finales (entrée finie)
-    // Au doigt, le titre ne parle pas de glisser.
-    await expect(page.getByRole("heading", { level: 2, name: "Que voulez-vous envoyer ?" })).toBeVisible();
-    // Une seule action (« Commencer », vers la page d'envoi), grande, dans le premier écran ; ni « Commencer » du coffre ni tuiles en double.
-    await expect(page.getByRole("group", { name: "Ou créez sur place" })).toBeHidden();
-    await expect(page.locator(".browse")).toBeHidden();
+    await page.waitForTimeout(1400); // positions finales (entrée finie)
+    // La carte de dépôt ne reste que sur la page d'envoi.
+    await expect(page.locator('[data-slot="compose"]')).toBeHidden();
+    const frame = (await page.locator("[data-ctas]").boundingBox())!;
     const pick = (await page.locator("[data-pick]").boundingBox())!;
+    const room = (await page.locator("[data-ctas] [data-room]").boundingBox())!;
+    const more = (await page.locator("[data-more]").boundingBox())!;
     expect(pick.height).toBeGreaterThanOrEqual(48);
-    expect(pick.y + pick.height).toBeLessThanOrEqual(844 - 64); // au-dessus de la barre d'onglets
+    // Les boutons occupent la largeur du cadre ; ordre : fichiers, salon, « Ou créez sur place ».
+    expect(pick.width).toBeGreaterThan(frame.width - 40);
+    expect(room.y).toBeGreaterThan(pick.y);
+    expect(more.y).toBeGreaterThan(room.y);
+    expect(more.y + more.height).toBeLessThanOrEqual(844);
     expect(await page.evaluate(() => scrollY)).toBe(0);
-    const add = (await page.locator(".add-big").boundingBox())!;
-    expect(add.height).toBeGreaterThanOrEqual(56);
-    const vessel = (await page.locator('[data-slot="compose"]').boundingBox())!;
     const demo = (await page.locator("[data-demo]").boundingBox())!;
-    expect(demo.y).toBeGreaterThan(pick.y + pick.height);
-    expect(vessel.y).toBeGreaterThan(demo.y + demo.height);
+    expect(demo.y).toBeGreaterThan(frame.y + frame.height);
+    await page.locator("[data-more]").click();
+    await expect(page).toHaveURL(shh.origin + "/envoyer");
   });
 
   test("320 px : rien ne déborde ; capture", async ({ page, shh }) => {
@@ -117,7 +120,7 @@ test.describe("fr-FR", () => {
     await capture(page, "home-320-200pct-securite");
   });
 
-  test("K1 : toutes les animations d'entrée sont finies à 900 ms (hors ambiance et défilement)", async ({ page, shh, isMobile }) => {
+  test("K1 : toutes les animations d'entrée sont finies à 1,3 s (hors ambiance et défilement) ; l'effacement du titre à moins de 5 s", async ({ page, shh, isMobile }) => {
     // Cause de l'instabilité : document.getAnimations() ne liste que les animations vivantes. Sur une
     // machine chargée, le chargement dure plus de 900 ms, les entrées sont déjà finies (donc retirées
     // de la liste) au moment de l'échantillon, et il en restait 0. On enregistre donc chaque animation
@@ -149,11 +152,15 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     type Rec = { name: string; end: number; ambient: boolean; infinite: boolean };
     const recorded = () => page.evaluate(() => (window as unknown as { __anims: Rec[] }).__anims);
-    // Titre (9 mots), sur-titre, phrase, boutons, cases cochées, infographie et carte de dépôt :
-    // 15 entrées (refonte du 12 novembre), attendues jusqu'à ce que tous les départs aient eu lieu.
-    await expect.poll(async () => (await recorded()).filter((r) => !r.ambient).length, { timeout: 30_000 }).toBeGreaterThanOrEqual(15);
+    // Titre (9 mots), phrase, boutons, cases cochées, infographie (et carte de dépôt sur ordinateur) :
+    // 13 entrées au moins (retours du 15 novembre : plus de sur-titre ; entrée revue, 1,3 s),
+    // attendues jusqu'à ce que tous les départs aient eu lieu. « puis plus rien. » se défait
+    // ensuite (letter-out, letter-dot) : une fois, fini avant 5 s (WCAG 2.2.2).
+    const erase = (r: Rec) => /letter-(out|dot)$/.test(r.name);
+    await expect.poll(async () => (await recorded()).filter((r) => !r.ambient && !erase(r)).length, { timeout: 30_000 }).toBeGreaterThanOrEqual(13);
     const all = await recorded();
-    for (const e of all.filter((r) => !r.ambient)) expect(e.end, e.name).toBeLessThanOrEqual(900);
+    for (const e of all.filter((r) => !r.ambient && !erase(r))) expect(e.end, e.name).toBeLessThanOrEqual(1300);
+    for (const e of all.filter(erase)) expect(e.end, e.name).toBeLessThan(5000);
     // Seule l'ambiance boucle.
     const infinite = all.filter((r) => r.infinite);
     expect(infinite.length).toBeGreaterThan(0);
@@ -285,9 +292,9 @@ test.describe("fr-FR", () => {
     expect(page.url()).toBe(shh.origin + "/");
   });
 
-  test("« Commencer » (carte de dépôt) mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
+  test("« Commencer » (carte de dépôt) ou « Ou créez sur place » (téléphone) mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
-    const cta = isMobile ? page.locator(".add-big") : page.locator('[data-slot="compose"]').getByRole("button", { name: "Commencer" });
+    const cta = isMobile ? page.locator("[data-more]") : page.locator('[data-slot="compose"]').getByRole("button", { name: "Commencer" });
     await cta.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await cta.click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
@@ -452,7 +459,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
     for (const sel of [".aurora", ".grain", ".trame"])
       expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).display), sel).toBe("none");
-    for (const name of isMobile ? ["Commencer Photo, vidéo, vocal, note ou fichiers"] : ["Commencer", "Photo ou vidéo"]) {
+    for (const name of isMobile ? ["Choisir des fichiers"] : ["Commencer", "Photo ou vidéo"]) {
       const b = page.getByRole("button", { name, exact: true }).first();
       expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("solid");
     }
