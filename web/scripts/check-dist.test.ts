@@ -25,7 +25,7 @@ const DEMO_INDEX = `<!doctype html><html><head>
     <meta name="referrer" content="no-referrer">
     <meta name="robots" content="noindex">
     <meta charset="utf-8" />
-    <script type="module" crossorigin src="/shhdrop/assets/index-a.js"></script>
+    <script type="module" crossorigin src="/shhgone/assets/index-a.js"></script>
 </head><body></body></html>`;
 
 /** Site d'essai ; `sri` (défaut) : index.html reçoit les empreintes comme au build (spec §28.3). */
@@ -36,7 +36,7 @@ function site(input: Record<string, string>, sri = true): string {
   if (sri) files["assets/index-a.js"] ??= "console.info(1)"; // le script que chargent PROD_INDEX et DEMO_INDEX
   for (const page of ["index.html", "404.html"]) {
     if (!sri || files[page] === undefined) continue;
-    const base = files[page]!.includes('"/shhdrop/') ? "/shhdrop/" : "/";
+    const base = files[page]!.includes('"/shhgone/') ? "/shhgone/" : "/";
     try {
       files[page] = addSri(files[page]!, (rel: string) => (files[rel] === undefined ? null : Buffer.from(files[rel]!)), base);
     } catch {
@@ -108,7 +108,7 @@ describe("check-dist.mjs, production", () => {
   });
 
   it("échoue sur la CSP meta, le texte du bandeau, la base de démo, 404.html", () => {
-    expect(checkDist(site({ "index.html": DEMO_INDEX }), false).join("\n")).toMatch(/Content-Security-Policy[\s\S]*shhdrop\/assets\//);
+    expect(checkDist(site({ "index.html": DEMO_INDEX }), false).join("\n")).toMatch(/Content-Security-Policy[\s\S]*shhgone\/assets\//);
     expect(checkDist(site({ "index.html": PROD_INDEX, "a.js": "Demo: nothing is sent, the link only works in this tab." }), false)).toHaveLength(1);
     expect(checkDist(site({ "index.html": PROD_INDEX, "a.js": "rien n'est envoyé, le lien ne marche que dans cet onglet" }), false)).toHaveLength(1);
     expect(checkDist(site({ "index.html": PROD_INDEX, "404.html": PROD_INDEX }), false)).toEqual(["404.html : propre à la démo"]);
@@ -380,10 +380,10 @@ describe("check-dist.mjs --demo", () => {
     ]);
   });
 
-  it("échoue si une ressource est hors de la base /shhdrop/", () => {
-    const h = DEMO_INDEX.replace("/shhdrop/assets/", "/assets/");
+  it("échoue si une ressource est hors de la base /shhgone/", () => {
+    const h = DEMO_INDEX.replace("/shhgone/assets/", "/assets/");
     expect(checkDist(site({ ...good(), "index.html": h, "404.html": h }), true)).toEqual([
-      "index.html : « /assets/index-a.js » hors de la base /shhdrop/",
+      "index.html : « /assets/index-a.js » hors de la base /shhgone/",
     ]);
   });
 });

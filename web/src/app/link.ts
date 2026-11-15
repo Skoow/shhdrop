@@ -17,7 +17,7 @@ const INCOMPLETE: LinkState = Object.freeze({ kind: "incomplete" });
  * Lit le lien de l'adresse courante (spec §32 : `${base}#<clé>` ou `${base}#m<clé>`).
  * Seule la forme est vérifiée (linkForm, mêmes refus que parseLink du moteur) : la clé n'est pas
  * décodée ici, mais par le moteur au moment de l'utiliser (transfer/client.ts). Le chemin
- * doit être celui de la base (« / », ou « /shhdrop/ » en démo) ; la requête est
+ * doit être celui de la base (« / », ou « /shhgone/ » en démo) ; la requête est
  * ignorée : nos liens n'en portent jamais, mais les applications ajoutent des paramètres de
  * suivi (`?fbclid=…`) en gardant le fragment. Le lien rendu est remis à la racine de
  * l'origine (`${origin}/#…`), la forme qu'attendent les fonctions du client. Tout échec (pas

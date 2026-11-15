@@ -17,7 +17,7 @@ function target(tag) {
   return rel === "stylesheet" || rel === "modulepreload" ? (attr(tag, "href") ?? null) : null;
 }
 
-/** Chemin dans le dossier du site : la base (« / », « /shhdrop/ ») retirée ; chemin relatif tel quel. */
+/** Chemin dans le dossier du site : la base (« / », « /shhgone/ ») retirée ; chemin relatif tel quel. */
 const relOf = (url, base) => (url.startsWith(base) ? url.slice(base.length) : url.replace(/^\//, ""));
 
 /** Ajoute (ou remplace) integrity sur chaque balise ; `read(rel)` rend les octets du fichier, ou null. */

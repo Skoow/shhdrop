@@ -24,7 +24,7 @@ test("Sécurité : chiffrement, ce que voit le serveur, limites (historique, ong
   await expect(tech).not.toHaveAttribute("open");
   await tech.locator("summary").click();
   for (const x of ["AES-256-GCM", "Argon2id", "Permissions-Policy"]) await expect(tech).toContainText(x);
-  await expect(tech.getByRole("link", { name: /Code source public/ })).toHaveAttribute("href", "https://github.com/Skoow/shhdrop");
+  await expect(tech.getByRole("link", { name: /Code source public/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
   await expect(tech.getByRole("link", { name: /Spécification publique/ })).toHaveAttribute("href", /docs\/superpowers\/specs\/2026-11-03-shhdrop-design\.md$/);
   await tech.locator("summary").click();
   expect(await axe(page)).toEqual([]);

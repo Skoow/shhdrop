@@ -30,13 +30,13 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await foot.scrollIntoViewIfNeeded();
   await expect(foot).toBeVisible();
   for (const c of ["Produit", "Confiance", "Légal"]) await expect(foot.getByText(c, { exact: true })).toBeVisible();
-  for (const l of ["Envoyer", "Mes partages", "Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
+  for (const l of ["Envoyer", "Mes partages", "Téléchargements", "Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();
-  // 10 liens (dont « Mes partages », Task H), plus le logo (retour à l'accueil, UI7).
-  await expect(foot.getByRole("link")).toHaveCount(11);
+  // 11 liens (dont « Mes partages », Task H, et « Téléchargements », lot 15 du compte), plus le logo (retour à l'accueil, UI7).
+  await expect(foot.getByRole("link")).toHaveCount(12);
   await expect(foot.getByRole("link", { name: "Shhgone, accueil" })).toBeVisible();
   await expect(foot.getByText(/^Salon\s+bientôt$/)).toBeVisible(); // pas un lien
-  await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhdrop");
+  await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
   await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("rel", "noopener noreferrer");
   // Retours UI9 : plus de mention « aucune publicité » ; le nom en bas à gauche, « © 2026 » à côté.
   await expect(foot.getByText(/publicité/)).toHaveCount(0);

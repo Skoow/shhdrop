@@ -1,6 +1,6 @@
 // Nom affiché : Shhgone (décision du propriétaire, 12 novembre ; spec D42-24, UI P9). Tout ce qu'un
 // visiteur voit porte ce nom ; l'interne (dépôt, paquets, bases locales, étiquettes HKDF,
-// en-têtes X-Shh-*, base /shhdrop/ de la démo) garde « shhdrop » pour ne rien casser.
+// en-têtes X-Shh-*, base /shhgone/ de la démo) garde « shhdrop » pour ne rien casser.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";

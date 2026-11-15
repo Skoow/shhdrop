@@ -214,7 +214,7 @@ async function parseFor(link: string, expectedOrigin: string): Promise<ParsedLin
 }
 
 /**
- * Base de l'application (« / », « /shhdrop/ » en démo), lue à l'appel. createShare rend des
+ * Base de l'application (« / », « /shhgone/ » en démo), lue à l'appel. createShare rend des
  * liens qui la portent (option `base`) : les fonctions de lecture les acceptent donc, en plus
  * de la racine (forme rendue par app/link.ts:readLink). Aucun autre chemin : l'ancien format
  * « /s/<id>#… » reste refusé (scan de sécurité du 7 novembre, F2).
@@ -253,7 +253,7 @@ export type CaptchaCtx = { fallbackOrigin: string | null; mode: "pow" | "fallbac
 
 export type CreateOpts = api.Net & {
   /**
-   * Base de dépôt des liens rendus (« / » par défaut ; « /shhdrop/ » pour la démo, soit
+   * Base de dépôt des liens rendus (« / » par défaut ; « /shhgone/ » pour la démo, soit
    * import.meta.env.BASE_URL). Le lien vaut `${origin}${base}#<K_lien>` (spec §32).
    */
   base?: string;

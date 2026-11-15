@@ -347,9 +347,9 @@ describe("vite.config.ts résolu", () => {
     expect(resolve(false, "./routes/compte/pages", join(srcDir, "main.ts"))).toBeNull();
   });
 
-  it("mode demo : base /shhdrop/, sortie dist-demo, demoMeta", async () => {
+  it("mode demo : base /shhgone/, sortie dist-demo, demoMeta", async () => {
     const cfg = await resolveConfig({ configFile: join(webDir, "vite.config.ts"), root: webDir, mode: "demo" }, "build");
-    expect(cfg.base).toBe("/shhdrop/");
+    expect(cfg.base).toBe("/shhgone/");
     expect(cfg.build.outDir).toBe("dist-demo");
     const names = cfg.plugins.map((p) => p.name);
     expect(names).toContain("shh-demo-meta");

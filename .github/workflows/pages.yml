@@ -37,7 +37,7 @@ jobs:
           package-manager-cache: false
       # Moteur WebAssembly (npm run build:demo commence par npm run build:engine).
       - uses: ./.github/actions/engine-toolchain
-      # Build de démo (UI §14.3) : faux serveur en mémoire, CSP meta, base /shhdrop/, 404.html.
+      # Build de démo (UI §14.3) : faux serveur en mémoire, CSP meta, base /shhgone/, 404.html.
       - run: npm ci --ignore-scripts
         working-directory: web
       - run: npm run build:demo

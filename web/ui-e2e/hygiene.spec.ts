@@ -596,7 +596,7 @@ test.describe("moteur WebAssembly : chargement vérifié (spec moteur §7)", () 
     const pages = await startPagesServer(ENGINE_PAGE_DEMO);
     try {
       const seen = watchEngine(page);
-      await page.goto(`${pages.origin}/shhdrop/`);
+      await page.goto(`${pages.origin}/shhgone/`);
       expect(await kdf(page)).toBe(`cle ${KDF.key}`);
       expect(seen).toEqual({ wasm: [], script: [], workers: [], closed: 0 });
       expect(refused).toEqual([]);

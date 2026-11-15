@@ -1,4 +1,4 @@
-// Démo GitHub Pages (UI §14.3), servie comme par Pages (pages-server.ts : /shhdrop/, 404.html,
+// Démo GitHub Pages (UI §14.3), servie comme par Pages (pages-server.ts : /shhgone/, 404.html,
 // aucun en-tête). Gardes de la fixture `demo` : zéro violation de la CSP meta, zéro requête hors
 // de l'origine, aucune requête /api sur le réseau (le faux serveur est dans la page).
 // Les tâches suivantes ajoutent leur parcours à ce fichier.
@@ -21,7 +21,7 @@ const storage = (page: Page) => page.evaluate(() => localStorage.length + Object
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR" });
 
-  test("/shhdrop/ : accueil, bandeau permanent, titre « Démo · », CSP meta en tête ; axe ; captures", async ({ page, demo }) => {
+  test("/shhgone/ : accueil, bandeau permanent, titre « Démo · », CSP meta en tête ; axe ; captures", async ({ page, demo }) => {
     const res = await page.goto(demo.url);
     expect(res?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
@@ -89,7 +89,7 @@ test.describe("fr-FR", () => {
     });
   }
 
-  test("liens internes sous la base : « Tous les détails de sécurité » → /shhdrop/securite, logo → /shhdrop/", async ({ page, demo }) => {
+  test("liens internes sous la base : « Tous les détails de sécurité » → /shhgone/securite, logo → /shhgone/", async ({ page, demo }) => {
     await page.goto(demo.url);
     await page.getByRole("link", { name: "Tous les détails de sécurité" }).click();
     await expect(page).toHaveURL(`${demo.url}securite`);
@@ -103,12 +103,12 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
   });
 
-  // Spec §32 : liens à la base de la démo, « /shhdrop/#<clé> » et « /shhdrop/#m<clé> » (index.html, 200).
+  // Spec §32 : liens à la base de la démo, « /shhgone/#<clé> » et « /shhgone/#m<clé> » (index.html, 200).
   for (const [what, frag] of [
     ["partage", `#${KEY}`],
     ["gestion", `#m${KEY}`],
   ] as const) {
-    test(`lien court /shhdrop/#… (${what}) : route d'ouverture ou de gestion, # retiré, jamais envoyé`, async ({ page, demo }) => {
+    test(`lien court /shhgone/#… (${what}) : route d'ouverture ou de gestion, # retiré, jamais envoyé`, async ({ page, demo }) => {
       const res = await page.goto(`${demo.url}${frag}`);
       expect(res?.status()).toBe(200);
       await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
@@ -138,7 +138,7 @@ test.describe("fr-FR", () => {
     });
   }
 
-  test("fragment invalide à la base (« #x ») : accueil, # retiré ; ancien lien /shhdrop/s/<id>#… : 404 de l'interface, # retiré", async ({ page, demo }) => {
+  test("fragment invalide à la base (« #x ») : accueil, # retiré ; ancien lien /shhgone/s/<id>#… : 404 de l'interface, # retiré", async ({ page, demo }) => {
     await page.goto(`${demo.url}#x`);
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
     await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
@@ -203,10 +203,10 @@ test.describe("fr-FR", () => {
         });
       return {
         sameOriginFile: await attempt(fetch("robots.txt", { headers: hdr })),
-        sameOriginOther: await attempt(fetch(`${location.origin}/shhdrop/apis/x`, { method: "POST", headers: hdr, body: secret })),
+        sameOriginOther: await attempt(fetch(`${location.origin}/shhgone/apis/x`, { method: "POST", headers: hdr, body: secret })),
         otherOrigin: await attempt(fetch("https://ailleurs.test/api/shares", { method: "POST", headers: hdr, body: secret })),
         otherOriginXhr: await xhr("https://ailleurs.test/api/shares/x/segments/0"),
-        sameOriginXhr: await xhr(`${location.origin}/shhdrop/robots.txt`),
+        sameOriginXhr: await xhr(`${location.origin}/shhgone/robots.txt`),
       };
     }, SECRET);
     expect(r).toEqual({
@@ -281,7 +281,7 @@ test.describe("fr-FR", () => {
 test.describe("fr-FR : envoi (Tasks 17–18)", () => {
   test.use({ locale: "fr-FR" });
 
-  test("Chiffrer et envoyer : progression, Lien prêt avec un lien /shhdrop/#<43>, ouvrir comme destinataire", async ({ page, demo }) => {
+  test("Chiffrer et envoyer : progression, Lien prêt avec un lien /shhgone/#<43>, ouvrir comme destinataire", async ({ page, demo }) => {
     test.setTimeout(90_000);
     await page.goto(demo.url);
     await addText(page, "Le code de la porte est 4471.");
@@ -293,16 +293,16 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     await expect(page).toHaveTitle("Démo · Lien prêt · Shhgone");
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
-    expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhdrop/#[A-Za-z0-9_-]{43}$`));
+    expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/#[A-Za-z0-9_-]{43}$`));
     const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
-    expect(manage).toMatch(/\/shhdrop\/#m[A-Za-z0-9_-]{43}$/);
+    expect(manage).toMatch(/\/shhgone\/#m[A-Za-z0-9_-]{43}$/);
     expect(await storage(page)).toBe(0);
     await capture(page, "demo-ready");
     const password = (await page.getByRole("group", { name: "Mot de passe", exact: true }).locator(".sr-only").first().textContent()) ?? "";
     // Même onglet (le faux serveur vit dans la page) : ouverture complète, puis destruction.
     await page.getByRole("button", { name: "Ouvrir comme destinataire (démo)" }).click();
     await expect(readyHeading(page)).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => location.pathname + location.hash)).toBe("/shhdrop/");
+    await expect.poll(() => page.evaluate(() => location.pathname + location.hash)).toBe("/shhgone/");
     await expect(page.getByRole("heading", { name: "Un partage chiffré vous attend" })).toBeVisible();
     await page.getByLabel("Mot de passe", { exact: true }).fill("pas-le-bon");
     await page.getByRole("button", { name: "Déverrouiller" }).click();
@@ -330,7 +330,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(page.locator("[data-receipt]")).toBeVisible();
     expect(await storage(page)).toBe(0);
     // Le lien collé à nouveau dans le même onglet : le partage n'existe plus.
-    // Le lien est à la racine (« /shhdrop/#clé ») : depuis la page d'envoi (/envoyer, D41-37),
+    // Le lien est à la racine (« /shhgone/#clé ») : depuis la page d'envoi (/envoyer, D41-37),
     // on l'ouvre en entier dans le même onglet, comme un lien collé dans la barre d'adresse.
     await page.evaluate((l) => (location.href = l), link);
     await expect(page.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();
@@ -347,7 +347,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Partage supprimé" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Connexion impossible\u202f: le partage n'a pas été supprimé.")).toHaveCount(0);
-    // Le lien est à la racine (« /shhdrop/#clé ») : depuis la page d'envoi (/envoyer, D41-37),
+    // Le lien est à la racine (« /shhgone/#clé ») : depuis la page d'envoi (/envoyer, D41-37),
     // on l'ouvre en entier dans le même onglet, comme un lien collé dans la barre d'adresse.
     await page.evaluate((l) => (location.href = l), link);
     await expect(page.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();

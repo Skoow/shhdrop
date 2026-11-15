@@ -387,7 +387,7 @@ export function checkOrigin(origin: string): string {
   return origin;
 }
 
-// Base de dépôt : « / » en production, « /shhdrop/ » pour la démo GitHub Pages.
+// Base de dépôt : « / » en production, « /shhgone/ » pour la démo GitHub Pages.
 const BASE = /^\/(?:[A-Za-z0-9_-]+\/)*$/;
 
 function checkBase(base: string): string {

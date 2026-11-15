@@ -17,9 +17,9 @@ export type Tech = { h: string; p?: string[]; list?: string[]; links: { label: s
 export type InfoPage = { title: string; lede: string; draft?: boolean; blocks: Block[]; tech?: Tech };
 
 /** Dépôt public du code (lien sortant simple : rien n'est chargé depuis GitHub). */
-export const SOURCE_URL = "https://github.com/Skoow/shhdrop";
-export const LICENSE_URL = "https://github.com/Skoow/shhdrop/blob/main/LICENSE";
-export const SPEC_URL = "https://github.com/Skoow/shhdrop/blob/main/docs/superpowers/specs/2026-11-03-shhdrop-design.md";
+export const SOURCE_URL = "https://github.com/Skoow/shhgone";
+export const LICENSE_URL = "https://github.com/Skoow/shhgone/blob/main/LICENSE";
+export const SPEC_URL = "https://github.com/Skoow/shhgone/blob/main/docs/superpowers/specs/2026-11-03-shhdrop-design.md";
 
 /** `comptes` : drapeau de construction __COMPTES__ (paramètre pour les tests). */
 export function infoPage(name: InfoName, lang: Lang, comptes: boolean = __COMPTES__): InfoPage {
