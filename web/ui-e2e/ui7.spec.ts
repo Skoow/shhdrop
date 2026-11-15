@@ -123,7 +123,11 @@ test("pied de page : logo au bord intérieur de l'en-tête, liens sans soulignem
   const foot = page.locator("footer[data-foot]");
   await foot.scrollIntoViewIfNeeded();
   const [fl, hl] = [await foot.locator(".foot-logo").boundingBox(), await page.locator("header a.logo").boundingBox()];
-  expect(Math.abs(fl!.x - hl!.x)).toBeLessThanOrEqual(1);
+  // Téléphone (< 900 px, retours du 15 novembre) : pied d'un seul bloc centré, logo au centre.
+  if (w(isMobile) < 900) {
+    const fb = (await foot.boundingBox())!;
+    expect(Math.abs(fl!.x + fl!.width / 2 - (fb.x + fb.width / 2))).toBeLessThanOrEqual(1);
+  } else expect(Math.abs(fl!.x - hl!.x)).toBeLessThanOrEqual(1);
   const link = foot.getByRole("link", { name: /^Signaler un abus/ });
   expect(await link.evaluate((e) => getComputedStyle(e).textDecorationLine)).toBe("none");
   // Papier peint maison : un SVG statique (aucun data:), très discret, retiré en contraste renforcé.

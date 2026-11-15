@@ -409,8 +409,11 @@ test.describe("fr-FR", () => {
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
     // m6 : l'ouverture du contour (état drop) n'est pas animée, seule sa couleur l'est.
-    const props = await page.locator(".vessel .track").evaluate((e) => getComputedStyle(e).transitionProperty);
-    expect(props).not.toMatch(/stroke-dasharray|all/);
+    // (Ordinateur seulement : la carte de dépôt n'est plus sur l'accueil du téléphone.)
+    if (!isMobile) {
+      const props = await page.locator(".vessel .track").evaluate((e) => getComputedStyle(e).transitionProperty);
+      expect(props).not.toMatch(/stroke-dasharray|all/);
+    }
     await capture(page, "home-v3-reduced");
     await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(200);
@@ -495,7 +498,7 @@ test.describe("en-US", () => {
     await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then nothing." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Get started/ }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(Get started|Or create one here)/ }).filter({ visible: true }).first()).toBeVisible();
     for (const h of ["What happens when you share", "How it works", "Built for privacy", "Plans", "Your questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     expect(await noHScroll(page)).toBe(true);

@@ -703,7 +703,7 @@ test.describe("en-US", () => {
     if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(shh.origin + "/");
     // « Get started » mène à la page d'envoi (D41-37) ; puis « Add » (téléphone) ou la zone de dépôt.
-    await page.getByRole("button", { name: /^Get started/ }).filter({ visible: true }).first().click();
+    await page.getByRole("button", { name: /^(Get started|Or create one here)/ }).filter({ visible: true }).first().click();
     await expect(page).toHaveURL(/\/envoyer$/);
     const chooser = page.waitForEvent("filechooser");
     if (isMobile) {

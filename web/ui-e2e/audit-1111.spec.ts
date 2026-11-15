@@ -129,8 +129,9 @@ test("M20 : page du mot de passe : coût d'ouverture en une ligne ; dernier essa
 test("M17, M18, coffre : bloc des offres (12 novembre, remplace la ligne Plus et Pro), aucune option verrouillée ni copie chiffrée ; barre d'onglets sur téléphone seulement (deux onglets utiles) ; captures", async ({ page, shh, isMobile }) => {
   test.setTimeout(90_000);
   await page.goto(shh.origin + "/");
-  // M18 (règle du 11 novembre) : visible dès deux onglets utiles ; Mes partages fonctionne.
-  await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(isMobile ? 1 : 0);
+  // M18 (règle du 11 novembre) : visible dès deux onglets utiles ; sans compte, il n'en reste
+  // qu'un (Mes partages, retours du 15 novembre) : plus de barre, le menu ☰ la remplace.
+  await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
   await shot(page, "m18-accueil-onglets", isMobile);
   await addText(page, "Le code de la porte est 4471.");
   await expect(page.locator("[data-offer-strip]").filter({ visible: true })).toBeVisible();

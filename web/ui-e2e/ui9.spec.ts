@@ -89,7 +89,9 @@ test("pied : « Shhgone © 2026 » en bas à gauche, plus de « publicité » ; 
   const sig = foot.locator(".base .sig");
   await expect(sig).toHaveText(/^Shhgone\s*©\s2026$/);
   const [sb, base] = [await sig.boundingBox(), await foot.locator(".base").boundingBox()];
-  expect(Math.abs(sb!.x - base!.x)).toBeLessThanOrEqual(1);
+  // Téléphone (< 900 px, retours du 15 novembre) : signature centrée ; ordinateur : à gauche.
+  if (w(isMobile) < 900) expect(Math.abs(sb!.x + sb!.width / 2 - (base!.x + base!.width / 2))).toBeLessThanOrEqual(1);
+  else expect(Math.abs(sb!.x - base!.x)).toBeLessThanOrEqual(1);
   // Côtés : fichier statique (pas de data:), fixe, très discret, colonne centrale masquée.
   const st = await sides(page);
   expect(st.img).toMatch(/assets\/motif-[A-Za-z0-9_-]{8,}\.svg/);
