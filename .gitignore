@@ -12,3 +12,6 @@ SHA256SUMS.repro
 engine/target/
 web/src/engine/pkg/
 web/src/salon/pkg/
+
+# Captures des tests du navigateur (ui-e2e), jamais versionnées
+.superpowers/
