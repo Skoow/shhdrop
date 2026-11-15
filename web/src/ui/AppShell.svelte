@@ -11,6 +11,8 @@
   import Logo from "./Logo.svelte";
   import TabBar from "./TabBar.svelte";
   import TopNav from "./TopNav.svelte";
+  import MobileMenu from "./MobileMenu.svelte";
+  import { shares } from "../history/live.svelte";
 
   type Props = {
     children: Snippet;
@@ -84,7 +86,8 @@
       links: [
         { label: t("foot.send"), path: "/" },
         { label: t("foot.shares"), path: "/envois" },
-        { label: t("foot.downloads"), path: "/telechargements" },
+        // Sans compte, pas de Téléchargements (retours du 15 novembre, comme le menu ☰).
+        ...(shares.account !== null ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
         { label: t("foot.room"), soon: true },
         { label: t("foot.offers"), path: "/offres", tiers: true },
       ],
@@ -166,6 +169,8 @@
     </a>
     <!-- Ordinateur et tablette (≥ 768 px, refonte du 12 novembre) : menus et actions. -->
     <TopNav {busy} />
+    <!-- Téléphone (< 768 px, retours du 15 novembre) : menu ☰ à la place de la barre d'onglets. -->
+    <MobileMenu {busy} />
   </div>
 </header>
 
@@ -319,6 +324,13 @@
     -webkit-backdrop-filter: blur(20px) saturate(1.2);
     backdrop-filter: blur(20px) saturate(1.2);
     box-shadow: 0 1px 0 var(--hair);
+  }
+  /* Téléphone (retours du 15 novembre) : le texte de la page se lisait encore sous le logo et
+     sous « Retour » ; fond presque plein, le flou ne sert plus qu'au bord. */
+  @media (max-width: 899px) {
+    .top.scrolled {
+      background: color-mix(in srgb, var(--bg) 96%, transparent);
+    }
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .top.scrolled {
@@ -598,30 +610,58 @@
   .base .num {
     margin-inline-start: auto;
   }
+  /* Téléphone et tablette (retours du propriétaire du 15 novembre) : un seul bloc centré, plus
+     de colonnes. Marque et phrase, puis tous les liens à la suite ; les intitulés de colonne
+     restent pour les lecteurs d'écran (chaque liste garde son nom) ; « À propos » redisait la
+     phrase de la marque : retiré ici. */
   @media (max-width: 899px) {
-    .foot-in {
-      grid-template-columns: 1fr;
-      gap: var(--sp-6);
-    }
-  }
-  @media (max-width: 599px) {
     .foot {
       padding-block-start: var(--sp-6);
     }
-    .cols {
-      grid-template-columns: 1fr 1fr;
-      gap: var(--sp-5) var(--sp-4);
+    .foot-in {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      gap: var(--sp-5);
+      text-align: center;
     }
-    .cols .col:last-child {
-      grid-column: 1 / -1;
+    .brand {
+      justify-items: center;
+    }
+    .tag {
+      max-width: 34ch;
+    }
+    .cols {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      max-width: 34rem;
+    }
+    .ch {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .col ul {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0 var(--sp-5);
     }
     .fl,
     .off {
       min-height: 44px;
     }
+    .prefs {
+      display: none;
+    }
     .base {
+      justify-self: stretch;
       flex-direction: column;
-      align-items: flex-start;
+      align-items: center;
       gap: var(--sp-1);
     }
     .base .num {

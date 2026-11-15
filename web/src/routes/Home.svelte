@@ -1,6 +1,9 @@
 <script module lang="ts">
   // UI §20.4 : le titre entre mot par mot une seule fois par chargement de page.
   let revealed = false;
+  /** Effacement de « puis plus rien. » (CSS : départ 1,4 s, 45 ms par lettre, 2,6 s chacune) :
+   *  classe retirée à la fin, au plus 15 lettres ; sous les 5 s de WCAG 2.2.2. */
+  const ERASE_END_MS = 1400 + 15 * 45 + 2600 + 100;
 
   /** D'où viennent les fichiers remis à `onfiles` (composer.add, Task 10). */
   export type Source = "fichiers" | "photo" | "video" | "depot";
@@ -56,17 +59,31 @@
   // Décidé au montage seulement : un repli ultérieur ne rejoue pas l'entrée.
   let reveal = $state(!revealed && !untrack(() => compact));
   revealed = true;
-  // Retirée une fois l'entrée finie (870 ms, K1) : un changement de langue ou un compact qui
-  // repasse à faux ne rejoue pas l'entrée sur les nœuds recréés (§20.4 : une seule fois).
+  // Retirée une fois l'entrée finie (≈ 1,25 s, K1 revu le 15 novembre) : un changement de langue
+  // ou un compact qui repasse à faux ne rejoue pas l'entrée sur les nœuds recréés (§20.4 : une
+  // seule fois).
   $effect(() => {
     if (!reveal) return;
-    const timer = setTimeout(() => (reveal = false), 900);
+    const timer = setTimeout(() => (reveal = false), 1300);
+    return () => clearTimeout(timer);
+  });
+  // « puis plus rien. » se défait (retours du propriétaire du 15 novembre ; analyse du design
+  // du 13 novembre, M1) : après l'entrée, ses lettres deviennent des points (la trame du logo),
+  // de droite à gauche, les points s'éteignent, puis les lettres reviennent. Une seule fois,
+  // moins de 5 s (WCAG 2.2.2), opacity et transform seulement ; rien en mouvement réduit (CSS).
+  // La phrase entière reste lue d'un bloc (copie sr-only, K8).
+  let erase = $state(untrack(() => reveal));
+  $effect(() => {
+    if (!erase) return;
+    const timer = setTimeout(() => (erase = false), ERASE_END_MS);
     return () => clearTimeout(timer);
   });
 
   /**
-   * K1 : 560 ms par mot, 35 ms de décalage, respiration de 30 ms après la dernière virgule
-   * (« puis », « then ») : le dernier mot part à 310 ms et finit à 870 ms en français.
+   * K1 revu (15 novembre, « plus de fluidité ») : 760 ms par mot, 55 ms de décalage, respiration
+   * de 40 ms après la dernière virgule (« puis », « then ») ; montée courte et opacité, sans flou
+   * (le flou d'un grand texte saccadait sur téléphone). Le dernier mot finit vers 1,24 s.
+   * Lettres de la seconde ligne : décalage de l'effacement, de droite à gauche (`k`).
    */
   const words = $derived.by(() => {
     const list = t("hero.title").split(/ +/);
@@ -74,14 +91,20 @@
     list.forEach((w, i) => {
       if (w.endsWith(",") && i < list.length - 1) breath = i;
     });
+    const hl = (i: number) => breath >= 0 && i > breath;
+    const total = list.reduce((n, w, i) => n + (hl(i) ? [...w].length : 0), 0);
+    let seen = 0;
     // Seconde ligne colorée (référence du propriétaire, 12 novembre) : « puis plus rien. ».
-    return list.map((w, i) => ({ w, delay: i * 35 + (breath >= 0 && i > breath ? 30 : 0), hl: breath >= 0 && i > breath, br: breath >= 0 && i === breath + 1 }));
+    return list.map((w, i) => ({
+      w,
+      delay: i * 55 + (hl(i) ? 40 : 0),
+      hl: hl(i),
+      br: breath >= 0 && i === breath + 1,
+      letters: hl(i) ? [...w].map((c) => ({ c, k: total - 1 - seen++ })) : [],
+    }));
   });
 
   // Ligne de méta : la limite gratuite vient de limits.ts (jamais écrite dans les textes).
-  // Sur-titre : « Hébergé en Europe » est vrai pour le serveur de production, pas pour la démo
-  // GitHub Pages (hors d'Europe) ; la condition est remplacée à la compilation.
-  const eyebrow = $derived(import.meta.env.MODE === "demo" ? [t("hero.eyebrow.e2e")] : [t("hero.eyebrow.e2e"), t("hero.eyebrow.eu")]);
   const meta = $derived([t("hero.meta.free", { size: formatBytes(CONTENT_MAX, getLang()) }), t("home.fact.account"), t("hero.meta.erase")]);
 
   // UI §9.2.1 : Vocal masqué sans MediaRecorder. Pas de bouton Coller (décision du propriétaire) : Ctrl/Cmd + V suffit.
@@ -144,24 +167,25 @@
   </button>
 {/snippet}
 
-<div class={["home", { compact, reveal }]}>
+<div class={["home", { compact, reveal, erase }]}>
   <section class="hero" aria-labelledby="hero-title">
     <div class="pitch">
-      {#if !compact}
-        <!-- Téléphone : une ligne par moitié, le « · » s'efface. -->
-        <p class="eyebrow" data-eyebrow>{#each eyebrow as part, i (i)}{#if i > 0}<span class="sep">{" · "}</span>{/if}<span class="part">{part}</span>{/each}</p>
-      {/if}
+      <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
+           phrase et les cases cochées le disent déjà. -->
       <h1 id="hero-title" tabindex="-1" class:compact>
         <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
         <span class="sr-only">{t("hero.title")}</span>
         <span class="words" aria-hidden="true">
-          {#each words as { w, delay, hl, br }, i (i)}{#if br && !compact}<br />{/if}<span class={["w", { hl: hl && !compact }]} style:--d="{delay}ms">{w}</span>{" "}{/each}
+          {#each words as { w, delay, hl, br, letters }, i (i)}{#if br && !compact}<br />{/if}<span class={["w", { hl: hl && !compact }]} style:--d="{delay}ms"
+              >{#if hl && !compact}{#each letters as { c, k }, j (j)}<span class="l" style:--k={k}>{c}</span>{/each}{:else}{w}{/if}</span
+            >{" "}{/each}
         </span>
       </h1>
 
       {#if !compact}
         <p class="lede">{t("hero.lede")}</p>
-        <div class="ctas">
+        <!-- Cadre des deux actions (retours du 15 novembre) : les deux boutons ressortent. -->
+        <div class="ctas" data-ctas>
           <button type="button" class="pick" data-pick onclick={() => onpick?.()}>
             <Upload size={20} strokeWidth={2} aria-hidden="true" /><span>{t("hero.pick")}</span>
           </button>
@@ -173,6 +197,11 @@
             </button>
             <p id="room-soon" class="sr-only">{t("tabs.soon.chat")}</p>
           </div>
+          <!-- Téléphone : le bloc « Que voulez-vous envoyer ? » est retiré de l'accueil (doublon de
+               « Choisir des fichiers ») ; la création sur place reste à un geste, par la page d'envoi. -->
+          <button type="button" class="more" data-more onclick={() => onadd?.()}>
+            <span>{t("hero.more")}</span><ArrowRight size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
         <ul class="meta" aria-label={t("home.facts.label")} data-meta>
           {#each meta as m, i (i)}<li><span class="ck" aria-hidden="true"><Check size={12} strokeWidth={2.6} /></span>{m}</li>{/each}
@@ -282,30 +311,6 @@
   .pitch > * {
     max-width: 100%;
   }
-  .eyebrow {
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    color: #9fb3e8;
-    font-size: 0.75rem;
-    font-weight: 640;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-  .sep {
-    padding-inline: 0.2em;
-  }
-  /* La trame du logo en miniature : trois points qui s'éteignent, « puis plus rien ». */
-  .eyebrow::before {
-    content: "";
-    width: 22px;
-    height: 6px;
-    background:
-      radial-gradient(circle, var(--accent) 2.4px, transparent 2.8px) 0 50% / 8px 6px no-repeat,
-      radial-gradient(circle, rgb(95 227 181 / 0.55) 2.4px, transparent 2.8px) 8px 50% / 8px 6px no-repeat,
-      radial-gradient(circle, rgb(95 227 181 / 0.22) 2.4px, transparent 2.8px) 16px 50% / 8px 6px no-repeat;
-  }
   h1 {
     margin: 0;
     font-size: clamp(2.5rem, 1.1rem + 4.4vw, 4.75rem);
@@ -343,12 +348,69 @@
     line-height: 1.55;
     text-wrap: pretty;
   }
+  /* Cadre des deux actions (retours du 15 novembre) : verre sombre, filet lumineux en haut
+     (menthe vers bleu, comme le pied de page), coins larges ; les boutons gardent leurs couleurs. */
   .ctas {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     margin-top: var(--sp-2);
+    padding: var(--sp-3);
+    border-radius: 22px;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.015)),
+      rgb(13 17 26 / 0.72);
+    box-shadow:
+      inset 0 0 0 1px rgb(150 175 255 / 0.16),
+      0 24px 60px -28px rgb(51 102 255 / 0.55);
+  }
+  .ctas::before {
+    content: "";
+    position: absolute;
+    inset-inline: 18%;
+    inset-block-start: 0;
+    block-size: 1px;
+    background: linear-gradient(90deg, transparent, rgb(95 227 181 / 0.7), rgb(85 150 248 / 0.5), transparent);
+    pointer-events: none;
+  }
+  /* « Ou créez sur place » : téléphone seulement (sur ordinateur, la zone de dépôt de l'accueil
+     propose déjà Photo, Vocal et Texte). */
+  .more {
+    display: none;
+  }
+  @media (max-width: 767px) {
+    .more {
+      /* Après « Ouvrir un salon » (.room : order 4). */
+      order: 5;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 44px;
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text-2);
+      font: inherit;
+      font-size: var(--fs-small);
+      font-weight: 560;
+      cursor: pointer;
+    }
+    .more:hover,
+    .more:focus-visible {
+      color: var(--text);
+    }
+    .more:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    /* Le bloc « Que voulez-vous envoyer ? » ne reste que sur la page d'envoi. */
+    .home:not(.compact) .compose {
+      display: none;
+    }
   }
   /* Bouton principal : blanc plein, icône ; un léger halo vert au survol (le « scellé »). */
   .pick {
@@ -444,24 +506,17 @@
     margin-block: 0 var(--sp-6);
   }
   @media (max-width: 599px) {
-    .eyebrow {
-      display: grid;
-      grid-template-columns: 22px auto;
-      align-items: center;
-      gap: 2px 10px;
-      line-height: 1.5;
-    }
-    .sep {
-      display: none;
-    }
-    .eyebrow .part {
-      grid-column: 2;
-    }
     .ctas,
     .ctas > .room {
       display: grid;
       width: 100%;
     }
+    /* Le cadre centré hérite de justify-content: center (tablette) : sa colonne doit s'étirer. */
+    .home:not(.compact) .ctas {
+      grid-template-columns: minmax(0, 1fr);
+      justify-content: stretch;
+    }
+
     .pick,
     .ctas .room-b.hero-room {
       width: 100%;
@@ -961,9 +1016,8 @@
     /* Audit performance (5 novembre) : le texte au-dessus de la ligne de flottaison ne part
        jamais d'une opacité nulle (le LCP attendait la fin de l'entrée) ; montée et flou seulement. */
     .reveal .w {
-      animation: word-in var(--dur-reveal) var(--ease-out) var(--d) both;
+      animation: word-in 760ms var(--ease-out) var(--d) both;
     }
-    .reveal .eyebrow,
     .reveal .lede,
     .reveal .ctas,
     .reveal .meta {
@@ -987,8 +1041,68 @@
   }
   @keyframes word-in {
     from {
-      transform: translateY(0.32em);
-      filter: blur(var(--blur-in));
+      opacity: 0.35;
+      transform: translateY(0.22em);
+    }
+  }
+  /* « puis plus rien. » se défait : la lettre s'éteint et rétrécit, un point de la trame prend
+     sa place puis s'éteint (« plus rien »), la lettre revient. */
+  .l {
+    position: relative;
+    display: inline-block;
+  }
+  .l::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 58%;
+    width: 0.16em;
+    height: 0.16em;
+    margin: -0.08em 0 0 -0.08em;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .erase .l {
+      animation: letter-out 2600ms var(--ease-in-out) calc(1400ms + var(--k) * 45ms) both;
+    }
+    .erase .l::after {
+      animation: letter-dot 2600ms var(--ease-in-out) calc(1400ms + var(--k) * 45ms) both;
+    }
+  }
+  @keyframes letter-out {
+    0% {
+      opacity: 1;
+      transform: none;
+    }
+    16%,
+    66% {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+    86%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes letter-dot {
+    0%,
+    8% {
+      opacity: 0;
+      transform: scale(0);
+    }
+    18%,
+    34% {
+      opacity: 1;
+      transform: none;
+    }
+    48%,
+    100% {
+      opacity: 0;
+      transform: scale(0.4);
     }
   }
   @keyframes rise-only {
@@ -1014,8 +1128,12 @@
       padding: var(--sp-6) var(--sp-6) var(--sp-5);
     }
   }
-  /* Tablette : texte centré, infographie dessous, à largeur lisible. */
-  @media (min-width: 600px) and (max-width: 1023px) {
+  /* Téléphone et tablette (téléphone ajouté le 15 novembre : centrage revu) : texte centré,
+     infographie dessous, à largeur lisible. */
+  @media (max-width: 1023px) {
+    .home:not(.compact) h1 {
+      margin-inline: auto;
+    }
     .home:not(.compact) .pitch {
       justify-items: center;
       text-align: center;
@@ -1086,7 +1204,6 @@
       line-height: 1.15;
     }
     .home:not(.compact) .hero::before,
-    .eyebrow::before,
     .tile::before,
     .flash {
       display: none;
@@ -1097,6 +1214,12 @@
     .add-big {
       border: 1px solid ButtonText;
       box-shadow: none;
+    }
+    .ctas {
+      border: 1px solid CanvasText;
+    }
+    .ctas::before {
+      display: none;
     }
   }
 </style>

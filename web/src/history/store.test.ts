@@ -43,6 +43,19 @@ function dump(v: unknown): string {
 }
 
 describe("historique chiffré (IndexedDB simulé)", () => {
+  // Retours du 15 novembre : stockage persistant demandé à la première entrée gardée, une fois,
+  // jamais à la simple ouverture ; un refus ou une erreur ne gêne rien.
+  it("stockage persistant : demandé une fois, au premier ajout seulement ; une erreur ne casse rien", async () => {
+    let asked = 0;
+    const h = (await openHistory({ backend: memoryBackend(), now: () => T0, persist: async () => void asked++ }))!;
+    await h.list();
+    expect(asked).toBe(0);
+    await h.add(fresh());
+    await h.add(fresh({ manage: fresh().manage.replace(/.$/, "B") }));
+    expect(asked).toBe(1);
+    const k = (await openHistory({ backend: memoryBackend(), now: () => T0, persist: () => Promise.reject(new Error("refus")) }))!;
+    expect((await k.add(fresh())).state).toBe("ready");
+  });
   it("add puis lecture brute : aucun octet de S_gestion, de la taille, du nombre ni de la date en clair", async () => {
     const idb = fakeIndexedDB();
     const h = (await openHistory({ backend: idbBackend(idb), now: () => T0 }))!;

@@ -66,3 +66,4 @@ export { default as Search } from "./icons/Search.svelte";
 export { default as User } from "./icons/User.svelte";
 export { default as MessagesSquare } from "./icons/MessagesSquare.svelte";
 export { default as ChevronRight } from "./icons/ChevronRight.svelte";
+export { default as Menu } from "./icons/Menu.svelte";

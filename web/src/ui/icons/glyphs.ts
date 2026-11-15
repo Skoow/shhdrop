@@ -85,6 +85,8 @@ export const GLYPHS = {
   "user": [{ c: [12, 8.5, 3.75] }, { d: "M5 20a7 7 0 0 1 14 0" }],
   "messages-square": [{ d: "M14.5 9.5a2 2 0 0 1-2 2h-6L3.5 14.5v-9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z" }, { d: "M17.5 8.5h1a2 2 0 0 1 2 2v10l-3-3h-6a2 2 0 0 1-2-2v-1" }],
   "chevron-right": [{ d: "M9.5 6l6 6-6 6" }],
+  // Menu du téléphone (retours du 15 novembre) : trois traits.
+  "menu": [{ d: "M4.5 7h15M4.5 12h15M4.5 17h15" }],
   "send": [{ d: "M20.5 3.5l-10 10M20.5 3.5l-6 17-4-7-7-4z" }],
 } as const satisfies Record<string, readonly GlyphEl[]>;
 

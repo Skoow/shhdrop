@@ -77,10 +77,13 @@ function backend(): Backend | null {
 let chosen: Backend | null | undefined;
 const theBackend = () => (chosen === undefined ? (chosen = backend()) : chosen);
 
+/** Stockage persistant (store.ts, askPersist) : absent de certains navigateurs, alors rien. */
+const persistStorage = async (): Promise<unknown> => globalThis.navigator?.storage?.persist?.();
+
 let opening: Promise<History | null> | undefined;
 /** Ouvre l'historique, en le créant au besoin (clé, base) : seulement pour y écrire. */
 function store(): Promise<History | null> {
-  return (opening ??= openHistory({ backend: theBackend() }).catch(() => null));
+  return (opening ??= openHistory({ backend: theBackend(), persist: persistStorage }).catch(() => null));
 }
 /**
  * Ouvre sans rien créer : une simple visite (accueil, « Vos envois ») n'écrit rien dans le

@@ -447,6 +447,8 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "hourglass", "wrench", "monitor-x", "send", "broom", "volume",
     // Conception compte §21.15 (plan, lot 12) : accueil connecté, revue du jeu fermé.
     "search", "user", "messages-square", "chevron-right",
+    // Menu du téléphone (retours du 15 novembre).
+    "menu",
   ];
   const pascal = (s: string) =>
     s.split("-").map((p) => p[0]!.toUpperCase() + p.slice(1)).join("");

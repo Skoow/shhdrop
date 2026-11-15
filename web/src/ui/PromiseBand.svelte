@@ -142,9 +142,19 @@
     -webkit-mask-image: none;
     mask-image: none;
   }
+  /* Une grille alignée à gauche, chaque promesse peut passer à la ligne (retours du 15 novembre :
+     sur téléphone, les lignes sortaient de l'écran, coupées, et se décalaient en escalier). */
   .still ul {
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    width: 100%;
+    padding-block: 6px;
+  }
+  .still li {
+    align-items: baseline;
+    padding: 8px 16px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   @media (prefers-reduced-motion: reduce) {
     .track {

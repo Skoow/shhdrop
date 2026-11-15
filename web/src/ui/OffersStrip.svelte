@@ -8,6 +8,10 @@
   // page, la page des offres s'ouvre alors dans un nouvel onglet.
   // `cards` (accueil, refonte du 12 novembre) : trois grandes cartes, chacune un lien vers
   // /offres (« → ») ; le titre est celui de la section de l'accueil.
+  // Cartes de l'accueil (retours du propriétaire du 15 novembre) : le prix prévu (« bientôt »,
+  // lu dans PAID) et le sens de chaque chiffre (taille par partage, durée, ouvertures).
+  // MODIFIE D41-16 (« ni prix » hors de /offres) à la demande du propriétaire : toujours rien en
+  // vente, ni bouton d'achat ni adresse demandée ; le prix est dit « prévu » et « bientôt ».
   import { followLink, href } from "../app/router.svelte";
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -26,6 +30,13 @@
     t("options.opens.count", { n: x === "free" ? MAX_OPENS : PAID[x].opens }),
   ];
   const uid = $props.id();
+  const eur = (v: number) => new Intl.NumberFormat(lang, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  /** Carte de l'accueil : chaque chiffre avec son intitulé. */
+  const details = (x: Tier) => [
+    { k: t("offers.card.size"), v: lines(x)[0]! },
+    { k: t("offers.card.ttl"), v: lines(x)[1]! },
+    { k: t("offers.card.opens"), v: String(x === "free" ? MAX_OPENS : PAID[x].opens) },
+  ];
 </script>
 
 {#if cards}
@@ -37,8 +48,16 @@
             <span class="tn">{name(x)}</span>
             <span class={["tag", { soon: x !== "free" }]}>{x === "free" ? t("offers.strip.now") : t("foot.soon")}</span>
           </span>
-          <span class="lim num">
-            {#each lines(x) as l, k (k)}<span class="l">{l}</span>{/each}
+          <span class="pr num" data-price>
+            {#if x === "free"}
+              <span class="pv">{eur(0)}</span>{" "}<span class="pu">{t("offers.card.free")}</span>
+            {:else}
+              <span class="pv">{eur(PAID[x].month)}</span>{" "}<span class="pu">{t("offers.card.month")}</span>{" "}
+              <span class="py">{t("offers.card.year", { price: eur(PAID[x].year) })}</span>
+            {/if}
+          </span>
+          <span class="dt num" data-details>
+            {#each details(x) as d (d.k)}<span class="dr"><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></span>{/each}
           </span>
           <span class="go" aria-hidden="true"><ArrowRight size={18} strokeWidth={2} /></span>
         </a>
@@ -277,14 +296,48 @@
     background: rgb(255 255 255 / 0.06);
     font-size: 0.75rem;
   }
-  .big .lim {
-    gap: 4px;
-    font-size: var(--fs-small);
+  /* Prix prévu : montant en grand, unité à côté, prix à l'année dessous. */
+  .pr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 6px;
   }
-  .big .l:first-child {
+  .pv {
     font-size: 1.75rem;
     font-weight: 680;
     letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .pu {
+    color: var(--text-2);
+    font-size: var(--fs-small);
+  }
+  .py {
+    flex-basis: 100%;
+    color: var(--text-3);
+    font-size: var(--fs-micro);
+  }
+  /* Détail : intitulé à gauche, valeur à droite, filet entre les lignes ; place pour la flèche. */
+  .dt {
+    display: grid;
+    margin-block-end: 40px;
+    font-size: var(--fs-small);
+  }
+  .dr {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding-block: 7px;
+    border-block-start: 1px solid rgb(255 255 255 / 0.07);
+  }
+  .dk {
+    color: var(--text-2);
+  }
+  .dv {
+    color: var(--text);
+    font-weight: 600;
+    text-align: end;
   }
   .go {
     position: absolute;

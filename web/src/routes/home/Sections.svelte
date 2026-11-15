@@ -126,6 +126,23 @@
   .offers :global([data-offer-cards]) {
     width: 100%;
   }
+  /* Téléphone (retours du 15 novembre : centrage revu) : les titres de section sont centrés, le
+     contenu des cartes l'est aussi (icône, titre, texte) ; sections un peu moins espacées. */
+  @media (max-width: 599px) {
+    .sec {
+      gap: var(--sp-6);
+      padding-block: 72px 16px;
+    }
+    .card {
+      justify-items: center;
+      text-align: center;
+    }
+    .key {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+  }
   @media (min-width: 760px) {
     .three {
       grid-template-columns: repeat(3, minmax(0, 1fr));

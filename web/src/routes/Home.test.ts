@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { PAID } from "../limits";
 import { createRawSnippet, flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../i18n/i18n.svelte";
@@ -31,7 +32,12 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(h1.classList.contains("compact")).toBe(false);
-    expect(document.querySelector("[data-eyebrow]")!.textContent).toBe("Chiffré de bout en bout · Hébergé en Europe");
+    // Plus de sur-titre (retours du 15 novembre) ; les deux boutons dans un cadre, avec
+    // « Ou créez sur place » (téléphone) qui mène à la page d'envoi.
+    expect(document.querySelector("[data-eyebrow]")).toBeNull();
+    expect(document.querySelector("[data-ctas] [data-pick]")).not.toBeNull();
+    expect(document.querySelector("[data-ctas] [data-room]")).not.toBeNull();
+    expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Ou créez sur place : note, vocal, photo");
     expect(document.querySelector(".lede")!.textContent!.length).toBeGreaterThan(20);
     const pick = document.querySelector<HTMLButtonElement>("[data-pick]")!;
     expect(pick.textContent!.trim()).toBe("Choisir des fichiers");
@@ -67,6 +73,13 @@ describe("Home (UI §9.1)", () => {
     expect(key.textContent!.trim()).toBe("La clé du lien est après le «\u00a0#\u00a0»\u202f: les navigateurs n'envoient jamais cette partie au serveur.");
     expect(key.querySelector("svg[aria-hidden='true']")).not.toBeNull();
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);
+    // Retours du 15 novembre : prix prévu et sens de chaque chiffre dans les cartes (lus dans PAID).
+    const card = (x: string) => document.querySelector(`[data-offer="${x}"]`)!;
+    const norm = (s: string | null | undefined) => (s ?? "").replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
+    expect(norm(card("free").querySelector("[data-price]")!.textContent)).toBe("0 € pour toujours");
+    expect(norm(card("plus").querySelector("[data-price]")!.textContent)).toBe(`${PAID.plus.month} € par mois, prévu ou ${PAID.plus.year} € par an`);
+    expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus"]);
+    expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
     expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
     expect(document.querySelector('[data-slot="compose"]')).not.toBeNull();
   });
@@ -98,10 +111,15 @@ describe("Home (UI §9.1)", () => {
     const words = [...copy.querySelectorAll<HTMLElement>(".w")];
     expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "plus", "rien."]);
     const delays = words.map((w) => w.style.getPropertyValue("--d"));
-    expect(delays).toEqual(["0ms", "35ms", "70ms", "105ms", "140ms", "175ms", "240ms", "275ms", "310ms"]);
+    expect(delays).toEqual(["0ms", "55ms", "110ms", "165ms", "220ms", "275ms", "370ms", "425ms", "480ms"]);
+    // « puis plus rien. » lettre par lettre (effacement, retours du 15 novembre), décalage de
+    // droite à gauche : le point final part le premier.
+    const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
+    expect(letters.map((l) => l.textContent).join("")).toBe("puisplusrien.");
+    expect(letters.map((l) => l.style.getPropertyValue("--k"))).toEqual(["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0"]);
   });
 
-  it("entrée une seule fois (§20.4) : la classe reveal part après 900 ms, jamais rejouée", async () => {
+  it("entrée une seule fois (§20.4) : la classe reveal part après 1,3 s, l'effacement après 4,775 s, jamais rejoués", async () => {
     vi.useFakeTimers();
     try {
       vi.resetModules(); // nouveau chargement de page : le drapeau « déjà joué » repart de zéro
@@ -109,13 +127,23 @@ describe("Home (UI §9.1)", () => {
       const { mount, flushSync, unmount } = await import("svelte");
       const a = mount(Fresh as never, { target: document.body, props: {} });
       flushSync();
-      expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(true);
-      vi.advanceTimersByTime(899);
+      const home = () => document.querySelector(".home")!.classList;
+      expect(home().contains("reveal")).toBe(true);
+      expect(home().contains("erase")).toBe(true);
+      vi.advanceTimersByTime(1299);
       flushSync();
-      expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(true);
+      expect(home().contains("reveal")).toBe(true);
       vi.advanceTimersByTime(1);
       flushSync();
-      expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(false);
+      expect(home().contains("reveal")).toBe(false);
+      // L'effacement de « puis plus rien. » dure un peu plus (4,775 s), une seule fois, < 5 s.
+      expect(home().contains("erase")).toBe(true);
+      vi.advanceTimersByTime(4775 - 1300 - 1);
+      flushSync();
+      expect(home().contains("erase")).toBe(true);
+      vi.advanceTimersByTime(1);
+      flushSync();
+      expect(home().contains("erase")).toBe(false);
       // Changement de langue : les mots recréés n'ont plus d'entrée.
       setLang("en");
       flushSync();
@@ -211,16 +239,15 @@ describe("Home (UI §9.1)", () => {
     expect(onfiles).toHaveBeenCalledWith([a], "depot", ["Vacances"]);
   });
 
-  it("démo (GitHub Pages, hors d'Europe) : sur-titre sans « Hébergé en Europe », en français comme en anglais", () => {
+  it("démo (GitHub Pages, hors d'Europe) : jamais « Europe », en français comme en anglais", () => {
     vi.stubEnv("MODE", "demo");
     try {
       show();
-      expect(document.querySelector("[data-eyebrow]")!.textContent).toBe("Chiffré de bout en bout");
+      expect(document.body.textContent).not.toMatch(/Europe/);
       if (c) void unmount(c);
       document.body.innerHTML = "";
       setLang("en");
       show();
-      expect(document.querySelector("[data-eyebrow]")!.textContent).toBe("End-to-end encrypted");
       expect(document.body.textContent).not.toMatch(/Europe/);
     } finally {
       vi.unstubAllEnvs();
@@ -231,7 +258,7 @@ describe("Home (UI §9.1)", () => {
     setLang("en");
     show();
     expect(title(document.querySelector("h1")!)).toBe("One link, one password, then nothing.");
-    expect(document.querySelector("[data-eyebrow]")!.textContent).toBe("End-to-end encrypted · Hosted in Europe");
+    expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Or create one here: note, voice, photo");
     expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
     expect(document.querySelector("[data-key-note]")!.textContent!.trim()).toBe("The link's key comes after the “#”: browsers never send that part to the server.");
     expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Erased after opening"]);

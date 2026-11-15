@@ -180,6 +180,13 @@
       padding-block: 140px 140px;
     }
   }
+  /* Téléphone (retours du 15 novembre) : 120 px sous la dernière question, plus la marge du pied,
+     laissaient un grand vide avant le pied de page. */
+  @media (max-width: 599px) {
+    .faq {
+      padding-block: 72px 16px;
+    }
+  }
   @media (forced-colors: active) {
     details {
       border: 1px solid CanvasText;

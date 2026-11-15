@@ -8,12 +8,13 @@ import type { Route } from "./router.svelte";
 export type TabId = "send" | "shares" | "downloads" | "chat" | "home" | "profile";
 
 /** Onglets dans l'ordre ; `soon` : pas encore construit (désactivé, « Bientôt »). */
+// Sans compte (retours du propriétaire du 15 novembre) : plus de barre d'onglets sur le site.
+// « Envoyer » ramenait à l'accueil, déjà atteint par le logo ; « Téléchargements » ne sert pas sans
+// compte (historique de ce seul navigateur, sans lien pour retélécharger). Il ne reste que « Mes
+// partages », et une barre d'un seul onglet n'a pas de sens (tabBarUseful) : la navigation passe
+// par le menu ☰ (ui/MobileMenu.svelte). Remplace la conception compte §21.15.5 (trois onglets).
 export const TABS: readonly { id: TabId; soon: boolean }[] = [
-  { id: "send", soon: false },
   { id: "shares", soon: false }, // historique « Vos envois » (/envois, Task H)
-  // Conception compte §21.15.5 : sans compte, trois onglets (Envoyer, Mes partages,
-  // Téléchargements) ; « Salon (bientôt) » laisse sa place (le salon reste annoncé ailleurs).
-  { id: "downloads", soon: false },
 ];
 
 /** Connecté (conception compte §21.15.1) : Accueil, Envoyer, Téléchargements, Profil. */
@@ -47,7 +48,7 @@ export function tabBarUseful(tabs: readonly { id?: TabId; soon: boolean }[]): bo
  * Masquée tant qu'un seul onglet fonctionne (décision du propriétaire du 11 novembre, audit
  * M18) ; visible depuis que Mes partages fonctionne ; `useful` : forcé par les tests.
  */
-export function tabBarVisible(o: { supported: boolean; route: Route["name"]; sending: boolean; composing: boolean; connected?: boolean }, useful = tabBarUseful(TABS)): boolean {
+export function tabBarVisible(o: { supported: boolean; route: Route["name"]; sending: boolean; composing: boolean; connected?: boolean }, useful = tabBarUseful(tabsFor(!!o.connected))): boolean {
   return useful && o.supported && !o.sending && !o.composing && (o.connected ? ROOTS_CONNECTED : ROOTS).has(o.route);
 }
 

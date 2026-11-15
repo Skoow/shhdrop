@@ -348,8 +348,19 @@ const aad = (id: string) => new TextEncoder().encode(AAD + id);
  * Ouvre l'historique. `backend` null ou toute erreur (IndexedDB absent, refusé, écriture de la
  * clé impossible, WebCrypto absent) : null, le site marche sans historique.
  */
-export async function openHistory(deps: { backend: Backend | null; now?: () => number }): Promise<History | null> {
+export async function openHistory(deps: { backend: Backend | null; now?: () => number; persist?: () => Promise<unknown> }): Promise<History | null> {
   const now = deps.now ?? Date.now;
+  // Retours du 15 novembre (« Mes partages » doit retrouver mes liens d'une visite à l'autre) :
+  // à la première entrée gardée, le navigateur est prié de ne pas effacer ce stockage quand la
+  // place manque (navigator.storage.persist). Une fois par ouverture, jamais attendu ; un refus
+  // ou une erreur ne change rien (l'historique marche comme avant). Pas à la simple visite :
+  // Firefox peut poser la question, elle n'a de sens qu'une fois un partage gardé.
+  let askedPersist = false;
+  const askPersist = () => {
+    if (askedPersist || !deps.persist) return;
+    askedPersist = true;
+    void deps.persist().catch(() => undefined);
+  };
   const b = deps.backend;
   if (b === null) return null;
   let key: CryptoKey;
@@ -423,6 +434,7 @@ export async function openHistory(deps: { backend: Backend | null; now?: () => n
       const same = (await all()).find((x) => linkKey(x) === linkKey(e));
       if (same) return same;
       await seal(e);
+      askPersist();
       return e;
     },
     async put(x) {
