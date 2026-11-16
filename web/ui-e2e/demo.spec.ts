@@ -106,18 +106,20 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
   });
 
-  // Spec §32 : liens à la base de la démo, « /shhgone/#<clé> » et « /shhgone/#m<clé> » (index.html, 200).
-  for (const [what, frag] of [
-    ["partage", `#${KEY}`],
-    ["gestion", `#m${KEY}`],
+  // Spec §32 : liens sous la base de la démo, « /shhgone/s#<clé> » et « /shhgone/s#m<clé> »
+  // (s.html, 200) ; ancien lien « /shhgone/#… » : remplacé par « /shhgone/s » (16 novembre).
+  for (const [what, start, frag] of [
+    ["partage", "s", `#${KEY}`],
+    ["gestion", "s", `#m${KEY}`],
+    ["ancien lien de partage", "", `#${KEY}`],
   ] as const) {
-    test(`lien court /shhgone/#… (${what}) : route d'ouverture ou de gestion, # retiré, jamais envoyé`, async ({ page, demo }) => {
-      const res = await page.goto(`${demo.url}${frag}`);
+    test(`lien court /shhgone/${start}#… (${what}) : route d'ouverture ou de gestion, # retiré, jamais envoyé`, async ({ page, demo }) => {
+      const res = await page.goto(`${demo.url}${start}${frag}`);
       expect(res?.status()).toBe(200);
-      await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
-      expect(page.url()).toBe(demo.url);
+      await expect.poll(() => page.url()).toBe(`${demo.url}s`);
+      expect(await page.evaluate(() => location.hash)).toBe("");
       // Route d'ouverture ou de gestion : le faux serveur de cet onglet ne connaît pas ce partage.
-      if (what === "partage") {
+      if (what.includes("partage")) {
         await expect(page.getByRole("heading", { level: 1, name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();
         await expect(page.getByText("(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)")).toBeVisible();
       } else {
@@ -136,7 +138,7 @@ test.describe("fr-FR", () => {
       expect(demo.requests.every((r) => !("referer" in r.headers) || !r.headers.referer!.includes("#"))).toBe(true);
       await page.goto(`${demo.url}securite`);
       await page.goBack();
-      await expect.poll(() => page.evaluate(() => location.href)).toBe(demo.url);
+      await expect.poll(() => page.evaluate(() => location.href)).toBe(`${demo.url}s`);
       expect(await storage(page)).toBe(0);
     });
   }
@@ -284,7 +286,7 @@ test.describe("fr-FR", () => {
 test.describe("fr-FR : envoi (Tasks 17–18)", () => {
   test.use({ locale: "fr-FR" });
 
-  test("Chiffrer et envoyer : progression, Lien prêt avec un lien /shhgone/#<43>, ouvrir comme destinataire", async ({ page, demo }) => {
+  test("Chiffrer et envoyer : progression, Lien prêt avec un lien /shhgone/s#<43>, ouvrir comme destinataire", async ({ page, demo }) => {
     test.setTimeout(90_000);
     await page.goto(demo.url);
     await addText(page, "Le code de la porte est 4471.");
@@ -296,18 +298,19 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     await expect(page).toHaveTitle("Démo · Lien prêt · Shhgone");
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
-    expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/#[A-Za-z0-9_-]{43}$`));
+    expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/s#[A-Za-z0-9_-]{43}$`));
     // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien (16 novembre).
     await expect(page.locator("[data-demo-note]")).toHaveText("Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.");
     const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
-    expect(manage).toMatch(/\/shhgone\/#m[A-Za-z0-9_-]{43}$/);
+    expect(manage).toMatch(/\/shhgone\/s#m[A-Za-z0-9_-]{43}$/);
     expect(await storage(page)).toBe(0);
     await capture(page, "demo-ready");
     const password = (await page.getByRole("group", { name: "Mot de passe", exact: true }).locator(".sr-only").first().textContent()) ?? "";
-    // Même onglet (le faux serveur vit dans la page) : ouverture complète, puis destruction.
+    // Même onglet (le faux serveur garde les partages de l'onglet) : la page /s se charge,
+    // ouverture complète, puis destruction.
     await page.getByRole("button", { name: "Ouvrir comme destinataire (démo)" }).click();
     await expect(readyHeading(page)).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => location.pathname + location.hash)).toBe("/shhgone/");
+    await expect.poll(() => page.evaluate(() => location.pathname + location.hash)).toBe("/shhgone/s");
     await expect(page.getByRole("heading", { name: "Un partage chiffré vous attend" })).toBeVisible();
     await page.getByLabel("Mot de passe", { exact: true }).fill("pas-le-bon");
     await page.getByRole("button", { name: "Déverrouiller" }).click();

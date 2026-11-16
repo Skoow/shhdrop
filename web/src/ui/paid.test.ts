@@ -66,10 +66,11 @@ describe("feuille Plus : honnête, rien à acheter", () => {
     expect(s).not.toMatch(/offre limitée|plus que/i);
     expect(document.querySelectorAll("form, input, a[href]")).toHaveLength(0);
   });
-  it("Pro : 50 Go, 50 ouvertures, 20 € par mois et 200 € par an (2 mois offerts) ; mensuel par abonnement, annuel au choix ; carte et crypto-monnaies ; aucun frais caché", () => {
+  it("Pro : 50 Go, 50 ouvertures, 20 € par mois et 200 € par an (2 mois offerts) ; mensuel par abonnement, annuel au choix ; carte bancaire seulement (crypto-monnaies retirées le 16 novembre) ; aucun frais caché", () => {
     show(PaidSheet, { open: true, tier: "pro" });
     const s = text();
-    for (const x of ["Shhgone Pro", "50 Go par partage", "Jusqu'à 50 ouvertures (gratuit : 10)", "20 € par mois, TTC", "ou 200 € par an", "2 mois offerts", "Au mois :", "abonnement renouvelé automatiquement chaque mois, résiliable en un clic, sans frais.", "À l'année, au choix :", "paiement unique (rien n'est prélevé ensuite) ou renouvellement automatique", "Moyens de paiement", "Carte bancaire", "Crypto-monnaies", "Aucun frais caché."]) expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
+    for (const x of ["Shhgone Pro", "50 Go par partage", "Jusqu'à 50 ouvertures (gratuit : 10)", "20 € par mois, TTC", "ou 200 € par an", "2 mois offerts", "Au mois :", "abonnement renouvelé automatiquement chaque mois, résiliable en un clic, sans frais.", "À l'année, au choix :", "paiement unique (rien n'est prélevé ensuite) ou renouvellement automatique", "Moyens de paiement", "Carte bancaire", "Aucun frais caché."]) expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
+    expect(s).not.toMatch(/crypto/i);
     expect(s).not.toContain("220");
     expect(s).not.toContain("payé en une fois");
     // Aucun logo de marque tierce : les moyens de paiement sont des libellés et des pictogrammes maison.

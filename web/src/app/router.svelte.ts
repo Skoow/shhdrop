@@ -80,6 +80,13 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
     if (hash === "" && reopen) return { name: "open" };
     return { name: "home" };
   }
+  // Liens sous « /s » (décision du propriétaire du 16 novembre) : ouverture et gestion, dans leur
+  // propre page (s.html). Sans fragment de la bonne forme : l'écran d'ouverture dit « Lien
+  // incomplet » (ou rouvre, après un rechargement de l'ouverture déverrouillée).
+  if (p === "/s" || p === "/s.html") {
+    if (MANAGE_FRAGMENT.test(hash)) return { name: "manage" };
+    return { name: "open" };
+  }
   // Pages d'information : aussi sous le nom de leur fichier (« /securite.html », pages séparées).
   const page = p.endsWith(".html") ? p.slice(0, -5) : p;
   const info = Object.hasOwn(INFO_PATHS, page) ? INFO_PATHS[page] : undefined;
@@ -133,14 +140,33 @@ const base = () => import.meta.env.BASE_URL;
  * l'autre, rien ne change.
  */
 export const PAGE_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["securite", "confidentialite", "conditions", "mentions", "signaler", "offres"]);
-let entry: "app" | "pages" = "app";
-/** Appelé une fois par le point d'entrée des pages d'information (src/pages/main.ts). */
-export function setEntry(e: "app" | "pages"): void {
+/** Écrans de la page « /s » (s.html, 16 novembre) : ouverture et gestion d'un partage. */
+export const LINK_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["open", "manage"]);
+type Entry = "app" | "pages" | "s";
+let entry: Entry = "app";
+/** Appelé une fois par le point d'entrée des pages d'information (src/pages/main.ts) et de /s (src/open/main.ts). */
+export function setEntry(e: Entry): void {
   entry = e;
 }
-/** Vrai si `path` est servi par l'autre fichier HTML que la page courante. */
+const entryOf = (name: Route["name"]): Entry => (PAGE_ROUTES.has(name) ? "pages" : LINK_ROUTES.has(name) ? "s" : "app");
+/** Vrai si `path` est servi par un autre fichier HTML que la page courante. */
 export function otherEntry(path: string): boolean {
-  return PAGE_ROUTES.has(match(href(path), "").name) !== (entry === "pages");
+  return entryOf(match(href(path), "").name) !== entry;
+}
+
+/**
+ * Ancien lien à la racine (« /#<clé> », avant le 16 novembre) : remplacé, sans nouvelle entrée
+ * d'historique, par « /s » et le même fragment (même origine : le fragment ne part jamais au
+ * serveur). La requête (« ?fbclid=… » des messageries) n'est pas recopiée. Rend vrai si la page
+ * part ; l'appelant n'affiche alors rien.
+ */
+export function moveLegacyLink(loc: Pick<Location, "pathname" | "hash" | "replace">): boolean {
+  const name = match(loc.pathname, loc.hash).name;
+  // Déjà sur « /s » (serveur sans s.html, qui rendrait index.html) : jamais de boucle.
+  const onS = loc.pathname === href("/s") || loc.pathname === href("/s.html");
+  if (!LINK_ROUTES.has(name) || entry !== "app" || onS) return false;
+  loc.replace(href("/s") + loc.hash);
+  return true;
 }
 
 /**

@@ -1065,6 +1065,8 @@ Le test « le serveur ne voit rien » ajoute un repère de mot de passe saisi **
 
 ## 32. Décision du propriétaire (v2.6) — lien court
 
+> **Décision du propriétaire (16 novembre) : liens sous `/s`.** Lien de partage `{origine}{base}s#<K_lien>`, de gestion `{origine}{base}s#m<S_gestion>`, du QR code `{origine}{base}s#<K_lien>.<mot de passe>` ; les anciens liens à la racine restent lus (moteur) et ouverts (la page `/` remplace l'adresse par `/s` et le même fragment). La page `/s` (s.html) ne contient que l'ouverture et la gestion ; `/` garde l'accueil et l'envoi. Raisons, format et signalements : `docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md` ; vecteurs : `engine/vectors/v3-liens.json`. Ce qui suit sur la forme « à la racine » est remplacé d'autant.
+
 - **Lien de partage** : `https://shhdrop.app/#<K_lien en base64url, 43 caractères>` (64 caractères en tout, contre 90 environ). L'identifiant n'est plus dans le lien : `id` = HKDF(`K_lien`, « shhdrop/v2/id »), à sens unique. Le serveur ne voit même plus de chemin révélateur : la page demandée est `/`.
 - **Lien de gestion** : `https://shhdrop.app/#m<S_gestion, 43 caractères>` ; le serveur trouve le partage par `V_gestion` (index unique), donc le lien de gestion n'a pas besoin de l'identifiant (§29.8). Le lien de partage, lui, est trouvé par `V_accès` (index unique, Task K2) : l'`id` n'est plus envoyé du tout.
 - **Unicité** : `id` fait 128 bits tirés d'une clé aléatoire de 256 bits ; la probabilité d'une collision parmi n partages vaut environ n² / 2¹²⁹ (négligeable même pour 10¹² partages). → Task K2 : le serveur n'indexe plus par cet `id` mais par `V_accès` et `V_gestion` (256 bits, index uniques) ; un doublon est refusé et le client recommence avec une nouvelle clé. Un lien n'est **jamais réutilisé** pour un nouveau partage : qui garde l'ancien lien y aurait accès. Chaque partage tire une `K_lien` neuve ; un créateur malveillant qui viserait un `id` passé sans connaître sa `K_lien` ne ferait correspondre aucun `V_accès`.
@@ -1612,11 +1614,11 @@ Modèle choisi par le propriétaire : le service gratuit reste **complet, privé
 
 | # | Question | Défaut recommandé |
 |---|---|---|
-| Q-P1 | Moyen de paiement | Carte via un vendeur officiel, pass prépayés ; BTCPay ensuite ; ni espèces ni Monero au lancement |
-| Q-P2 | Exception à la règle crypto pour Privacy Pass (circl, blindrsa-ts) | Oui, après revue de chaîne d'approvisionnement et de l'implémentation ; sinon variante minimale de §38.4 |
+| Q-P1 | Moyen de paiement | ~~Carte via un vendeur officiel, pass prépayés ; BTCPay ensuite ; ni espèces ni Monero au lancement~~ **Tranché le 16 novembre (propriétaire)** : **Paddle** comme vendeur officiel (Merchant of Record), carte seulement au lancement ; la ligne « Crypto-monnaies » est retirée de l'affichage (D41-34 (3) amendée) ; BTCPay reste « plus tard » |
+| Q-P2 | Exception à la règle crypto pour Privacy Pass (circl, blindrsa-ts) | **Acceptée le 16 novembre (propriétaire)**, après revue de chaîne d'approvisionnement et de l'implémentation des deux bibliothèques (versions épinglées) ; exception écrite dans CLAUDE.md au moment de leur ajout |
 | Q-P3 | Limites Plus | Remplacée par §38.8.1 (v2.9) : Plus 10 Gio, 50 éléments, 7 j, 50 ouvertures sous 100 Go, 30 liens par pass ; Pro 50 Gio, éléments illimités (v2.10, §38.9.2), 7 j (comme Plus, v2.10), 100 ouvertures sous 250 Go, 100 liens par pass |
 | Q-P4 | Abonnement ou prépayé | ~~Prépayé seulement, aucun renouvellement automatique~~ **Tranché par D41-32** : au choix, paiement unique (30 jours ou 1 an, sans renouvellement) ou renouvellement automatique facultatif, résiliable à tout moment en un clic, sans frais |
-| Q-P5 | Statut juridique de l'exploitant | À décider avec le juriste et le comptable avant P1 (micro-entreprise avec domiciliation ou société) |
+| Q-P5 | Statut juridique de l'exploitant | À décider avec le juriste et le comptable avant P1 (micro-entreprise avec domiciliation ou société). **16 novembre** : le propriétaire indique que le statut et le cadre légal sont prêts (« tout est bon, je peux le faire ») et demande d'ouvrir les étapes compte et paiement. **Restent à fournir avant la première vente** (§38.5) : identité professionnelle pour les mentions légales (dénomination, adresse ou domiciliation, immatriculation), CGV, médiateur de la consommation, texte de renonciation au droit de rétractation (case non cochée), avis du juriste sur la conservation des données de création de compte (D8) |
 | Q-P6 | « Demander des fichiers » | Base gratuite, limites Plus payantes ; spécifiée en §38.9.3 (v2.10) |
 | Q-P7 | Coffre plus grand payant | Non |
 

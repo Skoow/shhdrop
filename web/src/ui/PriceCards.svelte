@@ -2,8 +2,8 @@
   // Prix des formules (spec §38.8.2, D41-32, D41-34) : le prix MENSUEL en grand, l'annuel dessous
   // (mois offerts calculés depuis PAID), puis comment payer : le mensuel par abonnement à
   // renouvellement automatique (résiliable en un clic, sans frais), l'annuel au choix en paiement
-  // unique ou avec renouvellement ; moyens de paiement en libellés (carte bancaire,
-  // crypto-monnaies), sans logo de marque. Information seulement : rien n'est en vente, aucun
+  // unique ou avec renouvellement ; moyens de paiement en libellés (carte bancaire seulement depuis
+  // le 16 novembre), sans logo de marque. Information seulement : rien n'est en vente, aucun
   // bouton d'achat, rien n'est branché côté paiement.
   import { getLang, t } from "../i18n/i18n.svelte";
   import { PAID, type PaidTier } from "../limits";
@@ -38,10 +38,7 @@
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="5.5" width="18" height="13" rx="2.5" /><path d="M3 9.5h18M6.5 15h4" /></svg>
         <span><b>{t("price.card")}</b></span>
       </li>
-      <li>
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="5" /><path d="M12 9.5v5" /></svg>
-        <span><b>{t("price.crypto")}</b> {t("price.crypto.body")}</span>
-      </li>
+      <!-- Crypto-monnaies retirées au lancement (décision du propriétaire du 16 novembre, Q-P1). -->
     </ul>
     <p class="hidden-fees">{t("price.noHidden")}</p>
   </div>

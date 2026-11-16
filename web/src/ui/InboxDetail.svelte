@@ -49,7 +49,7 @@
 
   /** Rouvrir : la page d'ouverture lit le lien puis le retire de la barre d'adresse (spec §5.3). */
   function reopen() {
-    location.assign(href("/") + entry.link.slice(entry.link.lastIndexOf("#")));
+    location.assign(href("/s") + entry.link.slice(entry.link.lastIndexOf("#")));
   }
 </script>
 

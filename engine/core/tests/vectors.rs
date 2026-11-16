@@ -135,15 +135,44 @@ fn parsed(p: ParsedLink) -> Parsed {
 /// Seul cas `link` dont le résultat Rust diffère du vecteur (hôte IDN, voir README).
 const IDN_LINK: &str = "https://été.example/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
 
+/// Cas de `v2.json` remplacés par `v3-liens.json` (liens sous `/s`, 16 novembre) : les liens
+/// écrits (forme racine) et les deux refus de `…/s#…`. `v2.json` est figé : ils y restent.
+fn superseded_by_v3(c: &Value) -> bool {
+    match c["fn"].as_str().unwrap() {
+        "shareLink" | "manageLink" => c["result"].is_string(),
+        "parseLink" => {
+            let url = arg(c, 0);
+            let path = url.split('#').next().unwrap_or("");
+            c["error"].is_string() && (path.ends_with("://x/s") || path.ends_with("/shhdrop/s"))
+        }
+        _ => false,
+    }
+}
+
 #[test]
 fn link() {
     let v = vectors();
-    let cases = v["link"].as_array().unwrap();
-    let mut seen = std::collections::BTreeMap::<&str, usize>::new();
+    let mut cases: Vec<Value> = v["link"].as_array().unwrap().clone();
+    let before = cases.len();
+    cases.retain(|c| !superseded_by_v3(c));
+    // 10 liens écrits (5 origines ou bases × 2) et 2 refus : remplacés, rien d'autre.
+    assert_eq!(before - cases.len(), 12, "cas remplacés de v2.json");
+    let v3: Value = serde_json::from_str(
+        &std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../vectors/v3-liens.json"
+        ))
+        .expect("lecture de v3-liens.json"),
+    )
+    .unwrap();
+    let added = v3["link"].as_array().unwrap();
+    assert_eq!(added.len(), 49);
+    cases.extend(added.iter().cloned());
+    let mut seen = std::collections::BTreeMap::<String, usize>::new();
     let mut idn_seen = 0;
-    for c in cases {
+    for c in &cases {
         let f = c["fn"].as_str().unwrap();
-        *seen.entry(f).or_default() += 1;
+        *seen.entry(f.to_owned()).or_default() += 1;
         match f {
             "shareLink" => {
                 let k = KLien::from_bytes(key32(arg(c, 1)));

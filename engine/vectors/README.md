@@ -146,3 +146,8 @@ Mêmes conventions que `v2.json` (hex minuscule, JSON à clés triées, 2 espace
 ## Empreinte des fichiers (`v2-empreinte.json`)
 
 Extension facultative du manifeste v2 (décision du propriétaire du 16 novembre, spec §29.3) : champ `sha256` d'une entrée de fichier, 64 chiffres hexadécimaux minuscules, écrit après `clean`. `read` : manifestes et empreinte attendue à la lecture (`null` : ignorée) ; `write` : entrée et `manifest_json` exact. Lu par `engine/core/tests/empreinte.rs`. `v2.json` n'est pas modifié : sans empreinte, le manifeste reste identique octet pour octet.
+
+## Liens sous `/s` (`v3-liens.json`)
+
+Décision du propriétaire du 16 novembre (spec §32, `docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md`) : les liens écrits ont un « s » avant le « # » (`https://hôte/s#<clé>`, `…/s#m<clé>`), et `parseLink` lit les deux formes. `v2.json` n'est pas modifié : ses 10 cas `shareLink`/`manageLink` réussis (forme racine) et ses 2 cas `parseLink` qui refusaient `…/s#…` sont **remplacés** par les 49 cas de `v3-liens.json` ; tous ses autres cas restent valables. Lu par `engine/core/tests/vectors.rs` et, côté site, par `web/src/engine/link-vectors.testutil.ts`.
+

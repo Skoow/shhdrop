@@ -31,7 +31,7 @@ export type HistoryEntry = {
   id: string;
   sorte: Sorte;
   origine: Origine;
-  /** Envoi : lien de gestion « https://…/#m<S_gestion> », chiffré au repos ; "" sinon. */
+  /** Envoi : lien de gestion « https://…/s#m<S_gestion> » (« /#m… » avant le 16 novembre), chiffré au repos ; "" sinon. */
   manage: string;
   /** Reçu : lien « https://…/#<K_lien> » ; salon : invitation « https://…/#c<K_lien> » ; "" pour un envoi. */
   link: string;

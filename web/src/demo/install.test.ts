@@ -57,16 +57,19 @@ describe("installDemo", async () => {
     expect(d.securityGaps).toContain("GitHub receives your IP address");
   });
 
-  it("openAsRecipient : pushState vers /#<43> (spec §32) et popstate ; refuse un autre lien", () => {
+  it("openAsRecipient : charge /s#<43> dans le même onglet (16 novembre) ; refuse un autre lien", () => {
     const d = getDemo()!;
-    const pops: string[] = [];
-    window.addEventListener("popstate", () => pops.push(location.pathname + location.hash));
-    const key = "A".repeat(43);
-    d.openAsRecipient(`${location.origin}/#${key}`);
-    expect(pops).toEqual([`/#${key}`]);
-    for (const bad of [`https://ailleurs.test/#${key}`, `${location.origin}/#m${key}`, `${location.origin}/?x=1#${key}`, `${location.origin}/s/abc#${key}`, `${location.origin}/#court`])
-      expect(() => d.openAsRecipient(bad), bad).toThrow("lien_invalide");
-    expect(pops).toHaveLength(1);
+    const assign = vi.spyOn(location, "assign").mockImplementation(() => undefined);
+    try {
+      const key = "A".repeat(43);
+      d.openAsRecipient(`${location.origin}/s#${key}`);
+      expect(assign.mock.calls).toEqual([[`/s#${key}`]]);
+      for (const bad of [`https://ailleurs.test/s#${key}`, `${location.origin}/s#m${key}`, `${location.origin}/s?x=1#${key}`, `${location.origin}/#${key}`, `${location.origin}/s/abc#${key}`, `${location.origin}/s#court`])
+        expect(() => d.openAsRecipient(bad), bad).toThrow("lien_invalide");
+      expect(assign).toHaveBeenCalledTimes(1);
+    } finally {
+      assign.mockRestore();
+    }
   });
 
   it("aucun stockage navigateur", () => {

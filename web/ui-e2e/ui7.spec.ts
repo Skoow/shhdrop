@@ -1,7 +1,7 @@
 // Retours UI7 du propriétaire, sur le vrai serveur : libellé de format toujours DANS l'icône,
 // état de nettoyage dans la bulle du cadenas (étincelle, pastille ambre, rien), « Signaler »
 // seulement dans le pied de page (confirmation du partage ouvert), pied de page refait, Offres
-// (mensuel par abonnement, annuel au choix, carte et crypto-monnaies). Captures fr-FR ×2 à 390 et 1440 px.
+// (mensuel par abonnement, annuel au choix, carte bancaire ; crypto-monnaies retirées le 16 novembre). Captures fr-FR ×2 à 390 et 1440 px.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { axe, captureOf, expect, test } from "./fixtures";

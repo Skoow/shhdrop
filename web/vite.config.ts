@@ -261,7 +261,7 @@ export function infoPages(base: string, demo: boolean): Plugin {
   let mode = "";
   return {
     name: "shh-info-pages",
-    config: () => ({ build: { rollupOptions: { input: { index: join(here, "index.html"), page: join(here, "page.html") } } } }),
+    config: () => ({ build: { rollupOptions: { input: { index: join(here, "index.html"), page: join(here, "page.html"), s: join(here, "s.html") } } } }),
     configResolved(c) {
       outDir = join(c.root, c.build.outDir);
       configFile = c.configFile;
@@ -273,6 +273,8 @@ export function infoPages(base: string, demo: boolean): Plugin {
         const p = (req.url ?? "").split("?")[0]!;
         const rest = p.startsWith(base) ? "/" + p.slice(base.length) : p;
         if ((PAGE_PATHS as readonly string[]).includes(rest.replace(/\.html$/, ""))) req.url = base + "page.html";
+        // Liens sous « /s » (16 novembre) : la page d'ouverture et de gestion.
+        else if (rest === "/s") req.url = base + "s.html";
         next();
       });
     },

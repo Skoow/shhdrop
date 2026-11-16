@@ -367,9 +367,10 @@ export const MANAGE_FRAGMENT = /^#m[A-Za-z0-9_-]{43}$/;
 
 /**
  * Forme d'un lien de partage de production (benchmark M13, réutilisée par les tests de
- * pages) : `https://hôte/#` + 43 caractères, rien d'autre (ni chemin, ni requête, ni mot de passe).
+ * pages) : `https://hôte/s#` + 43 caractères (16 novembre), rien d'autre (ni autre chemin, ni
+ * requête, ni mot de passe).
  */
-export const SHARE_LINK_SHAPE = /^https:\/\/[a-z0-9.-]+(?::\d+)?\/#[A-Za-z0-9_-]{43}$/;
+export const SHARE_LINK_SHAPE = /^https:\/\/[a-z0-9.-]+(?::\d+)?\/s#[A-Za-z0-9_-]{43}$/;
 
 const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -419,6 +420,9 @@ const canonical = (key: string) => ALPHABET.indexOf(key[key.length - 1]!) % 4 ==
  * Error("lien_invalide") (Error("base_invalide") pour une base mal formée). La clé n'est lue en
  * octets que par le moteur (engine/index.ts : parseLink), au moment de l'utiliser.
  */
+/** Chemin des liens sous la base (décision du propriétaire du 16 novembre, moteur : LINK_PATH). */
+export const LINK_PATH = "s";
+
 export function linkForm(url: string, base = "/"): LinkForm {
   checkBase(base);
   let u: URL;
@@ -428,7 +432,8 @@ export function linkForm(url: string, base = "/"): LinkForm {
     throw invalid();
   }
   if (!allowedScheme(u) || u.username !== "" || u.password !== "") throw invalid();
-  if (u.pathname !== base && u.pathname + "/" !== base) throw invalid();
+  // Forme écrite depuis le 16 novembre : « {base}s » ; ancienne forme à la racine encore lue.
+  if (u.pathname !== base + LINK_PATH && u.pathname !== base && u.pathname + "/" !== base) throw invalid();
   // Le genre vient de la forme entière (longueur), jamais du seul « m » de tête : une clé de
   // partage commence par « m » une fois sur 64 (« #m » + 42 caractères = partage).
   const kind = SHARE_FRAGMENT.test(u.hash) ? "s" : MANAGE_FRAGMENT.test(u.hash) ? "m" : null;

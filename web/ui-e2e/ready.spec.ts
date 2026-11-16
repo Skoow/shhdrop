@@ -7,7 +7,7 @@ import { qrPath } from "../src/qr/qr";
 import { axe, capture, expect, grantClipboard, readClipboard, test } from "./fixtures";
 import { addText, armed, readyHeading, sendButton } from "./send-helpers";
 
-const LINK_RE = /^http:\/\/127\.0\.0\.1:\d+\/#[A-Za-z0-9_-]{43}$/;
+const LINK_RE = /^http:\/\/127\.0\.0\.1:\d+\/s#[A-Za-z0-9_-]{43}$/;
 
 async function toReady(page: Page, context: BrowserContext, origin: string, text = "Le code de la porte est 4471.") {
   await grantClipboard(context, origin);

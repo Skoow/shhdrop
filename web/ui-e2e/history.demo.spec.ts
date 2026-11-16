@@ -15,11 +15,12 @@ test("démo : envoi → « Vos envois » (en mémoire), aucune base IndexedDB d'
   await page.getByRole("button", { name: "Terminé" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Terminer" }).or(page.locator(".ready").getByRole("button", { name: "Terminer" })).filter({ visible: true }).first().click();
   await expect(readyHeading(page)).toBeHidden();
-  // Navigation dans l'application (aucun rechargement : la démo garde l'historique en mémoire).
-  const link = page.locator("footer.foot").getByRole("link", { name: "Mes partages", exact: true });
-  await link.scrollIntoViewIfNeeded();
-  await link.click();
-  await expect(page).toHaveURL(/\/shhdrop\/envois$/);
+  // Navigation dans l'application (aucun rechargement : la démo garde l'historique en mémoire) ;
+  // « Mes partages » est dans l'en-tête, ou dans le menu ☰ sur téléphone (16 novembre).
+  const menu = page.locator("[data-menu-button]");
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole(await menu.isVisible() ? "navigation" : "banner").getByRole("link", { name: "Mes partages", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/shhgone\/envois$/);
   await expect(page.locator("[data-share-card]")).toHaveCount(1);
   await expect(page.locator("[data-share-card] [data-state-chip]")).toHaveText("Actif");
   const dbs = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));

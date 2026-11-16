@@ -6,6 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadEngine, type Wasm } from "./load";
 import * as P from "./pure";
 
+import { linkCases } from "./link-vectors.testutil";
 const V = JSON.parse(readFileSync(new URL("../../../engine/vectors/v2.json", import.meta.url), "utf8"));
 const unhex = (s: string) => new Uint8Array(Buffer.from(s, "hex"));
 const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
@@ -120,8 +121,8 @@ describe("base64url : TypeScript = vecteurs = moteur", () => {
   });
 });
 
-describe("liens : TypeScript = vecteurs = moteur (126 cas)", () => {
-  const cases = V.link as { fn: string; args: string[]; result?: unknown; error?: string }[];
+describe("liens : TypeScript = vecteurs = moteur (v2.json et v3-liens.json)", () => {
+  const cases = linkCases();
 
   it("checkOrigin, shareLinkWithPassword, splitPassword", () => {
     for (const c of cases) {
@@ -168,7 +169,8 @@ describe("liens : TypeScript = vecteurs = moteur (126 cas)", () => {
       }
       n++;
     }
-    expect(n).toBe(58);
+    // 58 cas de v2.json, moins 2 remplacés, plus 25 de v3-liens.json (liens sous /s).
+    expect(n).toBe(81);
   });
 
   it("linkForm : genre (partage ou gestion) comme le moteur, quel que soit le PREMIER caractère de la clé (une clé de partage commençant par « m » reste un partage)", () => {

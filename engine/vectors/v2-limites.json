@@ -1976,38 +1976,38 @@
     "qr": [
       {
         "label": "qr_cle_en_m",
-        "link": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
-        "link_with_password": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs.YUMzIWNENT8jRmc",
+        "link": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+        "link_with_password": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs.YUMzIWNENT8jRmc",
         "password": "aC3!cD5?#Fg",
         "split": {
-          "href": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+          "href": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
           "password": "aC3!cD5?#Fg"
         }
       },
       {
         "label": "qr_cle_en_m_blancs_en_bord",
-        "link": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
-        "link_with_password": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs.IGFDMyFjRDU_I0ZnCg",
+        "link": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+        "link_with_password": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs.IGFDMyFjRDU_I0ZnCg",
         "password": " aC3!cD5?#Fg\n",
         "split": {
-          "href": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+          "href": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
           "password": " aC3!cD5?#Fg\n"
         }
       },
       {
         "label": "qr_cle_en_m_unicode",
-        "link": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
-        "link_with_password": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs.7ZWc6riALcOFLfCfmIA",
+        "link": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+        "link_with_password": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs.7ZWc6riALcOFLfCfmIA",
         "password": "한글-Å-😀",
         "split": {
-          "href": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+          "href": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
           "password": "한글-Å-😀"
         }
       },
       {
         "error": "lien_invalide",
         "label": "qr_lien_de_gestion",
-        "link": "https://shhdrop.example/#mmJhoKieWTmcxqaI5TlgfPva4Rna-DmMaJRjPPHCMZXU",
+        "link": "https://shhdrop.example/s#mmJhoKieWTmcxqaI5TlgfPva4Rna-DmMaJRjPPHCMZXU",
         "password": "aC3!cD5?#Fg"
       }
     ],
@@ -2017,7 +2017,7 @@
         "fn": "shareLink",
         "key": "98cec4d4c6b8a8d0adae625ae5f3626385a539700ede226a3ba87effbf59cebb",
         "label": "partage_cle_en_m",
-        "link": "https://shhdrop.example/#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
+        "link": "https://shhdrop.example/s#mM7E1Ma4qNCtrmJa5fNiY4WlOXAO3iJqO6h-_79Zzrs",
         "parsed": {
           "key": "98cec4d4c6b8a8d0adae625ae5f3626385a539700ede226a3ba87effbf59cebb",
           "kind": "s",
@@ -2029,7 +2029,7 @@
         "fn": "shareLink",
         "key": "9bd2ebd0c85c6093abcaed8ccf3174fb35fdf792c9058070bac714f77e2004e2",
         "label": "partage_cle_en_m_base_demo",
-        "link": "https://shhdrop.example/shhdrop/#m9Lr0MhcYJOryu2MzzF0-zX995LJBYBwuscU934gBOI",
+        "link": "https://shhdrop.example/shhdrop/s#m9Lr0MhcYJOryu2MzzF0-zX995LJBYBwuscU934gBOI",
         "parsed": {
           "key": "9bd2ebd0c85c6093abcaed8ccf3174fb35fdf792c9058070bac714f77e2004e2",
           "kind": "s",
@@ -2041,7 +2041,7 @@
         "fn": "manageLink",
         "key": "9898682a27964e6731a9a2394e581f3ef6b84676be0e631a2518cf3c708c6575",
         "label": "gestion_cle_en_m",
-        "link": "https://shhdrop.example/#mmJhoKieWTmcxqaI5TlgfPva4Rna-DmMaJRjPPHCMZXU",
+        "link": "https://shhdrop.example/s#mmJhoKieWTmcxqaI5TlgfPva4Rna-DmMaJRjPPHCMZXU",
         "parsed": {
           "key": "9898682a27964e6731a9a2394e581f3ef6b84676be0e631a2518cf3c708c6575",
           "kind": "m",
@@ -2053,7 +2053,7 @@
         "fn": "shareLink",
         "key": "f8a14e7ce9d01ae683751a63626f841d4053f3c2149e8a33ebff8b8972347af6",
         "label": "partage_cle_en_tiret",
-        "link": "https://shhdrop.example/#-KFOfOnQGuaDdRpjYm-EHUBT88IUnooz6_-LiXI0evY",
+        "link": "https://shhdrop.example/s#-KFOfOnQGuaDdRpjYm-EHUBT88IUnooz6_-LiXI0evY",
         "parsed": {
           "key": "f8a14e7ce9d01ae683751a63626f841d4053f3c2149e8a33ebff8b8972347af6",
           "kind": "s",
@@ -2065,7 +2065,7 @@
         "fn": "shareLink",
         "key": "fce2000bc4206af84b43f5c8130406803eb5a77519ce426a2cde0d9c855a5d82",
         "label": "partage_cle_en_souligne",
-        "link": "https://shhdrop.example/#_OIAC8QgavhLQ_XIEwQGgD61p3UZzkJqLN4NnIVaXYI",
+        "link": "https://shhdrop.example/s#_OIAC8QgavhLQ_XIEwQGgD61p3UZzkJqLN4NnIVaXYI",
         "parsed": {
           "key": "fce2000bc4206af84b43f5c8130406803eb5a77519ce426a2cde0d9c855a5d82",
           "kind": "s",
@@ -2077,7 +2077,7 @@
         "fn": "manageLink",
         "key": "fbbc8c3677c4b0c999a09406cac561951c0225715d36ed8687b86557d7c95c38",
         "label": "gestion_cle_en_tiret",
-        "link": "https://shhdrop.example/#m-7yMNnfEsMmZoJQGysVhlRwCJXFdNu2Gh7hlV9fJXDg",
+        "link": "https://shhdrop.example/s#m-7yMNnfEsMmZoJQGysVhlRwCJXFdNu2Gh7hlV9fJXDg",
         "parsed": {
           "key": "fbbc8c3677c4b0c999a09406cac561951c0225715d36ed8687b86557d7c95c38",
           "kind": "m",
@@ -2089,7 +2089,7 @@
         "fn": "shareLink",
         "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "label": "partage_cle_ff",
-        "link": "https://shhdrop.example/#__________________________________________8",
+        "link": "https://shhdrop.example/s#__________________________________________8",
         "parsed": {
           "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
           "kind": "s",
@@ -2101,7 +2101,7 @@
         "fn": "shareLink",
         "key": "fbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfb",
         "label": "partage_cle_fb",
-        "link": "https://shhdrop.example/#-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_s",
+        "link": "https://shhdrop.example/s#-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_v7-_s",
         "parsed": {
           "key": "fbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfb",
           "kind": "s",
@@ -2113,7 +2113,7 @@
         "fn": "manageLink",
         "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "label": "gestion_cle_ff",
-        "link": "https://shhdrop.example/#m__________________________________________8",
+        "link": "https://shhdrop.example/s#m__________________________________________8",
         "parsed": {
           "key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
           "kind": "m",
@@ -2125,7 +2125,7 @@
         "fn": "shareLink",
         "key": "0000000000000000000000000000000000000000000000000000000000000000",
         "label": "partage_cle_00",
-        "link": "https://shhdrop.example/#AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "link": "https://shhdrop.example/s#AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "parsed": {
           "key": "0000000000000000000000000000000000000000000000000000000000000000",
           "kind": "s",

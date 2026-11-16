@@ -66,7 +66,9 @@ describe("check-dist.mjs, production", () => {
   it("pages séparées : chaque page existe, a ses empreintes, son contenu écrit, aucun style en ligne, et ne charge pas le moteur", () => {
     const PAGE = (body: string, js = "page-a.js") =>
       `<!doctype html><html><head>\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app">${body}</div></body></html>`;
-    const ok = { "index.html": PROD_INDEX, "securite.html": PAGE("<h1>Sécurité</h1><p>…</p>"), "assets/page-a.js": "console.info(2)" };
+    const S = (robots = '<meta name="robots" content="noindex" />', js = "s-a.js") =>
+      `<!doctype html><html><head>\n${robots}\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app"></div></body></html>`;
+    const ok = { "index.html": PROD_INDEX, "securite.html": PAGE("<h1>Sécurité</h1><p>…</p>"), "assets/page-a.js": "console.info(2)", "s.html": S(), "assets/s-a.js": "console.info(3)" };
     expect(checkDist(site(ok), false, false, ["securite.html"])).toEqual([]);
     expect(checkDist(site({ "index.html": PROD_INDEX }), false, false, ["securite.html"])).toContain("securite.html : page d'information absente");
     expect(checkDist(site({ ...ok, "securite.html": PAGE("") }), false, false, ["securite.html"]).join("\n")).toMatch(/contenu non écrit/);
@@ -74,6 +76,11 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><img src="/src/assets/a.png">') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse de développement/);
     expect(checkDist(site({ ...ok, "assets/page-a.js": 'const e="/assets/engine-x.wasm";' }), false, false, ["securite.html"]).join("\n")).toMatch(/cite le moteur/);
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><a href="https://github.com/x">code</a>') }), false, false, ["securite.html"])).toEqual([]);
+    // Page « /s » (16 novembre) : présente, jamais indexée, sans le script de l'application d'envoi.
+    const { "s.html": _s, ...noS } = ok;
+    expect(checkDist(site(noS), false, false, ["securite.html"])).toContain("s.html : page d'ouverture absente");
+    expect(checkDist(site({ ...ok, "s.html": S("") }), false, false, ["securite.html"])).toContain("s.html : sans « noindex »");
+    expect(checkDist(site({ ...ok, "s.html": S(undefined, "index-a.js"), "assets/index-a.js": "1" }), false, false, ["securite.html"])).toContain("s.html : charge le script de l'application d'envoi");
   });
 
   it("A7 : police ou image hors de assets/ ou sans empreinte → refus (pas de cache long)", () => {

@@ -669,7 +669,7 @@ describe("origine attendue (audit F1)", () => {
   const evil = `https://evil.example:8443/${k}`;
   const creds = `https://user:pw@srv.test/${k}`;
   it("lien d'une autre origine ou avec identifiants : lien_invalide, aucune requête", async () => {
-    for (const link of [evil, creds, `http://srv.test/${k}`, `${ORIGIN}/s${k}`]) {
+    for (const link of [evil, creds, `http://srv.test/${k}`, `${ORIGIN}/x${k}`, `${ORIGIN}/s/${k}`]) {
       const s = server(() => undefined);
       await expect(fetchMeta(link, ORIGIN, s.net), link).rejects.toThrow("lien_invalide");
       await expect(openShare(link, PW, ORIGIN, undefined, s.net), link).rejects.toThrow("lien_invalide");
@@ -1150,7 +1150,7 @@ describe("createShare : reprise sur coupure (budget SERVER_STALL_MS)", () => {
     const s = sender({ segments: 1, finalize: (a) => (a === 1 ? "net" : j(404, { error: "not_found" })), status: () => j(200, READY) });
     const r = await drive(createShare(ORIGIN, SMALL, base(s)));
     expect(r.expiresInS).toBe(3500);
-    expect(r.manage).toMatch(/^https:\/\/srv\.test\/#m[A-Za-z0-9_-]{43}$/);
+    expect(r.manage).toMatch(/^https:\/\/srv\.test\/s#m[A-Za-z0-9_-]{43}$/);
     expect(s.calls.filter((c) => c.startsWith("POST /api/shares/") || c.startsWith("GET /api/manage/"))).toEqual([
       "POST /api/shares/finalize",
       "POST /api/shares/finalize",
@@ -1373,8 +1373,8 @@ describe("createShare v2 : création, envoi sans le bourrage, finalisation", () 
     expect(fin.salt).toMatch(/^[A-Za-z0-9_-]{22}$/);
 
     vi.useRealTimers();
-    expect(r.link).toMatch(/^https:\/\/srv\.test\/#[A-Za-z0-9_-]{43}$/);
-    expect(r.manage).toMatch(/^https:\/\/srv\.test\/#m[A-Za-z0-9_-]{43}$/);
+    expect(r.link).toMatch(/^https:\/\/srv\.test\/s#[A-Za-z0-9_-]{43}$/);
+    expect(r.manage).toMatch(/^https:\/\/srv\.test\/s#m[A-Za-z0-9_-]{43}$/);
     const lk = await parseLink(r.link);
     expect(lk.kind === "s" && b64u((await deriveAccess(lk.kLien)).kAcces)).toBe(s.creates[0]!.access);
     expect(r.manage.slice(r.manage.indexOf("#m") + 2)).toBe(s.creates[0]!.manage);
@@ -1636,19 +1636,19 @@ describe("base de l'application (scan de sécurité du 7 novembre, F2)", () => {
 
   it("démo (/shhdrop/) : les liens rendus par createShare, avec la base, sont acceptés ; la racine aussi", async () => {
     vi.stubEnv("BASE_URL", "/shhdrop/");
-    const atBase = MANAGE.replace("/#m", "/shhdrop/#m");
+    const atBase = MANAGE.replace("/s#m", "/shhdrop/s#m");
     expect(atBase).not.toBe(MANAGE);
     const s = server(() => j(404, { error: "not_found" }));
     expect(await reject(destroyShare(atBase, ORIGIN, s.net))).toBeInstanceOf(NotFoundError);
     expect(await reject(shareStatus(atBase, ORIGIN, s.net))).toBeInstanceOf(NotFoundError);
-    expect(await fetchMeta(LINK.replace("/#", "/shhdrop/#"), ORIGIN, server(() => undefined).net)).toEqual({ expiresInS: 3000, opensLeft: 2 });
+    expect(await fetchMeta(LINK.replace("/s#", "/shhdrop/s#"), ORIGIN, server(() => undefined).net)).toEqual({ expiresInS: 3000, opensLeft: 2 });
     expect(await fetchMeta(LINK, ORIGIN, server(() => undefined).net)).toEqual({ expiresInS: 3000, opensLeft: 2 });
     // Ouvertures restantes absentes ou hors bornes : réponse refusée (ruling 5).
     for (const bad of [{ ...META, opens_left: undefined }, { ...META, opens_left: 0 }, { ...META, opens_left: 1.5 }])
       expect(await reject(fetchMeta(LINK, ORIGIN, server((_m, path) => (path.endsWith("/meta") ? j(200, bad) : undefined)).net))).toBeInstanceOf(NotFoundError);
     // Autre chemin, ancien format : toujours refusés, sans requête.
     const none = server(() => undefined);
-    for (const bad of [MANAGE.replace("/#m", "/autre/#m"), `${ORIGIN}/s/${b64u(new Uint8Array(16).fill(5))}#${b64u(KLIEN())}`]) {
+    for (const bad of [MANAGE.replace("/s#m", "/autre/#m"), `${ORIGIN}/s/${b64u(new Uint8Array(16).fill(5))}#${b64u(KLIEN())}`]) {
       await expect(destroyShare(bad, ORIGIN, none.net), bad).rejects.toThrow("lien_invalide");
     }
     expect(none.calls).toEqual([]);
@@ -1656,7 +1656,7 @@ describe("base de l'application (scan de sécurité du 7 novembre, F2)", () => {
 
   it("production (/) : un lien sous /shhdrop/ est refusé", async () => {
     const s = server(() => undefined);
-    await expect(destroyShare(MANAGE.replace("/#m", "/shhdrop/#m"), ORIGIN, s.net)).rejects.toThrow("lien_invalide");
+    await expect(destroyShare(MANAGE.replace("/s#m", "/shhdrop/s#m"), ORIGIN, s.net)).rejects.toThrow("lien_invalide");
     expect(s.calls).toEqual([]);
   });
 });

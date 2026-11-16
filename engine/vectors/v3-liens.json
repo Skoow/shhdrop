@@ -1,0 +1,489 @@
+{
+  "about": "Liens sous /s (décision du propriétaire du 16 novembre, docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md) : remplacent les cas shareLink et manageLink de v2.json et ses deux cas parseLink qui refusaient « …/s#… ». Lus par engine/core/tests/vectors.rs et web/src/engine/engine.test.ts ; voir engine/vectors/README.md.",
+  "link": [
+    {
+      "args": [
+        "https://example.org",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "shareLink",
+      "result": "https://example.org/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "https://example.org",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "manageLink",
+      "result": "https://example.org/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "https://srv.test:8443",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "shareLink",
+      "result": "https://srv.test:8443/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "https://srv.test:8443",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "manageLink",
+      "result": "https://srv.test:8443/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "http://localhost:8080",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "shareLink",
+      "result": "http://localhost:8080/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "http://localhost:8080",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "manageLink",
+      "result": "http://localhost:8080/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "http://[::1]:4000",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "shareLink",
+      "result": "http://[::1]:4000/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "http://[::1]:4000",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "fn": "manageLink",
+      "result": "http://[::1]:4000/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "https://skoow.github.io",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/shhdrop/"
+      ],
+      "fn": "shareLink",
+      "result": "https://skoow.github.io/shhdrop/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "https://skoow.github.io",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/shhdrop/"
+      ],
+      "fn": "manageLink",
+      "result": "https://skoow.github.io/shhdrop/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8"
+    },
+    {
+      "args": [
+        "http://srv.test/",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "error": "origine_invalide",
+      "fn": "shareLink"
+    },
+    {
+      "args": [
+        "http://srv.test/",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "error": "origine_invalide",
+      "fn": "manageLink"
+    },
+    {
+      "args": [
+        "https://srv.test/x",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "error": "origine_invalide",
+      "fn": "shareLink"
+    },
+    {
+      "args": [
+        "https://srv.test/x",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/"
+      ],
+      "error": "origine_invalide",
+      "fn": "manageLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        ""
+      ],
+      "error": "base_invalide",
+      "fn": "shareLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        ""
+      ],
+      "error": "base_invalide",
+      "fn": "manageLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/shhdrop"
+      ],
+      "error": "base_invalide",
+      "fn": "shareLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/shhdrop"
+      ],
+      "error": "base_invalide",
+      "fn": "manageLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/a b/"
+      ],
+      "error": "base_invalide",
+      "fn": "shareLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "/a b/"
+      ],
+      "error": "base_invalide",
+      "fn": "manageLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "//"
+      ],
+      "error": "base_invalide",
+      "fn": "shareLink"
+    },
+    {
+      "args": [
+        "https://x.test",
+        "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "//"
+      ],
+      "error": "base_invalide",
+      "fn": "manageLink"
+    },
+    {
+      "args": [
+        "https://example.org/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://example.org"
+      }
+    },
+    {
+      "args": [
+        "https://example.org/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "m",
+        "origin": "https://example.org"
+      }
+    },
+    {
+      "args": [
+        "https://example.org/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://example.org"
+      }
+    },
+    {
+      "args": [
+        "https://srv.test:8443/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://srv.test:8443"
+      }
+    },
+    {
+      "args": [
+        "https://srv.test:8443/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "m",
+        "origin": "https://srv.test:8443"
+      }
+    },
+    {
+      "args": [
+        "https://srv.test:8443/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://srv.test:8443"
+      }
+    },
+    {
+      "args": [
+        "http://localhost:8080/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "http://localhost:8080"
+      }
+    },
+    {
+      "args": [
+        "http://localhost:8080/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "m",
+        "origin": "http://localhost:8080"
+      }
+    },
+    {
+      "args": [
+        "http://localhost:8080/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "http://localhost:8080"
+      }
+    },
+    {
+      "args": [
+        "http://[::1]:4000/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "http://[::1]:4000"
+      }
+    },
+    {
+      "args": [
+        "http://[::1]:4000/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "m",
+        "origin": "http://[::1]:4000"
+      }
+    },
+    {
+      "args": [
+        "http://[::1]:4000/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "http://[::1]:4000"
+      }
+    },
+    {
+      "args": [
+        "https://skoow.github.io/shhgone/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://skoow.github.io"
+      }
+    },
+    {
+      "args": [
+        "https://skoow.github.io/shhgone/s#mMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "m",
+        "origin": "https://skoow.github.io"
+      }
+    },
+    {
+      "args": [
+        "https://skoow.github.io/shhgone/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://skoow.github.io"
+      }
+    },
+    {
+      "args": [
+        "https://skoow.github.io/shhgone#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://skoow.github.io"
+      }
+    },
+    {
+      "args": [
+        "https://x.test/s?fbclid=abc#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "fn": "parseLink",
+      "result": {
+        "key": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "kind": "s",
+        "origin": "https://x.test"
+      }
+    },
+    {
+      "args": [
+        "https://x.test/s/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/ss#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/S#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/s/x#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/x/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/shhgone/s/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/shhgones#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://x.test/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "/shhgone/"
+      ],
+      "error": "lien_invalide",
+      "fn": "parseLink"
+    },
+    {
+      "args": [
+        "https://example.org/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "Kq7!mP2#x?a"
+      ],
+      "fn": "shareLinkWithPassword",
+      "result": "https://example.org/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8.S3E3IW1QMiN4P2E"
+    },
+    {
+      "args": [
+        "https://example.org/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8.S3E3IW1QMiN4P2E"
+      ],
+      "fn": "splitPassword",
+      "result": {
+        "href": "https://example.org/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+        "password": "Kq7!mP2#x?a"
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { href, match, navigate, otherEntry, router, setEntry, suite } from "./router.svelte";
+import { href, match, moveLegacyLink, navigate, otherEntry, router, setEntry, suite } from "./router.svelte";
 
 const KEY = "A".repeat(42) + "Q"; // 43 caractères base64url (forme seulement)
 
@@ -51,8 +51,17 @@ describe("match", () => {
     expect(match("/x", `#${KEY}`)).toEqual({ name: "notfound" });
   });
 
+  it("liens sous /s (16 novembre) : partage, mot de passe du QR et lien coupé → ouverture ; gestion → gestion ; sans fragment → ouverture (lien incomplet)", () => {
+    expect(match("/s", `#${KEY}`)).toEqual({ name: "open" });
+    expect(match("/s", `#m${KEY}`)).toEqual({ name: "manage" });
+    expect(match("/s", `#${KEY}.YWJj`)).toEqual({ name: "open" });
+    expect(match("/s", `#${KEY.slice(0, 30)}`)).toEqual({ name: "open" });
+    expect(match("/s", "")).toEqual({ name: "open" });
+    expect(match("/shhdrop/s", `#m${KEY}`, "/shhdrop/")).toEqual({ name: "manage" });
+  });
+
   it("anciens liens /s/{id}, /m/{id} (aucune compatibilité) et adresses inconnues → 404", () => {
-    for (const p of ["/s/AbC_-1", "/m/xyz", "/s/", "/s", "/s/a/b", "/inconnu", "/securite/x", "//", "/s/é"]) {
+    for (const p of ["/s/AbC_-1", "/m/xyz", "/s/", "/S", "/ss", "/s/a/b", "/inconnu", "/securite/x", "//", "/s/é"]) {
       expect(match(p), p).toEqual({ name: "notfound" });
       expect(match(p, `#${KEY}`), p).toEqual({ name: "notfound" });
     }
@@ -140,6 +149,38 @@ describe("navigate", () => {
       setEntry("app");
       assign.mockRestore();
     }
+  });
+
+  // Page « /s » (16 novembre) : ouverture et gestion dans leur propre fichier HTML.
+  it("page /s : autre fichier HTML que l'application et les pages d'information", () => {
+    expect(otherEntry("/s")).toBe(true);
+    setEntry("s");
+    try {
+      expect(otherEntry("/s")).toBe(false);
+      expect(otherEntry("/")).toBe(true);
+      expect(otherEntry("/envoyer")).toBe(true);
+      expect(otherEntry("/securite")).toBe(true);
+    } finally {
+      setEntry("app");
+    }
+  });
+
+  it("ancien lien à la racine : remplacé par /s et le même fragment (requête non recopiée) ; rien ailleurs, jamais en boucle", () => {
+    const calls: string[] = [];
+    const loc = (pathname: string, hash: string) => ({ pathname, hash, replace: (u: string) => void calls.push(u) });
+    expect(moveLegacyLink(loc("/", `#${KEY}`))).toBe(true);
+    expect(moveLegacyLink(loc("/", `#m${KEY}`))).toBe(true);
+    expect(moveLegacyLink(loc("/", `#${KEY}.YWJj`))).toBe(true);
+    expect(calls).toEqual([`/s#${KEY}`, `/s#m${KEY}`, `/s#${KEY}.YWJj`]);
+    for (const [p, h] of [["/", ""], ["/", "#x"], ["/envoyer", `#${KEY}`], ["/s", `#${KEY}`], ["/s", ""], ["/s.html", `#${KEY}`]] as const)
+      expect(moveLegacyLink(loc(p, h)), `${p}${h}`).toBe(false);
+    setEntry("s");
+    try {
+      expect(moveLegacyLink(loc("/", `#${KEY}`))).toBe(false);
+    } finally {
+      setEntry("app");
+    }
+    expect(calls).toHaveLength(3);
   });
 
   it("refuse tout ce qui n'est pas un chemin interne", () => {

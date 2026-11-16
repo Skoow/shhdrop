@@ -1,5 +1,6 @@
-//! Liens de partage et de gestion (spec §32, `transfer/link.ts`) : à la racine du site, le secret
-//! après le « # ». Le fragment n'est jamais envoyé au serveur ; ni le lien ni la page ne portent
+//! Liens de partage et de gestion (spec §32, `transfer/link.ts`) : sous `/s` (décision du
+//! propriétaire du 16 novembre, docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md),
+//! le secret après le « # ». Les anciens liens à la racine du site restent lus. Le fragment n'est jamais envoyé au serveur ; ni le lien ni la page ne portent
 //! d'identifiant (l'id du partage se calcule à partir de K_lien).
 use crate::encoding::{b64u, unb64u};
 use crate::error::{Error, Result};
@@ -66,18 +67,27 @@ fn check_base(base: &str) -> Result<&str> {
     }
 }
 
-/// `{origine}{base}#{K_lien}` : 45 caractères de plus que l'origine avec la base « / ».
+/// Chemin des liens sous la base (16 novembre) : `{base}s`, réservé aux futurs liens universels.
+pub const LINK_PATH: &str = "s";
+
+/// `{origine}{base}s#{K_lien}` : 46 caractères de plus que l'origine avec la base « / ».
 pub fn share_link(origin: &str, k_lien: &KLien, base: &str) -> Result<String> {
     let origin = check_origin(origin)?;
     let base = check_base(base)?;
-    Ok(format!("{origin}{base}#{}", b64u(k_lien.as_bytes())))
+    Ok(format!(
+        "{origin}{base}{LINK_PATH}#{}",
+        b64u(k_lien.as_bytes())
+    ))
 }
 
-/// `{origine}{base}#m{S_gestion}`.
+/// `{origine}{base}s#m{S_gestion}`.
 pub fn manage_link(origin: &str, s_gestion: &SGestion, base: &str) -> Result<String> {
     let origin = check_origin(origin)?;
     let base = check_base(base)?;
-    Ok(format!("{origin}{base}#m{}", b64u(s_gestion.as_bytes())))
+    Ok(format!(
+        "{origin}{base}{LINK_PATH}#m{}",
+        b64u(s_gestion.as_bytes())
+    ))
 }
 
 /// Décodage strict : 43 caractères, encodage canonique, 32 octets.
@@ -86,8 +96,8 @@ fn strict(s: &str) -> Result<[u8; 32]> {
     b.as_slice().try_into().map_err(|_| Error::LienInvalide)
 }
 
-/// Analyse un lien : chemin égal à `base` exactement (`/shhdrop` sans barre finale toléré pour
-/// la démo), sans identifiants dans l'adresse. La requête est ignorée (les messageries ajoutent
+/// Analyse un lien : chemin `{base}s` (forme écrite depuis le 16 novembre) ou, ancienne forme,
+/// égal à `base` exactement (`/shhdrop` sans barre finale toléré pour la démo), sans identifiants dans l'adresse. La requête est ignorée (les messageries ajoutent
 /// `?fbclid=…` en gardant le fragment). L'origine attendue n'est pas vérifiée ici : l'appelant
 /// compare `origin` à la sienne.
 pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
@@ -97,7 +107,8 @@ pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
         return Err(Error::LienInvalide);
     }
     let path = u.pathname();
-    if path != base && format!("{path}/") != base {
+    let new_form = path.strip_prefix(base) == Some(LINK_PATH);
+    if !new_form && path != base && format!("{path}/") != base {
         return Err(Error::LienInvalide);
     }
     let hash = u.hash();
@@ -210,13 +221,13 @@ mod tests {
         r.expect_err("refus attendu")
     }
 
-    /// Forme d'un lien de partage de production (SHARE_LINK_SHAPE de link.ts) :
-    /// `https://[a-z0-9.-]+(:\d+)?/#` + 43 caractères base64url.
+    /// Forme d'un lien de partage de production (16 novembre) :
+    /// `https://[a-z0-9.-]+(:\d+)?/s#` + 43 caractères base64url.
     fn production_shape(l: &str) -> bool {
         let Some(rest) = l.strip_prefix("https://") else {
             return false;
         };
-        let Some((host, frag)) = rest.split_once("/#") else {
+        let Some((host, frag)) = rest.split_once("/s#") else {
             return false;
         };
         let (h, port) = host.split_once(':').unwrap_or((host, "1"));
@@ -232,12 +243,15 @@ mod tests {
     fn aller_retour_share_link() {
         let kl = KLien::from_bytes([9; 32]);
         let link = share_link("https://shhdrop.example", &kl, "/").unwrap();
-        assert_eq!(link, format!("https://shhdrop.example/#{}", b64u(&[9; 32])));
-        assert_eq!(link.len(), "https://shhdrop.example".len() + 45);
+        assert_eq!(
+            link,
+            format!("https://shhdrop.example/s#{}", b64u(&[9; 32]))
+        );
+        assert_eq!(link.len(), "https://shhdrop.example".len() + 46);
         assert!(production_shape(&link));
         assert_eq!(
             share_link("https://shhdrop.app", &kl, "/").unwrap().len(),
-            64
+            65
         );
         let p = parse_link(&link, "/").unwrap();
         assert_eq!(kind(&p), 's');
@@ -249,7 +263,7 @@ mod tests {
     fn aller_retour_manage_link() {
         let s = SGestion::from_bytes([5; 32]);
         let link = manage_link("http://127.0.0.1:4000", &s, "/").unwrap();
-        assert_eq!(link, format!("http://127.0.0.1:4000/#m{}", b64u(&[5; 32])));
+        assert_eq!(link, format!("http://127.0.0.1:4000/s#m{}", b64u(&[5; 32])));
         let p = parse_link(&link, "/").unwrap();
         assert_eq!(kind(&p), 'm');
         assert_eq!(key(&p), [5; 32]);
@@ -308,7 +322,9 @@ mod tests {
             format!("https://x/#{k}="),
             format!("https://x/#x{k}"),
             format!("https://x/x#{k}"),
-            format!("https://x/s#{k}"),
+            format!("https://x/s/#{k}"),
+            format!("https://x/ss#{k}"),
+            format!("https://x/S#{k}"),
             format!("https://x/s/AAAAAAAAAAAAAAAAAAAAAA#{k}"),
             format!("https://x/m/AAAAAAAAAAAAAAAAAAAAAA#{k}"),
             format!("https://x//#{k}"),
@@ -338,7 +354,7 @@ mod tests {
         let link = share_link("https://skoow.github.io", &kl, "/shhdrop/").unwrap();
         assert_eq!(
             link,
-            format!("https://skoow.github.io/shhdrop/#{}", b64u(&[3; 32]))
+            format!("https://skoow.github.io/shhdrop/s#{}", b64u(&[3; 32]))
         );
         let p = parse_link(&link, "/shhdrop/").unwrap();
         assert_eq!(
@@ -358,7 +374,9 @@ mod tests {
             format!("https://x/#{k}"),
             format!("https://x/shhdropx/#{k}"),
             format!("https://x/shhdrop/shhdrop/#{k}"),
-            format!("https://x/shhdrop/s#{k}"),
+            format!("https://x/s#{k}"),
+            format!("https://x/shhdrop/s/#{k}"),
+            format!("https://x/shhdrops#{k}"),
         ] {
             assert_eq!(err(parse_link(&u, "/shhdrop/")), Error::LienInvalide, "{u}");
         }
@@ -417,7 +435,25 @@ mod tests {
         let kl = KLien::from_bytes([8; 32]);
         let link = share_link("https://shhdrop.app", &kl, "/").unwrap();
         assert!(!link.contains("Ab3!xY7#"));
-        assert_eq!(&link["https://shhdrop.app/#".len()..], b64u(&[8; 32]));
+        assert_eq!(&link["https://shhdrop.app/s#".len()..], b64u(&[8; 32]));
+    }
+
+    #[test]
+    fn ancienne_forme_a_la_racine_toujours_lue() {
+        // Liens écrits avant le 16 novembre : à la racine, lus comme avant ; jamais plus écrits.
+        let k = k();
+        for (u, b) in [
+            (format!("https://x.test/#{k}"), "/"),
+            (format!("https://x.test/s#{k}"), "/"),
+            (format!("https://x.test/shhdrop/#{k}"), "/shhdrop/"),
+            (format!("https://x.test/shhdrop#{k}"), "/shhdrop/"),
+            (format!("https://x.test/shhdrop/s#{k}"), "/shhdrop/"),
+        ] {
+            let p = parse_link(&u, b).unwrap();
+            assert_eq!((kind(&p), key(&p)), ('s', K1), "{u}");
+        }
+        let p = parse_link(&format!("https://x.test/s#m{k}"), "/").unwrap();
+        assert_eq!((kind(&p), key(&p)), ('m', K1));
     }
 
     #[test]

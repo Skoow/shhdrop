@@ -110,57 +110,70 @@ function expectOnlyOwnEntries(urls: string[], origin: string, paths: string[]): 
   expect(urls.slice(0, urls.length - own.length).every((u) => u === "about:blank")).toBe(true);
 }
 
-// Spec §32 : lien court à la racine, « /#<clé> » (partage) ou « /#m<clé> » (gestion).
-for (const [kind, frag] of [
-  ["partage", `#${KEY}`],
-  ["gestion", `#m${KEY}`],
+// Spec §32 : lien court sous « /s » (16 novembre), « /s#<clé> » (partage) ou « /s#m<clé> »
+// (gestion) ; ancien lien à la racine (« /#… ») : remplacé par « /s » et le même fragment, sans
+// entrée d'historique de plus, puis retiré de même.
+for (const [kind, start, frag] of [
+  ["partage", "/s", `#${KEY}`],
+  ["gestion", "/s", `#m${KEY}`],
+  ["ancien lien de partage", "/", `#${KEY}`],
+  ["ancien lien de gestion", "/", `#m${KEY}`],
 ] as const) {
-  test(`/${frag.slice(0, 2)}… (${kind}) : le # est retiré de l'adresse et de l'historique, jamais envoyé`, async ({ page, shh, browserName }) => {
+  const share = kind.includes("partage");
+  test(`${start}${frag.slice(0, 2)}… (${kind}) : le # est retiré de l'adresse et de l'historique, jamais envoyé`, async ({ page, shh, browserName }) => {
     const api = apiRequests(page);
     const all = allRequests(page);
-    await page.goto(`${shh.origin}/${frag}`);
-    await expect.poll(() => hash(page)).toBe("");
-    expect(page.url()).toBe(`${shh.origin}/`);
+    await page.goto(`${shh.origin}${start}${frag}`);
+    await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
+    expect(await hash(page)).toBe("");
     // La lecture de l'état part avant de quitter la page (sinon, sous charge, l'écran est
     // quitté avant elle et le décompte ci-dessous échoue).
     await expect.poll(() => api.length).toBe(1);
 
     // Retour / Avant : aucune entrée d'historique ne réaffiche le #, et le retrait n'a pas
-    // ajouté d'entrée (replaceState) : une seule entrée « / » de l'origine avant « /securite ».
+    // ajouté d'entrée (replace, replaceState) : une seule entrée « /s » avant « /securite ».
     await goSecurity(page);
     await expect(page).toHaveURL(`${shh.origin}/securite`);
     const forward = browserName !== "webkit";
-    expectOnlyOwnEntries(await walkHistory(page, [KEY], forward), shh.origin, ["/", "/securite"]);
+    expectOnlyOwnEntries(await walkHistory(page, [KEY], forward), shh.origin, ["/s", "/securite"]);
     // Rechargement : rien ne revient. Sans parcours Avant (WebKit, voir walkHistory), l'onglet est
     // resté sur la première entrée : on rouvre « / » directement (l'entrée « / » de l'historique
     // vient d'être vérifiée sans # par le parcours Retour).
     if (forward) await page.goBack();
-    else await page.goto(`${shh.origin}/`);
-    await expect(page).toHaveURL(`${shh.origin}/`);
+    else await page.goto(`${shh.origin}/s`);
+    await expect(page).toHaveURL(`${shh.origin}/s`);
     await page.reload();
-    expect(page.url()).toBe(`${shh.origin}/`);
+    expect(page.url()).toBe(`${shh.origin}/s`);
     expect(await page.content()).not.toContain(KEY);
     // Ouverture : une seule lecture de l'état (meta, avec K_accès dérivé, jamais la clé) ;
     // gestion : une lecture de l'état (manage/status). Aucune autre requête d'API.
-    expect(api.map((u) => new URL(u).pathname)).toEqual([kind === "partage" ? "/api/shares/meta" : "/api/manage/status"]);
+    expect(api.map((u) => new URL(u).pathname)).toEqual([share ? "/api/shares/meta" : "/api/manage/status"]);
     // La partie après « # » n'est jamais envoyée au serveur (adresse, en-têtes, corps).
     // Gestion : S_gestion (la valeur du fragment) part, par conception, dans l'en-tête
     // X-Shh-Manage de manage/status (spec §29.8) ; nulle part ailleurs (adresse, corps, autre en-tête).
     expect(all.length).toBeGreaterThan(0);
-    for (const r of all) expect(kind === "gestion" ? r.replace(`"x-shh-manage":"${KEY}"`, "") : r).not.toContain(KEY);
+    for (const r of all) expect(share ? r : r.replace(`"x-shh-manage":"${KEY}"`, "")).not.toContain(KEY);
   });
 }
 
 test("# collé dans la barre sur la même page (navigation de fragment) : retiré aussi", async ({ page, shh, browserName }) => {
-  await page.goto(`${shh.origin}/#${KEY}`);
+  await page.goto(`${shh.origin}/s#${KEY}`);
   await expect.poll(() => hash(page)).toBe("");
   await page.evaluate((k) => (location.hash = k), KEY2);
   await expect.poll(() => hash(page)).toBe("");
   await page.evaluate((k) => (location.hash = `m${k}`), KEY2);
   await expect.poll(() => hash(page)).toBe("");
-  // Chaque navigation de fragment a créé une entrée, aussitôt remplacée par « / » nu : trois
-  // entrées « / », aucune avec un « # », au Retour (et à l'Avant hors WebKit : walkHistory).
-  expectOnlyOwnEntries(await walkHistory(page, [KEY, KEY2], browserName !== "webkit"), shh.origin, ["/", "/", "/"]);
+  // Chaque navigation de fragment a créé une entrée, aussitôt remplacée par « /s » nu : trois
+  // entrées « /s », aucune avec un « # », au Retour (et à l'Avant hors WebKit : walkHistory).
+  expectOnlyOwnEntries(await walkHistory(page, [KEY, KEY2], browserName !== "webkit"), shh.origin, ["/s", "/s", "/s"]);
+});
+
+test("# de lien collé dans la barre sur l'accueil : part vers /s, retiré ; aucune entrée avec un #", async ({ page, shh, browserName }) => {
+  await page.goto(`${shh.origin}/`);
+  await expect(page.locator("main#contenu")).toBeVisible();
+  await page.evaluate((k) => (location.hash = k), KEY2);
+  await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
+  expectOnlyOwnEntries(await walkHistory(page, [KEY2], browserName !== "webkit"), shh.origin, ["/", "/s"]);
 });
 
 test.describe("navigateur intégré (Instagram)", () => {
@@ -168,7 +181,7 @@ test.describe("navigateur intégré (Instagram)", () => {
 
   test("le # est gardé (pour « Ouvrir dans le navigateur »), aucune requête /api/", async ({ page, shh }) => {
     const api = apiRequests(page);
-    await page.goto(`${shh.origin}/#${KEY}`);
+    await page.goto(`${shh.origin}/s#${KEY}`);
     await expect(page.locator("main#contenu")).toBeVisible();
     await page.evaluate(() => new Promise((r) => setTimeout(r, 300)));
     expect(await hash(page)).toBe(`#${KEY}`);
@@ -229,20 +242,24 @@ test("fichier déposé sur /s/x : défaut empêché, l'adresse ne change pas", a
 
 // I1 : liens abîmés (ponctuation ajoutée par une messagerie, autre chemin, ancien format
 // /s/{id}, majuscule) : le routeur les classe en accueil ou en 404, le « # » est retiré quand même.
-for (const [what, path, frag] of [
-  ["point collé", "/", `#${KEY}.`],
-  ["parenthèse collée", "/", `#${KEY})`],
-  ["clé tronquée", "/", `#${KEY.slice(1)}`],
-  ["préfixe M majuscule", "/", `#M${KEY}`],
-  ["ancien format /s/{id}", "/s/AAAAAAAAAAAAAAAAAAAAAA", `#${KEY}`],
-  ["/S/ majuscule", "/S/x", `#${KEY}`],
-  ["route inconnue", "/inconnu", `#${KEY}`],
-  ["page fixe", "/securite", `#${KEY}`],
+// Sur « / », un lien abîmé reconnu comme lien (clé tronquée, mot de passe du QR mal formé) part
+// d'abord vers « /s » (16 novembre) : la page d'arrivée est alors « /s ».
+for (const [what, path, frag, at] of [
+  ["point collé", "/", `#${KEY}.`, "/s"],
+  ["parenthèse collée", "/", `#${KEY})`, "/"],
+  ["clé tronquée", "/", `#${KEY.slice(1)}`, "/s"],
+  ["préfixe M majuscule", "/", `#M${KEY}`, "/s"],
+  ["point collé sous /s", "/s", `#${KEY}.`, "/s"],
+  ["clé tronquée sous /s", "/s", `#${KEY.slice(1)}`, "/s"],
+  ["ancien format /s/{id}", "/s/AAAAAAAAAAAAAAAAAAAAAA", `#${KEY}`, "/s/AAAAAAAAAAAAAAAAAAAAAA"],
+  ["/S/ majuscule", "/S/x", `#${KEY}`, "/S/x"],
+  ["route inconnue", "/inconnu", `#${KEY}`, "/inconnu"],
+  ["page fixe", "/securite", `#${KEY}`, "/securite"],
 ] as const) {
   test(`${path}#… (${what}) : le # est retiré sur toute route, Retour ne le rend pas`, async ({ page, shh, browserName }) => {
     await page.goto(`${shh.origin}${path}${frag}`);
-    await expect.poll(() => hash(page)).toBe("");
-    expect(page.url()).toBe(`${shh.origin}${path}`);
+    await expect.poll(() => page.url()).toBe(`${shh.origin}${at}`);
+    expect(await hash(page)).toBe("");
     // Vers une AUTRE page : depuis /securite, un lien vers /securite même n'ajoute pas toujours
     // d'entrée d'historique (WebKit), et Retour sortait alors du site (about:blank).
     const next = path === "/securite" ? "/confidentialite" : "/securite";
@@ -250,29 +267,34 @@ for (const [what, path, frag] of [
     else await page.getByRole("contentinfo").getByRole("link", { name: "Confidentialité", exact: true }).click();
     await expect(page).toHaveURL(`${shh.origin}${next}`);
     await page.goBack();
-    await expect(page).toHaveURL(`${shh.origin}${path}`);
+    await expect(page).toHaveURL(`${shh.origin}${at}`);
     expect(await hash(page)).toBe("");
     await page.goForward();
     await expect(page).toHaveURL(`${shh.origin}${next}`);
     // Parcours « Avant » complet non fait sous WebKit (raison : walkHistory) ; un Avant a eu lieu plus haut.
-    expectOnlyOwnEntries(await walkHistory(page, [KEY], browserName !== "webkit"), shh.origin, [path, next]);
+    expectOnlyOwnEntries(await walkHistory(page, [KEY], browserName !== "webkit"), shh.origin, [at, next]);
   });
 }
 
 // Spec §32 : X-Robots-Tag et le repli particulier de /s/ et /m/ ont disparu.
-test("/ : pas de X-Robots-Tag ; /s/<id>. (ancien lien abîmé) → 404 du serveur", async ({ page, shh }) => {
-  const res = await page.goto(`${shh.origin}/#${KEY}`);
+test("/s : 200, pas de X-Robots-Tag (noindex dans la page) ; /s/<id>. (ancien lien abîmé) → 404 du serveur", async ({ page, shh }) => {
+  const res = await page.goto(`${shh.origin}/s#${KEY}`);
   expect(res?.status()).toBe(200);
   expect(res?.headers()["x-robots-tag"]).toBeUndefined();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
   const old = await page.request.get(`${shh.origin}/s/AAAAAAAAAAAAAAAAAAAAAA.`);
   expect(old.status()).toBe(404);
 });
 
 // I2 : paramètre de suivi ajouté par l'application (Facebook, Messenger, Instagram).
-test("/?fbclid=x#<clé> : requête et # retirés, adresse = chemin nu", async ({ page, shh }) => {
+test("/s?fbclid=x#<clé> et ancien /?fbclid=x#<clé> : requête et # retirés, adresse = /s", async ({ page, shh }) => {
   const api = apiRequests(page);
+  await page.goto(`${shh.origin}/s?fbclid=x#${KEY}`);
+  await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
+  await expect.poll(() => api.map((u) => new URL(u).pathname + new URL(u).search)).toEqual(["/api/shares/meta"]);
+  api.length = 0;
   await page.goto(`${shh.origin}/?fbclid=x#${KEY}`);
-  await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
+  await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
   // Seule requête d'API : la lecture de l'état du partage (sans la clé ni la requête de suivi).
   await expect.poll(() => api.map((u) => new URL(u).pathname + new URL(u).search)).toEqual(["/api/shares/meta"]);
 });
@@ -281,16 +303,18 @@ test.describe("navigateur intégré (Facebook) avec ?fbclid=", () => {
   test.use({ userAgent: INSTAGRAM.replace(/Instagram .*$/, "[FBAN/FBIOS;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/17.1]") });
 
   test("rien n'est retiré (S4), même avec un fragment invalide ou sur une route 404", async ({ page, shh }) => {
-    for (const [path, frag] of [
-      ["/?fbclid=x", `#${KEY}`],
-      ["/?fbclid=x", `#m${KEY}`],
-      ["/", `#${KEY}.`],
-      ["/inconnu", `#${KEY}`],
+    // Ancien lien à la racine : il part quand même vers « /s » (même fragment, gardé ici).
+    for (const [path, frag, at] of [
+      ["/s?fbclid=x", `#${KEY}`, "/s?fbclid=x"],
+      ["/s?fbclid=x", `#m${KEY}`, "/s?fbclid=x"],
+      ["/?fbclid=x", `#${KEY}`, "/s"],
+      ["/", `#${KEY}.`, "/s"],
+      ["/inconnu", `#${KEY}`, "/inconnu"],
     ] as const) {
       await page.goto(`${shh.origin}${path}${frag}`);
       await expect(page.locator("main#contenu")).toBeVisible();
       await page.evaluate(() => new Promise((r) => setTimeout(r, 300)));
-      expect(page.url()).toBe(`${shh.origin}${path}${frag}`);
+      expect(page.url()).toBe(`${shh.origin}${at}${frag}`);
     }
   });
 });

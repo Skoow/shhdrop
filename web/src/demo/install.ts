@@ -100,15 +100,15 @@ export async function installDemo(w: Window): Promise<void> {
   setDemo({
     solveCaptcha: async (): Promise<CaptchaProof> => ({ kind: "pow", payload: "demo" }),
     openAsRecipient(link: string) {
-      // Lien de partage de cet onglet (spec §32 : `${origin}${base}#<43>`) : navigation interne,
-      // sans rechargement ; App.svelte lit puis retire le « # » comme pour un lien ouvert.
+      // Lien de partage de cet onglet (`${origin}${base}/s#<43>`, 16 novembre) : la page « /s »
+      // se charge dans le même onglet ; le faux serveur y retrouve les partages de l'onglet
+      // (demo/persist.ts) et l'écran d'ouverture lit puis retire le « # » comme pour tout lien.
       const u = new URL(link);
-      const ok = u.origin === w.location.origin && (u.pathname === base + "/" || u.pathname === base || (base === "" && u.pathname === "/")) && u.search === "" && SHARE_FRAGMENT.test(u.hash);
+      const ok = u.origin === w.location.origin && u.pathname === base + "/s" && u.search === "" && SHARE_FRAGMENT.test(u.hash);
       if (!ok) throw new Error("lien_invalide");
       // Navigation voulue : la garde du bouton Retour (« Lien prêt ») ne la retient pas.
       leaveGuard?.release();
-      w.history.pushState(null, "", base + "/" + u.hash);
-      w.dispatchEvent(new PopStateEvent("popstate"));
+      w.location.assign(base + "/s" + u.hash);
     },
     get invalidLinkNote() {
       return INVALID_LINK_NOTE[getLang()];

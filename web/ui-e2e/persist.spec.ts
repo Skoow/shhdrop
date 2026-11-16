@@ -87,7 +87,7 @@ for (const late of [false, true]) {
       await page.goto(sent.link);
       await unlock(page, sent.password);
       // M3 : l'entrée d'historique de l'onglet ne porte plus le # (replaceState).
-      expect(await page.evaluate(() => ({ href: location.href, n: history.length }))).toEqual({ href: shh.origin + "/", n: 2 });
+      expect(await page.evaluate(() => ({ href: location.href, n: history.length }))).toEqual({ href: shh.origin + "/s", n: 2 });
       expect(await page.evaluate(() => sessionStorage.getItem("shh.og") ?? "")).toContain(key);
       await step("fermeture du profil", () => ctx.close());
 
@@ -107,7 +107,7 @@ for (const late of [false, true]) {
       if (back) {
         const nav = await back.evaluate(() => (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type ?? "");
         test.info().annotations.push({ type: "type de navigation restaurée", description: nav });
-        expect(back.url()).toBe(shh.origin + "/");
+        expect(back.url()).toBe(shh.origin + "/s");
         if (late) {
           // Entrée effacée et plus de « # » (retiré par replaceState) : la clé est perdue.
           await expect(back.getByRole("heading", { name: "Lien incomplet", exact: true })).toBeVisible();

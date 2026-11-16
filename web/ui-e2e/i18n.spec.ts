@@ -59,13 +59,16 @@ test.describe("français par défaut", () => {
     expect(new URL(page.url()).hash).toBe("");
   });
 
+  // Pages d'information séparées (16 novembre) : « Sécurité » charge sa page ; la navigation
+  // interne sans rechargement se vérifie donc dans l'application, vers « Mes partages ».
   test("navigation interne sans rechargement, focus sur le contenu, retour arrière", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
     await page.evaluate(() => ((window as unknown as { __marque: number }).__marque = 1));
-    await openSecurity(page);
-    await expect(page).toHaveURL(shh.origin + "/securite");
-    if (!isMobile) await expect(page.getByRole("link", { name: "Sécurité", exact: true })).toHaveAttribute("aria-current", "page");
-    await expect(page.locator("main#contenu")).toBeFocused();
+    if (isMobile) await page.locator("[data-menu-button]").click();
+    await page.getByRole(isMobile ? "navigation" : "banner").getByRole("link", { name: "Mes partages", exact: true }).first().click();
+    await expect(page).toHaveURL(shh.origin + "/envois");
+    // Focus dans le contenu : sur <main>, ou sur le titre de l'écran qui l'a pris (téléphone).
+    await expect.poll(() => page.evaluate(() => document.querySelector("main#contenu")?.contains(document.activeElement) ?? false)).toBe(true);
     await page.goBack();
     await expect(page).toHaveURL(shh.origin + "/");
     expect(await page.evaluate(() => (window as unknown as { __marque?: number }).__marque)).toBe(1);

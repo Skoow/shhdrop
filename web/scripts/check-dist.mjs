@@ -149,6 +149,18 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     }
   }
 
+  // Page « /s » (16 novembre) : ouverture et gestion d'un partage, son propre fichier, ses
+  // empreintes SRI, jamais indexée, sans le script de l'application d'envoi (assets/index-*.js).
+  if (pages.length > 0) {
+    const sHtml = byRel.get("s.html")?.toString("utf8");
+    if (sHtml === undefined) problems.push("s.html : page d'ouverture absente");
+    else {
+      problems.push(...checkSri("s.html", sHtml, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
+      if (!/<meta name="robots" content="noindex"/.test(sHtml)) problems.push("s.html : sans « noindex »");
+      if (/assets\/index-[^"]+\.js/.test(sHtml)) problems.push("s.html : charge le script de l'application d'envoi");
+    }
+  }
+
   // Aucune ressource tierce (CLAUDE.md) : ni dans les pages (index.html, 404.html de la démo,
   // pdf-frame.html), ni dans les feuilles de style (polices, images). Production et démo.
   for (const f of all) {

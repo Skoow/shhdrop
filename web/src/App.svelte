@@ -3,8 +3,8 @@
   import { getDemo } from "./app/demo-hooks";
   import { inAppBrowser, isStandalone, isSupported } from "./app/env";
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
-  import { readLink, readShare, scrubAddressBar, type LinkState, type ShareTake } from "./app/link";
-  import { href, PAGE_ROUTES, router } from "./app/router.svelte";
+  import { scrubAddressBar } from "./app/link";
+  import { href, LINK_ROUTES, moveLegacyLink, PAGE_ROUTES, router } from "./app/router.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
   import { getLang } from "./i18n/i18n.svelte";
@@ -12,9 +12,7 @@
   import { watchOpenGrant } from "./session/open-grant";
   import Downloads from "./routes/Downloads.svelte";
   import History from "./routes/History.svelte";
-  import Manage from "./routes/Manage.svelte";
   import NotFound from "./routes/NotFound.svelte";
-  import Open from "./routes/Open.svelte";
   import SendFlow from "./routes/SendFlow.svelte";
   import Unsupported from "./routes/Unsupported.svelte";
   import PageRedirect from "./pages/PageRedirect.svelte";
@@ -48,50 +46,31 @@
   reloadIfRestored(window);
 
   /**
-   * UI §12.1, spec §32 : le lien d'ouverture ou de gestion (racine avec un « # » de la bonne
-   * forme) est lu par l'écran lui-même, au moment où il se monte (take), puis le « # » et la
-   * requête sont retirés de l'adresse et de l'historique. Le secret n'est rangé dans aucun état
-   * réactif ni global : il passe par valeur à la fermeture de l'écran.
-   * - Ouverture : createReceiver le retire juste après la lecture, sauf dans un navigateur
-   *   intégré (S4, jusqu'à « Continuer ici quand même »).
-   * - Gestion : retiré ici, à la lecture (sauf navigateur intégré).
-   * - Toute autre route (accueil avec un « # » mal formé, 404, hors base de démo) : un « # » non
-   *   vide est retiré aussi.
+   * UI §12.1, spec §32 : l'ouverture et la gestion ont leur page, « /s » (s.html, 16 novembre).
+   * Un ancien lien à la racine (« /#<clé> », ou collé ensuite dans la barre) y est envoyé tel
+   * quel (moveLegacyLink : remplacement, même fragment). Toute autre route (accueil avec un
+   * « # » mal formé, 404, hors base de démo) : un « # » non vide est retiré de l'adresse.
    */
   const inApp = () => inAppBrowser(navigator.userAgent, isStandalone(window)) !== null;
   function scrubHere(): void {
     // Chemin non nu (« //x », « \ ») : repli sur l'accueil plutôt que garder le « # ».
     if (!scrubAddressBar(history, location.pathname)) scrubAddressBar(history, href("/"));
   }
-  const takeShare = (): ShareTake => readShare(location.href);
-  function takeManage(): LinkState {
-    const l = readLink(location.href, "m");
-    if (!inApp()) scrubHere();
-    return l;
-  }
-  // Un nouveau lien collé sur la même route (navigation de fragment) remonte l'écran.
-  let linkGen = $state(0);
 
   function onRoute(): void {
-    const name = router.current.name;
-    if (name === "open" || name === "manage") return; // l'écran lit et nettoie lui-même
+    if (LINK_ROUTES.has(router.current.name)) {
+      moveLegacyLink(location);
+      return;
+    }
     if (location.hash !== "" && !inApp()) scrubHere();
   }
-  let lastRoute = router.current;
   $effect(() => {
-    lastRoute = router.current;
+    void router.current;
     if (supported) untrack(onRoute);
   });
-  // « # » collé dans la barre sur la même page : relu par un écran neuf s'il garde la même route
-  // d'ouverture ou de gestion (le changement de route, lui, monte déjà un écran neuf) ; retiré
-  // ailleurs. Un « # » déjà retiré ne relance rien.
+  // « # » collé dans la barre : un lien part vers « /s », tout autre « # » est retiré.
   function onHashChange() {
-    if (!supported || location.hash === "") return;
-    const r = router.current;
-    const same = r === lastRoute;
-    lastRoute = r;
-    if ((r.name === "open" || r.name === "manage") && same) linkGen++;
-    else onRoute();
+    if (supported && location.hash !== "") onRoute();
   }
 
   // UI §9.2.2 : hors de l'accueil, un fichier déposé ne fait jamais naviguer l'onglet. Sur
@@ -139,10 +118,8 @@
          même vide (retours DROP). Un seul SendFlow pour les deux : passer de l'un à l'autre garde
          la liste. -->
     <SendFlow sendPage={router.current.name === "envoyer"} onbusy={(b) => (sending = b)} />
-  {:else if router.current.name === "open"}
-    {#key linkGen}<Open take={takeShare} />{/key}
-  {:else if router.current.name === "manage"}
-    {#key linkGen}<Manage take={takeManage} />{/key}
+  {:else if LINK_ROUTES.has(router.current.name)}
+    <!-- Ancien lien à la racine : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
   {:else if router.current.name === "envois"}
     <History />
   {:else if router.current.name === "telechargements"}

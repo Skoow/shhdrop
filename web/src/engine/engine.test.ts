@@ -15,6 +15,7 @@ import type { FinalEntry } from "./pkg/shhdrop_wasm.js";
 import { createProvider, type WebCryptoProvider } from "./provider";
 
 const here = dirname(fileURLToPath(import.meta.url));
+import { linkCases, toS } from "./link-vectors.testutil";
 const V = JSON.parse(readFileSync(join(here, "../../../engine/vectors/v2.json"), "utf8"));
 const WASM = join(here, "pkg/shhdrop_wasm_bg.wasm");
 
@@ -137,7 +138,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     const IDN = "https://été.example/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
     const seen = new Map<string, number>();
     let idn = 0;
-    for (const c of V.link) {
+    for (const c of linkCases()) {
       const a = c.args as string[];
       seen.set(c.fn, (seen.get(c.fn) ?? 0) + 1);
       switch (c.fn) {
@@ -508,8 +509,9 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     for (const [n, w] of sh.segments.entries()) expect(sha(segs[n]!), `segment ${n}`).toBe(w.sha256_zero_filled);
     // Lien, lien de gestion, lien du QR, mot de passe, enveloppe (nonce du vecteur).
     const kLien = unhex(sh.k_lien);
-    expect(String(W.shareLink(sh.origin, kLien, "/"))).toBe(sh.link);
-    expect(String(W.manageLink(sh.origin, unhex(sh.s_gestion), "/"))).toBe(sh.manage_link);
+    // Lien écrit sous /s depuis le 16 novembre (v3-liens.json) ; la forme racine reste lue.
+    expect(String(W.shareLink(sh.origin, kLien, "/"))).toBe(toS(sh.link));
+    expect(String(W.manageLink(sh.origin, unhex(sh.s_gestion), "/"))).toBe(toS(sh.manage_link));
     expect(String(W.shareLinkWithPassword(utf8(sh.link), utf8(sh.password)))).toBe(sh.link_with_password);
     expect(String(W.generatePassword(testProvider([draw("password")]).p))).toBe(sh.password);
     expect(hex(W.passwordKeyForCreate(utf8(sh.password), unhex(sh.salt)))).toBe(sh.k_mdp);

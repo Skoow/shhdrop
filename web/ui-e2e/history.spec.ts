@@ -297,8 +297,8 @@ test.describe("en-US", () => {
     await page.goto(shh.origin + "/envois");
     await expect(page.getByRole("heading", { level: 1, name: "My shares" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Nothing sent yet" })).toBeVisible();
-    const foot = page.locator("footer.foot").getByRole("link", { name: "My shares", exact: true });
-    await expect(foot).toHaveAttribute("aria-current", "page");
+    // Plus de lien « My shares » dans le pied (16 novembre) : celui de l'en-tête (ordinateur).
+    if (!isMobile) await expect(page.getByRole("banner").getByRole("link", { name: "My shares", exact: true }).first()).toHaveAttribute("aria-current", "page");
     // Une simple visite (accueil, « Vos envois ») ne crée aucune base dans le navigateur.
     await page.goto(shh.origin + "/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

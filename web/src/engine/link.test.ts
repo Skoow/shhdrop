@@ -6,14 +6,14 @@ import { MANAGE_FRAGMENT, SHARE_FRAGMENT, SHARE_LINK_SHAPE, SHARE_PW_FRAGMENT, b
 
 const K = b64u(new Uint8Array(32).fill(1)); // 43 caractères
 
-describe("liens (spec §32 : à la racine, secret après #)", () => {
-  it("aller-retour shareLink → parseLink ; longueur = origine + 45", async () => {
+describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", () => {
+  it("aller-retour shareLink → parseLink ; longueur = origine + 46", async () => {
     const k = newKLien();
     const link = await shareLink("https://shhdrop.example", k);
-    expect(link).toBe(`https://shhdrop.example/#${b64u(k)}`);
-    expect(link.length).toBe("https://shhdrop.example".length + 45);
+    expect(link).toBe(`https://shhdrop.example/s#${b64u(k)}`);
+    expect(link.length).toBe("https://shhdrop.example".length + 46);
     expect(link).toMatch(SHARE_LINK_SHAPE);
-    expect(await shareLink("https://shhdrop.app", k)).toHaveLength(64); // « 64 caractères en tout »
+    expect(await shareLink("https://shhdrop.app", k)).toHaveLength(65); // 65 caractères en tout
     const p = await parseLink(link);
     if (p.kind !== "s") throw new Error("type");
     expect(p).toEqual({ kind: "s", origin: "https://shhdrop.example", kLien: k });
@@ -23,7 +23,7 @@ describe("liens (spec §32 : à la racine, secret après #)", () => {
   it("aller-retour manageLink → parseLink", async () => {
     const s = newSGestion();
     const link = await manageLink("http://127.0.0.1:4000", s);
-    expect(link).toBe(`http://127.0.0.1:4000/#m${b64u(s)}`);
+    expect(link).toBe(`http://127.0.0.1:4000/s#m${b64u(s)}`);
     const p = await parseLink(link);
     if (p.kind !== "m") throw new Error("type");
     expect(p.sGestion).toEqual(s);
@@ -59,8 +59,10 @@ describe("liens (spec §32 : à la racine, secret après #)", () => {
       `https://x/#${K}=`,
       `https://x/#x${K}`, // préfixe inconnu
       `https://x/x#${K}`, // autre chemin
-      `https://x/s#${K}`,
-      `https://x/s/AAAAAAAAAAAAAAAAAAAAAA#${K}`, // ancien format : aucune compatibilité
+      `https://x/s/#${K}`, // seul « /s » exact
+      `https://x/ss#${K}`,
+      `https://x/S#${K}`,
+      `https://x/s/AAAAAAAAAAAAAAAAAAAAAA#${K}`, // très ancien format : aucune compatibilité
       `https://x/m/AAAAAAAAAAAAAAAAAAAAAA#${K}`,
       `https://x//#${K}`,
       `https://x/shhdrop/#${K}`, // base de démo hors démo
@@ -77,7 +79,7 @@ describe("liens (spec §32 : à la racine, secret après #)", () => {
   it("base /shhdrop/ (démo) : chemin exigé, aller-retour", async () => {
     const k = newKLien();
     const link = await shareLink("https://skoow.github.io", k, "/shhdrop/");
-    expect(link).toBe(`https://skoow.github.io/shhdrop/#${b64u(k)}`);
+    expect(link).toBe(`https://skoow.github.io/shhdrop/s#${b64u(k)}`);
     expect(await parseLink(link, "/shhdrop/")).toEqual({ kind: "s", origin: "https://skoow.github.io", kLien: k });
     expect((await parseLink(`https://skoow.github.io/shhdrop#${K}`, "/shhdrop/")).kind).toBe("s");
     const s = newSGestion();
@@ -86,7 +88,7 @@ describe("liens (spec §32 : à la racine, secret après #)", () => {
       origin: "https://skoow.github.io",
       sGestion: s,
     });
-    for (const u of [`https://x/#${K}`, `https://x/shhdropx/#${K}`, `https://x/shhdrop/shhdrop/#${K}`, `https://x/shhdrop/s#${K}`])
+    for (const u of [`https://x/#${K}`, `https://x/shhdropx/#${K}`, `https://x/shhdrop/shhdrop/#${K}`, `https://x/s#${K}`, `https://x/shhdrop/s/#${K}`])
       await expect(parseLink(u, "/shhdrop/"), u).rejects.toThrow("lien_invalide");
     for (const b of ["", "Shhdrop/", "/shhdrop", "//", "/a b/"]) {
       await expect(parseLink(`https://x/#${K}`, b), b).rejects.toThrow("base_invalide");
@@ -111,7 +113,20 @@ describe("liens (spec §32 : à la racine, secret après #)", () => {
     const link = await shareLink("https://shhdrop.app", k);
     const password = "Ab3!xY7#";
     expect(link).not.toContain(password);
-    expect(link.slice("https://shhdrop.app/#".length)).toBe(b64u(k));
+    expect(link.slice("https://shhdrop.app/s#".length)).toBe(b64u(k));
+  });
+
+  it("anciens liens à la racine (avant le 16 novembre) : toujours lus, jamais plus écrits", async () => {
+    for (const [u, b] of [
+      [`https://x.test/#${K}`, "/"],
+      [`https://x.test/s#${K}`, "/"],
+      [`https://x.test/shhdrop/#${K}`, "/shhdrop/"],
+      [`https://x.test/shhdrop/s#${K}`, "/shhdrop/"],
+    ] as const) {
+      const p = await parseLink(u, b);
+      expect(p.kind === "s" && b64u(p.kLien), u).toBe(K);
+    }
+    expect((await parseLink(`https://x.test/s#m${K}`)).kind).toBe("m");
   });
 });
 

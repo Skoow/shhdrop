@@ -205,8 +205,8 @@ var appRoutes = map[string]bool{
 
 // compteRoutes : pages du compte (table COMPTE_PATHS de web/src/app/router.svelte.ts, lot 10),
 // servies en 200 seulement avec SHH_COMPTES=1.
-// pageFiles : pages d'information servies par leur propre fichier HTML (web/vite.config.ts,
-// PAGE_PATHS ; web/scripts/check-dist.mjs, INFO_PAGES).
+// pageFiles : pages servies par leur propre fichier HTML : pages d'information (web/vite.config.ts,
+// PAGE_PATHS ; web/scripts/check-dist.mjs, INFO_PAGES) et page d'ouverture « /s » (s.html).
 var pageFiles = map[string]string{
 	"/securite":         "securite.html",
 	"/confidentialite":  "confidentialite.html",
@@ -214,6 +214,8 @@ var pageFiles = map[string]string{
 	"/conditions":       "conditions.html",
 	"/mentions-legales": "mentions-legales.html",
 	"/signaler":         "signaler.html",
+	// Liens de partage et de gestion sous « /s » (16 novembre) : page d'ouverture seule.
+	"/s": "s.html",
 }
 
 var compteRoutes = map[string]bool{

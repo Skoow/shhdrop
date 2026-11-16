@@ -197,6 +197,18 @@ func TestServeStaticDir(t *testing.T) {
 			t.Fatalf("%s : %d %q %v", p, code, body, h)
 		}
 	}
+	// Liens sous « /s » (16 novembre) : la page d'ouverture est servie à « /s » seulement.
+	os.WriteFile(filepath.Join(static, "s.html"), []byte("<!doctype html><title>Ouvrir</title>"), 0o600)
+	for _, p := range []string{"/s", "/s.html"} {
+		if code, body, h := get("GET", p); code != 200 || body != "<!doctype html><title>Ouvrir</title>" || h.Get("Content-Security-Policy") == "" || h.Get("Cache-Control") != "no-store" {
+			t.Fatalf("%s : %d %q %v", p, code, body, h)
+		}
+	}
+	for _, p := range []string{"/s/", "/S", "/ss"} {
+		if code, body, _ := get("GET", p); code != 404 || strings.Contains(body, "Ouvrir") {
+			t.Fatalf("%s : %d %q", p, code, body)
+		}
+	}
 	if code, body, _ := get("GET", "/pdf-frame"); code != 404 || strings.Contains(body, "cadre") {
 		t.Fatalf("/pdf-frame : %d %q", code, body)
 	}

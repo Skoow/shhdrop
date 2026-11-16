@@ -654,8 +654,8 @@ fn v2_limites() {
     assert_eq!(by("note_400001_octets")["error"], "texte_trop_long");
     assert_eq!(by("note_utf8_invalide")["error"], "texte_invalide");
     assert_eq!(by("note_400000_octets")["opened"][0]["len"], 400_000);
-    assert!(l["written"][0]["link"].as_str().unwrap().contains("/#m"));
+    assert!(l["written"][0]["link"].as_str().unwrap().contains("/s#m"));
     assert_eq!(l["written"][0]["parsed"]["kind"], "s");
-    assert!(l["written"][2]["link"].as_str().unwrap().contains("/#mm"));
+    assert!(l["written"][2]["link"].as_str().unwrap().contains("/s#mm"));
     assert_eq!(l["written"][2]["parsed"]["kind"], "m");
 }
