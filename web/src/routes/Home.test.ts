@@ -40,7 +40,9 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Ou créez sur place : note, vocal, photo");
     expect(document.querySelector(".lede")!.textContent!.length).toBeGreaterThan(20);
     const pick = document.querySelector<HTMLButtonElement>("[data-pick]")!;
-    expect(pick.textContent!.trim()).toBe("Choisir des fichiers");
+    expect(pick.querySelector(".pk-t")!.textContent).toBe("Choisir des fichiers");
+    expect(pick.querySelector(".pk-s")!.textContent).toBe("Photos, vidéos, documents"); // tuile : sortes de fichiers, sans la taille
+    expect(pick.querySelector(".pk-s")!.getAttribute("aria-hidden")).toBe("true");
     expect(pick.querySelector("svg")).not.toBeNull();
     const room = document.querySelector<HTMLButtonElement>("[data-room] button")!;
     expect(room.textContent).toContain("Ouvrir un salon");
@@ -112,14 +114,18 @@ describe("Home (UI §9.1)", () => {
     expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "plus", "rien."]);
     const delays = words.map((w) => w.style.getPropertyValue("--d"));
     expect(delays).toEqual(["0ms", "55ms", "110ms", "165ms", "220ms", "275ms", "370ms", "425ms", "480ms"]);
-    // « puis plus rien. » lettre par lettre (effacement, retours du 15 novembre), décalage de
-    // droite à gauche : le point final part le premier.
+    // « puis plus rien. » lettre par lettre (décision du 16 novembre) : extinction de gauche à
+    // droite ; chaque lettre plus pâle que la précédente, le point final invisible.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
     expect(letters.map((l) => l.textContent).join("")).toBe("puisplusrien.");
-    expect(letters.map((l) => l.style.getPropertyValue("--k"))).toEqual(["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0"]);
+    expect(letters.map((l) => l.style.getPropertyValue("--k"))).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]);
+    const o = letters.map((l) => Number(l.style.getPropertyValue("--o")));
+    expect(o[0]).toBe(0.55);
+    expect(o[12]).toBe(0);
+    for (let i = 1; i < o.length; i++) expect(o[i]).toBeLessThan(o[i - 1]!);
   });
 
-  it("entrée une seule fois (§20.4) : la classe reveal part après 1,3 s, l'effacement après 4,775 s, jamais rejoués", async () => {
+  it("entrée une seule fois (§20.4) : la classe reveal part après 1,3 s, l'effacement après 3,75 s, jamais rejoués", async () => {
     vi.useFakeTimers();
     try {
       vi.resetModules(); // nouveau chargement de page : le drapeau « déjà joué » repart de zéro
@@ -136,9 +142,9 @@ describe("Home (UI §9.1)", () => {
       vi.advanceTimersByTime(1);
       flushSync();
       expect(home().contains("reveal")).toBe(false);
-      // L'effacement de « puis plus rien. » dure un peu plus (4,775 s), une seule fois, < 5 s.
+      // L'effacement de « puis plus rien. » dure un peu plus (3,75 s), une seule fois, < 5 s.
       expect(home().contains("erase")).toBe(true);
-      vi.advanceTimersByTime(4775 - 1300 - 1);
+      vi.advanceTimersByTime(3750 - 1300 - 1);
       flushSync();
       expect(home().contains("erase")).toBe(true);
       vi.advanceTimersByTime(1);
@@ -259,7 +265,7 @@ describe("Home (UI §9.1)", () => {
     show();
     expect(title(document.querySelector("h1")!)).toBe("One link, one password, then nothing.");
     expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Or create one here: note, voice, photo");
-    expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
+    expect(document.querySelector("[data-pick] .pk-t")!.textContent).toBe("Choose files");
     expect(document.querySelector("[data-key-note]")!.textContent!.trim()).toBe("The link's key comes after the “#”: browsers never send that part to the server.");
     expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Erased after opening"]);
   });

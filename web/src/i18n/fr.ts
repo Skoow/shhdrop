@@ -5,6 +5,7 @@ export const fr = {
   "hero.lede": "Fichiers, photos, vidéos, vocaux et notes, chiffrés sur votre appareil avant de partir. Sans le lien et le mot de passe, personne ne peut les lire.",
   // Vrai pour le serveur de production (en Europe) ; masqué dans la démo GitHub Pages.
   "hero.pick": "Choisir des fichiers",
+  "hero.pick.sub": "Photos, vidéos, documents",
   "hero.room": "Ouvrir un salon",
   "hero.more": "Ou créez sur place : note, vocal, photo",
   "hero.meta.free": "Gratuit jusqu'à {size}",

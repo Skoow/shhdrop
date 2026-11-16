@@ -232,6 +232,7 @@
               {t("ready.demo.open")}
             </Button>
           </div>
+          <p class="demo-note" data-demo-note>{demo.readyNote}</p>
         {/if}
       </div>
 
@@ -589,5 +590,11 @@
   .lede {
     margin: 0;
     color: var(--text-2);
+  }
+  /* Démo seulement : la mention qui remplace le texte du bandeau (16 novembre). */
+  .demo-note {
+    margin: var(--sp-2) 0 0;
+    color: var(--warn);
+    font-size: var(--fs-small);
   }
 </style>

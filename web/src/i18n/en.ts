@@ -5,6 +5,7 @@ export const en = {
   "hero.lede": "Files, photos, videos, voice notes and notes, encrypted on your device before they leave. Without the link and the password, nobody can read them.",
   // Vrai pour le serveur de production (en Europe) ; masqué dans la démo GitHub Pages.
   "hero.pick": "Choose files",
+  "hero.pick.sub": "Photos, videos, documents",
   "hero.room": "Open a room",
   "hero.more": "Or create one here: note, voice, photo",
   "hero.meta.free": "Free up to {size}",

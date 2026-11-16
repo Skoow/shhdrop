@@ -8,7 +8,6 @@
   // « Rien de réel » (audit F5) : les partages de la démo restent chiffrés dans ce navigateur,
   // sur une origine (github.io) partagée par tous les sites GitHub Pages du compte.
   import { getLang } from "../i18n/i18n.svelte";
-  import { TriangleAlert } from "../ui/Icon";
 
   const TEXT = {
     fr: "Démo : rien n'est envoyé, le lien ne marche que dans cet onglet. N'y mettez rien de réel.",
@@ -16,43 +15,22 @@
   } as const;
 </script>
 
+<!-- Décision du propriétaire du 16 novembre : une ligne orange fine, sans texte visible ; le texte
+     reste lu par les lecteurs d'écran, et « Lien prêt » le redit sous le lien (readyNote). -->
 <div class="demo-banner" role="note" data-demo={MARK}>
-  <p class="in">
-    <span class="ic" aria-hidden="true"><TriangleAlert size={18} strokeWidth={1.75} /></span>
-    <span>{TEXT[getLang()]}</span>
-  </p>
+  <p class="sr-only">{TEXT[getLang()]}</p>
 </div>
 
 <style>
   .demo-banner {
-    background: var(--warn-tint);
-    border-block-end: 1px solid var(--line);
-    color: var(--text);
-    font-size: var(--fs-small);
-    line-height: var(--lh-small);
-  }
-  .in {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-2);
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: var(--sp-2) max(var(--sp-4), env(safe-area-inset-right)) var(--sp-2) max(var(--sp-4), env(safe-area-inset-left));
-  }
-  @media (min-width: 600px) {
-    .in {
-      padding-inline: max(var(--sp-5), env(safe-area-inset-left)) max(var(--sp-5), env(safe-area-inset-right));
-    }
-  }
-  .ic {
-    display: inline-flex;
-    flex: none;
-    padding-block-start: 1px;
-    color: var(--warn);
+    height: 3px;
+    background: linear-gradient(90deg, rgb(245 165 36 / 0.25), var(--warn) 18%, #ffb84d 50%, var(--warn) 82%, rgb(245 165 36 / 0.25));
+    box-shadow: 0 0 10px rgb(245 165 36 / 0.45);
   }
   @media (forced-colors: active) {
     .demo-banner {
-      border-block-end-color: CanvasText;
+      background: Highlight;
+      box-shadow: none;
     }
   }
 </style>

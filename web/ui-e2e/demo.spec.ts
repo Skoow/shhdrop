@@ -28,6 +28,8 @@ test.describe("fr-FR", () => {
     const banner = page.getByRole("note");
     await expect(banner).toHaveText(BANNER_FR);
     await expect(banner).toBeVisible();
+    // Une ligne orange fine (16 novembre) : le texte n'est lu que par les lecteurs d'écran.
+    expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(4);
     // Tout en haut de la page, avant l'en-tête, sans bouton de fermeture.
     expect((await banner.boundingBox())!.y).toBe(0);
     await expect(banner.getByRole("button")).toHaveCount(0);
@@ -295,6 +297,8 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(page).toHaveTitle("Démo · Lien prêt · Shhgone");
     const link = (await page.getByRole("group", { name: "Lien", exact: true }).locator(".sr-only").first().textContent()) ?? "";
     expect(link).toMatch(new RegExp(`^${demo.origin.replace(/\./g, "\\.")}/shhgone/#[A-Za-z0-9_-]{43}$`));
+    // Le bandeau n'est plus qu'une ligne : l'avertissement est redit sous le lien (16 novembre).
+    await expect(page.locator("[data-demo-note]")).toHaveText("Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.");
     const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
     expect(manage).toMatch(/\/shhgone\/#m[A-Za-z0-9_-]{43}$/);
     expect(await storage(page)).toBe(0);

@@ -155,8 +155,8 @@ test.describe("fr-FR", () => {
     // Titre (9 mots), phrase, boutons, cases cochées, infographie (et carte de dépôt sur ordinateur) :
     // 13 entrées au moins (retours du 15 novembre : plus de sur-titre ; entrée revue, 1,3 s),
     // attendues jusqu'à ce que tous les départs aient eu lieu. « puis plus rien. » se défait
-    // ensuite (letter-out, letter-dot) : une fois, fini avant 5 s (WCAG 2.2.2).
-    const erase = (r: Rec) => /letter-(out|dot)$/.test(r.name);
+    // ensuite (letter-fade) : une fois, fini avant 5 s (WCAG 2.2.2).
+    const erase = (r: Rec) => /letter-fade$/.test(r.name);
     await expect.poll(async () => (await recorded()).filter((r) => !r.ambient && !erase(r)).length, { timeout: 30_000 }).toBeGreaterThanOrEqual(13);
     const all = await recorded();
     for (const e of all.filter((r) => !r.ambient && !erase(r))) expect(e.end, e.name).toBeLessThanOrEqual(1300);

@@ -22,6 +22,12 @@ const SLOW_RATE = 1_000_000;
 const OUTAGE = { atFraction: 0.5, ms: 20_000 };
 
 
+/** Sous le lien de « Lien prêt » (décision du propriétaire du 16 novembre : le bandeau devient
+ *  une ligne fine, l'avertissement reste là où il compte, avant d'envoyer un lien). */
+const READY_NOTE = {
+  fr: "Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.",
+  en: "Demo: this link only works in this tab. Nothing is sent.",
+} as const;
 const INVALID_LINK_NOTE = {
   fr: "(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)",
   en: "(expected in the demo: a share only exists in the tab that created it)",
@@ -106,6 +112,9 @@ export async function installDemo(w: Window): Promise<void> {
     },
     get invalidLinkNote() {
       return INVALID_LINK_NOTE[getLang()];
+    },
+    get readyNote() {
+      return READY_NOTE[getLang()];
     },
     get securityGaps() {
       return SECURITY_GAPS[getLang()].join("\n");

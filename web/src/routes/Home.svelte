@@ -1,9 +1,9 @@
 <script module lang="ts">
   // UI §20.4 : le titre entre mot par mot une seule fois par chargement de page.
   let revealed = false;
-  /** Effacement de « puis plus rien. » (CSS : départ 1,4 s, 45 ms par lettre, 2,6 s chacune) :
+  /** Effacement de « puis plus rien. » (CSS : départ 1,4 s, 90 ms par lettre, 900 ms chacune) :
    *  classe retirée à la fin, au plus 15 lettres ; sous les 5 s de WCAG 2.2.2. */
-  const ERASE_END_MS = 1400 + 15 * 45 + 2600 + 100;
+  const ERASE_END_MS = 1400 + 15 * 90 + 900 + 100;
 
   /** D'où viennent les fichiers remis à `onfiles` (composer.add, Task 10). */
   export type Source = "fichiers" | "photo" | "video" | "depot";
@@ -28,7 +28,7 @@
   import { CONTENT_MAX } from "../limits";
   import { magnet } from "../ui/attach";
   import DropOverlay from "../ui/DropOverlay.svelte";
-  import { ArrowRight, Camera, Check, Lock, Mic, Timer, Type, Upload, UserX } from "../ui/Icon";
+  import { ArrowRight, Camera, Check, ChevronRight, Lock, Mic, Timer, Type, Upload, UserX } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
   import PromiseBand from "../ui/PromiseBand.svelte";
@@ -67,10 +67,10 @@
     const timer = setTimeout(() => (reveal = false), 1300);
     return () => clearTimeout(timer);
   });
-  // « puis plus rien. » se défait (retours du propriétaire du 15 novembre ; analyse du design
-  // du 13 novembre, M1) : après l'entrée, ses lettres deviennent des points (la trame du logo),
-  // de droite à gauche, les points s'éteignent, puis les lettres reviennent. Une seule fois,
-  // moins de 5 s (WCAG 2.2.2), opacity et transform seulement ; rien en mouvement réduit (CSS).
+  // « puis plus rien. » s'efface vers la dernière lettre (décision du propriétaire du 16 novembre,
+  // proposition G) : après l'entrée, chaque lettre s'éteint à son tour, de gauche à droite, et
+  // reste pâle ; plus on avance, plus elle s'efface ; le point final disparaît. Une seule fois,
+  // moins de 5 s (WCAG 2.2.2), opacity seulement ; en mouvement réduit, l'état final d'emblée.
   // La phrase entière reste lue d'un bloc (copie sr-only, K8).
   let erase = $state(untrack(() => reveal));
   $effect(() => {
@@ -83,7 +83,8 @@
    * K1 revu (15 novembre, « plus de fluidité ») : 760 ms par mot, 55 ms de décalage, respiration
    * de 40 ms après la dernière virgule (« puis », « then ») ; montée courte et opacité, sans flou
    * (le flou d'un grand texte saccadait sur téléphone). Le dernier mot finit vers 1,24 s.
-   * Lettres de la seconde ligne : décalage de l'effacement, de droite à gauche (`k`).
+   * Lettres de la seconde ligne : rang de gauche à droite (`k`, décalage de l'effacement) et
+   * opacité finale (`o`), de 0,55 pour la première à 0 pour la dernière.
    */
   const words = $derived.by(() => {
     const list = t("hero.title").split(/ +/);
@@ -100,7 +101,12 @@
       delay: i * 55 + (hl(i) ? 40 : 0),
       hl: hl(i),
       br: breath >= 0 && i === breath + 1,
-      letters: hl(i) ? [...w].map((c) => ({ c, k: total - 1 - seen++ })) : [],
+      letters: hl(i)
+        ? [...w].map((c) => {
+            const k = seen++;
+            return { c, k, o: total > 1 ? +(0.55 * (1 - k / (total - 1))).toFixed(3) : 0 };
+          })
+        : [],
     }));
   });
 
@@ -177,7 +183,7 @@
         <span class="sr-only">{t("hero.title")}</span>
         <span class="words" aria-hidden="true">
           {#each words as { w, delay, hl, br, letters }, i (i)}{#if br && !compact}<br />{/if}<span class={["w", { hl: hl && !compact }]} style:--d="{delay}ms"
-              >{#if hl && !compact}{#each letters as { c, k }, j (j)}<span class="l" style:--k={k}>{c}</span>{/each}{:else}{w}{/if}</span
+              >{#if hl && !compact}{#each letters as { c, k, o }, j (j)}<span class="l" style:--k={k} style:--o={o}>{c}</span>{/each}{:else}{w}{/if}</span
             >{" "}{/each}
         </span>
       </h1>
@@ -186,8 +192,13 @@
         <p class="lede">{t("hero.lede")}</p>
         <!-- Cadre des deux actions (retours du 15 novembre) : les deux boutons ressortent. -->
         <div class="ctas" data-ctas>
+          <!-- Tuile (proposition 4a, décision du propriétaire du 16 novembre) : pastille, titre, les
+               sortes de fichiers en petit (sans la taille : elle est dite plus bas), flèche. Le nom
+               accessible reste « Choisir des fichiers » ; la ligne fine redit la phrase d'accroche. -->
           <button type="button" class="pick" data-pick onclick={() => onpick?.()}>
-            <Upload size={20} strokeWidth={2} aria-hidden="true" /><span>{t("hero.pick")}</span>
+            <span class="pk-ic" aria-hidden="true"><Upload size={20} strokeWidth={2} /></span>
+            <span class="pk-tx"><span class="pk-t">{t("hero.pick")}</span><span class="pk-s" aria-hidden="true">{t("hero.pick.sub")}</span></span>
+            <ChevronRight size={20} strokeWidth={2} aria-hidden="true" />
           </button>
           <!-- Salon (spec §39 : « le bouton du salon est à part, pour qu'on le voie ») : pas encore
                construit (désactivé, « bientôt ») ; même icône que l'onglet du téléphone. -->
@@ -348,32 +359,13 @@
     line-height: 1.55;
     text-wrap: pretty;
   }
-  /* Cadre des deux actions (retours du 15 novembre) : verre sombre, filet lumineux en haut
-     (menthe vers bleu, comme le pied de page), coins larges ; les boutons gardent leurs couleurs. */
+  /* Les deux actions (la tuile se suffit : plus de cadre autour, 16 novembre). */
   .ctas {
-    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     margin-top: var(--sp-2);
-    padding: var(--sp-3);
-    border-radius: 22px;
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.015)),
-      rgb(13 17 26 / 0.72);
-    box-shadow:
-      inset 0 0 0 1px rgb(150 175 255 / 0.16),
-      0 24px 60px -28px rgb(51 102 255 / 0.55);
-  }
-  .ctas::before {
-    content: "";
-    position: absolute;
-    inset-inline: 18%;
-    inset-block-start: 0;
-    block-size: 1px;
-    background: linear-gradient(90deg, transparent, rgb(95 227 181 / 0.7), rgb(85 150 248 / 0.5), transparent);
-    pointer-events: none;
   }
   /* « Ou créez sur place » : téléphone seulement (sur ordinateur, la zone de dépôt de l'accueil
      propose déjà Photo, Vocal et Texte). */
@@ -412,49 +404,96 @@
       display: none;
     }
   }
-  /* Bouton principal : blanc plein, icône ; un léger halo vert au survol (le « scellé »). */
+  /* Tuile « Choisir des fichiers » (proposition 4a, 16 novembre) : verre sombre, liseré menthe →
+     bleu, pastille d'icône menthe, titre et sortes de fichiers, flèche ; moins haute qu'une carte. */
   .pick {
-    max-width: 100%;
-    display: inline-flex;
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
-    min-height: 52px;
-    padding: 0 22px;
+    gap: 14px;
+    width: min(100%, 26rem);
+    min-height: 72px;
+    padding: 12px 16px 12px 12px;
     border: 0;
-    border-radius: 14px;
-    background: #fff;
-    color: #07102a;
-    font: inherit;
-    font-size: 1rem;
-    font-weight: 650;
-    cursor: pointer;
+    border-radius: 18px;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.015)),
+      rgb(16 22 38 / 0.85);
     box-shadow:
-      0 14px 30px -14px rgb(51 102 255 / 0.7),
-      inset 0 -2px 0 rgb(7 16 42 / 0.12);
+      inset 0 0 0 1px rgb(150 175 255 / 0.18),
+      0 18px 40px -22px rgb(51 102 255 / 0.6);
+    color: var(--text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     transition:
       transform 360ms var(--ease-settle),
       box-shadow var(--dur-base) var(--ease-out);
   }
-  .pick :global(svg) {
+  /* Liseré dégradé (masque : seul le bord est peint). */
+  .pick::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(110deg, var(--accent), #5596f8 60%, rgb(85 150 248 / 0));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .pk-ic {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: rgb(95 227 181 / 0.14);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
+    color: var(--accent);
+  }
+  .pk-tx {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .pk-t {
+    font-size: 1.0625rem;
+    font-weight: 650;
+  }
+  .pk-s {
+    color: var(--text-3);
+    font-size: 0.75rem;
+  }
+  .pick > :global(svg) {
+    color: var(--text-2);
     transition: transform 420ms var(--ease-settle);
   }
   @media (hover: hover) {
     .pick:hover {
       transform: translateY(-2px);
       box-shadow:
-        0 18px 36px -14px rgb(51 102 255 / 0.85),
-        0 0 0 4px rgb(95 227 181 / 0.18),
-        inset 0 -2px 0 rgb(7 16 42 / 0.12);
+        inset 0 0 0 1px rgb(150 175 255 / 0.28),
+        0 22px 46px -22px rgb(51 102 255 / 0.8),
+        0 0 0 4px rgb(95 227 181 / 0.12);
     }
-    .pick:hover :global(svg) {
-      transform: translateY(-2px);
+    .pick:hover > :global(svg) {
+      transform: translateX(3px);
     }
   }
   .pick:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
     transition-duration: var(--dur-press);
   }
   .pick:focus-visible {
@@ -1049,64 +1088,20 @@
       transform: translateY(0.22em);
     }
   }
-  /* « puis plus rien. » se défait : la lettre s'éteint et rétrécit, un point de la trame prend
-     sa place puis s'éteint (« plus rien »), la lettre revient. */
+  /* « puis plus rien. » s'efface vers la dernière lettre : état final pâle, toujours (aussi en
+     mouvement réduit et après l'entrée) ; l'extinction lettre à lettre ne se joue qu'une fois. */
   .l {
-    position: relative;
     display: inline-block;
-  }
-  .l::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 58%;
-    width: 0.16em;
-    height: 0.16em;
-    margin: -0.08em 0 0 -0.08em;
-    border-radius: 50%;
-    background: currentColor;
-    opacity: 0;
-    pointer-events: none;
+    opacity: var(--o, 1);
   }
   @media (prefers-reduced-motion: no-preference) {
     .erase .l {
-      animation: letter-out 2600ms var(--ease-in-out) calc(1400ms + var(--k) * 45ms) both;
-    }
-    .erase .l::after {
-      animation: letter-dot 2600ms var(--ease-in-out) calc(1400ms + var(--k) * 45ms) both;
+      animation: letter-fade 900ms var(--ease-in-out) calc(1400ms + var(--k) * 90ms) backwards;
     }
   }
-  @keyframes letter-out {
-    0% {
+  @keyframes letter-fade {
+    from {
       opacity: 1;
-      transform: none;
-    }
-    16%,
-    66% {
-      opacity: 0;
-      transform: scale(0.55);
-    }
-    86%,
-    100% {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes letter-dot {
-    0%,
-    8% {
-      opacity: 0;
-      transform: scale(0);
-    }
-    18%,
-    34% {
-      opacity: 1;
-      transform: none;
-    }
-    48%,
-    100% {
-      opacity: 0;
-      transform: scale(0.4);
     }
   }
   @keyframes rise-only {
@@ -1219,10 +1214,7 @@
       border: 1px solid ButtonText;
       box-shadow: none;
     }
-    .ctas {
-      border: 1px solid CanvasText;
-    }
-    .ctas::before {
+    .pick::before {
       display: none;
     }
   }

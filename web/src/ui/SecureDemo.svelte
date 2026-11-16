@@ -75,23 +75,23 @@
   }));
   const at = (n: number, ...steps: number[]) => steps.includes(n);
 
-  // Journal (référence du propriétaire, 12 novembre) : ce qui se passe, ligne à ligne ; les
-  // lignes « late » (l'attaquant) arrivent un instant après celle de leur étape.
-  type Glyph = "file" | "lock" | "up" | "server" | "link" | "open" | "check" | "thief";
-  type Line = { n: number; icon: Glyph; text: Key; st: Key; tone: "ok" | "atk" | "end"; sub?: Key; late?: boolean };
+  // Journal façon terminal (décision du propriétaire du 16 novembre) : une ligne courte par étape,
+  // tapée lettre par lettre derrière une invite (« $ », « ! » pour l'attaquant), l'état à droite une
+  // fois la ligne tapée ; les lignes « late » (l'attaquant) arrivent un instant après celle de leur
+  // étape ; quatre lignes au plus à l'écran. Les dessins au-dessus ne changent pas.
+  type Line = { n: number; text: Key; st: Key; tone: "ok" | "atk" | "end"; late?: boolean };
   const LOG: Line[] = [
-    { n: 1, icon: "file", text: "demo.log.drop", st: "demo.st.ready", tone: "ok" },
-    { n: 2, icon: "lock", text: "demo.log.seal", st: "demo.st.ok", tone: "ok" },
-    { n: 3, icon: "up", text: "demo.log.send", st: "demo.st.ok", tone: "ok" },
-    { n: 3, icon: "thief", text: "demo.log.intercept", st: "demo.unreadable", tone: "atk", late: true },
-    { n: 4, icon: "server", text: "demo.log.server", st: "demo.unreadable", tone: "ok", sub: "demo.log.server.sub" },
-    { n: 4, icon: "thief", text: "demo.log.search", st: "demo.st.nothing", tone: "atk", late: true },
-    { n: 5, icon: "link", text: "demo.log.link", st: "demo.st.ok", tone: "ok" },
-    { n: 6, icon: "open", text: "demo.log.open", st: "demo.st.decrypted", tone: "ok" },
-    { n: 7, icon: "check", text: "demo.log.erase", st: "demo.st.done", tone: "end" },
-    { n: 7, icon: "thief", text: "demo.log.search2", st: "demo.empty", tone: "atk", late: true },
+    { n: 1, text: "demo.log.drop", st: "demo.st.ready", tone: "ok" },
+    { n: 2, text: "demo.log.seal", st: "demo.st.ok", tone: "ok" },
+    { n: 3, text: "demo.log.send", st: "demo.st.ok", tone: "ok" },
+    { n: 3, text: "demo.log.intercept", st: "demo.unreadable", tone: "atk", late: true },
+    { n: 4, text: "demo.log.server", st: "demo.unreadable", tone: "ok" },
+    { n: 4, text: "demo.log.search", st: "demo.st.nothing", tone: "atk", late: true },
+    { n: 5, text: "demo.log.link", st: "demo.st.ok", tone: "ok" },
+    { n: 6, text: "demo.log.open", st: "demo.st.decrypted", tone: "ok" },
+    { n: 7, text: "demo.log.erase", st: "demo.st.done", tone: "end" },
   ];
-  const lines = $derived(LOG.filter((l) => l.n <= shown));
+  const lines = $derived(LOG.filter((l) => l.n <= shown).slice(-4));
 </script>
 
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
@@ -229,11 +229,10 @@
     <ol class="log" aria-hidden="true">
       {#each lines as l, i (l.text)}
         <li class={["ln", l.tone, { late: l.late, last: i === lines.length - 1 }]}>
-          <span class="li-ic">{@render glyph(l.icon)}</span>
-          <span class="li-t">{t(l.text)}</span>
+          <span class="li-ic">{l.tone === "atk" ? "!" : "$"}</span>
+          <span class="li-t" style:--n={[...t(l.text)].length}>{t(l.text)}</span>
           <span class="li-dots"></span>
-          <span class="li-s">{t(l.st)}</span>
-          {#if l.sub}<span class="li-sub">{t(l.sub)}</span>{/if}
+          <span class="li-s">{l.tone === "atk" ? "✕" : "✓"} {t(l.st)}</span>
         </li>
       {/each}
     </ol>
@@ -258,18 +257,7 @@
 <figcaption class="figcap" aria-hidden="true"><span class="fig-n">{t("demo.fig")}</span> {t("demo.title")}</figcaption>
 </figure>
 
-{#snippet glyph(id: Glyph)}
-  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">
-    {#if id === "file"}<path d="M4 1.8h5l3 3v9.4H4z M9 1.8v3h3" />
-    {:else if id === "lock"}<rect x="3.5" y="7" width="9" height="7" rx="1.6" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-    {:else if id === "up"}<path d="M8 13V3 M4 7l4-4 4 4" />
-    {:else if id === "server"}<rect x="2.5" y="2.5" width="11" height="4.5" rx="1.2" /><rect x="2.5" y="9" width="11" height="4.5" rx="1.2" /><path d="M5 4.8h.01 M5 11.3h.01" />
-    {:else if id === "link"}<path d="M6.8 9.2a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-.6.6 M9.2 6.8a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l.6-.6" />
-    {:else if id === "open"}<rect x="3.5" y="7" width="9" height="7" rx="1.6" /><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1" />
-    {:else if id === "check"}<path d="M3 8.5l3.2 3L13 4.5" />
-    {:else}<path d="M8 2.2c-2.8 0-4.4 2.1-4.4 4.6 0 1.4.6 2.6 1.4 3.3L3 14h10l-2-3.9c.8-.7 1.4-1.9 1.4-3.3 0-2.5-1.6-4.6-4.4-4.6z" /><path d="M6.6 7.4h.01 M9.4 7.4h.01" />{/if}
-  </svg>
-{/snippet}
+
 
 {#snippet hood()}
   <g class="hood">
@@ -618,67 +606,80 @@
     }
   }
 
-  /* Journal : police mono embarquée, lignes qui s'écrivent l'une après l'autre. */
+  /* Journal façon terminal (16 novembre) : police mono embarquée, vert phosphore, fines lignes de
+     balayage ; chaque ligne se tape lettre par lettre (largeur en ch, par crans), l'état apparaît
+     ensuite ; curseur plein au bout de la dernière ligne. */
   .log {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    gap: 5px;
-    height: 132px;
+    gap: 6px;
+    height: 116px;
     margin: 0;
     padding: 10px 16px 12px;
     overflow: hidden;
     list-style: none;
     border-top: 1px solid rgb(150 175 255 / 0.1);
-    background: rgb(4 7 16 / 0.45);
+    background:
+      repeating-linear-gradient(180deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 3px),
+      rgb(3 9 8 / 0.7);
+    color: #9ff5d3;
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    line-height: 1.4;
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 34px);
-    mask-image: linear-gradient(to bottom, transparent, #000 34px);
+    line-height: 1.45;
+    text-shadow: 0 0 6px rgb(95 227 181 / 0.35);
   }
   @media (max-width: 479px) {
     .log {
       padding-inline: 12px;
       font-size: 0.6875rem;
     }
-    .li-sub {
-      font-size: 0.625rem;
-    }
   }
   .ln {
     flex: none;
     min-width: 0;
     display: grid;
-    grid-template-columns: 16px minmax(0, max-content) minmax(8px, 1fr) minmax(0, max-content);
+    grid-template-columns: 12px minmax(0, max-content) minmax(8px, 1fr) minmax(0, max-content);
     align-items: center;
     column-gap: 8px;
-    color: var(--text);
-    animation: line-in 380ms var(--ease-out) both;
+    animation: line-in 200ms var(--ease-out) both;
+    --type: calc(var(--n, 20) * 38ms);
+  }
+  /* Les anciennes lignes pâlissent : l'œil va à la dernière. */
+  .ln:not(.last) {
+    color: #4f8f78;
+    text-shadow: none;
   }
   .ln.late {
-    animation-delay: 800ms;
+    animation-delay: 900ms;
   }
   @keyframes line-in {
     from {
       opacity: 0;
-      transform: translateY(8px);
     }
   }
   .li-ic {
-    display: grid;
-    place-items: center;
-    color: var(--mint);
+    color: #5596f8;
+    font-weight: 700;
   }
   .li-t {
     min-width: 0;
+    max-width: calc(var(--n) * 1ch);
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+    animation: type var(--type) steps(var(--n)) both;
+  }
+  .ln.late .li-t {
+    animation-delay: 900ms;
+  }
+  @keyframes type {
+    from {
+      max-width: 0;
+    }
   }
   .li-dots {
     height: 1px;
-    border-top: 1px dotted rgb(150 175 255 / 0.3);
+    border-top: 1px dotted rgb(95 227 181 / 0.25);
   }
   .li-s {
     min-width: 0;
@@ -687,20 +688,21 @@
     font-weight: 600;
     white-space: nowrap;
     text-overflow: ellipsis;
+    animation: line-in 160ms var(--ease-out) var(--type) both;
   }
-  .li-sub {
-    grid-column: 2 / -1;
-    color: var(--text-2);
-    font-size: 0.6875rem;
+  .ln.late .li-s {
+    animation-delay: calc(900ms + var(--type));
   }
   .ln.atk .li-ic,
-  .ln.atk .li-t {
-    color: #f5c96b;
+  .ln.atk .li-t,
+  .ln.atk .li-s {
+    color: #ff8a8a;
+    text-shadow: 0 0 6px rgb(255 107 107 / 0.35);
   }
   .ln.end .li-s {
     color: var(--text);
   }
-  /* Curseur qui clignote au bout de la dernière ligne. */
+  /* Curseur plein qui clignote au bout de la dernière ligne. */
   .ln.last .li-s::after {
     content: "";
     display: inline-block;
@@ -708,7 +710,8 @@
     height: 13px;
     margin-inline-start: 6px;
     vertical-align: -2px;
-    background: var(--mint);
+    background: #9ff5d3;
+    box-shadow: 0 0 8px rgb(95 227 181 / 0.7);
     animation: blink 1s steps(1) infinite;
   }
   @keyframes blink {

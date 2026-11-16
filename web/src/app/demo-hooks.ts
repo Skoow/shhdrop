@@ -13,6 +13,8 @@ export type DemoHooks = {
   readonly invalidLinkNote: string;
   /** Écarts de protection de la démo par rapport à la production (page Sécurité, langue courante). */
   readonly securityGaps: string;
+  /** Mention sous le lien de « Lien prêt » (langue courante) : le lien de démo ne marche que dans cet onglet. */
+  readonly readyNote: string;
   /** Bandeau permanent, rendu dans l'emplacement `banner` de AppShell. */
   Banner: Component;
 };
