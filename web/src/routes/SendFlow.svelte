@@ -7,6 +7,7 @@
   import { flushSync, tick } from "svelte";
   import { getDemo } from "../app/demo-hooks";
   import { gate } from "../flows/clean-gate";
+  import { digestAsync } from "../flows/digest.svelte";
   import { setScreenTitle } from "../app/title";
   import { leaveGuard, router } from "../app/router.svelte";
   import { createWakeLock } from "../app/wakelock";
@@ -59,6 +60,8 @@
       // Dernier verrou avant le chiffrement : seul un contenu déclaré prêt par le composeur
       // (nettoyé, ou « Envoyer tel quel » choisi) est chiffré (flows/clean-gate.ts, spec §35.2).
       prepare: gate,
+      // Empreinte déjà calculée pour la ligne du fichier (flows/digest), écrite dans le manifeste.
+      sha256: digestAsync,
       onChange: () => {
         if (d !== draft) return;
         uploadVersion++;

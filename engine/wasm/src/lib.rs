@@ -24,7 +24,7 @@ use shhdrop_core::envelope::{self, AccessKeys, ContentKeys};
 use shhdrop_core::format::{self, MAX_SAFE};
 use shhdrop_core::kdf::{self, KDF_CREATE, KDF_MAX, KDF_MIN};
 use shhdrop_core::link::{self, ParsedLink};
-use shhdrop_core::manifest::{Clean, Kind, Manifest};
+use shhdrop_core::manifest::{self, Clean, Kind, Manifest};
 use shhdrop_core::platform::{KeyHandle, NONCE_LEN, Opened, Platform, SecretBuf, TAG_LEN};
 use shhdrop_core::reader::{Part, Reader, Segments};
 use shhdrop_core::{Error, KLien, KMdp, Result, SGestion, Seed, compte, encoding, password};
@@ -1237,6 +1237,18 @@ fn final_entry(v: &JsValue) -> core::result::Result<FinalEntry, JsValue> {
     if kind == FinalKind::Text && size <= format::TEXT_BYTES_MAX {
         el.check_note().map_err(js_err)?;
     }
+    // Empreinte SHA-256 du fichier (16 novembre) : facultative ; mal formée ou sur une note :
+    // refusée (seul le moteur l'écrit, en hexadécimal minuscule).
+    let sum = get(v, "sha256");
+    let sha256 = if sum.is_undefined() {
+        None
+    } else {
+        let h = sum.as_string().and_then(|s| manifest::sha256_hex(&s));
+        match (kind, h) {
+            (FinalKind::File(_), Some(h)) => Some(h),
+            _ => return Err(js_msg(BAD_ENTRY)),
+        }
+    };
     Ok(FinalEntry {
         kind,
         name: text("name")?,
@@ -1244,6 +1256,7 @@ fn final_entry(v: &JsValue) -> core::result::Result<FinalEntry, JsValue> {
         size,
         first: n64(num("first")?),
         k: el.k(),
+        sha256,
     })
 }
 
@@ -1334,7 +1347,7 @@ const TS_MANIFEST: &str = r#"
 /** Manifeste authentifié, sans les graines `k` (le lecteur garde les clés) ; une note porte son texte. */
 export type OpenedManifest = {
   v: 2; rights: "voir" | "enregistrer" | "coffre"; keep_ttl_h?: 1 | 6 | 12 | 24;
-  items: { kind: "text" | "file"; name: string; mime: string; size: number; offset: number; clean?: string; text?: string }[];
+  items: { kind: "text" | "file"; name: string; mime: string; size: number; offset: number; clean?: string; sha256?: string; text?: string }[];
 };
 "#;
 
@@ -1358,6 +1371,15 @@ fn manifest_js(m: &Manifest) -> Object {
             // Graine `k` omise : le lecteur tient les clés des éléments (jamais rendue à JS).
             if let Some(c) = e.clean {
                 set(&i, "clean", &c.name().into());
+            }
+            if let Some(h) = &e.sha256 {
+                const HEX: &[u8; 16] = b"0123456789abcdef";
+                let hex: String = h
+                    .iter()
+                    .flat_map(|b| [HEX[usize::from(b >> 4)], HEX[usize::from(b & 15)]])
+                    .map(char::from)
+                    .collect();
+                set(&i, "sha256", &hex.into());
             }
             if e.kind == Kind::Text {
                 set(&i, "text", &e.text.as_deref().unwrap_or_default().into());

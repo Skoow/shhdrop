@@ -214,6 +214,7 @@ fn build(p: &Rc<R>, items: &[(FinalKind, &str, &[u8], u64)]) -> Built {
             size: data.len() as u64,
             first,
             k: el.k(),
+            sha256: None,
         });
     }
     let fin = block_on(seal_final(&entries, &keys, None, None)).unwrap();

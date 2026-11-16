@@ -54,6 +54,10 @@ test("listes compactes : groupes, icônes par format, types, tailles, temps esti
   expect(await fmt("vocal.ogg")).toBe("OGG");
   expect(await fmt("trap.svg")).toBe("SVG");
   await expect(row(page, "contrat.pdf")).toContainText("Document PDF");
+  // Empreinte SHA-256 (16 novembre) : au même endroit que chez l'expéditeur, celle des octets
+  // envoyés, lue dans le manifeste chiffré ; aucune pour la note.
+  for (const n of NAMES) await expect(row(page, n).locator(`[data-sha256="${sha(await sentBytes(n))}"]`)).toHaveCount(1);
+  await expect(page.locator('[data-group="texte"] [data-sha256]')).toHaveCount(0);
   // Aucune estimation avant un débit mesuré dans cette session (retours UI4).
   await expect(row(page, "contrat.pdf")).not.toContainText(/env\.\s/);
   await expect(page.locator(".sum")).not.toContainText("(estimation)");

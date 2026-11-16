@@ -1,6 +1,7 @@
 // Brouillon d'envoi dès l'ajout (spec §41.14) contre le faux serveur de la démo (même contrat
 // que le serveur Go) : envoi avant le clic, retrait qui efface sur le serveur, manifeste des
 // seuls éléments gardés, abandon, et « le serveur ne voit rien ».
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { findIn, needle } from "../../e2e/scan";
 import { CHUNK_CT, HEADER, SEG_CHUNKS, SEG_PLAIN, utf8 } from "../engine/pure";
@@ -106,7 +107,30 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     const kLien = r.link.split("#")[1]!;
     const hay = Buffer.concat(seen.filter((x) => !x.path.includes("/unlock") && !x.path.includes("/meta")).map((x) => Buffer.concat([x.body, Buffer.from(x.path + x.headers)])));
     expect(findIn(hay, [needle("contenu", MARK), needle("nom", "a-repere"), needle("mdp", PW), needle("lien", kLien)])).toEqual([]);
+    // Empreinte SHA-256 (16 novembre) : dans le manifeste chiffré, celle des octets envoyés ;
+    // aucune pour la note ; jamais visible par le serveur (ni en hexadécimal, ni en octets).
+    const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+    const sumA = sha(Buffer.from(await blobA.arrayBuffer()));
+    const sumB = sha(Buffer.from(await blobB.arrayBuffer()));
+    expect(o.manifest.items.map((e) => e.sha256)).toEqual([undefined, sumB, sumA]);
+    expect(findIn(hay, [needle("empreinte", sumA), needle("empreinte b", sumB), needle("empreinte (octets)", new Uint8Array(Buffer.from(sumA, "hex")))])).toEqual([]);
   });
+
+  it("A5b : empreintes en trop pour le manifeste (200 fichiers aux noms longs) : envoi sans empreinte, jamais bloqué", async () => {
+    const { net } = setup();
+    const d = createDraft(ORIGIN, { ...net, solveCaptcha, auto: true });
+    const blobs = Array.from({ length: 200 }, (_, i) => file(10 + i, i + 1));
+    d.sync(blobs.map((data, i) => ({ id: `f${i}`, data })));
+    await until(() => blobs.every((_, i) => d.status(`f${i}`)?.phase === "pret"), 60_000);
+    const long = (i: number) => `${"n".repeat(112)}-${String(i).padStart(3, "0")}.bin`;
+    const r = await d.finalize(
+      blobs.map((data, i) => ({ id: `f${i}`, item: fileItem(long(i), data) })),
+      { ttlHours: 1, maxOpens: 1, password: PW, solveCaptcha },
+    );
+    const o = await openShare(r.link, PW, ORIGIN, undefined, net);
+    expect(o.manifest.items).toHaveLength(200);
+    expect(o.manifest.items.every((e) => e.sha256 === undefined)).toBe(true);
+  }, 120_000);
 
   it("A6 : warm() demande le défi et lance la preuve dès l'arrivée ; au premier fichier, création sans nouveau défi ni attente", async () => {
     const { seen, net } = setup();

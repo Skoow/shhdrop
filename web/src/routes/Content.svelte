@@ -488,6 +488,7 @@
             format={formats[i]!}
             kind={entries[i]!.kind}
             clean={entries[i]!.clean}
+            sha256={entries[i]!.sha256}
             row={dl.rows[i]!}
             estimate={est(i)}
             canView={viewKind(i) !== null}

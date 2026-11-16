@@ -122,6 +122,7 @@ fn file(name: &str, size: u64, first: u64, k: [u8; 32]) -> FinalEntry {
         size,
         first,
         k: Zeroizing::new(k),
+        sha256: None,
     }
 }
 
@@ -133,6 +134,7 @@ fn text(name: &str, size: u64, first: u64, k: [u8; 32]) -> FinalEntry {
         size,
         first,
         k: Zeroizing::new(k),
+        sha256: None,
     }
 }
 
@@ -726,6 +728,10 @@ fn expected(entries: &[FinalEntry], rights: Rights) -> Manifest {
                 k: Some(e.k.clone()),
                 clean: match e.kind {
                     FinalKind::File(c) => c,
+                    FinalKind::Text => None,
+                },
+                sha256: match e.kind {
+                    FinalKind::File(_) => e.sha256,
                     FinalKind::Text => None,
                 },
             })

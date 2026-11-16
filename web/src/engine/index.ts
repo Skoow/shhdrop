@@ -433,7 +433,7 @@ export async function elementSealer(blob: Blob, first: number): Promise<ElementS
  */
 export type FinalEntry =
   | { kind: "text"; name: string; mime: string; size: number; /** premier morceau */ first: number; sealer: ElementSealer }
-  | { kind: "file"; name: string; mime: string; size: number; /** premier morceau */ first: number; sealer: ElementSealer; clean?: ManifestClean };
+  | { kind: "file"; name: string; mime: string; size: number; /** premier morceau */ first: number; sealer: ElementSealer; clean?: ManifestClean; /** SHA-256 du fichier envoyé, hexadécimal minuscule (16 novembre) */ sha256?: string };
 
 /**
  * Manifeste des éléments gardés, dans l'ordre donné, palier final, en-tête et morceau chiffré du

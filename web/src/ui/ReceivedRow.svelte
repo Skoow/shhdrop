@@ -17,6 +17,7 @@
   import { Copy, Download, Eye, Pause, Play, RefreshCw, Square, Volume } from "./Icon";
   import Tip from "./Tip.svelte";
   import CleanMark from "./CleanMark.svelte";
+  import HashLine from "./HashLine.svelte";
   import { receivedClean, type ManifestClean } from "../media/clean-label";
 
   type Props = {
@@ -26,6 +27,8 @@
     kind: "file" | "text";
     /** Nettoyage dit par le manifeste chiffré (D41-35) ; absent : rien n'est affiché. */
     clean?: ManifestClean;
+    /** Empreinte SHA-256 écrite par l'expéditeur dans le manifeste chiffré ; absente : rien. */
+    sha256?: string;
     row: Row;
     /** Secondes estimées pour le télécharger (null : rien à dire, un texte). */
     estimate: number | null;
@@ -41,7 +44,7 @@
     onretry: () => void;
     oncopy: () => void;
   };
-  let { i, name, format, kind, clean, row, estimate, canView, risky, viewOnly, disabled, onview, ondownload, onpause, onresume, onstop, onretry, oncopy }: Props = $props();
+  let { i, name, format, kind, clean, sha256, row, estimate, canView, risky, viewOnly, disabled, onview, ondownload, onpause, onresume, onstop, onretry, oncopy }: Props = $props();
   const lang = $derived(getLang());
 
   const dot = $derived(name.lastIndexOf("."));
@@ -89,6 +92,7 @@
       {:else}
         <!-- Une note ne montre que son titre : le contenu se lit avec « Voir ». -->
         <span>{t(kind === "text" ? "compose.cat.text" : typeKey(format))}</span><span aria-hidden="true">·</span><span>{formatBytes(row.total, lang)}</span>
+        {#if kind === "file" && sha256}<HashLine sum={sha256} />{/if}
         <!-- Téléchargé : dit par la pastille de l'icône (retours UI6). -->
         {#if row.state !== "done" && estimate !== null && !viewOnly}
           <span aria-hidden="true">·</span><span class="eta" title={t("dl.estimate.title")}>{t("dl.estimate", { time: formatDuration(estimate, lang) })}<span class="sr-only"> ({t("dl.estimate.title")})</span></span>

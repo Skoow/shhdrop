@@ -1,7 +1,11 @@
 //! Manifeste chiffré du paquet (spec §29.3, §34, §41.14), comme `crypto/container.ts` :
 //! lecture stricte (`parse`, même refus que `parseManifest`, tous en `paquet_corrompu`) et
 //! écriture octet pour octet identique à `JSON.stringify` (`to_json`), champs dans l'ordre
-//! `v, rights, keep_ttl_h?, items[{kind, name, mime, size, offset, text?, k?, clean?}]`.
+//! `v, rights, keep_ttl_h?, items[{kind, name, mime, size, offset, text?, k?, clean?, sha256?}]`.
+//! `sha256` (16 novembre, décision du propriétaire) : empreinte SHA-256 du fichier tel qu'envoyé,
+//! en hexadécimal minuscule (64 caractères), calculée sur l'appareil de l'expéditeur ; fichiers
+//! seulement. Facultative et ignorée si mal formée (comme `clean`) : un ancien lecteur l'ignore,
+//! un ancien manifeste n'en a pas.
 //!
 //! Lecture comme `JSON.parse` : clé répétée → la dernière valeur compte ; BOM initial retiré
 //! (TextDecoder) ; nombres lus en IEEE 754 (`3.0`, `3e0` et `-0` sont des entiers sûrs).
@@ -183,6 +187,8 @@ pub struct Entry {
     pub k: Option<Zeroizing<[u8; 32]>>,
     /// Fichier seulement ; ignoré pour une note.
     pub clean: Option<Clean>,
+    /// Empreinte SHA-256 du fichier envoyé (fichier seulement ; absente des anciens manifestes).
+    pub sha256: Option<[u8; 32]>,
 }
 
 impl Drop for Entry {
@@ -207,6 +213,7 @@ impl PartialEq for Entry {
             && self.offset == o.offset
             && self.text == o.text
             && self.clean == o.clean
+            && self.sha256 == o.sha256
     }
 }
 
@@ -221,6 +228,7 @@ impl fmt::Debug for Entry {
             .field("text", &self.text.as_ref().map(|_| "…"))
             .field("k", &self.k.as_ref().map(|_| "…"))
             .field("clean", &self.clean)
+            .field("sha256", &self.sha256.as_ref().map(|_| "…"))
             .finish_non_exhaustive()
     }
 }
@@ -293,6 +301,7 @@ fn entry(e: &Value, data_len: u64) -> Result<Entry> {
         text: None,
         k: None,
         clean: None,
+        sha256: None,
     };
     match e.get("kind").and_then(Value::as_str) {
         // Ancien format : texte dans le manifeste.
@@ -320,6 +329,7 @@ fn entry(e: &Value, data_len: u64) -> Result<Entry> {
                 .get("clean")
                 .and_then(Value::as_str)
                 .and_then(Clean::from_name);
+            out.sha256 = e.get("sha256").and_then(Value::as_str).and_then(sha256_hex);
             out.k = k.map(seed).transpose()?;
         }
         _ => return Err(Error::PaquetCorrompu),
@@ -345,6 +355,24 @@ fn nat(v: Option<&Value>) -> Result<u64> {
 }
 
 /// Graine `k` : 43 caractères base64url canoniques, soit 32 octets.
+/// Empreinte écrite par `write` : exactement 64 chiffres hexadécimaux minuscules ; sinon rien.
+pub fn sha256_hex(s: &str) -> Option<[u8; 32]> {
+    let b = s.as_bytes();
+    if b.len() != 64 {
+        return None;
+    }
+    let digit = |c: u8| match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        _ => None,
+    };
+    let mut out = [0u8; 32];
+    for (i, o) in out.iter_mut().enumerate() {
+        *o = (digit(b[2 * i])? << 4) | digit(b[2 * i + 1])?;
+    }
+    Some(out)
+}
+
 fn seed(v: &Value) -> Result<Zeroizing<[u8; 32]>> {
     let s = v
         .as_str()
@@ -458,6 +486,17 @@ fn write(m: &Manifest, out: &mut dyn FnMut(&[u8])) {
         if let Some(c) = e.clean {
             out(b",\"clean\":");
             string(c.name(), out);
+        }
+        if let (Kind::File, Some(h)) = (e.kind, &e.sha256) {
+            const HEX: &[u8; 16] = b"0123456789abcdef";
+            out(b",\"sha256\":\"");
+            let mut x = [0u8; 64];
+            for (i, b) in h.iter().enumerate() {
+                x[2 * i] = HEX[usize::from(b >> 4)];
+                x[2 * i + 1] = HEX[usize::from(b & 15)];
+            }
+            out(&x);
+            out(b"\"");
         }
         out(b"}");
     }

@@ -20,6 +20,7 @@ import {
   contentKeys,
   deriveAccess,
   elementSealer,
+  fileSha256,
   footprintFor,
   forget,
   isGeneratedPassword,
@@ -91,6 +92,12 @@ export type DraftOpts = api.Net & {
    * la place). Par défaut, le contenu tel quel.
    */
   prepare?: (data: Blob) => Promise<Blob>;
+  /**
+   * Empreinte SHA-256 (hexadécimal minuscule) du contenu chiffré d'un fichier, écrite dans le
+   * manifeste (16 novembre). Par défaut, calculée par le moteur ; l'écran d'envoi réutilise
+   * celle déjà affichée. Un échec n'empêche pas l'envoi : le fichier part sans empreinte.
+   */
+  sha256?: (data: Blob) => Promise<string>;
   /** Un état a changé (ligne, progression, création). */
   onChange?: () => void;
   /** Créer le brouillon dès le premier fichier (faux : seulement au clic, ex. createShare). */
@@ -833,9 +840,25 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
         const e = els.get(id)!;
         // Note (D41-36) : un élément comme un fichier, envoyé dès sa validation.
         if (item.kind === "text") entries.push({ kind: "text", name: item.name, mime: item.mime, size: e.data!.size, first: e.first, sealer: e.sealer! });
-        else entries.push({ kind: "file", name: item.name, mime: item.mime, size: e.data!.size, first: e.first, sealer: e.sealer!, ...(item.clean ? { clean: item.clean } : {}) });
+        else {
+          // Empreinte des octets envoyés (e.data), jamais d'un autre Blob.
+          const sum = await (o.sha256 ?? fileSha256)(e.data!).catch(() => undefined);
+          throwIfAborted(f.signal);
+          entries.push({ kind: "file", name: item.name, mime: item.mime, size: e.data!.size, first: e.first, sealer: e.sealer!, ...(item.clean ? { clean: item.clean } : {}), ...(sum && /^[0-9a-f]{64}$/.test(sum) ? { sha256: sum } : {}) });
+        }
       }
-      const fin = await sealFinal(entries, keys, { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined });
+      const opts = { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined };
+      // Empreintes en trop (200 fichiers aux noms très longs) : le manifeste déborderait ; il part
+      // alors sans empreinte plutôt que d'empêcher l'envoi (le refus de validation n'use pas la
+      // clé, moteur). Le composeur borne la taille sans les empreintes.
+      const fin = await sealFinal(entries, keys, opts).catch((err: unknown) => {
+        if (!(err instanceof Error && err.message === "manifeste_trop_gros" && entries.some((x) => x.kind === "file" && x.sha256))) throw err;
+        return sealFinal(
+          entries.map((x) => (x.kind === "file" ? { ...x, sha256: undefined } : x)),
+          keys,
+          opts,
+        );
+      });
       throwIfAborted(f.signal);
       const kMdp = await kMdpFor(f.password);
       wipe.push(kMdp);

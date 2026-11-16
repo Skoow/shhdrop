@@ -577,6 +577,7 @@ fn ecriture_json_stringify() {
             text: None,
             k: Some(Zeroizing::new([0; 32])),
             clean: Some(Clean::TelQuel),
+            sha256: None,
         }],
     };
     let want = concat!(

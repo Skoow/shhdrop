@@ -142,3 +142,7 @@ Mêmes conventions que `v2.json` (hex minuscule, JSON à clés triées, 2 espace
 | `mot_de_passe` | Mot de passe, adresse → `ok` ou `mdp_court`, `mdp_long`, `mdp_adresse` (en minuscules, égal à l'adresse exacte, à l'adresse canonique ou à l'une de leurs parties locales). |
 | `enveloppes` | `env_mdp` = nonce (12) ‖ AES-256-GCM(`kek_mdp`, nonce, `k_compte`, AD = « SHH-CENV1 » ‖ `h` ‖ « mdp ») : 60 octets. |
 | `coffre_prive`, `coffre_profil` | « SHH-ACCT1 » ou « SHH-PROF1 » (9) ‖ `gen` (8, gros-boutiste) ‖ nonce (12) ‖ AES-256-GCM(`cle`, nonce, clair, AD = magie ‖ `h` ‖ `gen`) ; clair = longueur du JSON (4, gros-boutiste) ‖ JSON ‖ zéros, **de la taille exacte du palier** (4, 16, 64 ou 256 Kio : le plus petit qui contient 4 + JSON) ; coffre = palier + 45 octets. `blob` en entier pour les cas de 4 Kio, sinon `blob_len` et `blob_sha256`. |
+
+## Empreinte des fichiers (`v2-empreinte.json`)
+
+Extension facultative du manifeste v2 (décision du propriétaire du 16 novembre, spec §29.3) : champ `sha256` d'une entrée de fichier, 64 chiffres hexadécimaux minuscules, écrit après `clean`. `read` : manifestes et empreinte attendue à la lecture (`null` : ignorée) ; `write` : entrée et `manifest_json` exact. Lu par `engine/core/tests/empreinte.rs`. `v2.json` n'est pas modifié : sans empreinte, le manifeste reste identique octet pour octet.

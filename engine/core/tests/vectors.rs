@@ -623,6 +623,7 @@ fn manifest_of(c: &Value) -> Manifest {
                 text: None,
                 k: Some(Zeroizing::new(key32(e["k"].as_str().unwrap()))),
                 clean: e["clean"].as_str().map(|s| Clean::from_name(s).unwrap()),
+                sha256: None,
             }
         })
         .collect();
@@ -786,6 +787,7 @@ fn final_entries(entries: &Value) -> Vec<shhdrop_core::elements::FinalEntry> {
             size: e["size"].as_u64().unwrap(),
             first: e["first"].as_u64().unwrap(),
             k: Zeroizing::new(key32(e["k"].as_str().unwrap())),
+            sha256: None,
         })
         .collect()
 }

@@ -301,6 +301,8 @@ pub struct FinalEntry {
     /// Premier morceau.
     pub first: u64,
     pub k: Zeroizing<[u8; 32]>,
+    /// Empreinte SHA-256 du fichier envoyé, calculée par l'expéditeur (fichier seulement).
+    pub sha256: Option<[u8; 32]>,
 }
 
 impl FinalEntry {
@@ -335,6 +337,7 @@ impl FinalEntry {
             size: el.size,
             first: el.first,
             k: el.k(),
+            sha256: None,
         }
     }
 }
@@ -434,6 +437,7 @@ pub async fn seal_final<P: Platform>(
             text: None,
             k: Some(e.k.clone()),
             clean,
+            sha256: if kind == Kind::File { e.sha256 } else { None },
         });
         if e.size > 0 {
             data_end = data_end.max(offset + e.size);

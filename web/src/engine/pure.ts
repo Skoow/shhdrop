@@ -152,6 +152,11 @@ export type ManifestEntry = {
   k?: string;
   /** Fichier seulement : nettoyage avant l'envoi (D41-35) ; absent ou inconnu : rien n'est dit. */
   clean?: ManifestClean;
+  /**
+   * Fichier seulement : empreinte SHA-256 du fichier envoyé, 64 chiffres hexadécimaux minuscules,
+   * calculée par l'expéditeur (16 novembre) ; absente des anciens partages ou si mal formée.
+   */
+  sha256?: string;
 };
 
 export type ManifestV2 = { v: 2; rights: Rights; keep_ttl_h?: KeepTtl; items: ManifestEntry[] };

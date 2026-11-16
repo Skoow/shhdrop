@@ -1,0 +1,83 @@
+{
+  "about": "Empreinte SHA-256 facultative des fichiers dans le manifeste v2 (décision du propriétaire du 16 novembre) ; voir engine/vectors/README.md. Graine k nulle, taille 3, premier morceau 0, données de 65 536 octets.",
+  "read": [
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}]}",
+      "name": "minuscules, 64 caractères",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD\"}]}",
+      "name": "majuscules : ignorée",
+      "sha256": null
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015a\"}]}",
+      "name": "63 caractères : ignorée",
+      "sha256": null
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad0\"}]}",
+      "name": "65 caractères : ignorée",
+      "sha256": null
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"ga7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}]}",
+      "name": "caractère non hexadécimal : ignorée",
+      "sha256": null
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":12}]}",
+      "name": "nombre : ignorée",
+      "sha256": null
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"text\",\"name\":\"n\",\"mime\":\"text/plain\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}]}",
+      "name": "sur une note : ignorée",
+      "sha256": null
+    },
+    {
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}]}",
+      "name": "absente",
+      "sha256": null
+    }
+  ],
+  "write": [
+    {
+      "entry": {
+        "clean": null,
+        "kind": "file",
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}]}",
+      "name": "fichier avec empreinte"
+    },
+    {
+      "entry": {
+        "clean": "image",
+        "kind": "file",
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"clean\":\"image\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}]}",
+      "name": "fichier nettoyé (image) avec empreinte, écrite après clean"
+    },
+    {
+      "entry": {
+        "clean": null,
+        "kind": "file",
+        "sha256": null
+      },
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}]}",
+      "name": "fichier sans empreinte (ancien format, inchangé)"
+    },
+    {
+      "entry": {
+        "clean": null,
+        "kind": "text",
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"text\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}]}",
+      "name": "note : jamais d'empreinte écrite"
+    }
+  ]
+}

@@ -21,6 +21,7 @@
   import { sendLock } from "./lock";
   import { formatBytes } from "../i18n/format";
   import { digestOf } from "../flows/digest.svelte";
+  import HashLine from "./HashLine.svelte";
   import type { RowStatus } from "../flows/preupload";
   import FormatIcon from "./FormatIcon.svelte";
   import { formatOf, typeKey } from "./formats";
@@ -233,10 +234,7 @@
           <!-- Empreinte SHA-256 (16 novembre) : sur la ligne du type et de la taille (elle passe à
                la ligne seulement faute de place) ; sélectionnée d'un toucher pour la copier, entière
                au survol. Elle change si le fichier est nettoyé. -->
-          {@const sum = digestOf(item.data)}
-          <span class="hash num" data-sha256={sum && sum !== "erreur" ? sum : undefined} title={sum && sum !== "erreur" ? sum : undefined}
-            ><span class="hk">SHA-256</span> {sum === null ? t("compose.hash.computing") : sum === "erreur" ? t("compose.hash.failed") : sum}</span
-          >
+          <HashLine sum={digestOf(item.data)} />
         {/if}
         {#if upload}
           <!-- État de l'envoi : barre et Réessayer seulement ; le libellé est dans la bulle du cadenas. -->
@@ -601,23 +599,5 @@
     .row.moving {
       outline: 2px solid Highlight;
     }
-  }
-  /* Empreinte SHA-256 : une ligne fine, mono, coupée par des points de suspension sur un écran
-     étroit ; un toucher la sélectionne entière (copie). */
-  .hash {
-    display: block;
-    flex: 1 1 14ch;
-    min-width: 14ch;
-    overflow: hidden;
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    user-select: all;
-  }
-  .hk {
-    color: var(--text-2);
-    user-select: none;
   }
 </style>
