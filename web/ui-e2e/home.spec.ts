@@ -464,7 +464,8 @@ test.describe("fr-FR", () => {
       expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).display), sel).toBe("none");
     for (const name of isMobile ? ["Choisir des fichiers"] : ["Commencer", "Photo ou vidéo"]) {
       const b = page.getByRole("button", { name, exact: true }).first();
-      expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("solid");
+      // La tuile « Choisir des fichiers » est une zone de dépôt : pointillé (16 novembre).
+      expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe(name === "Choisir des fichiers" ? "dashed" : "solid");
     }
     await page.waitForTimeout(900);
     await capture(page, "home-v3-forced");

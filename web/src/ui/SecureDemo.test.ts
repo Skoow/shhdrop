@@ -16,6 +16,7 @@ function show() {
   flushSync();
 }
 const root = () => document.querySelector<HTMLElement>("[data-demo]")!;
+const toggle = () => document.querySelector<HTMLButtonElement>("[data-demo-toggle]")!;
 const step = () => Number(root().dataset.step);
 function tickSteps(n: number) {
   for (let i = 0; i < n; i++) {
@@ -72,11 +73,17 @@ describe("SecureDemo", () => {
     expect(STEP_MS * 7).toBeLessThanOrEqual(14_000);
   });
 
-  // Décision du propriétaire du 16 novembre : plus de bouton lecture ou pause ; la boucle démarre seule.
-  it("aucun bouton lecture ou pause ; la boucle démarre seule", () => {
+  it("bouton pause/lecture visible : arrête puis reprend la boucle", () => {
     show();
-    expect(document.querySelector("[data-demo-toggle]")).toBeNull();
-    expect(document.querySelectorAll("[data-demo] button")).toHaveLength(0);
+    expect(toggle().getAttribute("aria-label")).toBe("Mettre l'animation en pause");
+    toggle().click();
+    flushSync();
+    expect(toggle().getAttribute("aria-label")).toBe("Lire l'animation");
+    expect(root().classList.contains("paused")).toBe(true);
+    tickSteps(3);
+    expect(step()).toBe(1);
+    toggle().click();
+    flushSync();
     tickSteps(1);
     expect(step()).toBe(2);
   });
@@ -84,34 +91,34 @@ describe("SecureDemo", () => {
   it("pause sous la souris et au focus, reprise ensuite ; un toucher n'arrête rien (iPhone)", () => {
     show();
     const view = document.querySelector("[data-demo-view]")!;
-    const enter = (pointerType: string) => {
-      const e = new Event("pointerenter");
-      Object.defineProperty(e, "pointerType", { value: pointerType });
-      view.dispatchEvent(e);
-      flushSync();
-    };
-    // Écran tactile : pointerenter sans pointerleave ; la boucle continue.
-    enter("touch");
+    const touch = new Event("pointerenter");
+    Object.defineProperty(touch, "pointerType", { value: "touch" });
+    view.dispatchEvent(touch);
+    flushSync();
     tickSteps(1);
     expect(step()).toBe(2);
     view.dispatchEvent(new Event("pointerleave"));
     flushSync();
-    enter("mouse");
+    tickSteps(6);
+    expect(step()).toBe(1);
+    const mouse = new Event("pointerenter");
+    Object.defineProperty(mouse, "pointerType", { value: "mouse" });
+    view.dispatchEvent(mouse);
     flushSync();
     tickSteps(2);
-    expect(step()).toBe(2);
+    expect(step()).toBe(1);
     view.dispatchEvent(new Event("pointerleave"));
     flushSync();
     tickSteps(1);
-    expect(step()).toBe(3);
-    root().dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    expect(step()).toBe(2);
+    toggle().dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     flushSync();
     tickSteps(2);
-    expect(step()).toBe(3);
-    root().dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: document.body }));
+    expect(step()).toBe(2);
+    toggle().dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: document.body }));
     flushSync();
     tickSteps(1);
-    expect(step()).toBe(4);
+    expect(step()).toBe(3);
   });
 
   it("mouvement réduit : storyboard statique, toutes les étapes visibles, aucun minuteur", () => {
@@ -128,6 +135,7 @@ describe("SecureDemo", () => {
   it("anglais", () => {
     setLang("en");
     show();
+    expect(toggle().getAttribute("aria-label")).toBe("Pause the animation");
     expect(document.querySelector("[data-demo-steps]")!.textContent).toContain("Encrypted on your device");
   });
 

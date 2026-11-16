@@ -91,15 +91,22 @@ test.describe("barre du haut (ordinateur)", () => {
   });
 });
 
-test("infographie : la boucle démarre seule, sans bouton ; le survol à la souris l'arrête ; hors écran, arrêtée", async ({ page, shh }) => {
+test("infographie : la boucle démarre seule, le bouton pause l'arrête, le survol à la souris aussi ; hors écran, arrêtée", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   const demo = page.locator("[data-demo]");
   await demo.scrollIntoViewIfNeeded();
   await page.mouse.move(1, 1);
   const s0 = await step(page);
   await expect.poll(() => step(page), { timeout: 5000 }).not.toBe(s0);
-  // Plus de bouton lecture ou pause (décision du 16 novembre) : la boucle démarre seule.
-  await expect(page.locator("[data-demo-toggle]")).toHaveCount(0);
+  await page.locator("[data-demo-toggle]").click();
+  await expect(page.locator("[data-demo-toggle]")).toHaveAttribute("aria-label", "Lire l'animation");
+  await page.mouse.move(1, 1);
+  const frozen = await step(page);
+  await page.waitForTimeout(2600);
+  expect(await step(page)).toBe(frozen);
+  await page.locator("[data-demo-toggle]").click();
+  await page.mouse.move(1, 1);
+  await expect.poll(() => step(page), { timeout: 5000 }).not.toBe(frozen);
   // Survol de la scène : arrêt.
   await page.locator("[data-demo-view]").hover();
   const held = await step(page);
@@ -131,15 +138,18 @@ test("mouvement réduit : storyboard statique, bande immobile, aucune animation 
   expect(await axe(page)).toEqual([]);
 });
 
-test("bande des engagements : promesses vraies, défile seule, sans bouton (16 novembre)", async ({ page, shh }) => {
+test("bande des engagements : promesses vraies, défile seule, bouton d'arrêt", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   const band = page.locator("[data-band]");
   await expect(band.getByRole("listitem")).toHaveCount(6);
-  await expect(band.getByRole("button")).toHaveCount(0);
   await band.scrollIntoViewIfNeeded();
   await page.mouse.move(1, 1);
+  expect(await band.locator(".track").evaluate((e) => e.getAnimations().map((a) => a.playState))).toEqual(["running"]);
+  await band.getByRole("button", { name: "Arrêter le défilement" }).click();
+  await expect(band).toHaveClass(/stopped/);
+  await page.mouse.move(1, 1);
   const t = await band.locator(".track").evaluate((e) => e.getAnimations().map((a) => a.playState));
-  expect(t).toEqual(["running"]);
+  expect(t).toEqual(["paused"]);
 });
 
 test("rien n'a l'air d'une commande sans en être une : tout ce qui montre une main est un lien, un bouton ou une question", async ({ page, shh }) => {

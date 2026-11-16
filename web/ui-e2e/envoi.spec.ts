@@ -257,7 +257,7 @@ for (const vp of [null, { width: 720, height: 450 }]) {
     {
       const add = (await page.locator(".dropzone.empty").filter({ visible: true }).boundingBox())!;
       expect((await strip.boundingBox())!.y).toBeGreaterThan(add.y + add.height);
-      const bar = await page.evaluate(() => Math.min(...[...document.querySelectorAll<HTMLElement>("*")].filter((e) => getComputedStyle(e).position === "fixed" && e.getBoundingClientRect().bottom >= innerHeight - 1 && e.getBoundingClientRect().height > 60).map((e) => e.getBoundingClientRect().top)));
+      const bar = await page.evaluate(() => Math.min(...[...document.querySelectorAll<HTMLElement>("*")].filter((e) => ["fixed", "sticky"].includes(getComputedStyle(e).position) && e.getBoundingClientRect().bottom >= innerHeight - 1 && e.getBoundingClientRect().top > innerHeight / 2).map((e) => e.getBoundingClientRect().top)));
       expect(add.y + add.height).toBeLessThanOrEqual(bar);
     }
     await addPdfAndPhoto(page);

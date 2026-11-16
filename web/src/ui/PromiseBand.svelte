@@ -1,10 +1,10 @@
 <script lang="ts">
   // Bande qui défile sous le héros (référence du propriétaire, 12 novembre) : des promesses
   // produit vraies, jamais une activité « en direct » (ce serait un faux, et le vrai une fuite).
-  // Défilement CSS (transform seulement), arrêté hors écran, onglet caché, sous la souris et au
-  // focus ; immobile en mouvement réduit. Plus de bouton d'arrêt (décision du 16 novembre ;
-  // écart signalé avec WCAG 2.2.2, qui demande un moyen d'arrêter un défilement de plus de 5 s).
+  // Défilement CSS (transform seulement), arrêté hors écran, onglet caché, au survol, au focus
+  // et par son bouton (WCAG 2.2.2) ; immobile en mouvement réduit.
   import { t, type Key } from "../i18n/i18n.svelte";
+  import { Pause, Play } from "./Icon";
 
   const ITEMS: Key[] = ["band.1", "band.2", "band.3", "band.4", "band.5", "band.6"];
 
@@ -16,6 +16,7 @@
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   });
+  let stopped = $state(false);
   let onscreen = $state(true);
   let hidden = $state(typeof document !== "undefined" && document.hidden);
   let el: HTMLElement | undefined = $state();
@@ -34,7 +35,7 @@
   <svg class="mk" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false"><path d="M5 0v10M0 5h10" /></svg>
 {/snippet}
 
-<section bind:this={el} class={["band", { still: reduced, off: !onscreen || hidden }]} aria-labelledby="{uid}-t" data-band data-ambient>
+<section bind:this={el} class={["band", { still: reduced, stopped, off: !onscreen || hidden }]} aria-labelledby="{uid}-t" data-band data-ambient>
   <h2 class="sr-only" id="{uid}-t">{t("band.label")}</h2>
   <div class="view">
     <div class="track">
@@ -48,6 +49,11 @@
       {/if}
     </div>
   </div>
+  {#if !reduced}
+    <button type="button" class="stop" data-band-toggle aria-label={stopped ? t("band.play") : t("band.pause")} onclick={() => (stopped = !stopped)}>
+      {#if stopped}<Play size={14} strokeWidth={2.2} aria-hidden="true" />{:else}<Pause size={14} strokeWidth={2.2} aria-hidden="true" />{/if}
+    </button>
+  {/if}
 </section>
 
 <style>
@@ -72,10 +78,10 @@
     width: max-content;
     animation: slide 48s linear infinite;
   }
-  /* Plus de bouton lecture ou pause (décision du propriétaire du 16 novembre) : arrêt hors écran,
-     onglet caché, au focus, et sous la souris seulement (un toucher laissait :hover collé sur
-     iPhone, la bande restait arrêtée). */
+  /* Arrêt sous la souris seulement : un toucher laissait :hover collé sur iPhone, la bande
+     restait arrêtée (16 novembre). */
   .band:focus-within .track,
+  .stopped .track,
   .off .track {
     animation-play-state: paused;
   }
@@ -111,6 +117,27 @@
     flex: none;
     stroke: var(--accent);
     stroke-width: 1.4;
+  }
+  .stop {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-inline-end: max(8px, env(safe-area-inset-right));
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .stop:hover {
+    color: var(--text);
+    background: rgb(255 255 255 / 0.05);
+  }
+  .stop:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
   /* Mouvement réduit : immobile, les promesses passent à la ligne. */
   .still .track {

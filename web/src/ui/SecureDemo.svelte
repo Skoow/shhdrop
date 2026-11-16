@@ -7,6 +7,7 @@
   // nom, le mot de passe ni l'adresse IP ; tout est effacé après ouverture ou à l'échéance.
   // Le brouillé est décoratif (decor.ts : générateur à graine fixe, jamais de crypto).
   import { t, type Key } from "../i18n/i18n.svelte";
+  import { Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
   import { STEP_MS, STEPS } from "./demo-steps";
 
@@ -23,15 +24,16 @@
   });
 
   let step = $state(1);
+  let userPaused = $state(false);
   let hover = $state(false);
   let focused = $state(false);
   let onscreen = $state(true);
   let hidden = $state(typeof document !== "undefined" && document.hidden);
-  // Démarre seule (décision du propriétaire du 16 novembre : plus de bouton lecture ou pause).
-  // S'arrête hors écran, onglet caché, sous la souris ou au focus clavier. Le « survol » ne
+  // Démarre seule, et un bouton permet de la mettre en pause (décisions du propriétaire du
+  // 16 novembre ; WCAG 2.2.2). S'arrête aussi hors écran, onglet caché, sous la souris ou au focus. Le « survol » ne
   // compte qu'à la souris : sur un écran tactile, toucher ou faire défiler émet un pointerenter
   // sans pointerleave, et l'animation restait arrêtée jusqu'à ce qu'on touche ailleurs (iPhone).
-  const playing = $derived(!reduced && !hover && !focused && onscreen && !hidden);
+  const playing = $derived(!reduced && !userPaused && !hover && !focused && onscreen && !hidden);
   // Storyboard du mouvement réduit : l'étape qui résume tout (rien de lisible sur le serveur).
   const shown = $derived(reduced ? 4 : step);
 
@@ -43,6 +45,16 @@
   });
 
   let root: HTMLElement | undefined = $state();
+  // Pause/lecture : l'état affiché est l'état réel (arrêtée au survol ou au focus aussi) ;
+  // « Lire » relance même sous le pointeur ou le focus, jusqu'à ce qu'ils reviennent.
+  function toggle() {
+    if (playing) userPaused = true;
+    else {
+      userPaused = false;
+      hover = false;
+      focused = false;
+    }
+  }
   $effect(() => {
     if (!root || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(([e]) => (onscreen = e!.isIntersecting));
@@ -220,9 +232,11 @@
   {#if !reduced}
     <ol class="log" aria-hidden="true">
       {#each lines as l, i (l.text)}
-        <li class={["ln", l.tone, { late: l.late, last: i === lines.length - 1 }]}>
+        <li class={["ln", l.tone, { late: l.late, last: i === lines.length - 1 }]} style:--n={[...t(l.text)].length}>
           <span class="li-ic">{l.tone === "atk" ? "!" : "$"}</span>
-          <span class="li-t" style:--n={[...t(l.text)].length}>{t(l.text)}</span>
+          <span class="li-tw"
+            ><span class="li-t">{t(l.text)}</span>{#if i === lines.length - 1}<span class="cur"></span>{/if}</span
+          >
           <span class="li-dots"></span>
           <span class="li-s">{l.tone === "atk" ? "✕" : "✓"} {t(l.st)}</span>
         </li>
@@ -232,6 +246,11 @@
   </div>
   <div class="info">
     <span class="info-t" aria-hidden="true">{t("demo.info")}</span>
+    {#if !reduced}
+      <button type="button" class="toggle" data-demo-toggle aria-label={playing ? t("demo.pause") : t("demo.play")} onclick={toggle}>
+        {#if !playing}<Play size={14} strokeWidth={2.2} aria-hidden="true" />{:else}<Pause size={14} strokeWidth={2.2} aria-hidden="true" />{/if}
+      </button>
+    {/if}
   </div>
   <ol class={["steps", { "sr-only": !reduced }]} data-demo-steps>
     {#each STEPS as n (n)}
@@ -630,7 +649,7 @@
     align-items: center;
     column-gap: 8px;
     animation: line-in 200ms var(--ease-out) both;
-    --type: calc(var(--n, 20) * 38ms);
+    --type: calc(var(--n, 20) * 22ms);
   }
   /* Les anciennes lignes pâlissent : l'œil va à la dernière. */
   .ln:not(.last) {
@@ -648,6 +667,29 @@
   .li-ic {
     color: #5596f8;
     font-weight: 700;
+  }
+  /* Texte et curseur qui le suit pendant la frappe (16 novembre : lettres une par une, vite). */
+  .li-tw {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .cur {
+    flex: none;
+    width: 7px;
+    height: 13px;
+    margin-inline-start: 1px;
+    background: #9ff5d3;
+    box-shadow: 0 0 8px rgb(95 227 181 / 0.7);
+    animation: cur-off 1ms linear var(--type) forwards;
+  }
+  .ln.late .cur {
+    animation-delay: calc(900ms + var(--type));
+  }
+  @keyframes cur-off {
+    to {
+      visibility: hidden;
+    }
   }
   .li-t {
     min-width: 0;
@@ -721,6 +763,26 @@
   }
   .info-t {
     min-width: 0;
+  }
+  .toggle {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  .toggle:hover {
+    background: rgb(255 255 255 / 0.06);
+  }
+  .toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
   /* Figure : coins marqués (équerres menthe), légende mono dessous. */
   .fig {
