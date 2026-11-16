@@ -194,6 +194,26 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     for (const c of V.sha256) expect(hex(W.sha256(unhex(c.input)))).toBe(c.digest);
   });
 
+  // Empreinte d'un fichier (16 novembre) : par tranches, même résultat que d'un bloc et que
+  // node:crypto, quelle que soit la découpe ; un hacheur fini refuse toute suite.
+  it("FileHasher : SHA-256 par tranches = d'un bloc = node:crypto", () => {
+    for (const c of V.sha256) {
+      const data = unhex(c.input);
+      for (const size of [1, 3, 64, Math.max(1, data.length)]) {
+        const h = new W.FileHasher();
+        for (let i = 0; i < data.length; i += size) h.update(data.slice(i, i + size));
+        expect(hex(h.finish()), `${c.input.length / 2} octets, tranches de ${size}`).toBe(c.digest);
+        expect(() => h.finish()).toThrow();
+        h.free();
+      }
+    }
+    const big = new Uint8Array(5 * 1024 * 1024 + 17).map((_, i) => (i * 31) & 255);
+    const h = new W.FileHasher();
+    for (let i = 0; i < big.length; i += 1 << 20) h.update(big.slice(i, i + (1 << 20)));
+    expect(hex(h.finish())).toBe(sha(big));
+    h.free();
+  });
+
   it("argon2id : passwordKey, passwordKeyForCreate, NFC et refus (dont ops 2,5, non tronqué)", async () => {
     let computed = 0;
     for (const c of V.argon2id) {

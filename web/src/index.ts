@@ -55,6 +55,8 @@ export {
   type TtlHours,
 } from "./limits";
 export { PASSWORD_ALPHABET, PASSWORD_LEN, generatePassword, isGeneratedPassword, type GeneratedPassword } from "./engine";
+// Empreinte SHA-256 d'un fichier, affichée sur sa ligne avant l'envoi (16 novembre).
+export { fileSha256 } from "./engine";
 export {
   MANAGE_FRAGMENT,
   SHARE_FRAGMENT,

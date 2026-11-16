@@ -11,6 +11,8 @@ describe("interface publique", () => {
         // Codes des catégories de signalement (conception compte §21.10.1) : constantes, aucun secret.
         "CATEGORIES",
         "CATEGORIE_AUTRE",
+        // Empreinte SHA-256 d'un fichier, calculée sur l'appareil (16 novembre) : rien de secret n'en sort.
+        "fileSha256",
         "GrantInvalidError",
         "ReopenLimitError",
         "grantTag",

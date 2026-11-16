@@ -33,6 +33,11 @@ zeroize = { version = "1.9", default-features = false, features = ["alloc"] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 aes-gcm = { version = "0.11", default-features = false, features = ["aes", "zeroize"] }
 
+[features]
+# Empreinte SHA-256 par morceaux d'un fichier (16 novembre) : activée par le moteur des partages
+# (shhdrop-wasm) et les apps ; pas par le module du salon, qui reste sous son plafond de poids.
+empreinte = []
+
 [[bench]]
 name = "argon2"
 harness = false

@@ -135,6 +135,35 @@ export function forget(x: { free(): void } | null | undefined): void {
   }
 }
 
+// --- Empreinte d'un fichier (16 novembre) --------------------------------------------------------
+
+/** Tranche lue à la fois : un fichier de 2 Go n'est jamais entier en mémoire. */
+const HASH_CHUNK = 4 * 1024 * 1024;
+
+/**
+ * Empreinte SHA-256 d'un fichier, en hexadécimal minuscule (affichée sur sa ligne, avant l'envoi :
+ * la personne peut la comparer avec celle du fichier reçu). Calculée dans le moteur (RustCrypto,
+ * mêmes résultats que les apps), tranche par tranche ; chaque tranche lue est effacée ensuite.
+ * Jamais envoyée au serveur.
+ */
+export function fileSha256(blob: Blob, signal?: AbortSignal): Promise<string> {
+  return run(async (e) => {
+    const h = new e.wasm.FileHasher();
+    try {
+      for (let at = 0; at < blob.size; at += HASH_CHUNK) {
+        signal?.throwIfAborted();
+        const part = new Uint8Array(await blob.slice(at, at + HASH_CHUNK).arrayBuffer());
+        h.update(part);
+        part.fill(0);
+      }
+      signal?.throwIfAborted();
+      return Array.from(h.finish(), (b) => b.toString(16).padStart(2, "0")).join("");
+    } finally {
+      h.free();
+    }
+  });
+}
+
 // --- Dérivations (spec §29.2) -----------------------------------------------------------------
 
 export type AccessKeysV = { kAcces: KAcces; vAcces: Uint8Array<ArrayBuffer> };

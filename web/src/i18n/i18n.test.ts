@@ -48,6 +48,12 @@ describe("dictionnaires", () => {
     // pages.fr.ts et pages.en.ts (Task 25) rejoindront cette liste.
     for (const [lang, d] of [["fr", fr], ["en", en]] as const)
       for (const [k, v] of Object.entries(d)) {
+        // Seule exception, voulue par le propriétaire (16 novembre) : le nom de l'empreinte
+        // (SHA-256) dans l'avertissement du nettoyage, pour la comparer avec ses propres outils.
+        if (k === "clean.confirm.local") {
+          expect(v.replace(/SHA-256/g, ""), `${lang} ${k}`).not.toMatch(technical);
+          continue;
+        }
         expect(technical.test(v), `${lang} ${k} : « ${v} »`).toBe(false);
         expect(/100\s*%\s*(s[eé]curis|secure)/iu.test(v), `${lang} ${k}`).toBe(false);
         expect(/ne voit rien/iu.test(v), `${lang} ${k}`).toBe(false);

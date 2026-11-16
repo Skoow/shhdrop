@@ -653,6 +653,40 @@ pub fn sha256(data: &Uint8Array) -> Uint8Array {
     Uint8Array::from(&kdf::sha256(&secret(data))[..])
 }
 
+/// SHA-256 par morceaux (empreinte d'un fichier à l'envoi, 16 novembre) : `update` sur chaque
+/// tranche lue du fichier, puis `finish` (une fois). Les tranches ne sont jamais gardées.
+#[wasm_bindgen(js_name = FileHasher)]
+pub struct FileHasher(Option<kdf::Sha256Stream>);
+
+#[wasm_bindgen(js_class = FileHasher)]
+impl FileHasher {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> FileHasher {
+        FileHasher(Some(kdf::Sha256Stream::new()))
+    }
+    pub fn update(&mut self, chunk: &Uint8Array) -> core::result::Result<(), JsValue> {
+        let h = self
+            .0
+            .as_mut()
+            .ok_or_else(|| JsValue::from_str("argument_invalide"))?;
+        h.update(&secret(chunk));
+        Ok(())
+    }
+    pub fn finish(&mut self) -> core::result::Result<Uint8Array, JsValue> {
+        let h = self
+            .0
+            .take()
+            .ok_or_else(|| JsValue::from_str("argument_invalide"))?;
+        Ok(Uint8Array::from(&h.finish()[..]))
+    }
+}
+
+impl Default for FileHasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// HKDF-SHA-256 à sel vide (vecteurs communs, §9) : longueurs du moteur (16, 32) et celle de
 /// la RFC 5869 A.3 (42). Ne rend qu'une fonction d'octets que JavaScript détient déjà.
 #[wasm_bindgen]

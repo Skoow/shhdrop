@@ -36,6 +36,29 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     sha2::Sha256::digest(data).into()
 }
 
+/// SHA-256 par morceaux (empreinte d'un fichier affichée à l'envoi, 16 novembre) : un fichier de
+/// 2 Go est lu tranche par tranche, jamais entier en mémoire. Même résultat que [`sha256`] sur
+/// la concaténation des tranches. Fonction « empreinte » : seul le moteur des partages l'active
+/// (le module du salon reste sous son plafond de poids).
+#[cfg(feature = "empreinte")]
+#[derive(Default)]
+pub struct Sha256Stream(sha2::Sha256);
+
+#[cfg(feature = "empreinte")]
+impl Sha256Stream {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn update(&mut self, chunk: &[u8]) {
+        use sha2::Digest;
+        self.0.update(chunk);
+    }
+    pub fn finish(self) -> [u8; 32] {
+        use sha2::Digest;
+        self.0.finalize().into()
+    }
+}
+
 /// HKDF-SHA-256 à sel vide (RFC 5869 : équivaut à un sel de 32 zéros), `N` octets.
 ///
 /// La longueur est un paramètre de type : `N` au-delà de 255 × 32 = 8 160 octets (où HKDF
@@ -149,6 +172,43 @@ mod tests {
 
     fn hex(b: &[u8]) -> String {
         b.iter().map(|x| format!("{x:02x}")).collect()
+    }
+
+    /// Par morceaux = d'un bloc, quelle que soit la découpe ; vecteurs FIPS 180-2 (vide, « abc »,
+    /// un million de « a »).
+    #[cfg(feature = "empreinte")]
+    #[test]
+    fn sha256_par_morceaux() {
+        let cas: [(&[u8], &str); 2] = [
+            (
+                b"",
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
+            (
+                b"abc",
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ),
+        ];
+        for (data, want) in cas {
+            let mut h = Sha256Stream::new();
+            for b in data.chunks(1) {
+                h.update(b);
+            }
+            assert_eq!(hex(&h.finish()), want);
+            assert_eq!(hex(&sha256(data)), want);
+        }
+        let million = vec![b'a'; 1_000_000];
+        for taille in [1usize, 7, 4096, 65_536, 1_000_000] {
+            let mut h = Sha256Stream::new();
+            for b in million.chunks(taille) {
+                h.update(b);
+            }
+            assert_eq!(
+                hex(&h.finish()),
+                "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+                "tranches de {taille}"
+            );
+        }
     }
 
     const SALT: [u8; 16] = [7; 16];

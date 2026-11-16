@@ -5,6 +5,7 @@
 // menu « … », barre collée, options en feuille). Captures fr-FR à 1440 × 900, 1920 × 1080, 390 × 844.
 import { closeSync, ftruncateSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
@@ -296,6 +297,9 @@ test.describe("fr-FR", () => {
     const cur = page.locator("[data-current-offer]").filter({ visible: true });
     await expect(cur).toHaveText(/^Votre offre\u202f:\s*Gratuit\s*2\u202fGo · 24\u202fh · 10\u202fouvertures\s*Voir les offres/);
     await expect(page.locator("[data-offer-strip], [data-locked], [data-paid-space]")).toHaveCount(0);
+    // Empreinte SHA-256 du fichier sur sa ligne (16 novembre) : exactement celle de node:crypto.
+    const want = createHash("sha256").update(readFileSync(f("contrat.pdf"))).digest("hex");
+    await expect(page.locator(`[data-sha256="${want}"]`).filter({ visible: true })).toHaveCount(1);
     // Liste non vide : /offres s'ouvre dans un nouvel onglet (la liste resterait sinon perdue).
     await expect(cur.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("target", "_blank");
     expect((await cur.getByRole("link", { name: /^Voir les offres/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44); // cible d'appui (audit M21)

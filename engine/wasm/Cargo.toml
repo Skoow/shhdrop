@@ -11,7 +11,7 @@ publish.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-shhdrop-core = { path = "../core" }
+shhdrop-core = { path = "../core", features = ["empreinte"] }
 # Versions exactes, publiées ensemble : wasm-bindgen-cli 0.2.130 exige wasm-bindgen 0.2.130,
 # js-sys 0.3.107 et wasm-bindgen-futures 0.4.80 (même dépôt, même version de publication).
 wasm-bindgen = "=0.2.130"
