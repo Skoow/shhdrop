@@ -1,12 +1,10 @@
 <script lang="ts">
-  import InfoPage from "./routes/InfoPage.svelte";
-  import Offres from "./routes/Offres.svelte";
   import { untrack } from "svelte";
   import { getDemo } from "./app/demo-hooks";
   import { inAppBrowser, isStandalone, isSupported } from "./app/env";
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
   import { readLink, readShare, scrubAddressBar, type LinkState, type ShareTake } from "./app/link";
-  import { href, router } from "./app/router.svelte";
+  import { href, PAGE_ROUTES, router } from "./app/router.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
   import { getLang } from "./i18n/i18n.svelte";
@@ -19,6 +17,7 @@
   import Open from "./routes/Open.svelte";
   import SendFlow from "./routes/SendFlow.svelte";
   import Unsupported from "./routes/Unsupported.svelte";
+  import PageRedirect from "./pages/PageRedirect.svelte";
   import AppShell from "./ui/AppShell.svelte";
   import { chrome } from "./app/chrome.svelte";
   import { tabBarVisible } from "./app/tabbar";
@@ -146,8 +145,6 @@
     <History />
   {:else if router.current.name === "telechargements"}
     <Downloads />
-  {:else if router.current.name === "offres"}
-    <Offres />
   {:else if router.current.name === "inscription"}
     <Inscription />
   {:else if router.current.name === "oubli"}
@@ -162,8 +159,10 @@
     <!-- /compte et /compte/profil sans session : la connexion (conception §12.4) ; /compte/connexion
          avec session : la même page dit « connecté ». -->
     <Connexion />
-  {:else}
-    <!-- Pages d'information (pied de page, retours UI5). -->
-    <InfoPage name={router.current.name} />
+  {:else if PAGE_ROUTES.has(router.current.name)}
+    <!-- Pages d'information : leur propre fichier HTML (pages séparées, 16 novembre). Le serveur
+         le sert déjà à cette adresse ; si ce script arrive quand même ici (ancien serveur), il
+         recharge l'adresse pour obtenir ce fichier, une fois. -->
+    <PageRedirect />
   {/if}
 </AppShell>

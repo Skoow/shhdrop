@@ -65,6 +65,14 @@ func staticHandler(dir string, comptes bool) (http.Handler, error) {
 			return
 		}
 		status := http.StatusOK
+		// Pages séparées (conception du 16 novembre) : une page d'information a son propre fichier
+		// (« /securite » → securite.html). Liste fermée : aucun autre fichier .html n'est servi
+		// sans son extension (le cadre PDF garde ses en-têtes propres à son seul chemin, N1).
+		if file, ok := pageFiles[r.URL.Path]; ok && errors.Is(err, fs.ErrNotExist) {
+			if f2, fi2, err2 := openRegular(fsys, file); err2 == nil {
+				name, f, fi, err = file, f2, fi2, nil
+			}
+		}
 		if errors.Is(err, fs.ErrNotExist) && !strings.Contains(path.Base(name), ".") && !isDir(fsys, name) {
 			if !appRoutes[r.URL.Path] && !(comptes && compteRoutes[r.URL.Path]) {
 				status = http.StatusNotFound
@@ -197,6 +205,17 @@ var appRoutes = map[string]bool{
 
 // compteRoutes : pages du compte (table COMPTE_PATHS de web/src/app/router.svelte.ts, lot 10),
 // servies en 200 seulement avec SHH_COMPTES=1.
+// pageFiles : pages d'information servies par leur propre fichier HTML (web/vite.config.ts,
+// PAGE_PATHS ; web/scripts/check-dist.mjs, INFO_PAGES).
+var pageFiles = map[string]string{
+	"/securite":         "securite.html",
+	"/confidentialite":  "confidentialite.html",
+	"/offres":           "offres.html",
+	"/conditions":       "conditions.html",
+	"/mentions-legales": "mentions-legales.html",
+	"/signaler":         "signaler.html",
+}
+
 var compteRoutes = map[string]bool{
 	"/compte":             true,
 	"/compte/inscription": true,

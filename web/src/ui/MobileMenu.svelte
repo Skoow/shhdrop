@@ -5,8 +5,8 @@
   // un clic ailleurs ou un changement d'écran le ferme. « Téléchargements » n'y figure qu'avec un
   // compte : sans compte, l'historique des téléchargements ne vit que dans ce navigateur et ne
   // permet de rien retélécharger (le lien n'est jamais gardé), il n'a pas sa place dans le menu.
-  import { followLink, href, router } from "../app/router.svelte";
-  import { shares } from "../history/live.svelte";
+  import { currentPath, followLink, href, router } from "../app/router.svelte";
+  import { accountFlag } from "../app/account-flag.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { Menu, X } from "./Icon";
 
@@ -20,13 +20,13 @@
   type Link = { label: string; path: string; main?: boolean };
   const links = $derived<Link[]>([
     { label: t("nav.cta"), path: "/envoyer", main: true },
-    shares.account !== null ? { label: t("nav.home"), path: "/" } : { label: t("nav.shares"), path: "/envois" },
-    ...(shares.account !== null ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
+    accountFlag.connected ? { label: t("nav.home"), path: "/" } : { label: t("nav.shares"), path: "/envois" },
+    ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
     { label: t("nav.offers"), path: "/offres" },
     // Sécurité, Confidentialité, Signaler, Code source : dans le pied de page de chaque écran,
     // pas répétés ici (décision du propriétaire du 16 novembre : Envoi, Mes partages, Offres).
   ]);
-  const here = (p: string) => (location.pathname === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
+  const here = (p: string) => (currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
 
   function close(focusBack = false) {
     if (!open) return;

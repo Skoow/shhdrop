@@ -198,11 +198,14 @@ describe("règles de sources", () => {
         .map((f) => f.rel),
     ).toEqual([]));
 
-  it("demo/ importé seulement par main.ts, sous la forme import(\"./demo/install\")", () => {
+  it("demo/ importé seulement par main.ts et pages/main.ts, sous la forme import(\"…/demo/install\")", () => {
     for (const f of files) {
       const found = f.text.match(RE_DEMO_IMPORT) ?? [];
       if (f.rel === "main.ts") {
         for (const m of found) expect(m).toBe('import("./demo/install")');
+      } else if (f.rel === "pages/main.ts") {
+        // Pages séparées (16 novembre) : même installation de la démo, sous la même condition.
+        for (const m of found) expect(m).toBe('import("../demo/install")');
       } else {
         expect({ file: f.rel, found }).toEqual({ file: f.rel, found: [] });
       }

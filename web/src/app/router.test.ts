@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
-import { href, match, navigate, router, suite } from "./router.svelte";
+import { describe, expect, it, vi } from "vitest";
+import { href, match, navigate, otherEntry, router, setEntry, suite } from "./router.svelte";
 
 const KEY = "A".repeat(42) + "Q"; // 43 caractères base64url (forme seulement)
 
@@ -114,11 +114,32 @@ describe("pages du compte", () => {
 
 describe("navigate", () => {
   it("met à jour l'adresse et la route, sans rechargement", () => {
-    navigate("/securite");
-    expect(location.pathname).toBe("/securite");
-    expect(router.current).toEqual({ name: "securite" });
+    navigate("/envois");
+    expect(location.pathname).toBe("/envois");
+    expect(router.current).toEqual({ name: "envois" });
     navigate("/");
     expect(router.current).toEqual({ name: "home" });
+  });
+
+  // Pages séparées (16 novembre) : une page d'information a son propre fichier HTML ; depuis
+  // l'application, y aller charge cette page (et inversement), sans toucher au routeur.
+  it("vers l'autre fichier HTML (application ↔ page d'information) : chargement complet", () => {
+    const assign = vi.spyOn(location, "assign").mockImplementation(() => undefined);
+    try {
+      navigate("/securite");
+      expect(assign).toHaveBeenCalledWith("/securite");
+      expect(router.current).toEqual({ name: "home" });
+      expect(otherEntry("/offres")).toBe(true);
+      expect(otherEntry("/envois")).toBe(false);
+      setEntry("pages");
+      expect(otherEntry("/offres")).toBe(false);
+      expect(otherEntry("/")).toBe(true);
+      expect(match("/securite.html", "")).toEqual({ name: "securite" });
+      expect(match("/offres.html", "")).toEqual({ name: "offres" });
+    } finally {
+      setEntry("app");
+      assign.mockRestore();
+    }
   });
 
   it("refuse tout ce qui n'est pas un chemin interne", () => {
@@ -128,7 +149,7 @@ describe("navigate", () => {
   });
 
   it("popstate resynchronise la route, fragment compris (lien collé dans la barre)", () => {
-    navigate("/confidentialite");
+    navigate("/envois");
     history.replaceState(null, "", `/#m${KEY}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toEqual({ name: "manage" });
@@ -138,12 +159,12 @@ describe("navigate", () => {
   });
 
   it("popstate sans changement de route : router.current n'est pas réaffecté (ni focus volé)", () => {
-    navigate("/securite");
+    navigate("/envois");
     const before = router.current;
-    history.replaceState(null, "", "/securite#ancre");
+    history.replaceState(null, "", "/envois#ancre");
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toBe(before);
-    navigate("/confidentialite");
+    navigate("/telechargements");
     expect(router.current).not.toBe(before);
     navigate("/");
   });

@@ -34,7 +34,7 @@ function site(input: Record<string, string>, sri = true): string {
   dirs.push(d);
   const files: Record<string, string> = { ...input };
   if (sri) files["assets/index-a.js"] ??= "console.info(1)"; // le script que chargent PROD_INDEX et DEMO_INDEX
-  for (const page of ["index.html", "404.html"]) {
+  for (const page of Object.keys(files).filter((f) => !f.includes("/") && f.endsWith(".html"))) {
     if (!sri || files[page] === undefined) continue;
     const base = files[page]!.includes('"/shhgone/') ? "/shhgone/" : "/";
     try {
@@ -62,6 +62,20 @@ function run(args: string[]): { code: number; err: string } {
 }
 
 describe("check-dist.mjs, production", () => {
+  // Pages séparées (conception du 16 novembre) : exigées par le vrai build (INFO_PAGES).
+  it("pages séparées : chaque page existe, a ses empreintes, son contenu écrit, aucun style en ligne, et ne charge pas le moteur", () => {
+    const PAGE = (body: string, js = "page-a.js") =>
+      `<!doctype html><html><head>\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app">${body}</div></body></html>`;
+    const ok = { "index.html": PROD_INDEX, "securite.html": PAGE("<h1>Sécurité</h1><p>…</p>"), "assets/page-a.js": "console.info(2)" };
+    expect(checkDist(site(ok), false, false, ["securite.html"])).toEqual([]);
+    expect(checkDist(site({ "index.html": PROD_INDEX }), false, false, ["securite.html"])).toContain("securite.html : page d'information absente");
+    expect(checkDist(site({ ...ok, "securite.html": PAGE("") }), false, false, ["securite.html"]).join("\n")).toMatch(/contenu non écrit/);
+    expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1 style="x">S</h1>') }), false, false, ["securite.html"]).join("\n")).toMatch(/attribut style/);
+    expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><img src="/src/assets/a.png">') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse de développement/);
+    expect(checkDist(site({ ...ok, "assets/page-a.js": 'const e="/assets/engine-x.wasm";' }), false, false, ["securite.html"]).join("\n")).toMatch(/cite le moteur/);
+    expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><a href="https://github.com/x">code</a>') }), false, false, ["securite.html"])).toEqual([]);
+  });
+
   it("A7 : police ou image hors de assets/ ou sans empreinte → refus (pas de cache long)", () => {
     const ok = site({ "index.html": PROD_INDEX, "assets/mona-sans-AbCdEf12.woff2": "w", "assets/grain-AbCdEf12.png": "p", "assets/motif-AbCdEf12.svg": "<svg/>" });
     expect(checkDist(ok, false)).toEqual([]);

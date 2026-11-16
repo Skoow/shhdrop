@@ -40,6 +40,8 @@ export async function startPagesServer(root: string, base = "/shhgone/"): Promis
       if ((p === root || p.startsWith(root.endsWith(sep) ? root : root + sep)) && !rel.includes("\0")) {
         const f = existsSync(p) && statSync(p).isDirectory() ? join(p, "index.html") : p;
         if (existsSync(f) && statSync(f).isFile()) file = f;
+        // Comme GitHub Pages : « /securite » sert securite.html s'il existe (pages séparées).
+        else if (extname(p) === "" && existsSync(p + ".html") && statSync(p + ".html").isFile()) file = p + ".html";
       }
     }
     if (req.method !== "GET" && req.method !== "HEAD") {

@@ -2,7 +2,7 @@
   import type { Snippet } from "svelte";
   import { BUILD_ID } from "../app/build";
   import { chrome } from "../app/chrome.svelte";
-  import { followLink, href, navigate, router } from "../app/router.svelte";
+  import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
   import { LICENSE_URL, SOURCE_URL } from "../routes/pages/content";
   import { t } from "../i18n/i18n.svelte";
   import Aurora from "./Aurora.svelte";
@@ -12,7 +12,7 @@
   import TabBar from "./TabBar.svelte";
   import TopNav from "./TopNav.svelte";
   import MobileMenu from "./MobileMenu.svelte";
-  import { shares } from "../history/live.svelte";
+  import { accountFlag } from "../app/account-flag.svelte";
 
   type Props = {
     children: Snippet;
@@ -87,7 +87,7 @@
         { label: t("foot.send"), path: "/" },
         { label: t("foot.shares"), path: "/envois" },
         // Sans compte, pas de Téléchargements (retours du 15 novembre, comme le menu ☰).
-        ...(shares.account !== null ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
+        ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
         { label: t("foot.room"), soon: true },
         { label: t("foot.offers"), path: "/offres", tiers: true },
       ],
@@ -115,7 +115,7 @@
   // Libellé découpé : les mots « Plus » et « Pro » (noms d'offre, identiques en français et en anglais).
   const tierParts = (label: string) => label.split(/\b(Plus|Pro)\b/).map((text, i) => ({ text, tier: i % 2 === 1 ? text.toLowerCase() : null }));
   // « Envoyer » (/) n'est la page courante que sur l'accueil : un partage ouvert a aussi « / » pour chemin.
-  const pathHere = (p: string) => (router.current.name !== "notfound" && location.pathname === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
+  const pathHere = (p: string) => (router.current.name !== "notfound" && currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
   // « Mes partages » et « Téléchargements » sont des onglets racine quand la barre d'onglets est là : pas de Retour.
   const back = $derived(BACK.has(router.current.name) && !(tabs && (router.current.name === "envois" || router.current.name === "telechargements")));
   let small = $state("");

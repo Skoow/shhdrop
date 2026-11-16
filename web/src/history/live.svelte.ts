@@ -5,6 +5,7 @@
 // partagée de GitHub Pages : rien n'y est écrit) ; indisponible → `status: "unavailable"` et
 // le site marche sans historique. Lire l'historique ne fait AUCUNE requête réseau ; les
 // relectures passent par `refreshShare` (poll.ts : visible, 5 min, gigue).
+import { accountFlag } from "../app/account-flag.svelte";
 import { getDemo } from "../app/demo-hooks";
 import { destroyShare, fetchMeta, shareStatus } from "../index";
 import { destroyedPatch, missingPatch, pollHistory, statusPatch, type PollError, type Poller, type RefreshResult, type Status } from "./poll";
@@ -45,6 +46,7 @@ export const shares = $state({
 export const keepReceivedDefault = (): boolean => (shares.account ? shares.account.keepReceived : false);
 export function setAccountPrefs(p: { keepReceived: boolean } | null): void {
   shares.account = p;
+  accountFlag.connected = p !== null;
 }
 
 /** Ajout ou retrait d'une entrée par un geste sur cet appareil (synchronisation du compte). */

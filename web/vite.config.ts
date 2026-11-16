@@ -1,6 +1,6 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
@@ -42,16 +42,23 @@ export function sri(base: string): Plugin {
     configResolved(c) {
       outDir = join(c.root, c.build.outDir);
     },
-    writeBundle() {
-      const page = join(outDir, "index.html");
-      const read = (rel: string) => {
-        try {
-          return readFileSync(join(outDir, rel));
-        } catch {
-          return null;
+    // Toutes les pages de la racine (index.html et les pages séparées, écrites juste avant).
+    writeBundle: {
+      sequential: true,
+      handler() {
+        const read = (rel: string) => {
+          try {
+            return readFileSync(join(outDir, rel));
+          } catch {
+            return null;
+          }
+        };
+        for (const f of readdirSync(outDir)) {
+          if (!f.endsWith(".html") || f === "pdf-frame.html") continue;
+          const page = join(outDir, f);
+          writeFileSync(page, addSri(readFileSync(page, "utf8"), read, base));
         }
-      };
-      writeFileSync(page, addSri(readFileSync(page, "utf8"), read, base));
+      },
     },
   };
 }
@@ -237,6 +244,88 @@ export function demoMeta(): Plugin {
 }
 
 /**
+ * Pages séparées (conception du 16 novembre) : chaque page d'information a son propre fichier
+ * HTML (securite.html, offres.html…), copié du gabarit page.html, avec son titre, sa description,
+ * son adresse canonique et son contenu déjà écrits (rendu Svelte côté serveur, en français, par
+ * src/pages/prerender.ts). Le script de ces pages (src/pages/main.ts) ne contient ni composeur,
+ * ni moteur, ni compte. Les attributs style du rendu sont retirés (la CSP n'admet aucun style en
+ * ligne ; le script les pose au montage), les images importées pointent vers leurs fichiers
+ * construits. À placer AVANT sri : chaque page reçoit ensuite ses empreintes.
+ */
+export const SITE_ORIGIN = "https://shhgone.com";
+export const PAGE_PATHS = ["/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales", "/signaler"] as const;
+export function infoPages(base: string, demo: boolean): Plugin {
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  let outDir = "";
+  let configFile: string | undefined;
+  let mode = "";
+  return {
+    name: "shh-info-pages",
+    config: () => ({ build: { rollupOptions: { input: { index: join(here, "index.html"), page: join(here, "page.html") } } } }),
+    configResolved(c) {
+      outDir = join(c.root, c.build.outDir);
+      configFile = c.configFile;
+      mode = c.mode;
+    },
+    // Développement : « /securite » sert le gabarit, rempli par le script.
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const p = (req.url ?? "").split("?")[0]!;
+        const rest = p.startsWith(base) ? "/" + p.slice(base.length) : p;
+        if ((PAGE_PATHS as readonly string[]).includes(rest.replace(/\.html$/, ""))) req.url = base + "page.html";
+        next();
+      });
+    },
+    writeBundle: {
+      order: "pre",
+      sequential: true,
+      async handler(_opts, bundle) {
+        const template = readFileSync(join(outDir, "page.html"), "utf8");
+        // Images importées par les composants : adresse de développement → fichier construit.
+        const assets = new Map<string, string>();
+        for (const f of Object.values(bundle)) {
+          if (f.type !== "asset") continue;
+          for (const o of (f as { originalFileNames?: string[] }).originalFileNames ?? []) assets.set("/" + o.replace(/\\/g, "/"), base + f.fileName);
+        }
+        const { createServer } = await import("vite");
+        const vite = await createServer({ configFile, mode, server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
+        try {
+          const { renderPage, PAGE_FILES } = (await vite.ssrLoadModule("/src/pages/prerender.ts")) as {
+            renderPage: (n: string) => { body: string; title: string; description: string; path: string | undefined };
+            PAGE_FILES: Record<string, string>;
+          };
+          for (const [name, file] of Object.entries(PAGE_FILES)) {
+            const r = renderPage(name);
+            const body = r.body
+              .replace(/\sstyle="[^"]*"/g, "")
+              .replace(/\ssrc="([^"]*?\/src\/[^"]+)"/g, (_m, u: string) => {
+                // Adresse de développement, avec ou sans la base (« /shhgone/src/… » en démo).
+                const to = assets.get(u.startsWith(base) ? "/" + u.slice(base.length) : u);
+                if (!to) throw new Error(`pages séparées : ${u} sans fichier construit`);
+                return ` src="${to}"`;
+              });
+            if (/\b(?:href|src)="[^"]*\/src\//.test(body)) throw new Error(`pages séparées : ${file} cite encore /src/`);
+            const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+            let head = "";
+            if (!demo) head += r.path !== undefined ? `<meta name="robots" content="index, follow" />\n    <link rel="canonical" href="${SITE_ORIGIN}${r.path}" />\n  ` : `<meta name="robots" content="noindex" />\n  `;
+            const html = template
+              .replace(/<title>[^<]*<\/title>/, `<title>${esc(demo ? "Démo · " + r.title : r.title)}</title>`)
+              .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, (_m, a: string, b: string) => a + esc(r.description) + b)
+              .replace("</head>", head + "</head>")
+              .replace("<!--shh-page-->", body);
+            if (!html.includes(body)) throw new Error(`pages séparées : ${file} sans contenu`);
+            writeFileSync(join(outDir, file), html);
+          }
+        } finally {
+          await vite.close();
+        }
+        rmSync(join(outDir, "page.html"));
+      },
+    },
+  };
+}
+
+/**
  * Version du site affichée dans le pied de page (retours UI5) : hash court du commit, sans
  * secret. SHH_BUILD_ID (CI, image Docker) sinon `git rev-parse --short=7 HEAD` ; 7 à 40 chiffres
  * hexadécimaux, ramenés à 7. Même commit, même valeur : la construction reste reproductible
@@ -327,7 +416,7 @@ export function comptesPages(actifs: boolean): Plugin {
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
-    plugins: [comptesPages(comptesActifs(demo)), svelte(), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
+    plugins: [comptesPages(comptesActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
     define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)) },
     build: {

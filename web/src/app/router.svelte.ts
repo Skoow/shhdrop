@@ -2,7 +2,7 @@
 // (spec §32 : « #<43> » partage, « #m<43> » gestion) sans jamais en garder le contenu : la
 // clé est lue une fois par readLink (app/link.ts), puis retirée de l'adresse.
 import { flushSync } from "svelte";
-import { MANAGE_FRAGMENT, SHARE_FRAGMENT } from "../index";
+import { MANAGE_FRAGMENT, SHARE_FRAGMENT } from "../engine/pure";
 
 // Lien du QR code (D41-29) : « #<K_lien>. » suivi du mot de passe, même mal formé (écran de saisie).
 const SHARE_PW_PREFIX = /^#[A-Za-z0-9_-]{43}\./;
@@ -80,9 +80,12 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
     if (hash === "" && reopen) return { name: "open" };
     return { name: "home" };
   }
-  const info = INFO_PATHS[p];
+  // Pages d'information : aussi sous le nom de leur fichier (« /securite.html », pages séparées).
+  const page = p.endsWith(".html") ? p.slice(0, -5) : p;
+  const info = Object.hasOwn(INFO_PATHS, page) ? INFO_PATHS[page] : undefined;
   if (info !== undefined) return { name: info };
   if (p === "/offres") return { name: "offres" };
+  if (p === "/offres.html") return { name: "offres" };
   if (p === "/envoyer") return { name: "envoyer" };
   // Tableau de bord « Vos envois » (spec §33, §33.1) : historique local, aucun secret dans l'adresse.
   if (p === "/envois") return { name: "envois" };
@@ -123,6 +126,35 @@ if (typeof window !== "undefined")
 const base = () => import.meta.env.BASE_URL;
 
 /** Adresse complète d'un chemin de l'application (préfixe de dépôt en démo). */
+/**
+ * Pages servies par leur propre fichier HTML (pages séparées, conception du 16 novembre) : le
+ * serveur répond « securite.html » à « /securite ». Entre l'application (index.html) et ces
+ * pages, un lien charge l'autre page (navigation complète) ; à l'intérieur de l'une ou de
+ * l'autre, rien ne change.
+ */
+export const PAGE_ROUTES: ReadonlySet<Route["name"]> = new Set<Route["name"]>(["securite", "confidentialite", "conditions", "mentions", "signaler", "offres"]);
+let entry: "app" | "pages" = "app";
+/** Appelé une fois par le point d'entrée des pages d'information (src/pages/main.ts). */
+export function setEntry(e: "app" | "pages"): void {
+  entry = e;
+}
+/** Vrai si `path` est servi par l'autre fichier HTML que la page courante. */
+export function otherEntry(path: string): boolean {
+  return PAGE_ROUTES.has(match(href(path), "").name) !== (entry === "pages");
+}
+
+/**
+ * Chemin de la page courante, pour « aria-current » : sans « .html » (une page d'information
+ * peut être ouverte sous le nom de son fichier) ; au rendu du build (pas de location), celui de
+ * la route courante.
+ */
+export function currentPath(): string {
+  if (typeof location !== "undefined") return location.pathname.replace(/\.html$/, "");
+  const n = router.current.name;
+  const info = Object.keys(INFO_PATHS).find((k) => INFO_PATHS[k] === n);
+  return href(info ?? (n === "offres" ? "/offres" : "/"));
+}
+
 export function href(path: string): string {
   return base().replace(/\/$/, "") + path;
 }
@@ -134,6 +166,11 @@ export function href(path: string): string {
 export function navigate(path: string, opts: { back?: boolean } = {}): void {
   const nu = path.replace(/^(\/compte\/(?:connexion|inscription))\?suite=salon$/, "$1");
   if (!/^\/(?!\/)[^\\#?]*$/.test(nu)) throw new Error("chemin interne attendu");
+  // L'autre fichier HTML (application ↔ page d'information) : chargement complet.
+  if (otherEntry(nu)) {
+    location.assign(href(path));
+    return;
+  }
   const go = () => {
     history.pushState(null, "", href(path));
     sync();

@@ -93,7 +93,11 @@ const metaRe = (attrs) => {
 const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
 
 /** Rend la liste des problèmes (vide si tout va bien). `comptes` : build avec __COMPTES__ (jamais pour la démo). */
-export function checkDist(dir, demo, comptes = false) {
+/** Pages d'information servies par leur propre fichier (vite.config.ts, PAGE_PATHS). */
+export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html"];
+
+/** `pages` : pages d'information exigées (le vrai build : INFO_PAGES ; les petits sites des tests : aucune). */
+export function checkDist(dir, demo, comptes = false, pages = []) {
   const problems = [];
   if (!existsSync(join(dir, "index.html"))) return [`${dir} : index.html absent (build manquant ?)`];
   const raw = files(dir).map((p) => ({ rel: relative(dir, p), data: readFileSync(p) }));
@@ -122,11 +126,39 @@ export function checkDist(dir, demo, comptes = false) {
   // (serveur Go, headers.go). Il reçoit pourtant le PDF déchiffré (audit web D7) : à faire.
   problems.push(...checkSri("index.html", index, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
 
+  // Pages séparées (conception du 16 novembre) : chaque page d'information a son fichier, ses
+  // empreintes SRI, son contenu déjà écrit (titre h1) avant tout script, son titre d'onglet, et
+  // ne charge ni le moteur ni le client d'envoi (aucun script qu'elle cite ne les cite).
+  for (const page of pages) {
+    const html = byRel.get(page)?.toString("utf8");
+    if (html === undefined) {
+      problems.push(`${page} : page d'information absente`);
+      continue;
+    }
+    problems.push(...checkSri(page, html, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
+    const app = /<div id="app">([\s\S]*?)<\/body>/.exec(html)?.[1] ?? "";
+    if (!/<h1[^>]*>[^<]+/.test(app)) problems.push(`${page} : contenu non écrit dans le HTML (aucun titre h1 avant le script)`);
+    if (/<!--shh-page-->/.test(html)) problems.push(`${page} : gabarit non rempli`);
+    if (/\/src\//.test(app)) problems.push(`${page} : adresse de développement (/src/) dans le contenu`);
+    if (/\sstyle="/.test(app)) problems.push(`${page} : attribut style dans le contenu (la CSP n'admet aucun style en ligne)`);
+    const base = demo ? DEMO_BASE : "/";
+    const scripts = [...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+\.js)"/g)].map((m) => (m[1].startsWith(base) ? m[1].slice(base.length) : m[1]));
+    for (const rel of scripts) {
+      const text = byRel.get(rel)?.toString("utf8") ?? "";
+      if (/assets\/(?:engine-[^"'\s]+|[^"'\s/]+\.wasm)/.test(text)) problems.push(`${page} : ${rel} cite le moteur de chiffrement (une page d'information ne le charge pas)`);
+    }
+  }
+
   // Aucune ressource tierce (CLAUDE.md) : ni dans les pages (index.html, 404.html de la démo,
   // pdf-frame.html), ni dans les feuilles de style (polices, images). Production et démo.
   for (const f of all) {
-    if (!/^(?:index|404|pdf-frame)\.html$|\.css$/.test(f.rel)) continue;
-    for (const url of findExternalUrls(f.data.toString("utf8"))) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
+    if (!/\.html$|\.css$/.test(f.rel)) continue;
+    // Pages d'information : leur contenu écrit cite des liens sortants (<a href>, ouverts par la
+    // personne, jamais chargés par la page) ; seuls ces liens-là sont admis.
+    let text = f.data.toString("utf8");
+    if (INFO_PAGES.includes(f.rel))
+      text = text.replace(/<a\b[^>]*\shref="https:\/\/[^"]*"[^>]*>/g, "<a>").replace(/<link rel="canonical" href="https:\/\/shhgone\.com\/[a-z-]*" \/>/g, "");
+    for (const url of findExternalUrls(text)) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
   }
 
   // Spec §35.1 (Task M2) : aucune statistique, aucun écouteur global d'erreurs, dans tout build.
@@ -166,7 +198,9 @@ export function checkDist(dir, demo, comptes = false) {
     // Worker ; repli : calcul dans la page avec le moteur déjà vérifié). Le script principal ne
     // contient aucun octet du .wasm (magie « \0asm » version 1, en base64 ou en tableau de
     // nombres), ne cite aucun de ces fichiers sans son empreinte SHA-384, et aucun n'est orphelin.
-    const mains = all.filter((f) => /^assets\/index-[^/]+\.js$/.test(f.rel)).map((f) => ({ rel: f.rel, text: f.data.toString("utf8") }));
+    // Scripts du site (points d'entrée et morceaux partagés des pages séparées) : tout script
+    // sous assets/ sauf le Worker du moteur, le dictionnaire anglais et le Worker anti-robot.
+    const mains = all.filter((f) => /^assets\/(?!engine-|locale-|pow\.worker)[^/]+\.js$/.test(f.rel)).map((f) => ({ rel: f.rel, text: f.data.toString("utf8") }));
     for (const m of mains) {
       if (m.text.includes("AGFzbQEAAAA") || /\b0,\s*97,\s*115,\s*109,\s*1,\s*0,\s*0,\s*0\b/.test(m.text))
         problems.push(`${m.rel} : octets WebAssembly en ligne dans le script principal : le moteur doit rester dans assets/engine-*.wasm, lu avec son empreinte`);
@@ -250,7 +284,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const rest = args.filter((a) => a !== "--demo" && a !== "--comptes");
   const web = fileURLToPath(new URL("..", import.meta.url));
   const dir = rest[0] ?? join(web, demo ? "dist-demo" : "dist");
-  const problems = checkDist(dir, demo, comptes);
+  // Le point d'entrée des pages d'information construit (assets/page-*.js) : ses six pages sont
+  // exigées. Les petits sites des tests, qui n'en ont pas, ne les demandent pas.
+  const hasPages = existsSync(join(dir, "assets")) && readdirSync(join(dir, "assets")).some((n) => /^page-[^/]+\.js$/.test(n));
+  const problems = checkDist(dir, demo, comptes, hasPages ? INFO_PAGES : []);
   if (problems.length > 0) {
     for (const p of problems) console.error(`check-dist${demo ? " --demo" : ""} : ${p}`);
     process.exit(1);

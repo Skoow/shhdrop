@@ -187,6 +187,22 @@ func TestServeStaticDir(t *testing.T) {
 			}
 		}
 	}
+	// Pages séparées (16 novembre) : une page d'information présente dans le dossier est servie
+	// à son adresse sans extension (200) ; aucun autre fichier .html ne l'est (le cadre PDF garde
+	// ses en-têtes propres à son seul chemin).
+	os.WriteFile(filepath.Join(static, "offres.html"), []byte("<!doctype html><title>Offres</title>"), 0o600)
+	os.WriteFile(filepath.Join(static, "pdf-frame.html"), []byte("<!doctype html><title>cadre</title>"), 0o600)
+	for _, p := range []string{"/offres", "/offres.html"} {
+		if code, body, h := get("GET", p); code != 200 || body != "<!doctype html><title>Offres</title>" || !strings.HasPrefix(h.Get("Content-Type"), "text/html") || h.Get("Content-Security-Policy") == "" {
+			t.Fatalf("%s : %d %q %v", p, code, body, h)
+		}
+	}
+	if code, body, _ := get("GET", "/pdf-frame"); code != 404 || strings.Contains(body, "cadre") {
+		t.Fatalf("/pdf-frame : %d %q", code, body)
+	}
+	if code, body, _ := get("GET", "/securite"); code != 200 || !strings.Contains(body, "<title>Shhdrop</title>") {
+		t.Fatalf("/securite sans securite.html : %d %q", code, body)
+	}
 	// Plus de repli particulier sous /s/ et /m/ : un fichier absent avec extension → 404 partout.
 	for _, p := range []string{"/assets/missing.js", "/s/AAAAAAAAAAAAAAAAAAAAAA.", "/m/x/y.png", "/s/a.js", "/sx/a.js", "/api/x.js"} {
 		if code, body, _ := get("GET", p); code != 404 || strings.Contains(body, "<title>Shhdrop</title>") {

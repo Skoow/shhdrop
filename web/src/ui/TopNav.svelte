@@ -7,7 +7,7 @@
   // Téléphone (< 768 px) : rien de tout ça, la barre d'onglets du bas tient la navigation.
   import { flushSync, tick, type Component } from "svelte";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
-  import { followLink, href, navigate, router } from "../app/router.svelte";
+  import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX } from "../limits";
@@ -16,7 +16,7 @@
   import { ChevronDown, Compass, EyeOff, Flag, Server, ShieldCheck, Upload } from "./Icon";
   import { reducedMotion } from "./motion";
   import TabIcon from "./TabIcon.svelte";
-  import { shares } from "../history/live.svelte";
+  import { accountFlag } from "../app/account-flag.svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
 
@@ -26,7 +26,7 @@
   const uid = $props.id();
 
   const off = $derived(busy ? { "aria-disabled": "true" as const, "aria-describedby": "foot-busy" } : {});
-  const here = (p: string) => (location.pathname === href(p) ? "page" : undefined);
+  const here = (p: string) => (currentPath() === href(p) ? "page" : undefined);
 
   function items(id: MenuId): HTMLElement[] {
     return [...(document.getElementById(`${uid}-${id}`)?.querySelectorAll<HTMLElement>("[data-nav-item]") ?? [])];
@@ -200,7 +200,7 @@
   </ul>
   <div class="acts">
     <!-- Connecté (conception compte §21.15.1) : « Mes partages » devient « Accueil » (la liste). -->
-    {#if shares.account !== null}
+    {#if accountFlag.connected}
       <a class="btn ghost" href={href("/")} aria-current={here("/")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))} {...off}>{t("nav.home")}</a>
     {:else}
       <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off}>{t("nav.shares")}</a>

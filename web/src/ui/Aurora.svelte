@@ -10,12 +10,13 @@
   import mintUrl from "../assets/aurora-mint.png";
 
   /** Échelles horizontale et verticale : une nappe couvre 150 × 95 vmax, comme le prototype. */
+  // Rendu du build (pages séparées) : pas de fenêtre, une taille de téléphone, corrigée au montage.
   function scales(): { x: number; y: number } {
-    const vmax = Math.max(innerWidth, innerHeight) / 100;
+    const vmax = typeof innerWidth === "number" ? Math.max(innerWidth, innerHeight) / 100 : 8.44;
     return { x: (150 * vmax) / 128, y: (95 * vmax) / 128 };
   }
   let k = $state(scales());
-  let hidden = $state(document.hidden);
+  let hidden = $state(typeof document !== "undefined" && document.hidden);
 </script>
 
 <svelte:window onresize={() => (k = scales())} />

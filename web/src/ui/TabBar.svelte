@@ -2,15 +2,15 @@
   // Barre d'onglets du téléphone (< 768 px), façon app : Envoyer, Mes partages, Téléchargements (conception compte §21.15.5). Plus d'onglet Réglages : langue, nettoyage et liens sont dans le pied de page.
   // Visibilité décidée par app/tabbar.ts ; masquée sur ordinateur par la CSS seule.
   import { currentTab, tabPath, tabsFor, type TabId } from "../app/tabbar";
-  import { shares } from "../history/live.svelte";
+  import { accountFlag } from "../app/account-flag.svelte";
   import { followLink, href, router } from "../app/router.svelte";
   import { t, type Key } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
   import TabIcon from "./TabIcon.svelte";
 
   // Connecté (conception compte §21.15.1) : Accueil, Envoyer, Téléchargements, Profil. Le compte
-  // ouvert est dit par l'historique (shares.account, posé par la session) : aucun code du compte ici.
-  const connected = $derived(shares.account !== null);
+  // ouvert est dit par l'historique (accountFlag, posé par la session) : aucun code du compte ici.
+  const connected = $derived(accountFlag.connected);
   const tabs = $derived(tabsFor(connected));
   const current = $derived(currentTab(router.current.name, connected));
 
