@@ -8,6 +8,7 @@
   import { tick } from "svelte";
   import { t } from "../i18n/i18n.svelte";
   import Broom from "./icons/Broom.svelte";
+  import Trash2 from "./icons/Trash2.svelte";
 
   type Props = {
     /** Bouton qui l'a ouverte (position, retour du focus) ; null : fermée. */
@@ -16,8 +17,10 @@
     body: string;
     onconfirm: () => void;
     onclose: () => void;
+    /** « delete » : confirmation de « Tout supprimer » (corbeille, bouton rouge, 16 novembre). */
+    kind?: "clean" | "delete";
   };
-  let { anchor, title, body, onconfirm, onclose }: Props = $props();
+  let { anchor, title, body, onconfirm, onclose, kind = "clean" }: Props = $props();
 
   const uid = $props.id();
   let box: HTMLDivElement | undefined = $state();
@@ -89,11 +92,11 @@
 {#if anchor}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div bind:this={box} class="cc" role="dialog" tabindex="-1" aria-labelledby="{uid}-t" aria-describedby="{uid}-b" popover="manual" onkeydown={key} onfocusout={left} data-clean-confirm>
-    <p class="t" id="{uid}-t"><Broom size={18} strokeWidth={1.9} />{title}</p>
+    <p class="t" id="{uid}-t">{#if kind === "delete"}<Trash2 size={18} strokeWidth={1.9} />{:else}<Broom size={18} strokeWidth={1.9} />{/if}{title}</p>
     <p class="b" id="{uid}-b">{body}</p>
     <div class="acts">
       <button type="button" class="btn ghost" bind:this={cancelBtn} onclick={() => close()}>{t("common.cancel")}</button>
-      <button type="button" class="btn go" onclick={confirm}>{t("clean.confirm.go")}</button>
+      <button type="button" class={["btn", "go", { danger: kind === "delete" }]} onclick={confirm}>{kind === "delete" ? t("compose.clear.go") : t("clean.confirm.go")}</button>
     </div>
   </div>
 {/if}
@@ -188,5 +191,9 @@
     .btn {
       border: 1px solid ButtonText;
     }
+  }
+  .btn.go.danger {
+    background: var(--danger);
+    color: var(--ink);
   }
 </style>

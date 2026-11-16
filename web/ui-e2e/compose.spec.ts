@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
 import { axe, capture, expect, readClipboard, test } from "./fixtures";
-import { composerFits, openFilePicker, pickInAddSheet, enterComposer } from "./send-helpers";
+import { clearAll, composerFits, openFilePicker, pickInAddSheet, enterComposer } from "./send-helpers";
 import { MIMES } from "../src/media/capture";
 
 /** Le navigateur testé sait-il enregistrer un vocal ? Sinon le site masque « Vocal » (media/capture.ts, captureSupport). */
@@ -148,10 +148,10 @@ test.describe("fr-FR", () => {
     await expect(rows(page).filter({ hasText: "archive.zip" }).locator("svg.fi")).toHaveAttribute("data-format", "ZIP");
     await expect(rows(page).filter({ hasText: "contrat.pdf" })).toContainText(/Document PDF.*octets/);
     await expect(page.locator("[data-row], .group .meta").filter({ hasText: /env\.\s/ })).toHaveCount(0);
-    // « Tout supprimer » : un vrai bouton secondaire avec icône, dans l'en-tête de la liste, au-dessus des tailles.
+    // « Tout supprimer » : petite icône (corbeille) dans l'en-tête de la liste, au-dessus des tailles (16 novembre).
     const clear = page.getByRole("button", { name: "Tout supprimer" });
-    await expect(clear).toHaveClass(/secondary/);
     await expect(clear.locator("svg")).toHaveCount(1);
+    expect((await clear.boundingBox())!.width).toBeLessThanOrEqual(44);
     expect((await clear.boundingBox())!.y).toBeLessThan((await page.locator(".cap").boundingBox())!.y);
     await expect(rows(page).filter({ hasText: "anniversaire-lou.webm" })).toContainText("1:12");
     await expect(page.locator(".group .meta").first()).toContainText(/^1 · /);
@@ -360,7 +360,7 @@ test.describe("fr-FR", () => {
     await expect(rows(page)).toHaveCount(2);
     await page.getByRole("group", { name: "contrat.pdf supprimé" }).getByRole("button", { name: "Annuler" }).click();
     await expect(rows(page)).toHaveCount(3);
-    await page.getByRole("button", { name: "Tout supprimer" }).click();
+    await clearAll(page);
     await expect(page.locator(".dropzone.empty")).toBeVisible(); // page d'envoi vide (D41-37)
     await page.getByRole("button", { name: "Annuler" }).click();
     await expect(rows(page)).toHaveCount(3);
@@ -500,7 +500,7 @@ test.describe("fr-FR", () => {
     await capture(page, "compose-limit-count");
 
     test.skip(browserName !== "chromium", "fichier creux de 2 Go : Chromium (chemin local)");
-    await page.getByRole("button", { name: "Tout supprimer" }).click();
+    await clearAll(page);
     await expect(page.locator(".dropzone.empty")).toBeVisible(); // page d'envoi vide (D41-37)
     const dir = mkdtempSync(join(tmpdir(), "shh-2go-"));
     try {
@@ -513,7 +513,7 @@ test.describe("fr-FR", () => {
       await expect(rows(page)).toHaveCount(1);
       await expect(page.getByRole("alert").filter({ hasText: /^Trop gros/ })).toHaveCount(0);
       await expect(page.locator("#send-reason")).toHaveCount(0);
-      await page.getByRole("button", { name: "Tout supprimer" }).click();
+      await clearAll(page);
       await expect(page.locator(".dropzone.empty")).toBeVisible(); // page d'envoi vide (D41-37)
       const p = join(dir, "film-2go-plus-1.bin");
       const fd = openSync(p, "w");

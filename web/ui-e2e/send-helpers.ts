@@ -154,3 +154,9 @@ export async function capturePutBodies(page: Page): Promise<{ url: string; body:
   });
   return out;
 }
+
+/** « Tout supprimer » (icône) puis « Supprimer » dans sa confirmation (16 novembre). */
+export async function clearAll(page: Page) {
+  await page.getByRole("button", { name: "Tout supprimer" }).click();
+  await page.getByRole("dialog", { name: /^Supprimer/ }).getByRole("button", { name: "Supprimer", exact: true }).click();
+}

@@ -32,6 +32,7 @@
   import TextField from "../ui/TextField.svelte";
   import CurrentOffer from "../ui/CurrentOffer.svelte";
   import CleanConfirm from "../ui/CleanConfirm.svelte";
+  import IconButton from "../ui/IconButton.svelte";
   import { cleanWhatKey, isCleanFailure } from "../media/clean-label";
   import Sheet from "../ui/Sheet.svelte";
   import TextArea from "../ui/TextArea.svelte";
@@ -522,6 +523,9 @@
   // ouvre une petite confirmation qui dit ce qui sera retiré ; « Nettoyer » lance le nettoyage.
   const cleanable = $derived(composer.items.filter((i) => canClean(i) === "nettoyer" && !composer.isCleaning(i.id)));
   let cleanAllBtn: HTMLButtonElement | undefined = $state();
+  // « Tout supprimer » : confirmé d'abord (16 novembre), puis l'annulation reste possible (toast).
+  let clearBtn: HTMLButtonElement | undefined = $state();
+  let clearAsk = $state<HTMLElement | null>(null);
   let cleanAsk = $state<{ ids: string[]; anchor: HTMLElement; title: string; body: string } | null>(null);
   function askClean(id: string, anchor: HTMLElement) {
     const it = composer.items.find((i) => i.id === id);
@@ -607,19 +611,18 @@
           <NamesTip />
         </div>
         {#if filled}
+          <!-- « Tout nettoyer » et « Tout supprimer » (retours du 16 novembre) : deux petites icônes
+               à droite du titre, chacune avec sa confirmation (rien n'est fait avant « Nettoyer »
+               ou « Supprimer ») ; nom complet pour les lecteurs d'écran et au survol. -->
           <div class="clear">
             {#if cleanable.length > 0}
-              <!-- « Tout nettoyer » (retours du 12 novembre) : seulement s'il reste un fichier à
-                   nettoyer ; même confirmation que le balai d'une ligne. -->
-              <Button variant="secondary" dense bind:el={cleanAllBtn} onpress={() => cleanAllBtn && askCleanAll(cleanAllBtn)} aria-haspopup="dialog" data-clean-all>
-                {#snippet icon()}<Broom size={18} strokeWidth={1.8} />{/snippet}
-                {t("compose.clean.all")}
-              </Button>
+              <IconButton label={t("compose.clean.all")} title={t("compose.clean.all")} bind:el={cleanAllBtn} onpress={() => cleanAllBtn && askCleanAll(cleanAllBtn)} aria-haspopup="dialog" data-clean-all>
+                <Broom size={20} strokeWidth={1.8} />
+              </IconButton>
             {/if}
-            <Button variant="secondary" dense onpress={clearAll}>
-              {#snippet icon()}<Trash2 size={18} strokeWidth={1.8} />{/snippet}
-              {t("compose.clear")}
-            </Button>
+            <IconButton label={t("compose.clear")} title={t("compose.clear")} bind:el={clearBtn} onpress={() => clearBtn && (clearAsk = clearBtn)} aria-haspopup="dialog" data-clear-all>
+              <Trash2 size={20} strokeWidth={1.8} />
+            </IconButton>
           </div>
         {/if}
         <div class="cap">
@@ -850,6 +853,7 @@
 <ViewerPanel items={viewItems} bind:at={viewAt} viewOnly={false} load={loadLocal} held={false} onclose={() => undefined} />
 
 
+<CleanConfirm kind="delete" anchor={clearAsk} title={t("compose.clear.confirm", { n: composer.count })} body={t("compose.clear.body")} onconfirm={clearAll} onclose={() => (clearAsk = null)} />
 <CleanConfirm anchor={cleanAsk?.anchor ?? null} title={cleanAsk?.title ?? ""} body={cleanAsk?.body ?? ""} onconfirm={() => { const ids = cleanAsk?.ids ?? []; void runClean(ids); }} onclose={() => (cleanAsk = null)} />
 
 <AddSheet bind:open={addOpen} actions={sheetActions} onpick={addAct} />
@@ -899,9 +903,7 @@
   /* Téléphone : « Tout nettoyer » et « Tout supprimer » sur leur propre rangée, sous le titre
      (le titre ne se coupe plus en deux). */
   .app.narrow .clear {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
+    gap: 0;
   }
   .narrow .list-col {
     gap: var(--sp-2);
@@ -1101,9 +1103,8 @@
   }
   .clear {
     display: flex;
-    flex-wrap: wrap;
     justify-content: flex-end;
-    gap: var(--sp-2);
+    gap: 2px;
   }
   .notes {
     list-style: none;
