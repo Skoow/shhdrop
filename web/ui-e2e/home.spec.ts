@@ -39,7 +39,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("button", { name: isMobile ? /^Ou créez sur place/ : /^Commencer/ }).filter({ visible: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
     // Limites gratuites (spec §41.2), lues des constantes.
-    if (!isMobile) await expect(page.locator("p.proof")).toHaveText("200\u202féléments · 2\u202fGo au total");
+    if (!isMobile) await expect(page.locator("p.proof")).toHaveText("Jusqu'à 2\u202fGo au total");
     for (const h of ["Ce qui se passe quand vous partagez", "Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     // Infographie : sept étapes lisibles en liste, le dessin caché.

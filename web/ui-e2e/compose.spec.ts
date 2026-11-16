@@ -119,8 +119,10 @@ test.describe("fr-FR", () => {
     await expect(rows(page)).toHaveCount(10);
 
     // Capacité en tête, à côté de « Votre envoi ».
-    await expect(page.locator(".top .ht")).toHaveText(/^10\s\/\s200\séléments · [\d,]+\s(?:Ko|Mo) \/ 2\sGo$/);
-    await expect(page.getByRole("meter", { name: "Nombre d'éléments" })).toHaveAttribute("aria-valuenow", "10");
+    // Le nombre d'éléments n'apparaît qu'à l'approche de la limite (décision du 16 novembre).
+    await expect(page.locator(".top .ht")).toHaveText(/^[\d,]+\s(?:Ko|Mo) \/ 2\sGo$/);
+    // Loin de la limite (10 sur 200) : pas de compteur d'éléments (décision du 16 novembre).
+    await expect(page.getByRole("meter", { name: "Nombre d'éléments" })).toHaveCount(0);
     expect(await page.locator(".top .gh").evaluate((e) => getComputedStyle(e).fontVariantNumeric)).toContain("tabular-nums");
     expect(await page.locator(".group h3").allTextContents()).toEqual(["Texte", "Photos", "Vidéos", "Documents", "Archives"]);
     // Note : son titre et « Texte · taille » seulement, jamais le contenu (D41-37).
@@ -698,7 +700,7 @@ test.describe("en-US", () => {
     } else await page.locator(".dropzone.empty").click();
     await (await chooser).setFiles(MIXED.slice(0, 8));
     await expect(page.getByRole("heading", { level: 2, name: "Your share" })).toBeVisible();
-    await expect(page.locator(".top .ht")).toHaveText(/^8\s\/\s200\sitems · /);
+    await expect(page.locator(".top .ht")).toHaveText(/^[\d,]+\s(?:KB|MB) \/ 2\sGB$/);
     if (isMobile) await expect(page.getByRole("button", { name: /^Options · 12h · 1\sopen · download allowed$/ })).toBeVisible();
     else await expect(page.locator(".summary")).toHaveText("Erased in 12h or after 1\u00a0open, whichever comes first.");
     expect(await axe(page)).toEqual([]);
