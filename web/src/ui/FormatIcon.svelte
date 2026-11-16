@@ -37,7 +37,9 @@
   // toujours DANS la pastille, elle-même DANS la feuille (retours UI7). Garde-fou : s'il dépasse
   // malgré tout (police de repli plus large), il est resserré à la largeur de la pastille.
   const label = $derived(abbr(format.label || t(`format.short.${format.family}`)));
-  const fs = $derived(label.length <= 2 ? 8.4 : label.length === 3 ? 7.6 : 6.8);
+  // Taille du libellé : la hauteur de ses glyphes (police du site chargée) tient dans la pastille
+  // (10 unités) ; à 7,6, « JPG » en dépassait de 0,25 (ui7.spec.ts, 16 novembre).
+  const fs = $derived(label.length <= 3 ? 7.2 : 6.8);
 </script>
 
 <script module lang="ts">
