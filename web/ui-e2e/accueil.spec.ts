@@ -131,14 +131,15 @@ test("mouvement réduit : storyboard statique, bande immobile, aucune animation 
   expect(await axe(page)).toEqual([]);
 });
 
-test("bande des engagements : promesses vraies, bouton d'arrêt", async ({ page, shh }) => {
+test("bande des engagements : promesses vraies, défile seule, sans bouton (16 novembre)", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   const band = page.locator("[data-band]");
   await expect(band.getByRole("listitem")).toHaveCount(6);
-  await band.getByRole("button", { name: "Arrêter le défilement" }).click();
-  await expect(band).toHaveClass(/stopped/);
+  await expect(band.getByRole("button")).toHaveCount(0);
+  await band.scrollIntoViewIfNeeded();
+  await page.mouse.move(1, 1);
   const t = await band.locator(".track").evaluate((e) => e.getAnimations().map((a) => a.playState));
-  expect(t).toEqual(["paused"]);
+  expect(t).toEqual(["running"]);
 });
 
 test("rien n'a l'air d'une commande sans en être une : tout ce qui montre une main est un lien, un bouton ou une question", async ({ page, shh }) => {
