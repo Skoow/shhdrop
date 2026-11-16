@@ -1,3 +1,4 @@
+import { href, navigate, otherEntry } from "./router.svelte";
 // État d'interface partagé entre les écrans et la coque (aucun secret) : composeur rempli ;
 // `report` : ouvre la confirmation de signalement du partage affiché (page d'un partage ouvert,
 // retours UI7), sinon null et le lien « Signaler » du pied de page mène à la page « Signaler un abus ».
@@ -11,3 +12,27 @@ export const chrome = $state<{ composing: boolean; report: (() => void) | null; 
   add: null,
   pending: null,
 });
+
+/**
+ * Geste choisi hors de la page d'envoi (menu « Envoyer », feuille « Nouveau ») : joué par le
+ * composeur au montage. Depuis une page d'information (son propre fichier HTML, pages séparées),
+ * la mémoire ne survit pas au chargement : le geste passe par l'adresse, « /envoyer?ajout=… »,
+ * un mot d'une liste fermée, sans aucune donnée, retiré aussitôt lu (takeGestureFromUrl).
+ */
+const GESTURES: readonly AddGesture[] = ["fichiers", "texte", "vocal", "media"];
+export function goToSend(g: AddGesture): void {
+  if (otherEntry("/envoyer")) {
+    location.assign(href("/envoyer") + "?ajout=" + g);
+    return;
+  }
+  chrome.pending = g;
+  navigate("/envoyer");
+}
+/** Au démarrage de l'application : « ?ajout=<geste> » exactement, sur /envoyer, puis l'adresse nettoyée. */
+export function takeGestureFromUrl(loc: Location = location, h: History = history): void {
+  const m = /^\?ajout=([a-z]+)$/.exec(loc.search);
+  if (m === null) return;
+  h.replaceState(h.state, "", loc.pathname);
+  const g = m[1] as AddGesture;
+  if (GESTURES.includes(g) && loc.pathname === href("/envoyer")) chrome.pending = g;
+}

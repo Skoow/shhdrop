@@ -19,7 +19,7 @@
   import Unsupported from "./routes/Unsupported.svelte";
   import PageRedirect from "./pages/PageRedirect.svelte";
   import AppShell from "./ui/AppShell.svelte";
-  import { chrome } from "./app/chrome.svelte";
+  import { chrome, takeGestureFromUrl } from "./app/chrome.svelte";
   import { tabBarVisible } from "./app/tabbar";
   // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
@@ -32,6 +32,8 @@
 
   // Démo GitHub Pages seulement (UI §14.3) : bandeau permanent ; null en production.
   const demo = getDemo();
+  // Geste choisi sur une page d'information (« /envoyer?ajout=texte ») : rejoué par le composeur.
+  takeGestureFromUrl();
 
   // Task 17 : vrai pendant un envoi et sur « Lien prêt » (langue figée, dépôt de fichier ignoré).
   let sending = $state(false);

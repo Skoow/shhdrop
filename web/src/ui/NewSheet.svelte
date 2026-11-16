@@ -2,8 +2,7 @@
   // Feuille « Nouveau » de l'accueil connecté (conception compte §21.15.1) : Envoyer des fichiers,
   // Écrire une note (page d'envoi, geste joué par le composeur à son montage), Créer un salon
   // (bientôt : il dépend des écrans du salon, C-3 ; annoncé, rien n'est demandé au serveur).
-  import { chrome, type AddGesture } from "../app/chrome.svelte";
-  import { navigate } from "../app/router.svelte";
+  import { goToSend, type AddGesture } from "../app/chrome.svelte";
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX } from "../limits";
@@ -15,8 +14,7 @@
 
   function go(g: AddGesture) {
     open = false;
-    chrome.pending = g;
-    navigate("/envoyer");
+    goToSend(g);
   }
 </script>
 

@@ -6,7 +6,7 @@
   // et rend le focus au bouton, Tab hors du menu le ferme ; un clic ailleurs le ferme aussi.
   // Téléphone (< 768 px) : rien de tout ça, la barre d'onglets du bas tient la navigation.
   import { flushSync, tick, type Component } from "svelte";
-  import { chrome, type AddGesture } from "../app/chrome.svelte";
+  import { chrome, goToSend, type AddGesture } from "../app/chrome.svelte";
   import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -107,8 +107,7 @@
     close();
     if (chrome.add) chrome.add(g);
     else {
-      chrome.pending = g;
-      navigate("/envoyer");
+      goToSend(g);
     }
   }
   /** Section de l'accueil, sans « # » dans l'adresse (le « # » est réservé aux clés). */
