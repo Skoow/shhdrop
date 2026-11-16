@@ -34,13 +34,11 @@ test("composeur et options : aucun choix payant verrouillé ; l'offre en cours d
   if (isMobile) await page.keyboard.press("Escape");
 });
 
-test("Offres : cartes et colonnes au bleu de leur offre ; feuille Pro en bleu Pro ; capture", async ({ page, shh, isMobile }) => {
+test("Offres : noms des offres au bleu de leur offre ; capture", async ({ page, shh, isMobile }) => {
   await page.setViewportSize({ width: w(isMobile), height: isMobile ? 844 : 1000 });
   await page.goto(shh.origin + "/offres");
-  expect(await page.locator('[data-price="plus"] .tier').evaluate(color)).toBe(PLUS);
-  expect(await page.locator('[data-price="pro"] .tier').evaluate(color)).toBe(PRO);
-  expect(await page.locator("[data-offers] thead th.plus").evaluate(color)).toBe(PLUS);
-  expect(await page.locator("[data-offers] thead th.pro").evaluate(color)).toBe(PRO);
+  expect(await page.locator('[data-tier="plus"] .nm').evaluate(color)).toBe(PLUS);
+  expect(await page.locator('[data-tier="pro"] .nm').evaluate(color)).toBe(PRO);
   await settle(page);
   expect(await axe(page)).toEqual([]);
   await page.screenshot({ path: `${SHOTS}offres-${w(isMobile)}.png`, fullPage: true });

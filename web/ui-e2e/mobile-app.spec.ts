@@ -130,12 +130,9 @@ test.describe("téléphone façon app", () => {
     await expect(foot(page).getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0); // langue du navigateur, plus de choix (12 novembre)
     await footLink(page, "Sécurité").click();
     await expect(page).toHaveURL(/\/securite$/);
-    // En-tête natif : retour en haut à gauche.
-    const back = page.getByRole("banner").getByRole("button", { name: "Retour" });
-    await expect(back).toBeVisible();
-    const bb = (await back.boundingBox())!;
-    expect(bb.x).toBeLessThan(24);
-    await back.click();
+    // Page d'information (page séparée, 16 novembre) : en-tête ordinaire, logo et menu, pas de « Retour ».
+    await expect(page.getByRole("banner").getByRole("button", { name: "Retour" })).toHaveCount(0);
+    await page.getByRole("banner").getByRole("link", { name: "Shhgone, accueil" }).click();
     await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
   });
 

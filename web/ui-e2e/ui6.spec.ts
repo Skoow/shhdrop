@@ -116,7 +116,7 @@ test("destinataire : pastille « Téléchargé » au coin de l'icône (cadenas �
 test("Offres et Sécurité : captures", async ({ page, shh, isMobile }) => {
   await page.setViewportSize({ width: w(isMobile), height: isMobile ? 844 : 1000 });
   await page.goto(shh.origin + "/offres");
-  await expect(page.locator("[data-prices]")).toBeVisible();
+  await expect(page.locator("[data-checkout]")).toBeVisible();
   await settle(page);
   await page.screenshot({ path: `${SHOTS}offres-${w(isMobile)}.png`, fullPage: true });
   await page.goto(shh.origin + "/securite");

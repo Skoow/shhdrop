@@ -229,6 +229,15 @@
         <span class="ty">{t(item.kind === "text" ? "compose.cat.text" : typeKey(format))}</span><span class="sep" aria-hidden="true">·</span>
         <span class="num">{formatBytes(item.size, getLang())}</span>
         {#if duration !== null}<span class="sep" aria-hidden="true">·</span><span class="num">{formatClock(duration)}</span>{/if}
+        {#if item.kind === "file"}
+          <!-- Empreinte SHA-256 (16 novembre) : sur la ligne du type et de la taille (elle passe à
+               la ligne seulement faute de place) ; sélectionnée d'un toucher pour la copier, entière
+               au survol. Elle change si le fichier est nettoyé. -->
+          {@const sum = digestOf(item.data)}
+          <span class="hash num" data-sha256={sum && sum !== "erreur" ? sum : undefined} title={sum && sum !== "erreur" ? sum : undefined}
+            ><span class="hk">SHA-256</span> {sum === null ? t("compose.hash.computing") : sum === "erreur" ? t("compose.hash.failed") : sum}</span
+          >
+        {/if}
         {#if upload}
           <!-- État de l'envoi : barre et Réessayer seulement ; le libellé est dans la bulle du cadenas. -->
           {@const busy = upload.key === "compose.up.envoi" || upload.key === "compose.up.chiffrement"}
@@ -247,14 +256,6 @@
         {/if}
         <ItemNotes {item} {cannotOpen} badgesOnly />
       </span>
-      {#if item.kind === "file"}
-        <!-- Empreinte SHA-256 (16 novembre) : en petit, sélectionnée d'un toucher pour la copier ;
-             entière au survol. Elle change si le fichier est nettoyé. -->
-        {@const sum = digestOf(item.data)}
-        <span class="hash num" data-sha256={sum && sum !== "erreur" ? sum : undefined} title={sum && sum !== "erreur" ? sum : undefined}
-          ><span class="hk">SHA-256</span> {sum === null ? t("compose.hash.computing") : sum === "erreur" ? t("compose.hash.failed") : sum}</span
-        >
-      {/if}
       <ItemNotes {item} {cannotOpen} lines />
     {/if}
   </div>
@@ -605,9 +606,8 @@
      étroit ; un toucher la sélectionne entière (copie). */
   .hash {
     display: block;
-    min-width: 0;
-    /* Même retrait que la ligne du type et de la taille : alignée sur le nom. */
-    padding-inline-start: 21px;
+    flex: 1 1 14ch;
+    min-width: 14ch;
     overflow: hidden;
     color: var(--text-3);
     font-family: var(--font-mono);

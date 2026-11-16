@@ -54,24 +54,31 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   }
 });
 
-test("Offres : « 10 Go par partage », « 50 Go par partage » ; prix mensuel en grand, annuel ; mensuel par abonnement, annuel au choix ; carte et crypto-monnaies ; rien à acheter ; capture", async ({ page, shh, isMobile }) => {
+test("Offres (refaite le 16 novembre) : une seule présentation, facturation, choix de l'offre, récapitulatif ; rien n'est demandé ni prélevé ; capture", async ({ page, shh, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(shh.origin + "/offres");
-  const t = page.locator("[data-offers]");
-  for (const x of ["2 Go par partage", "10 Go par partage", "50 Go par partage"]) await expect(t).toContainText(x);
+  const co = page.locator("[data-checkout]");
   const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, " ");
-  const prices = page.locator("[data-prices]");
-  expect(norm(await prices.locator('[data-price="plus"]').innerText())).toMatch(/7 €\s+par mois, TTC[\s\S]*ou 70 € par an[\s\S]*2 mois offerts/);
-  expect(norm(await prices.locator('[data-price="pro"]').innerText())).toMatch(/20 €\s+par mois, TTC[\s\S]*ou 200 € par an[\s\S]*2 mois offerts/);
-  // D41-34 : mensuel par abonnement seulement ; annuel au choix ; carte bancaire et crypto-monnaies.
-  for (const x of ["Au mois :", "abonnement renouvelé automatiquement chaque mois, résiliable en un clic, sans frais.", "À l'année, au choix :", "paiement unique (rien n'est prélevé ensuite) ou renouvellement automatique, résiliable en un clic, sans frais.", "Carte bancaire", "Crypto-monnaies", "Aucun frais caché."]) expect(norm(await prices.innerText())).toContain(x);
-  expect(norm(await prices.innerText())).not.toContain("payé en une fois");
-  await expect(prices.locator("img")).toHaveCount(0);
-  await expect(page.locator("main")).toContainText("Bientôt disponible.");
-  await expect(page.locator("main button")).toHaveCount(0);
-  // Le prix mensuel est le plus grand texte de la carte.
-  expect(await prices.locator('[data-price="plus"] .big').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(32);
-  await expect(page.locator("main form, main input")).toHaveCount(0);
+  // Trois offres, une seule fois chacune (plus de tableau qui redisait les cartes).
+  await expect(co.locator("[data-tier]")).toHaveCount(3);
+  await expect(page.locator("[data-offers], [data-prices]")).toHaveCount(0);
+  for (const [x, size] of [["free", "2 Go"], ["plus", "10 Go"], ["pro", "50 Go"]] as const) expect(norm(await co.locator(`[data-tier="${x}"]`).innerText())).toContain(size);
+  // Annuel par défaut ; mensuel au choix.
+  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/70 €\s+par an, TTC/);
+  await co.locator("[data-billing]").getByText("Mensuel").click();
+  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s+par mois, TTC/);
+  expect(norm(await co.locator('[data-tier="pro"] [data-price]').innerText())).toMatch(/20 €\s+par mois, TTC/);
+  // Gratuit : l'offre en cours, rien à choisir.
+  await expect(co.locator('[data-tier="free"] input')).toHaveCount(0);
+  await expect(co.locator("[data-summary]")).toHaveCount(0);
+  await co.locator('[data-tier="pro"]').getByText("Choisir Pro").click();
+  const sum = co.locator("[data-summary]");
+  expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € par mois, TTC/);
+  // Compte et paiement pas encore ouverts : le bouton le dit, aucun champ, aucun prélèvement.
+  const go = sum.getByRole("button", { name: "Créer mon compte et payer" });
+  await expect(go).toBeDisabled();
+  await expect(go).toHaveAccessibleDescription(/Rien n'est demandé ni prélevé aujourd'hui\./);
+  await expect(page.locator("main form, main input[type=email], main input[type=password], main img")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await axe(page)).toEqual([]);
   await page.screenshot({ path: `${SHOTS}offres-${w(isMobile)}.png`, fullPage: true });

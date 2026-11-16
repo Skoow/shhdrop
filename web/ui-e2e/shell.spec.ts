@@ -37,12 +37,14 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   }
   // Sans compte, pas de « Téléchargements » (retours du 15 novembre).
   await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
-  for (const l of ["Envoyer", "Mes partages", "Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
+  // Plus d'« Envoyer », de « Mes partages » ni de « Salon » (16 novembre) : le logo et le menu y mènent.
+  for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
+  await expect(foot.getByText(/^Salon/)).toHaveCount(0);
+  for (const l of ["Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();
-  // 10 liens (dont « Mes partages », Task H), plus le logo (retour à l'accueil, UI7).
-  await expect(foot.getByRole("link")).toHaveCount(11);
+  // 8 liens, plus le logo (retour à l'accueil, UI7).
+  await expect(foot.getByRole("link")).toHaveCount(9);
   await expect(foot.getByRole("link", { name: "Shhgone, accueil" })).toBeVisible();
-  await expect(foot.getByText(/^Salon\s+bientôt$/)).toBeVisible(); // pas un lien
   await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
   await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("rel", "noopener noreferrer");
   // Retours UI9 : plus de mention « aucune publicité » ; le nom en bas à gauche, « © 2026 » à côté.

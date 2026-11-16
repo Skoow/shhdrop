@@ -153,16 +153,3 @@ test("pied de page : logo au bord intérieur de l'en-tête, liens sans soulignem
   expect(await foot.evaluate((e) => getComputedStyle(e, "::after").display)).toBe("none");
 });
 
-test("Offres : mensuel par abonnement, annuel au choix, carte et crypto-monnaies, rien à acheter ; capture", async ({ page, shh, isMobile }) => {
-  await page.setViewportSize({ width: w(isMobile), height: isMobile ? 844 : 1000 });
-  await page.goto(shh.origin + "/offres");
-  const prices = page.locator("[data-prices]");
-  await expect(prices).toBeVisible();
-  const txt = (await prices.innerText()).replace(/[  ]/g, " ");
-  for (const x of ["Au mois :", "abonnement renouvelé automatiquement chaque mois", "À l'année, au choix :", "paiement unique", "Moyens de paiement", "Carte bancaire", "Crypto-monnaies", "Aucun frais caché."]) expect(txt).toContain(x);
-  await expect(page.locator("main")).toContainText("Bientôt disponible.");
-  await expect(page.locator("main button, main form, main input, main img")).toHaveCount(0);
-  await settle(page);
-  expect(await axe(page)).toEqual([]);
-  await page.screenshot({ path: `${SHOTS}offres-${w(isMobile)}.png`, fullPage: true });
-});
