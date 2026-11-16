@@ -177,9 +177,11 @@ describe("dictionnaires", () => {
         if (k in EXCEPTIONS) continue;
         expect(v, `${lang} ${k}`).not.toMatch(re);
       }
-    // Chiffres lus dans les constantes (benchmark M5) : l'unité suit {n} par une espace insécable.
-    expect(fr["compose.gauge.empty"]).toContain("{size} et {n}\u202féléments");
-    expect(en["compose.gauge.empty"]).toContain("{size} and {n}\u00a0items");
+    // Chiffres lus dans les constantes (benchmark M5). Le nombre d'éléments n'est plus annoncé
+    // d'avance (décision du propriétaire du 16 novembre) : seulement la taille.
+    expect(fr["compose.gauge.empty"]).toContain("{size} maximum");
+    expect(en["compose.gauge.empty"]).toContain("up to {size}");
+    for (const d of [fr, en]) for (const k of ["compose.gauge.empty", "compose.drop.limit", "home.proof"] as const) expect(d[k], k).not.toContain("{n}");
   });
 
   it("jamais « ≈ » ni « 100 % sécurisé »", () => {

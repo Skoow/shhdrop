@@ -15,14 +15,14 @@ const color = (e: Element) => getComputedStyle(e).color;
 // Décision du propriétaire du 11 novembre (audit M17) : plus aucun verrou ni pastille Plus ou Pro
 // dans le composeur ; depuis le 12 novembre, le bloc des offres (Plus, Pro) ouvre la feuille
 // d'information (« bientôt » en tête).
-test("composeur et options : aucun choix payant verrouillé ; le bloc des offres ouvre la feuille ; captures", async ({ page, shh, isMobile }) => {
+test("composeur et options : aucun choix payant verrouillé ; l'offre en cours dans un petit cadre ; captures", async ({ page, shh, isMobile }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: w(isMobile), height: isMobile ? 844 : 900 });
   await page.goto(shh.origin + "/");
   await addText(page, "Le code de la porte est 4471.");
   await expect(page.locator("[data-paid-space], [data-locked]")).toHaveCount(0);
-  const line = page.locator('[data-offer-strip] [data-offer="plus"] button').filter({ visible: true });
-  await expect(line).toContainText("bientôt");
+  // Plus de bande des offres dans le composeur (décision du 16 novembre) : « Votre offre : Gratuit ».
+  await expect(page.locator("[data-current-offer]").filter({ visible: true })).toContainText("Gratuit");
   await settle(page);
   await page.screenshot({ path: `${SHOTS}compose-top-${w(isMobile)}.png` });
   if (isMobile) await page.getByRole("button", { name: /^Options · / }).click();
@@ -32,9 +32,6 @@ test("composeur et options : aucun choix payant verrouillé ; le bloc des offres
   expect(await axe(page)).toEqual([]);
   await page.screenshot({ path: `${SHOTS}options-${w(isMobile)}.png` });
   if (isMobile) await page.keyboard.press("Escape");
-  await line.click();
-  const sheet = page.getByRole("dialog", { name: "Shhgone Plus" });
-  await expect(sheet.locator("[data-paid] > *").first()).toContainText("Bientôt disponible.");
 });
 
 test("Offres : cartes et colonnes au bleu de leur offre ; feuille Pro en bleu Pro ; capture", async ({ page, shh, isMobile }) => {

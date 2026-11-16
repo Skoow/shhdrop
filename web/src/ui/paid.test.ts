@@ -58,9 +58,9 @@ describe("feuille Plus : honnête, rien à acheter", () => {
     show(PaidSheet, { open: true, tier: "plus" });
     const s = text();
     expect(document.querySelector("[data-paid] > *")!.textContent).toContain("Bientôt disponible."); // audit M17
-    for (const x of ["Shhgone Plus", "10 Go par partage", "2 Go par partage", "50 Go par partage", "Durée jusqu'à 7 jours (gratuit : 24 h maximum)", "7 €", "70 €", "Bientôt disponible."])
-      expect(s, x).toContain(x);
-    expect(s).not.toMatch(/ouvertures \(gratuit/); // D41-36 : Plus garde les ouvertures du gratuit
+    for (const x of ["Shhgone Plus", "10 Go par partage", "2 Go par partage", "50 Go par partage", "Durée jusqu'à 3 jours (gratuit : 24 h maximum)", "Jusqu'à 20 ouvertures (gratuit : 10)", "7 €", "70 €", "Bientôt disponible."])
+      expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
+    // Décision du propriétaire du 16 novembre : Plus va jusqu'à 3 jours et 20 ouvertures (remplace D41-36).
     expect(s).not.toMatch(/élément/); // D41-17 : le nombre d'éléments n'est pas vendu
     expect([...document.querySelectorAll("button")].map((b) => b.textContent).join("|")).not.toMatch(/Acheter|Payer|S'abonner/i);
     expect(s).not.toMatch(/offre limitée|plus que/i);

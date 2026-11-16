@@ -60,21 +60,13 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);
   expect(h).toBeGreaterThanOrEqual(88); // facile à viser au doigt
   expect(h).toBeLessThanOrEqual(isMobile ? 150 : 220);
-  // Offres : trois formules, limites lues dans les constantes, « bientôt », lien vers /offres ; rien à acheter.
-  const offers = page.locator("[data-offer-strip]");
+  // Offre en cours (décision du 16 novembre) : petit cadre, limites lues dans les constantes, lien vers /offres.
+  const offers = page.locator("[data-current-offer]");
   await expect(offers).toBeInViewport({ ratio: 1 });
-  await expect(offers.locator("[data-offer]")).toHaveCount(3);
-  const norm = (s: string) => s.replace(/[  ]/g, " ");
-  expect(norm(await offers.locator('[data-offer="free"]').innerText())).toMatch(/Gratuit[\s\S]*2 Go[\s\S]*24 h[\s\S]*10 ouvertures/);
-  expect(norm(await offers.locator('[data-offer="plus"]').innerText())).toMatch(/Plus[\s\S]*bientôt[\s\S]*10 Go[\s\S]*7 jours[\s\S]*10 ouvertures/);
-  expect(norm(await offers.locator('[data-offer="pro"]').innerText())).toMatch(/Pro[\s\S]*bientôt[\s\S]*50 Go[\s\S]*7 jours[\s\S]*50 ouvertures/);
+  const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, " ");
+  expect(norm(await offers.innerText())).toMatch(/Votre offre :[\s\S]*Gratuit[\s\S]*2 Go · 24 h · 10 ouvertures/);
   await expect(offers.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("href", "/offres");
-  expect(await offers.innerText()).not.toMatch(/€|Acheter|Payer|S'abonner/i);
-  await expect(offers.locator("input, form")).toHaveCount(0);
-  // Plus : la feuille d'information s'ouvre sur place.
-  await offers.locator('[data-offer="plus"]').getByRole("button").click();
-  await expect(page.getByRole("dialog", { name: "Shhgone Plus" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(offers.locator("input, form, button")).toHaveCount(0);
   // Salon : même icône et même mot que l'onglet, « bientôt », désactivé avec sa raison.
   const room = page.locator("[data-room]").getByRole("button", { name: /^Salon/ });
   await expect(room).toBeInViewport({ ratio: 1 });
@@ -250,7 +242,7 @@ for (const vp of [null, { width: 720, height: 450 }]) {
       await page.setViewportSize(vp);
     } else test.skip(!isMobile, "téléphone");
     await openSend(page, shh.origin);
-    const strip = page.locator("[data-offer-strip]").filter({ visible: true });
+    const strip = page.locator("[data-current-offer]").filter({ visible: true });
     const title = page.locator("#compose-title");
     const cap = page.locator(".capg");
     const check = async () => {

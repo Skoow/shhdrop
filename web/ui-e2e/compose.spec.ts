@@ -288,32 +288,20 @@ test.describe("fr-FR", () => {
   // Décision du propriétaire du 11 novembre (audit M17), revue le 12 novembre : un bloc compact
   // Gratuit, Plus, Pro (limites lues dans les constantes) remplace la ligne discrète ; Plus et Pro
   // ouvrent la feuille d'information, qui dit « Bientôt disponible » en tête.
-  test("limites gratuites en clair ; bloc Gratuit, Plus, Pro → feuille honnête, « Bientôt disponible » en tête (D41-16)", async ({ page, shh, isMobile }) => {
+  test("limites gratuites en clair : « Votre offre : Gratuit » dans un petit cadre, lien vers les offres (décision du 16 novembre)", async ({ page, shh, isMobile }) => {
     await open(page, shh.origin);
     await browse(page, [f("contrat.pdf")]);
-    const strip = page.locator("[data-offer-strip]").filter({ visible: true });
-    await expect(strip.locator('[data-offer="free"]')).toHaveText(/^Gratuit\s*aujourd'hui\s*2\u202fGo\s*24\u202fh\s*10\u202fouvertures$/);
-    await expect(page.locator("[data-locked], [data-paid-space]")).toHaveCount(0);
-    const line = strip.locator('[data-offer="plus"] button');
-    await expect(line).toContainText("bientôt");
-    expect((await line.boundingBox())!.height).toBeGreaterThanOrEqual(44); // cible d'appui (audit M21)
+    const cur = page.locator("[data-current-offer]").filter({ visible: true });
+    await expect(cur).toHaveText(/^Votre offre\u202f:\s*Gratuit\s*2\u202fGo · 24\u202fh · 10\u202fouvertures\s*Voir les offres/);
+    await expect(page.locator("[data-offer-strip], [data-locked], [data-paid-space]")).toHaveCount(0);
     // Liste non vide : /offres s'ouvre dans un nouvel onglet (la liste resterait sinon perdue).
-    await expect(strip.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("target", "_blank");
+    await expect(cur.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("target", "_blank");
+    expect((await cur.getByRole("link", { name: /^Voir les offres/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44); // cible d'appui (audit M21)
     const opts = await options(page, isMobile);
     await expect(opts.getByRole("radio", { name: "12 h" })).toBeChecked();
     if (isMobile) await page.keyboard.press("Escape");
-    await line.click();
-    const sheet = page.getByRole("dialog", { name: "Shhgone Plus" });
-    await expect(sheet).toBeVisible();
-    await expect(sheet.locator("[data-paid] > *").first()).toContainText("Bientôt disponible.");
-    await expect(sheet).toContainText(/7\s€\s?par mois, TTC/);
-    await expect(sheet).toContainText(/ou 70\s€ par an/);
-    await expect(sheet.locator("form, input, a[href]")).toHaveCount(0);
     await settle(page);
     expect(await axe(page)).toEqual([]);
-    await capture(page, "compose-paid-sheet");
-    await sheet.getByRole("button", { name: "Compris" }).click();
-    await expect(sheet).toBeHidden();
   });
 
   test("options : 12 h et 1 ouverture par défaut, flèches, phrase à jour ; téléchargement (interrupteur), plus de coffre (décision du 11 novembre)", async ({ page, shh, isMobile }) => {
@@ -536,9 +524,7 @@ test.describe("fr-FR", () => {
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await page.waitForTimeout(6500);
       await capture(page, "compose-limit-size");
-      await page.locator('[data-offer-strip] [data-offer="plus"] button').filter({ visible: true }).click();
-      await expect(page.getByRole("dialog", { name: "Shhgone Plus" })).toBeVisible();
-      await page.keyboard.press("Escape");
+      await expect(page.locator("[data-current-offer]").filter({ visible: true })).toContainText("Gratuit");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -93,7 +93,8 @@ test.describe("téléphone façon app", () => {
     const closeButton = page.getByRole("banner").getByRole("button", { name: "Fermer le menu" });
     await expect(closeButton).toHaveAttribute("aria-expanded", "true");
     const menu = page.locator("[data-menu]");
-    await expect(menu.getByRole("link")).toHaveText(["Partager", "Mes partages", "Offres", "Sécurité", "Confidentialité", "Signaler un abus", /^Code source sur GitHub/]);
+    // Décision du 16 novembre : Envoi, Mes partages, Offres ; le reste est dans le pied de page.
+    await expect(menu.getByRole("link")).toHaveText(["Partager", "Mes partages", "Offres"]);
     await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
     expect(await smallTargets(page, "header")).toEqual([]);
     await shot(page, "menu-ouvert");

@@ -19,6 +19,9 @@
   const sizeText = $derived(t("compose.gauge.size", { size: formatBytes(bytes, lang), max }));
   const countText = $derived(t("compose.gauge.count", { n: count, max: MAX_ITEMS }));
   const uid = $props.id();
+  // Nombre d'éléments (décision du propriétaire du 16 novembre) : la limite est la même pour
+  // toutes les offres et rarement atteinte ; elle n'est montrée qu'à l'approche (80 %).
+  const countNear = $derived(count >= Math.floor(MAX_ITEMS * 0.8));
   // « Trop gros : 2 Go sur 2 Go » ne dirait rien : quand les deux tailles s'arrondissent pareil,
   // seul l'excédent est donné (« 4 octets de trop, limite : 2 Go »).
   const overText = $derived.by(() => {
@@ -38,15 +41,15 @@
 </script>
 
 {#if count === 0}
-  <p class="empty num">{t("compose.gauge.empty", { size: max, n: MAX_ITEMS })}</p>
+  <p class="empty num">{t("compose.gauge.empty", { size: max })}</p>
 {:else if head}
   <div class={["gh", level]}>
     <span id="{uid}-s" class="sr-only">{t("compose.gauge.sizeLabel")}</span>
     <span id="{uid}-c" class="sr-only">{t("compose.gauge.countLabel")}</span>
     <p class="ht num">
-      <span role="meter" aria-labelledby="{uid}-c" aria-valuemin="0" aria-valuemax={MAX_ITEMS} aria-valuenow={count} aria-valuetext={countText}
-        ><b>{count}</b>{t("compose.capacity.count", { n: "", max: MAX_ITEMS })}</span
-      ><span class="dot" aria-hidden="true">{" · "}</span><span aria-hidden="true"><b>{formatBytes(bytes, lang)}</b> / {max}</span>
+      {#if countNear}<span role="meter" aria-labelledby="{uid}-c" aria-valuemin="0" aria-valuemax={MAX_ITEMS} aria-valuenow={count} aria-valuetext={countText} data-count
+          ><b>{count}</b>{t("compose.capacity.count", { n: "", max: MAX_ITEMS })}</span
+        ><span class="dot" aria-hidden="true">{" · "}</span>{/if}<span aria-hidden="true"><b>{formatBytes(bytes, lang)}</b> / {max}</span>
     </p>
     <div class="bar" role="meter" aria-labelledby="{uid}-s" aria-valuemin="0" aria-valuemax={CONTENT_MAX} aria-valuenow={Math.min(bytes, CONTENT_MAX)} aria-valuetext={sizeText}>
       <span class="fill" style:--r={Math.min(1, ratio)}></span>

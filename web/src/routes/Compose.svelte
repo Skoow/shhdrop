@@ -7,7 +7,6 @@
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
   import { CONTENT_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
-  import type { PaidTier } from "../limits";
   import { blockKey, canClean, createComposer, type AddReport, type ComposeItem, type Source } from "../flows/compose.svelte";
   import { rowStatus, toDraftList } from "../flows/preupload";
   import { addActions, desktopActions, type AddId } from "../flows/add-actions";
@@ -31,8 +30,7 @@
   import CaptureScreen, { type Captured } from "../ui/CaptureScreen.svelte";
   import VoiceRecorder, { type Voice } from "../ui/VoiceRecorder.svelte";
   import TextField from "../ui/TextField.svelte";
-  import OffersStrip from "../ui/OffersStrip.svelte";
-  import PaidSheet from "../ui/PaidSheet.svelte";
+  import CurrentOffer from "../ui/CurrentOffer.svelte";
   import CleanConfirm from "../ui/CleanConfirm.svelte";
   import { cleanWhatKey, isCleanFailure } from "../media/clean-label";
   import Sheet from "../ui/Sheet.svelte";
@@ -87,13 +85,6 @@
   const narrow = $derived(narrowMq.current);
   const options = createOptions({ generate: generatePassword });
   $effect(() => onpassword?.(options.password));
-  // Formules payantes (D41-16) : feuille d'information seulement, rien n'est en vente.
-  let paidOpen = $state(false);
-  let paidTier = $state<PaidTier>("plus");
-  function showPaid(tier: PaidTier) {
-    paidTier = tier;
-    paidOpen = true;
-  }
 
   const filled = $derived(composer.count > 0);
   // Composeur à l'écran : dès le premier élément, ou d'emblée sur la page d'envoi (même vide).
@@ -596,7 +587,8 @@
   </div>
 {/snippet}
 
-{#snippet offers()}<OffersStrip newTab={filled} onpaid={showPaid} />{/snippet}
+<!-- Offre en cours (décision du propriétaire du 16 novembre) : un petit cadre, plus la bande Gratuit / Plus / Pro. -->
+{#snippet offers()}<CurrentOffer newTab={filled} />{/snippet}
 
 {#snippet app()}
   <div class={["app", { narrow }]} data-composer {@attach narrow ? null : fitViewport}>
@@ -854,7 +846,6 @@
      téléchargement ; le contenu ne quitte jamais la mémoire de la page. -->
 <ViewerPanel items={viewItems} bind:at={viewAt} viewOnly={false} load={loadLocal} held={false} onclose={() => undefined} />
 
-<PaidSheet bind:open={paidOpen} tier={paidTier} />
 
 <CleanConfirm anchor={cleanAsk?.anchor ?? null} title={cleanAsk?.title ?? ""} body={cleanAsk?.body ?? ""} onconfirm={() => { const ids = cleanAsk?.ids ?? []; void runClean(ids); }} onclose={() => (cleanAsk = null)} />
 

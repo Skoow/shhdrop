@@ -10,16 +10,13 @@ const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-e
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 const w = (isMobile: boolean) => (isMobile ? 390 : 1440);
 
-test("haut du composeur : bloc des offres Gratuit, Plus, Pro « bientôt » (12 novembre) ; aucun verrou ; rien ne déborde", async ({ page, shh, isMobile }) => {
+test("haut du composeur : « Votre offre : Gratuit » dans un petit cadre (16 novembre) ; aucun verrou ; rien ne déborde", async ({ page, shh, isMobile }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: w(isMobile), height: isMobile ? 844 : 900 });
   await page.goto(shh.origin + "/");
   await addText(page, "Le code de la porte est 4471.");
-  await expect(page.locator("[data-paid-space], [data-locked]")).toHaveCount(0);
-  const line = page.locator("[data-offer-strip]").filter({ visible: true });
-  await expect(line.locator("[data-offer]")).toHaveCount(3);
-  // Pas un bouton d'action : jamais le vert de l'action en fond.
-  for (const b of await line.locator("button").all()) expect(await b.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe("rgb(80, 227, 168)");
+  await expect(page.locator("[data-paid-space], [data-locked], [data-offer-strip]")).toHaveCount(0);
+  await expect(page.locator("[data-current-offer]").filter({ visible: true })).toContainText("Gratuit");
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
   if (!isMobile) expect(await composerFits(page)).toBe(true);
   await settle(page);

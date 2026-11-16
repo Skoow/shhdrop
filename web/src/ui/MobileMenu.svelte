@@ -8,7 +8,6 @@
   import { followLink, href, router } from "../app/router.svelte";
   import { shares } from "../history/live.svelte";
   import { t } from "../i18n/i18n.svelte";
-  import { SOURCE_URL } from "../routes/pages/content";
   import { Menu, X } from "./Icon";
 
   let { busy = false }: { busy?: boolean } = $props();
@@ -18,16 +17,14 @@
   let button: HTMLButtonElement | undefined = $state();
   const uid = $props.id();
 
-  type Link = { label: string; path?: string; url?: string; main?: boolean };
+  type Link = { label: string; path: string; main?: boolean };
   const links = $derived<Link[]>([
     { label: t("nav.cta"), path: "/envoyer", main: true },
     shares.account !== null ? { label: t("nav.home"), path: "/" } : { label: t("nav.shares"), path: "/envois" },
     ...(shares.account !== null ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
     { label: t("nav.offers"), path: "/offres" },
-    { label: t("shell.security"), path: "/securite" },
-    { label: t("shell.privacy"), path: "/confidentialite" },
-    { label: t("foot.report"), path: "/signaler" },
-    { label: t("foot.source"), url: SOURCE_URL },
+    // Sécurité, Confidentialité, Signaler, Code source : dans le pied de page de chaque écran,
+    // pas répétés ici (décision du propriétaire du 16 novembre : Envoi, Mes partages, Offres).
   ]);
   const here = (p: string) => (location.pathname === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
 
@@ -80,16 +77,14 @@
     <ul>
       {#each links as l (l.label)}
         <li>
-          {#if l.url}
-            <a class="mm-l" href={l.url} target="_blank" rel="noopener noreferrer" onclick={() => close()}>{l.label}<span class="sr-only"> {t("foot.external")}</span></a>
-          {:else if l.path}
+          {#if l.path}
             <a
               class={["mm-l", { main: l.main }]}
               href={href(l.path)}
               aria-current={here(l.path)}
               onclick={(e) => {
                 close();
-                followLink(e, l.path!);
+                followLink(e, l.path);
               }}>{l.label}</a
             >
           {/if}

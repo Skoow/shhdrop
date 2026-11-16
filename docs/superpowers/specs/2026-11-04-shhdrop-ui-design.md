@@ -1520,3 +1520,13 @@ Décisions du propriétaire (« vas-y, on voit après ») ; choix d'exécution f
 - **Bande des engagements** en mouvement réduit : grille alignée à gauche, chaque promesse passe à la ligne (elles sortaient de l'écran).
 - **Sections et questions (téléphone)** : contenu des cartes centré comme leurs titres ; espaces resserrés (le vide avant le pied de page disparaît).
 - **Mes partages** : à la première entrée gardée, `navigator.storage.persist()` est demandé (une fois, jamais attendu, sans effet en cas de refus) pour que le navigateur n'efface pas l'historique quand la place manque. Signalé : Firefox peut afficher une question à ce moment ; sur iPhone, seul l'ajout à l'écran d'accueil protège des 7 jours de Safari.
+
+## 27. Décisions du propriétaire du 16 novembre — amendements
+
+- **Menu ☰ (téléphone)** : Partager (vers `/envoyer`), Mes partages, Offres (et Téléchargements avec un compte). Sécurité, Confidentialité, Signaler un abus et Code source restent dans le pied de page de chaque écran. Le mot « Partager », trop proche de « Mes partages », sera revu plus tard (décision reportée par le propriétaire).
+- **Offres** : **Plus** va jusqu'à **3 jours** (choix 2 ou 3 jours) et **20 ouvertures** ; **Pro** garde **7 jours** et 50 ouvertures (`limits.ts`, `PAID`). Remplace D41-36 pour Plus (qui gardait les 10 ouvertures du gratuit) et la durée de 7 jours de Plus (§38.8.1 de la spécification principale).
+- **Nombre d'éléments** : la limite (200, la même pour toutes les offres, D41-17) n'est plus annoncée d'avance (accueil, voile de dépôt, jauge vide) ; la jauge de la page d'envoi ne la montre qu'à partir de 80 % (160 éléments). Le refus au-delà reste dit (« compose.tooMany »).
+- **Page d'envoi** : la bande Gratuit / Plus / Pro et sa feuille « Bientôt disponible » sont remplacées par un **petit cadre « Votre offre : Gratuit »** avec ses limites et « Voir les offres » (`ui/CurrentOffer.svelte`).
+- **Pied de page** : son propre fond, opaque ; l'aurore et la trame de la page passent dessous et ne se mêlent plus à son papier peint.
+- **En attente** (maquettes envoyées) : fond de la tuile « Choisir des fichiers » (4a, 4b, 4c), effet du titre, écran animé façon terminal, ligne orange de la démo, page Offres avec paiement (voir signalement ci-dessous).
+- **Signalement (élevé, légal et exploitation)** : le propriétaire veut une page Offres « définitive » où l'on choisit Plus ou Pro, au mois ou à l'année, puis on paie. Aucun paiement n'existe (Tasks P1 à P3) ; vendre exige un statut juridique, des CGV, la TVA et un prestataire (§38.5, Q-P1) ; un bouton « Payer » qui ne paie pas serait trompeur (§38.1). À trancher avant de l'afficher.

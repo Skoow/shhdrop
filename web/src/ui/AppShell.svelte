@@ -385,13 +385,17 @@
      anneau de focus au clavier. */
   .foot {
     position: relative;
+    /* Son propre fond seulement (décision du propriétaire du 16 novembre) : le fond de la page
+       (aurore, trame) ne se mélange plus à son papier peint ; la lueur et les pictos restent. */
+    z-index: 1;
     isolation: isolate;
     margin-block-start: var(--sp-8);
     padding-block: var(--sp-7) calc(var(--sp-6) + env(safe-area-inset-bottom));
     background:
       radial-gradient(60% 120% at 12% 0%, rgb(95 227 181 / 0.07), transparent 70%),
       radial-gradient(50% 90% at 88% 100%, rgb(85 150 248 / 0.05), transparent 70%),
-      linear-gradient(to bottom, transparent, rgb(7 8 12 / 0.55));
+      linear-gradient(to bottom, transparent, rgb(7 8 12 / 0.55))
+      var(--bg);
   }
   .foot::before {
     content: "";

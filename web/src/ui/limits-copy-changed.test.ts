@@ -24,7 +24,7 @@ describe("MAX_ITEMS à 7", () => {
     setLang("fr");
     c = mount(Home as never, { target: document.body, props: {} }) as Record<string, unknown>;
     flushSync();
-    expect(document.querySelector(".proof")!.textContent).toContain("7 éléments · 2 Go");
+    expect(document.querySelector(".proof")!.textContent).toMatch(/Jusqu'à 2\sGo au total/);
     void unmount(c);
     document.body.innerHTML = "";
     c = mount(CapacityGauge as never, { target: document.body, props: { bytes: 1, count: 2 } }) as Record<string, unknown>;
@@ -35,6 +35,7 @@ describe("MAX_ITEMS à 7", () => {
     document.body.innerHTML = "";
     c = mount(DropOverlay as never, { target: document.body, props: { open: true } }) as Record<string, unknown>;
     flushSync();
-    expect(document.body.textContent).toContain("7 éléments et 2 Go maximum");
+    expect(document.body.textContent).toMatch(/2\sGo maximum/);
+    expect(document.body.textContent).not.toMatch(/7\séléments/);
   });
 });

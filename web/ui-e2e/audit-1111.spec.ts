@@ -134,7 +134,9 @@ test("M17, M18, coffre : bloc des offres (12 novembre, remplace la ligne Plus et
   await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
   await shot(page, "m18-accueil-onglets", isMobile);
   await addText(page, "Le code de la porte est 4471.");
-  await expect(page.locator("[data-offer-strip]").filter({ visible: true })).toBeVisible();
+  // Offre en cours (décision du 16 novembre) : un petit cadre « Votre offre : Gratuit », plus la bande Gratuit / Plus / Pro.
+  await expect(page.locator("[data-current-offer]").filter({ visible: true })).toContainText("Gratuit");
+  await expect(page.locator("[data-offer-strip]")).toHaveCount(0);
   await expect(page.locator("[data-locked], [data-paid-space]")).toHaveCount(0);
   await expect(page.getByText(/copie chiffrée/)).toHaveCount(0);
   await shot(page, "m17-composeur", isMobile);
@@ -143,9 +145,6 @@ test("M17, M18, coffre : bloc des offres (12 novembre, remplace la ligne Plus et
     await shot(page, "m17-options", isMobile);
     await page.keyboard.press("Escape");
   }
-  await page.locator('[data-offer-strip] [data-offer="plus"] button').filter({ visible: true }).click();
-  await expect(page.getByRole("dialog", { name: "Shhgone Plus" })).toBeVisible();
-  await shot(page, "m17-feuille-bientot", isMobile);
 });
 
 test("M16, M22, I2 : « Lien prêt » : heure de fin seule et arrondi dit ; h1 ; Tab atteint le pied désactivé (et rien ne part)", async ({ page, shh, isMobile }) => {
