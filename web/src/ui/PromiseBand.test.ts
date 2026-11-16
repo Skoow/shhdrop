@@ -46,14 +46,11 @@ describe("PromiseBand", () => {
     expect(band.textContent).not.toMatch(/il y a|en direct|\bà [A-Z][a-z]+/);
   });
 
-  it("bouton d'arrêt et de reprise", () => {
+  // Décision du propriétaire du 16 novembre : plus de bouton d'arrêt (écart WCAG 2.2.2 signalé).
+  it("aucun bouton d'arrêt ; arrêt hors écran seulement", () => {
     show();
-    const b = document.querySelector<HTMLButtonElement>("[data-band-toggle]")!;
-    expect(b.getAttribute("aria-label")).toBe("Arrêter le défilement");
-    b.click();
-    flushSync();
-    expect(document.querySelector("[data-band]")!.classList.contains("stopped")).toBe(true);
-    expect(b.getAttribute("aria-label")).toBe("Reprendre le défilement");
+    expect(document.querySelector("[data-band-toggle]")).toBeNull();
+    expect(document.querySelectorAll("[data-band] button")).toHaveLength(0);
   });
 
   it("mouvement réduit : bande immobile, sans copie ni bouton", () => {

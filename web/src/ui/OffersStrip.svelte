@@ -323,7 +323,7 @@
   /* Détail : intitulé à gauche, valeur à droite, filet entre les lignes ; place pour la flèche. */
   .dt {
     display: grid;
-    margin-block-end: 40px;
+    margin-block-end: 44px;
     font-size: var(--fs-small);
   }
   .dr {
@@ -341,10 +341,11 @@
     font-weight: 600;
     text-align: end;
   }
+  /* Flèche centrée en bas de la carte (décision du propriétaire du 16 novembre). */
   .go {
     position: absolute;
-    inset-block-end: 18px;
-    inset-inline-end: 18px;
+    inset-block-end: 14px;
+    inset-inline-start: calc(50% - 18px);
     display: grid;
     place-items: center;
     width: 36px;
@@ -363,7 +364,7 @@
       transform: translateY(-3px);
     }
     .big .tier:hover .go {
-      transform: translateX(3px);
+      transform: translateY(2px);
       color: var(--text);
     }
   }

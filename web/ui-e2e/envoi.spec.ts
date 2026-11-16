@@ -252,7 +252,14 @@ for (const vp of [null, { width: 720, height: 450 }]) {
       expect(o.y + o.height).toBeLessThanOrEqual(h.y);
       expect(h.y).toBeLessThan(c.y);
     };
-    await check();
+    // Liste vide, téléphone (retours du 16 novembre) : le cadre passe sous « Ajouter », qui tient
+    // au-dessus de la barre d'envoi.
+    if (!vp) {
+      const add = (await page.locator(".dropzone.empty").filter({ visible: true }).boundingBox())!;
+      expect((await strip.boundingBox())!.y).toBeGreaterThan(add.y + add.height);
+      const bar = await page.evaluate(() => Math.min(...[...document.querySelectorAll<HTMLElement>("*")].filter((e) => getComputedStyle(e).position === "fixed" && e.getBoundingClientRect().bottom >= innerHeight - 1 && e.getBoundingClientRect().height > 60).map((e) => e.getBoundingClientRect().top)));
+      expect(add.y + add.height).toBeLessThanOrEqual(bar);
+    } else await check();
     await addPdfAndPhoto(page);
     await check();
     // Boutons de la carte, puis compteur, sans rien entre eux.

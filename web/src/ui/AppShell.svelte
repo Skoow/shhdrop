@@ -634,12 +634,14 @@
     .tag {
       max-width: 34ch;
     }
+    /* Une seule grille de deux colonnes alignées à gauche (retours du 16 novembre : la suite de
+       liens centrés se mélangeait) ; les trois listes partagent les mêmes colonnes. */
     .cols {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 0;
-      max-width: 34rem;
+      width: min(100%, 22rem);
+      text-align: start;
     }
     .ch {
       position: absolute;
@@ -650,10 +652,9 @@
       white-space: nowrap;
     }
     .col ul {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0 var(--sp-5);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--sp-4);
     }
     .fl,
     .off {

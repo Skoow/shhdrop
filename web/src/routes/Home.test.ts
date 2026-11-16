@@ -41,7 +41,7 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector(".lede")!.textContent!.length).toBeGreaterThan(20);
     const pick = document.querySelector<HTMLButtonElement>("[data-pick]")!;
     expect(pick.querySelector(".pk-t")!.textContent).toBe("Choisir des fichiers");
-    expect(pick.querySelector(".pk-s")!.textContent).toBe("Photos, vidéos, documents"); // tuile : sortes de fichiers, sans la taille
+    expect(pick.querySelector(".pk-s")!.textContent).toBe("ou glissez-les ici"); // tuile : aussi une zone de dépôt (16 novembre)
     expect(pick.querySelector(".pk-s")!.getAttribute("aria-hidden")).toBe("true");
     expect(pick.querySelector("svg")).not.toBeNull();
     const room = document.querySelector<HTMLButtonElement>("[data-room] button")!;
@@ -68,12 +68,10 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
-    expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos nettoyées", "Salon éphémère bientôt"]);
+    expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-how-card], [data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
-    // La clé après le « # » (retirée par la refonte, remise le 12 novembre) : une ligne courte et vraie.
-    const key = document.querySelector("section.priv [data-key-note]")!;
-    expect(key.textContent!.trim()).toBe("La clé du lien est après le «\u00a0#\u00a0»\u202f: les navigateurs n'envoient jamais cette partie au serveur.");
-    expect(key.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+    // Plus de ligne sur la clé après le « # » sur l'accueil (décision du 16 novembre).
+    expect(document.querySelector("[data-key-note]")).toBeNull();
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);
     // Retours du 15 novembre : prix prévu et sens de chaque chiffre dans les cartes (lus dans PAID).
     const card = (x: string) => document.querySelector(`[data-offer="${x}"]`)!;
@@ -266,7 +264,7 @@ describe("Home (UI §9.1)", () => {
     expect(title(document.querySelector("h1")!)).toBe("One link, one password, then nothing.");
     expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Or create one here: note, voice, photo");
     expect(document.querySelector("[data-pick] .pk-t")!.textContent).toBe("Choose files");
-    expect(document.querySelector("[data-key-note]")!.textContent!.trim()).toBe("The link's key comes after the “#”: browsers never send that part to the server.");
+    expect(document.querySelector("[data-pick] .pk-s")!.textContent).toBe("or drop them here");
     expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Erased after opening"]);
   });
 });

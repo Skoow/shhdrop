@@ -192,10 +192,10 @@
         <p class="lede">{t("hero.lede")}</p>
         <!-- Cadre des deux actions (retours du 15 novembre) : les deux boutons ressortent. -->
         <div class="ctas" data-ctas>
-          <!-- Tuile (proposition 4a, décision du propriétaire du 16 novembre) : pastille, titre, les
-               sortes de fichiers en petit (sans la taille : elle est dite plus bas), flèche. Le nom
-               accessible reste « Choisir des fichiers » ; la ligne fine redit la phrase d'accroche. -->
-          <button type="button" class="pick" data-pick onclick={() => onpick?.()}>
+          <!-- Tuile (décisions du propriétaire du 16 novembre) : aussi une zone de dépôt, ce que disent
+               le contour en pointillé et « ou glissez-les ici » ; elle s'allume quand on glisse des
+               fichiers sur la page. Le nom accessible reste « Choisir des fichiers ». -->
+          <button type="button" class={["pick", { over }]} data-pick onclick={() => onpick?.()}>
             <span class="pk-ic" aria-hidden="true"><Upload size={20} strokeWidth={2} /></span>
             <span class="pk-tx"><span class="pk-t">{t("hero.pick")}</span><span class="pk-s" aria-hidden="true">{t("hero.pick.sub")}</span></span>
             <ChevronRight size={20} strokeWidth={2} aria-hidden="true" />
@@ -404,11 +404,10 @@
       display: none;
     }
   }
-  /* Tuile « Choisir des fichiers » (proposition 4a, 16 novembre) : verre sombre, liseré menthe →
-     bleu, pastille d'icône menthe, titre et sortes de fichiers, flèche ; moins haute qu'une carte. */
+  /* Tuile « Choisir des fichiers » (16 novembre) : verre sombre, contour en pointillé menthe (une
+     zone de dépôt), pastille d'icône menthe, titre et « ou glissez-les ici », flèche. */
   .pick {
     position: relative;
-    isolation: isolate;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -416,14 +415,12 @@
     width: min(100%, 26rem);
     min-height: 72px;
     padding: 12px 16px 12px 12px;
-    border: 0;
+    border: 1.5px dashed rgb(95 227 181 / 0.55);
     border-radius: 18px;
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.015)),
       rgb(16 22 38 / 0.85);
-    box-shadow:
-      inset 0 0 0 1px rgb(150 175 255 / 0.18),
-      0 18px 40px -22px rgb(51 102 255 / 0.6);
+    box-shadow: 0 18px 40px -22px rgb(51 102 255 / 0.6);
     color: var(--text);
     font: inherit;
     text-align: start;
@@ -432,26 +429,16 @@
     -webkit-tap-highlight-color: transparent;
     transition:
       transform 360ms var(--ease-settle),
+      border-color var(--dur-base) var(--ease-out),
       box-shadow var(--dur-base) var(--ease-out);
   }
-  /* Liseré dégradé (masque : seul le bord est peint). */
-  .pick::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    padding: 1px;
-    border-radius: inherit;
-    background: linear-gradient(110deg, var(--accent), #5596f8 60%, rgb(85 150 248 / 0));
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
+  /* Des fichiers glissés sur la page : la tuile s'allume (le dépôt marche partout sur la page). */
+  .pick.over {
+    border-style: solid;
+    border-color: var(--accent);
+    box-shadow:
+      0 0 0 4px rgb(95 227 181 / 0.18),
+      0 18px 40px -22px rgb(95 227 181 / 0.6);
   }
   .pk-ic {
     display: grid;
@@ -483,8 +470,8 @@
   @media (hover: hover) {
     .pick:hover {
       transform: translateY(-2px);
+      border-color: var(--accent);
       box-shadow:
-        inset 0 0 0 1px rgb(150 175 255 / 0.28),
         0 22px 46px -22px rgb(51 102 255 / 0.8),
         0 0 0 4px rgb(95 227 181 / 0.12);
     }
@@ -1214,8 +1201,8 @@
       border: 1px solid ButtonText;
       box-shadow: none;
     }
-    .pick::before {
-      display: none;
+    .pick {
+      border-style: dashed;
     }
   }
 </style>

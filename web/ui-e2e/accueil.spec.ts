@@ -91,22 +91,15 @@ test.describe("barre du haut (ordinateur)", () => {
   });
 });
 
-test("infographie : la boucle avance, le bouton pause l'arrête, le survol aussi ; hors écran, arrêtée", async ({ page, shh }) => {
+test("infographie : la boucle démarre seule, sans bouton ; le survol à la souris l'arrête ; hors écran, arrêtée", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   const demo = page.locator("[data-demo]");
   await demo.scrollIntoViewIfNeeded();
   await page.mouse.move(1, 1);
   const s0 = await step(page);
   await expect.poll(() => step(page), { timeout: 5000 }).not.toBe(s0);
-  await page.locator("[data-demo-toggle]").click();
-  await expect(page.locator("[data-demo-toggle]")).toHaveAttribute("aria-label", "Lire l'animation");
-  await page.mouse.move(1, 1);
-  const frozen = await step(page);
-  await page.waitForTimeout(2600);
-  expect(await step(page)).toBe(frozen);
-  await page.locator("[data-demo-toggle]").click();
-  await page.mouse.move(1, 1);
-  await expect.poll(() => step(page), { timeout: 5000 }).not.toBe(frozen);
+  // Plus de bouton lecture ou pause (décision du 16 novembre) : la boucle démarre seule.
+  await expect(page.locator("[data-demo-toggle]")).toHaveCount(0);
   // Survol de la scène : arrêt.
   await page.locator("[data-demo-view]").hover();
   const held = await step(page);

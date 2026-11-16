@@ -9,7 +9,6 @@
   import { t, type Key } from "../i18n/i18n.svelte";
   import { cipherText, rng } from "./decor";
   import { STEP_MS, STEPS } from "./demo-steps";
-  import { Pause, Play } from "./Icon";
 
   const uid = $props.id();
 
@@ -24,12 +23,15 @@
   });
 
   let step = $state(1);
-  let userPaused = $state(false);
   let hover = $state(false);
   let focused = $state(false);
   let onscreen = $state(true);
   let hidden = $state(typeof document !== "undefined" && document.hidden);
-  const playing = $derived(!reduced && !userPaused && !hover && !focused && onscreen && !hidden);
+  // Démarre seule (décision du propriétaire du 16 novembre : plus de bouton lecture ou pause).
+  // S'arrête hors écran, onglet caché, sous la souris ou au focus clavier. Le « survol » ne
+  // compte qu'à la souris : sur un écran tactile, toucher ou faire défiler émet un pointerenter
+  // sans pointerleave, et l'animation restait arrêtée jusqu'à ce qu'on touche ailleurs (iPhone).
+  const playing = $derived(!reduced && !hover && !focused && onscreen && !hidden);
   // Storyboard du mouvement réduit : l'étape qui résume tout (rien de lisible sur le serveur).
   const shown = $derived(reduced ? 4 : step);
 
@@ -41,16 +43,6 @@
   });
 
   let root: HTMLElement | undefined = $state();
-  // Pause/lecture : l'état affiché est l'état réel (arrêtée au survol ou au focus aussi) ;
-  // « Lire » relance même sous le pointeur ou le focus, jusqu'à ce qu'ils reviennent.
-  function toggle() {
-    if (playing) userPaused = true;
-    else {
-      userPaused = false;
-      hover = false;
-      focused = false;
-    }
-  }
   $effect(() => {
     if (!root || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(([e]) => (onscreen = e!.isIntersecting));
@@ -117,7 +109,7 @@
   </div>
 
   <!-- Survol de la scène ou du journal : arrêt ; la barre du bas (pause, lecture) n'arrête rien. -->
-  <div class="view" role="presentation" data-demo-view onpointerenter={() => (hover = true)} onpointerleave={() => (hover = false)}>
+  <div class="view" role="presentation" data-demo-view onpointerenter={(e) => (hover = e.pointerType === "mouse")} onpointerleave={() => (hover = false)}>
   <div class="stage" aria-hidden="true">
     <svg viewBox="0 22 400 206" focusable="false">
       <defs>
@@ -240,11 +232,6 @@
   </div>
   <div class="info">
     <span class="info-t" aria-hidden="true">{t("demo.info")}</span>
-    {#if !reduced}
-      <button type="button" class="toggle" data-demo-toggle aria-label={playing ? t("demo.pause") : t("demo.play")} onclick={toggle}>
-        {#if !playing}<Play size={14} strokeWidth={2.2} aria-hidden="true" />{:else}<Pause size={14} strokeWidth={2.2} aria-hidden="true" />{/if}
-      </button>
-    {/if}
   </div>
   <ol class={["steps", { "sr-only": !reduced }]} data-demo-steps>
     {#each STEPS as n (n)}
@@ -734,26 +721,6 @@
   }
   .info-t {
     min-width: 0;
-  }
-  .toggle {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-    transition: background-color var(--dur-fast) var(--ease-out);
-  }
-  .toggle:hover {
-    background: rgb(255 255 255 / 0.06);
-  }
-  .toggle:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
   }
   /* Figure : coins marqués (équerres menthe), légende mono dessous. */
   .fig {

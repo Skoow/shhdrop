@@ -598,7 +598,9 @@
            liste n'est pas vide : elle serait perdue en quittant la page). Téléphone : avant la
            carte « Votre envoi » entière, jamais entre ses boutons et son compteur (audit R4) ;
            ordinateur : au-dessus de « Chiffrer et envoyer », la liste garde sa hauteur. -->
-      {#if narrow}<div class="offers">{@render offers()}</div>{/if}
+      <!-- Téléphone, liste vide (retours du 16 novembre) : le cadre passe sous « Ajouter », qui
+           tient alors au-dessus de la barre d'envoi au lieu d'être coupé par elle. -->
+      {#if narrow && filled}<div class="offers">{@render offers()}</div>{/if}
       <div class="top">
         <div class="tt">
           <h2 id="compose-title" class="title" tabindex="-1" data-large-title bind:this={title}>{t("compose.title")}</h2>
@@ -680,6 +682,7 @@
             <span class="dz-s">{t("add.big.sub")}</span>
           </span>
         </button>
+        <div class="offers after" data-offers-after>{@render offers()}</div>
       {:else if !narrow}
         <!-- Filigrane (retours DROP) : l'espace vide sous la liste est la zone de dépôt ; un clic y
              ouvre le choix de fichiers ; on dépose aussi n'importe où sur la page. Texte entier,
@@ -944,6 +947,9 @@
   /* Téléphone : avant la carte « Votre envoi », un peu détachées de son titre (audit R4). */
   .list-col > .offers {
     margin-block-end: var(--sp-2);
+  }
+  .offers.after {
+    margin-block-start: var(--sp-3);
   }
 
   /* Zone de dépôt : un clic ouvre le sélecteur ; on peut aussi déposer n'importe où sur la page. */
