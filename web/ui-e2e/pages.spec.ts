@@ -63,7 +63,9 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   await expect(co.locator("[data-tier]")).toHaveCount(3);
   await expect(page.locator("[data-offers], [data-prices]")).toHaveCount(0);
   for (const [x, size] of [["free", "2 Go"], ["plus", "10 Go"], ["pro", "50 Go"]] as const) expect(norm(await co.locator(`[data-tier="${x}"]`).innerText())).toContain(size);
-  // Annuel par défaut ; mensuel au choix.
+  // Mensuel par défaut (16 novembre) ; annuel au choix.
+  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s+par mois, TTC/);
+  await co.locator("[data-billing]").getByText("Annuel").click();
   expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/70 €\s+par an, TTC/);
   await co.locator("[data-billing]").getByText("Mensuel").click();
   expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s+par mois, TTC/);

@@ -12,7 +12,8 @@
   import { Check } from "./Icon";
 
   type Billing = "month" | "year";
-  let billing = $state<Billing>("year");
+  // Mensuel sélectionné par défaut (décision du propriétaire du 16 novembre).
+  let billing = $state<Billing>("month");
   let chosen = $state<PaidTier | null>(null);
   const uid = $props.id();
   const lang = $derived(getLang());
