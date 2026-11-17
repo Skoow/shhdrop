@@ -84,11 +84,14 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector('[data-slot="compose"]')).not.toBeNull();
   });
 
-  it("compact : titre replié, phrase et schéma retirés ; le titre reste le même h1", () => {
+  it("compact (page d'envoi) : plus le slogan de l'accueil, un h1 « Nouveau partage » pour les lecteurs d'écran ; trois assurances ; phrase et schéma retirés", () => {
     show({ compact: true });
     const h1 = document.querySelector("h1")!;
-    expect(title(h1)).toBe("Un lien, un mot de passe, puis plus rien.");
-    expect(h1.classList.contains("compact")).toBe(true);
+    expect(h1.textContent).toBe("Nouveau partage");
+    expect(h1.classList.contains("sr-only")).toBe(true);
+    expect(h1.id).toBe("hero-title");
+    expect([...document.querySelectorAll("[data-assure] .al")].map((e) => e.textContent)).toEqual(["Chiffré dans votre navigateur", "Partage sans compte", "Le lien s'autodétruit"]);
+    expect([...document.querySelectorAll("[data-assure] .as")].map((e) => e.textContent)).toEqual(["Chiffré", "Sans compte", "S'autodétruit"]);
     expect(document.querySelector("[data-demo]")).toBeNull();
     expect(document.querySelector("[data-pick]")).toBeNull();
     expect(document.querySelector("[data-eyebrow]")).toBeNull();

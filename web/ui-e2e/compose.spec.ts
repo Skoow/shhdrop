@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
-import { axe, capture, expect, readClipboard, test } from "./fixtures";
+import { axe, capture, expect, test } from "./fixtures";
 import { clearAll, composerFits, openFilePicker, pickInAddSheet, enterComposer } from "./send-helpers";
 import { MIMES } from "../src/media/capture";
 
@@ -242,47 +242,17 @@ test.describe("fr-FR", () => {
     expect(await axe(page)).toEqual([]);
   });
 
-  test("mot de passe : toujours généré, 11 caractères, « Générer un autre » et « Copier » dans le champ ; aucune saisie (D41-15)", async ({ page, shh, isMobile, browserName }) => {
+  test("mot de passe : plus dans les options (17 novembre) ; aucune saisie (D41-15)", async ({ page, shh, isMobile }) => {
     await open(page, shh.origin);
     await browse(page, [f("contrat.pdf")]);
     const opts = await options(page, isMobile);
-    const box = opts.locator(".box");
-    const regen = box.getByRole("button", { name: "Générer un autre" });
-    const copy = box.getByRole("button", { name: "Copier" });
-    await expect(regen).toHaveAttribute("title", "Générer un autre");
-    for (const b of [regen, copy]) {
-      const r = (await b.boundingBox())!;
-      expect(r.width).toBeGreaterThanOrEqual(43.5);
-      expect(r.height).toBeGreaterThanOrEqual(43.5);
-    }
-    const pw = box.locator(".val .sr-only");
-    const first = await pw.textContent();
-    expect(first).toMatch(/^[abcdefghkmnpqrtuvwxyACDEFGHJKLMNPQRTUVWXY23456789!?@#$%&*+\-=/()]{11}$/);
-    await regen.click();
-    await expect(pw).not.toHaveText(first!);
-    if (browserName === "chromium") {
-      await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-      await copy.click();
-      await expect(box.getByRole("button", { name: "Copié" })).toBeVisible();
-      expect(await readClipboard(page)).toBe(await pw.textContent());
-    }
-
+    // Généré sur l'appareil et montré sous le lien, une fois le lien créé (« Lien prêt ») :
+    // ni champ, ni « Générer un autre » avant l'envoi.
+    await expect(opts.getByRole("button", { name: "Générer un autre" })).toHaveCount(0);
+    await expect(opts.getByRole("heading", { name: "Mot de passe", exact: true })).toHaveCount(0);
     // D41-15 : aucune saisie possible, nulle part (ordinateur et feuille du téléphone).
-    await expect(opts.getByRole("button", { name: "Écrire mon propre mot de passe" })).toHaveCount(0);
     await expect(opts.locator("input[type=text], input[type=password], input:not([type])")).toHaveCount(0);
     expect(await page.locator("form").count()).toBe(0);
-    // Le champ et son contour de focus (2 + 2 px) tiennent dans la colonne (scan UX B4).
-    await settle(page);
-    const inside = await page.evaluate(() => {
-      const box = document.querySelector(".pf .box")!.getBoundingClientRect();
-      const col = (document.querySelector(".side-scroll") ?? document.querySelector("dialog[open]"))!;
-      const c = col.getBoundingClientRect();
-      const left = c.left + col.clientLeft;
-      return { boxL: box.left, boxR: box.right, colL: left, colR: left + col.clientWidth, scrollW: col.scrollWidth, clientW: col.clientWidth };
-    });
-    expect(inside.boxL - 4).toBeGreaterThanOrEqual(inside.colL - 0.5);
-    expect(inside.boxR + 4).toBeLessThanOrEqual(inside.colR + 0.5);
-    expect(inside.scrollW).toBeLessThanOrEqual(inside.clientW);
     expect(await axe(page)).toEqual([]);
     if (isMobile) await page.keyboard.press("Escape");
     await expect(send(page)).toBeEnabled();

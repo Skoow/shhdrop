@@ -113,7 +113,8 @@ test.describe("téléphone façon app", () => {
     await page.getByRole("banner").getByRole("button", { name: "Retour" }).click();
     await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
     expect(await smallTargets(page, "body")).toEqual([]);
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).toBe("none");
+    // Accueil vide : « tirer pour actualiser » permis (rien à perdre, 17 novembre).
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).not.toBe("none");
     expect(await noHScroll(page)).toBe(true);
     // UI5 : pied de page visible en bas de l'accueil, téléphone compris.
     await expect(page.locator("footer.foot")).toBeAttached();
@@ -248,6 +249,7 @@ test.describe("téléphone façon app", () => {
     expect(await smallFields(page)).toEqual([]);
     expect(await inViewport(page, unlockButton(page))).toBe(true);
     expect((await unlockButton(page).boundingBox())!.width).toBeGreaterThan(300); // pleine largeur
+    // Page d'un partage : « tirer pour actualiser » bloqué (l'écran verrouillé serait perdu).
     expect(await page.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY)).toBe("none");
     expect(await noHScroll(page)).toBe(true);
     await shot(page, "ouverture");

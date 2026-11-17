@@ -179,15 +179,17 @@ html.vt-reduced::view-transition-new(root) {
 }
 
 /* Téléphone (< 900 px), façon app (jusqu'à la vraie version mobile) : ni rebond ni « tirer pour
-   rafraîchir », aucun défilement horizontal, pas de délai ni de surlignage gris au toucher
+   rafraîchir » seulement quand une actualisation ferait perdre quelque chose (classe no-pull :
+   composeur ouvert, envoi, page d'un partage ; décision du propriétaire du 17 novembre),
+   aucun défilement horizontal, pas de délai ni de surlignage gris au toucher
    (chaque élément touchable a son propre état :active), champs à 16 px au moins (iOS ne zoome
    pas), place réservée à la barre d'onglets. */
 #app {
   overflow-x: clip;
 }
 @media (max-width: 899px) {
-  html,
-  body {
+  html.no-pull,
+  html.no-pull body {
     overscroll-behavior: none;
   }
   a,

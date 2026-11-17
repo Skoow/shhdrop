@@ -1,6 +1,6 @@
 <script lang="ts">
   // Options de l'envoi (UI §9.3, benchmark M4) : durée et ouvertures (phrase « S'efface dans
-  // 12 h ou après 1 ouverture… » sur ordinateur), mot de passe, destinataire (interrupteur
+  // 12 h ou après 1 ouverture… » sur ordinateur), destinataire (interrupteur
   // « Autoriser le téléchargement » ; plus de sous-option du coffre, décision du propriétaire du
 // 11 novembre), estimation du temps d'envoi.
   // `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
@@ -11,8 +11,8 @@
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { ShieldAlert, TriangleAlert } from "../ui/Icon";
-  import PassphraseField from "../ui/PassphraseField.svelte";
   import Segmented from "../ui/Segmented.svelte";
+  import Stepper from "../ui/Stepper.svelte";
   import Switch from "../ui/Switch.svelte";
 
   type Props = {
@@ -31,7 +31,11 @@
   const lang = $derived(getLang());
   const ttlLabel = (h: number) => formatDuration(h * 3600, lang);
   const ttlOptions = $derived(TTL_HOURS.map((h) => ({ value: h, label: ttlLabel(h) })));
-  const opensOptions = Array.from({ length: MAX_OPENS }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+  // Ouvertures (retours du propriétaire du 17 novembre) : des cases tant qu'il y en a peu
+  // (gratuit : 1 à 5) ; au-delà de 6 (offres Plus et Pro, jusqu'à 10 et 20), un compteur
+  // « − n + » plutôt qu'une grille de 10 ou 20 cases. `opensMax` suivra l'offre quand elle existera.
+  const opensMax = MAX_OPENS;
+  const opensOptions = Array.from({ length: opensMax }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
   // Une seule durée quand les deux s'arrondissent pareil (« environ 1 s », pas « 1 s à 1 s »).
   const opensText = $derived(t("options.opens.count", { n: options.maxOpens }));
 
@@ -71,16 +75,18 @@
     </div>
     <div class="ctl">
       <span class="cl" aria-hidden="true">{t("options.opens.label")}</span>
-      <Segmented label={t("options.opens.label")} options={opensOptions} columns={5} bind:value={() => options.maxOpens, (v) => (options.maxOpens = v)} />
+      {#if opensMax <= 6}
+        <Segmented label={t("options.opens.label")} options={opensOptions} columns={opensMax} bind:value={() => options.maxOpens, (v) => (options.maxOpens = v)} />
+      {:else}
+        <Stepper label={t("options.opens.label")} min={1} max={opensMax} bind:value={() => options.maxOpens, (v) => (options.maxOpens = v)} />
+      {/if}
       <p class="hint">{t("options.opens.hint")}</p>
     </div>
   </div>
 
-  <div class="block">
-    <h3 class="h3">{t("options.pw.title")}</h3>
-    <PassphraseField {options} />
-    {#if part === "all"}{@render trust()}{/if}
-  </div>
+  <!-- Plus de mot de passe dans les options (décision du propriétaire du 17 novembre) : il est
+       généré sur l'appareil et montré une fois le lien créé, sous le lien (« Lien prêt »). -->
+  {#if part === "all"}<div class="block">{@render trust()}</div>{/if}
 
   <div class="block" role="group" aria-labelledby="rights-title">
     <h3 class="h3" id="rights-title">{t("options.rights.label")}</h3>

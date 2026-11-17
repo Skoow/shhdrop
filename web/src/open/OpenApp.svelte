@@ -21,6 +21,9 @@
   const demo = getDemo();
 
   reloadIfRestored(window);
+  // Page d'un partage : la clé est déjà retirée de l'adresse, une actualisation par le geste
+  // « tirer vers le bas » perdrait l'écran verrouillé (base.css : no-pull, 17 novembre).
+  if (typeof document !== "undefined") document.documentElement.classList.add("no-pull");
 
   const inApp = () => inAppBrowser(navigator.userAgent, isStandalone(window)) !== null;
   function scrubHere(): void {

@@ -51,10 +51,17 @@ test("ordinateur : la carte du composeur a un contour entier (pas d'ouverture en
 
 test("premier écran : titre, trois assurances, zone de dépôt compacte, offres et Salon, sans défiler", async ({ page, shh, isMobile }) => {
   await openSend(page, shh.origin);
-  const h1 = page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis plus rien." });
-  await expect(h1).toBeInViewport();
-  expect(await h1.evaluate((e) => e.getBoundingClientRect().height)).toBeGreaterThan(10); // visible, plus caché à l'œil
-  await expect(page.getByRole("list", { name: "En bref" }).getByRole("listitem")).toHaveText(["Chiffré dans votre navigateur", "Partage sans compte", "Le lien s'autodétruit"]);
+  // Plus le slogan de l'accueil (17 novembre) : un h1 « Nouveau partage » pour les lecteurs d'écran.
+  await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis plus rien." })).toHaveCount(0);
+  // Trois assurances : libellés complets lus ; pastilles alignées, même hauteur, une seule ligne.
+  const items = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
+  for (const [i, l] of ["Chiffré dans votre navigateur", "Partage sans compte", "Le lien s'autodétruit"].entries()) await expect(items.nth(i)).toContainText(l);
+  const boxes = await items.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width) }; }));
+  expect(new Set(boxes.map((b) => b.top)).size).toBe(1);
+  expect(new Set(boxes.map((b) => b.h)).size).toBe(1);
+  expect(Math.max(...boxes.map((b) => b.h))).toBeLessThanOrEqual(44); // une ligne de texte
+  expect(Math.max(...boxes.map((b) => b.w)) - Math.min(...boxes.map((b) => b.w))).toBeLessThanOrEqual(1);
   const dz = page.locator(".dropzone").filter({ visible: true });
   await expect(dz).toBeInViewport({ ratio: 1 });
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);
@@ -64,7 +71,7 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   const offers = page.locator("[data-current-offer]");
   await expect(offers).toBeInViewport({ ratio: 1 });
   const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, " ");
-  expect(norm(await offers.innerText())).toMatch(/Votre offre :[\s\S]*Gratuit[\s\S]*2 Go · 24 h · 10 ouvertures/);
+  expect(norm(await offers.innerText())).toMatch(/Votre offre :[\s\S]*Gratuit[\s\S]*2 Go · 24 h · 5 ouvertures/);
   await expect(offers.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("href", "/offres");
   await expect(offers.locator("input, form, button")).toHaveCount(0);
   // Salon : même icône et même mot que l'onglet, « bientôt », désactivé avec sa raison.
@@ -157,7 +164,8 @@ test.describe("langue du navigateur", () => {
   test("anglais choisi tout seul, sans bouton ; balai nommé « Clean this file: nom »", async ({ page, shh, isMobile }) => {
     await openSend(page, shh.origin);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("list", { name: "In short" }).getByRole("listitem")).toHaveText(["Encrypted in your browser", "Share without an account", "The link self-destructs"]);
+    const items = page.getByRole("list", { name: "In short" }).getByRole("listitem");
+    for (const [i, l] of ["Encrypted in your browser", "Share without an account", "The link self-destructs"].entries()) await expect(items.nth(i)).toContainText(l);
     if (isMobile) return; // sélecteur ouvert par la zone de dépôt : ordinateur
     const chooser = page.waitForEvent("filechooser");
     await page.locator(".dropzone").click();

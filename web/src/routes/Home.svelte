@@ -165,15 +165,21 @@
     <div class="pitch">
       <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
            phrase et les cases cochées le disent déjà. -->
-      <h1 id="hero-title" tabindex="-1" class:compact>
-        <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
-        <span class="sr-only">{t("hero.title")}</span>
-        <span class="words" aria-hidden="true">
-          {#each words as { w, hl, br, letters }, i (i)}{#if br && !compact}<br />{/if}<span class={["w", { hl: hl && !compact }]}
-              >{#if hl && !compact}{#each letters as { c, o }, j (j)}<span class="l" style:--o={o}>{c}</span>{/each}{:else}{w}{/if}</span
-            >{" "}{/each}
-        </span>
-      </h1>
+      {#if compact}
+        <!-- Page d'envoi (retours du propriétaire du 17 novembre) : plus le slogan de l'accueil,
+             qui ne servait pas ici ; un titre pour les lecteurs d'écran et le focus seulement. -->
+        <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
+      {:else}
+        <h1 id="hero-title" tabindex="-1">
+          <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
+          <span class="sr-only">{t("hero.title")}</span>
+          <span class="words" aria-hidden="true">
+            {#each words as { w, hl, br, letters }, i (i)}{#if br}<br />{/if}<span class={["w", { hl }]}
+                >{#if hl}{#each letters as { c, o }, j (j)}<span class="l" style:--o={o}>{c}</span>{/each}{:else}{w}{/if}</span
+              >{" "}{/each}
+          </span>
+        </h1>
+      {/if}
 
       {#if !compact}
         <p class="lede">{t("hero.lede")}</p>
@@ -207,10 +213,12 @@
       {:else}
         <!-- Page d'envoi (retours du propriétaire du 12 novembre) : le titre reste visible, avec
              trois assurances courtes sous lui ; rien de plus haut que la zone de dépôt. -->
+        <!-- Trois pastilles de même taille, sur une ligne (17 novembre) : libellé complet, ou court
+             sur téléphone (jamais sur deux lignes). -->
         <ul class="assure" aria-label={t("home.facts.label")} data-assure>
-          <li><Lock size={15} strokeWidth={2} aria-hidden="true" />{t("send.assure.browser")}</li>
-          <li><UserX size={15} strokeWidth={2} aria-hidden="true" />{t("home.fact.account")}</li>
-          <li><Timer size={15} strokeWidth={2} aria-hidden="true" />{t("send.assure.burn")}</li>
+          {#each [{ I: Lock, k: "send.assure.browser", s: "send.assure.browser.short" }, { I: UserX, k: "home.fact.account", s: "send.assure.account.short" }, { I: Timer, k: "send.assure.burn", s: "send.assure.burn.short" }] as const as a (a.k)}
+            <li><a.I size={15} strokeWidth={2} aria-hidden="true" /><span class="al">{t(a.k)}</span><span class="as" aria-hidden="true">{t(a.s)}</span></li>
+          {/each}
         </ul>
         <div class="room compact" data-room>
           <button type="button" class="room-b" aria-disabled="true" aria-describedby="room-soon" onclick={() => announce(t("tabs.soon.chat"))}>
@@ -322,14 +330,6 @@
     min-width: 0;
     text-wrap: balance;
     view-transition-name: hero-title;
-  }
-  h1.compact {
-    font-size: var(--fs-h1);
-    line-height: var(--lh-h1);
-    font-weight: var(--fw-h1);
-    font-stretch: var(--wd-h1);
-    letter-spacing: -0.015em;
-    max-width: none;
   }
   h1:focus {
     outline: none;
@@ -554,6 +554,7 @@
      les assurances passent dessous quand la place manque. */
   .home.compact .pitch {
     order: 1;
+    container: send-pitch / inline-size;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -562,29 +563,67 @@
   .home.compact .compose {
     order: 2;
   }
-  h1.compact {
-    order: 1;
-    flex: 0 1 auto;
-    font-size: clamp(1.5rem, 1.2rem + 0.8vw, 1.875rem);
-    line-height: 1.15;
-    text-wrap: balance;
-  }
+  /* Trois pastilles égales, une ligne, même hauteur (17 novembre). */
   .assure {
     order: 2;
-    flex: 0 1 auto;
+    flex: 1 1 30rem;
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px var(--sp-4);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-2);
     color: var(--text-2);
     font-size: var(--fs-small);
   }
   .assure li {
-    display: inline-flex;
+    position: relative;
+    display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    min-width: 0;
+    min-height: 48px; /* même hauteur que le bouton Salon, sur la même rangée (ordinateur) */
+    padding-inline: 10px;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.03);
+    box-shadow: inset 0 0 0 1px var(--hair);
+    white-space: nowrap;
+  }
+  .al,
+  .as {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .as {
+    display: none;
+  }
+  /* Colonnes étroites : le libellé court (« Chiffré », « Sans compte », « S'autodétruit »). */
+  @container send-pitch (max-width: 620px) {
+    /* Le libellé complet reste lu par les lecteurs d'écran (le court est caché pour eux). */
+    .al {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    .as {
+      display: inline;
+    }
+    .assure li {
+      min-height: 40px;
+    }
+  }
+  /* Téléphone étroit : texte seul, un peu plus petit, pour que rien ne soit coupé. */
+  @container send-pitch (max-width: 420px) {
+    .assure li {
+      padding-inline: 6px;
+      font-size: var(--fs-micro);
+    }
+    .assure li :global(svg) {
+      display: none;
+    }
   }
   .assure :global(svg) {
     flex: none;

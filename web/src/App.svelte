@@ -42,6 +42,13 @@
   const connected = $derived(__COMPTES__ && connecte());
   const tabs = $derived(tabBarVisible({ supported, route: router.current.name, sending, composing: chrome.composing, connected }));
 
+  // « Tirer pour actualiser » (téléphone) bloqué seulement quand il ferait perdre la liste en
+  // cours ou un envoi (décision du propriétaire du 17 novembre, base.css : no-pull).
+  $effect(() => {
+    document.documentElement.classList.toggle("no-pull", chrome.composing || sending);
+    return () => document.documentElement.classList.remove("no-pull");
+  });
+
   // UI §12.2 : une page restaurée du cache « page précédente » est rechargée.
   reloadIfRestored(window);
 
