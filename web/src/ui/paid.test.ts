@@ -33,17 +33,14 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
     show(Options, { options, unviewable: [] });
     return { options };
   }
-  it("aucune saisie de mot de passe : ni champ, ni « Écrire mon propre mot de passe » ; Générer un autre et Copier restent", () => {
+  it("aucune saisie de mot de passe ; plus de mot de passe dans les options (17 novembre : montré sous le lien, sur « Lien prêt »)", () => {
     const { options } = opts();
     expect(document.querySelectorAll("input[type=text], input:not([type]), input[type=password]")).toHaveLength(0);
     expect(text()).not.toContain("Écrire mon propre");
+    expect(text()).not.toContain(options.password);
     const labels = [...document.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent);
-    expect(labels).toContain("Générer un autre");
-    expect(labels).toContain("Copier");
-    const before = options.password;
-    (document.querySelector('button[aria-label="Générer un autre"]') as HTMLButtonElement).click();
-    flushSync();
-    expect(options.password).not.toBe(before);
+    expect(labels).not.toContain("Générer un autre");
+    // Toujours généré, 11 caractères, prêt pour l'envoi.
     expect(options.password).toHaveLength(11);
   });
   it("audit M17 (décision du 11 novembre) : aucun choix payant verrouillé dans les options, ni coffre", () => {
