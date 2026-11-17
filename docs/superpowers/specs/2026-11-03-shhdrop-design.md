@@ -1632,6 +1632,8 @@ Remplace la colonne « Plus (suggéré) » de §38.2 et Q-P3 ; §38.1 (honnêtet
 
 #### 38.8.1 Ce que donne chaque formule
 
+> **Décision du propriétaire (17 novembre) — ouvertures et taille Pro.** Gratuit : **1 à 5 ouvertures** (10 avant ; serveur `share.MaxOpens` et `web/src/limits.ts`, `MAX_OPENS`, même valeur, refus au-delà) ; **Plus : jusqu'à 10** ; **Pro : jusqu'à 20** ; **Pro : 30 Go par partage** (50 avant). Les lignes du tableau ci-dessous sont remplacées d'autant. **Signalements** : (a) **moyenne, exploitation** : avec 30 Go × 20 ouvertures, le plafond « taille × ouvertures ≤ 250 Go » du Pro bride un partage de 30 Go à 8 ouvertures ; à trancher avant P2 (relever le plafond à 600 Go, ou le dire à l'écran) ; (b) **faible, exactitude** : le palier Pro de 30 Gio (491 521 morceaux) remplace celui de 50 Gio dans la liste des paliers payants, à reprendre à la Task P2 ; (c) **faible, usage** : un partage gratuit pour plus de 5 personnes demande désormais plusieurs liens ou une offre payante.
+
 | Fonction | Gratuit | **Plus** | **Pro** |
 |---|---|---|---|
 | Taille par lien | **2 Go** | **10 Go** (paliers 5 et 10 Gio, + morceau du manifeste, §29.3) | **50 Go** (paliers 20 et 50 Gio, + morceau du manifeste) |

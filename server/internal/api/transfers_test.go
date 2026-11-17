@@ -72,15 +72,15 @@ func getSeg(t *testing.T, srv *httptest.Server, id string, n int, tok, clientIP 
 	return resp, b
 }
 
-// tokens crée des partages du palier donné (10 ouvertures chacun) et rend count jetons
+// tokens crée des partages du palier donné (share.MaxOpens ouvertures chacun) et rend count jetons
 // de téléchargement, chacun avec son propre budget de lecture.
 func (e *env) tokens(t *testing.T, bucket, count int) (ids, toks []string) {
 	t.Helper()
 	for len(toks) < count {
 		k := newKeys()
-		c := e.create(t, "", k, bucket, 10)
+		c := e.create(t, "", k, bucket, share.MaxOpens)
 		e.upload(t, c, bucket)
-		for i := 0; i < 10 && len(toks) < count; i++ {
+		for i := 0; i < share.MaxOpens && len(toks) < count; i++ {
 			dl, _ := e.unlock(t, c.ID, k)
 			ids, toks = append(ids, c.ID), append(toks, dl)
 		}

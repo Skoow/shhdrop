@@ -1,9 +1,7 @@
 <script module lang="ts">
-  // UI §20.4 : le titre entre mot par mot une seule fois par chargement de page.
+  // UI §20.4 : l'entrée de la page (phrase, boutons) une seule fois par chargement. Le titre, lui,
+  // s'affiche d'emblée dans son état final (17 novembre).
   let revealed = false;
-  /** Effacement de « puis plus rien. » (CSS : départ 1,4 s, 90 ms par lettre, 900 ms chacune) :
-   *  classe retirée à la fin, au plus 15 lettres ; sous les 5 s de WCAG 2.2.2. */
-  const ERASE_END_MS = 1400 + 15 * 90 + 900 + 100;
 
   /** D'où viennent les fichiers remis à `onfiles` (composer.add, Task 10). */
   export type Source = "fichiers" | "photo" | "video" | "depot";
@@ -67,24 +65,14 @@
     const timer = setTimeout(() => (reveal = false), 1300);
     return () => clearTimeout(timer);
   });
-  // « puis plus rien. » s'efface vers la dernière lettre (décision du propriétaire du 16 novembre,
-  // proposition G) : après l'entrée, chaque lettre s'éteint à son tour, de gauche à droite, et
-  // reste pâle ; plus on avance, plus elle s'efface ; le point final disparaît. Une seule fois,
-  // moins de 5 s (WCAG 2.2.2), opacity seulement ; en mouvement réduit, l'état final d'emblée.
-  // La phrase entière reste lue d'un bloc (copie sr-only, K8).
-  let erase = $state(untrack(() => reveal));
-  $effect(() => {
-    if (!erase) return;
-    const timer = setTimeout(() => (erase = false), ERASE_END_MS);
-    return () => clearTimeout(timer);
-  });
+  // « puis plus rien. » effacé vers la dernière lettre (proposition G du 16 novembre) : affiché
+  // d'emblée dans cet état, sans entrée ni extinction animée (décision du propriétaire du
+  // 17 novembre) ; chaque lettre plus pâle que la précédente, le point final invisible. La phrase
+  // entière reste lue d'un bloc (copie sr-only, K8).
 
   /**
-   * K1 revu (15 novembre, « plus de fluidité ») : 760 ms par mot, 55 ms de décalage, respiration
-   * de 40 ms après la dernière virgule (« puis », « then ») ; montée courte et opacité, sans flou
-   * (le flou d'un grand texte saccadait sur téléphone). Le dernier mot finit vers 1,24 s.
-   * Lettres de la seconde ligne : rang de gauche à droite (`k`, décalage de l'effacement) et
-   * opacité finale (`o`), de 0,55 pour la première à 0 pour la dernière.
+   * Seconde ligne du titre (après la dernière virgule, « puis », « then ») : opacité de chaque
+   * lettre (`o`), de 0,55 pour la première à 0 pour la dernière.
    */
   const words = $derived.by(() => {
     const list = t("hero.title").split(/ +/);
@@ -98,13 +86,12 @@
     // Seconde ligne colorée (référence du propriétaire, 12 novembre) : « puis plus rien. ».
     return list.map((w, i) => ({
       w,
-      delay: i * 55 + (hl(i) ? 40 : 0),
       hl: hl(i),
       br: breath >= 0 && i === breath + 1,
       letters: hl(i)
         ? [...w].map((c) => {
             const k = seen++;
-            return { c, k, o: total > 1 ? +(0.55 * (1 - k / (total - 1))).toFixed(3) : 0 };
+            return { c, o: total > 1 ? +(0.55 * (1 - k / (total - 1))).toFixed(3) : 0 };
           })
         : [],
     }));
@@ -173,7 +160,7 @@
   </button>
 {/snippet}
 
-<div class={["home", { compact, reveal, erase }]}>
+<div class={["home", { compact, reveal }]}>
   <section class="hero" aria-labelledby="hero-title">
     <div class="pitch">
       <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
@@ -182,8 +169,8 @@
         <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
         <span class="sr-only">{t("hero.title")}</span>
         <span class="words" aria-hidden="true">
-          {#each words as { w, delay, hl, br, letters }, i (i)}{#if br && !compact}<br />{/if}<span class={["w", { hl: hl && !compact }]} style:--d="{delay}ms"
-              >{#if hl && !compact}{#each letters as { c, k, o }, j (j)}<span class="l" style:--k={k} style:--o={o}>{c}</span>{/each}{:else}{w}{/if}</span
+          {#each words as { w, hl, br, letters }, i (i)}{#if br && !compact}<br />{/if}<span class={["w", { hl: hl && !compact }]}
+              >{#if hl && !compact}{#each letters as { c, o }, j (j)}<span class="l" style:--o={o}>{c}</span>{/each}{:else}{w}{/if}</span
             >{" "}{/each}
         </span>
       </h1>
@@ -1045,9 +1032,6 @@
   @media (prefers-reduced-motion: no-preference) {
     /* Audit performance (5 novembre) : le texte au-dessus de la ligne de flottaison ne part
        jamais d'une opacité nulle (le LCP attendait la fin de l'entrée) ; montée et flou seulement. */
-    .reveal .w {
-      animation: word-in 760ms var(--ease-out) var(--d) both;
-    }
     .reveal .lede,
     .reveal .ctas,
     .reveal .meta {
@@ -1069,27 +1053,10 @@
       animation: rise-in 560ms var(--ease-settle) 240ms both;
     }
   }
-  @keyframes word-in {
-    from {
-      opacity: 0.35;
-      transform: translateY(0.22em);
-    }
-  }
-  /* « puis plus rien. » s'efface vers la dernière lettre : état final pâle, toujours (aussi en
-     mouvement réduit et après l'entrée) ; l'extinction lettre à lettre ne se joue qu'une fois. */
+  /* « puis plus rien. » effacé vers la dernière lettre, d'emblée (17 novembre). */
   .l {
     display: inline-block;
     opacity: var(--o, 1);
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .erase .l {
-      animation: letter-fade 900ms var(--ease-in-out) calc(1400ms + var(--k) * 90ms) backwards;
-    }
-  }
-  @keyframes letter-fade {
-    from {
-      opacity: 1;
-    }
   }
   @keyframes rise-only {
     from {

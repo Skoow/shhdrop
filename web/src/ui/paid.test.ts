@@ -58,18 +58,18 @@ describe("feuille Plus : honnête, rien à acheter", () => {
     show(PaidSheet, { open: true, tier: "plus" });
     const s = text();
     expect(document.querySelector("[data-paid] > *")!.textContent).toContain("Bientôt disponible."); // audit M17
-    for (const x of ["Shhgone Plus", "10 Go par partage", "2 Go par partage", "50 Go par partage", "Durée jusqu'à 3 jours (gratuit : 24 h maximum)", "Jusqu'à 20 ouvertures (gratuit : 10)", "7 €", "70 €", "Bientôt disponible."])
+    for (const x of ["Shhgone Plus", "10 Go par partage", "2 Go par partage", "30 Go par partage", "Durée jusqu'à 3 jours (gratuit : 24 h maximum)", "Jusqu'à 10 ouvertures (gratuit : 5)", "7 €", "70 €", "Bientôt disponible."])
       expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
-    // Décision du propriétaire du 16 novembre : Plus va jusqu'à 3 jours et 20 ouvertures (remplace D41-36).
+    // Décisions du propriétaire : 16 novembre, Plus jusqu'à 3 jours ; 17 novembre, 10 ouvertures (gratuit 5).
     expect(s).not.toMatch(/élément/); // D41-17 : le nombre d'éléments n'est pas vendu
     expect([...document.querySelectorAll("button")].map((b) => b.textContent).join("|")).not.toMatch(/Acheter|Payer|S'abonner/i);
     expect(s).not.toMatch(/offre limitée|plus que/i);
     expect(document.querySelectorAll("form, input, a[href]")).toHaveLength(0);
   });
-  it("Pro : 50 Go, 50 ouvertures, 20 € par mois et 200 € par an (2 mois offerts) ; mensuel par abonnement, annuel au choix ; carte bancaire seulement (crypto-monnaies retirées le 16 novembre) ; aucun frais caché", () => {
+  it("Pro : 30 Go, 20 ouvertures, 20 € / mois et 200 € / an (2 mois offerts) ; mensuel par abonnement, annuel au choix ; carte bancaire seulement (crypto-monnaies retirées le 16 novembre) ; aucun frais caché", () => {
     show(PaidSheet, { open: true, tier: "pro" });
     const s = text();
-    for (const x of ["Shhgone Pro", "50 Go par partage", "Jusqu'à 50 ouvertures (gratuit : 10)", "20 € par mois, TTC", "ou 200 € par an", "2 mois offerts", "Au mois :", "abonnement renouvelé automatiquement chaque mois, résiliable en un clic, sans frais.", "À l'année, au choix :", "paiement unique (rien n'est prélevé ensuite) ou renouvellement automatique", "Moyens de paiement", "Carte bancaire", "Aucun frais caché."]) expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
+    for (const x of ["Shhgone Pro", "30 Go par partage", "Jusqu'à 20 ouvertures (gratuit : 5)", "20 € / mois", "ou 200 € / an", "Prix TTC.", "2 mois offerts", "Au mois :", "abonnement renouvelé automatiquement chaque mois, résiliable en un clic, sans frais.", "À l'année, au choix :", "paiement unique (rien n'est prélevé ensuite) ou renouvellement automatique", "Moyens de paiement", "Carte bancaire", "Aucun frais caché."]) expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
     expect(s).not.toMatch(/crypto/i);
     expect(s).not.toContain("220");
     expect(s).not.toContain("payé en une fois");

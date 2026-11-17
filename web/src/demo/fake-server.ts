@@ -18,6 +18,7 @@
 // Non simulés : limites par connexion, quotas, place disque, gel. Aucune preuve anti-robot
 // n'est vérifiée (anti-robot désactivé en démo ; `fallback: null`).
 import { BUCKETS, CHUNK_CT, HEADER, SEG_CHUNKS, segmentCount, segmentSize } from "../engine/pure";
+import { MAX_OPENS } from "../limits";
 
 export const MARK = "__SHH_DEMO__";
 
@@ -568,7 +569,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     emptyHash ??= await sha256(new Uint8Array(0));
     if (
       ![1, 6, 12, 24].includes(ttl) ||
-      !(maxOpens >= 1 && maxOpens <= 10) ||
+      !(maxOpens >= 1 && maxOpens <= MAX_OPENS) ||
       ops !== 3 || // audit F4 : seuls paramètres de création, comme le vrai serveur
       mem !== 67108864 ||
       equal(proofV, emptyHash)

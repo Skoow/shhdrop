@@ -80,8 +80,8 @@
   const at = (n: number, ...steps: number[]) => steps.includes(n);
 
   // Journal façon terminal (décision du propriétaire du 16 novembre) : une ligne courte par étape,
-  // tapée lettre par lettre derrière une invite (« $ », « ! » pour l'attaquant), l'état à droite une
-  // fois la ligne tapée ; les lignes « late » (l'attaquant) arrivent un instant après celle de leur
+  // tapée lettre par lettre derrière une invite (« $ », « ! » pour l'attaquant), puis l'état à
+  // droite, tapé à la même allure (17 novembre : plus rien n'apparaît d'un coup) ; les lignes « late » (l'attaquant) arrivent un instant après celle de leur
   // étape ; quatre lignes au plus à l'écran. Les dessins au-dessus ne changent pas.
   type Line = { n: number; text: Key; st: Key; tone: "ok" | "atk" | "end"; late?: boolean };
   const LOG: Line[] = [
@@ -232,13 +232,14 @@
   {#if !reduced}
     <ol class="log" aria-hidden="true">
       {#each lines as l, i (l.text)}
-        <li class={["ln", l.tone, { late: l.late, last: i === lines.length - 1 }]} style:--n={[...t(l.text)].length}>
+        {@const st = `${l.tone === "atk" ? "✕" : "✓"} ${t(l.st)}`}
+        <li class={["ln", l.tone, { late: l.late, last: i === lines.length - 1 }]} style:--n={[...t(l.text)].length} style:--m={[...st].length}>
           <span class="li-ic">{l.tone === "atk" ? "!" : "$"}</span>
           <span class="li-tw"
             ><span class="li-t">{t(l.text)}</span>{#if i === lines.length - 1}<span class="cur"></span>{/if}</span
           >
-          <span class="li-dots"></span>
-          <span class="li-s">{l.tone === "atk" ? "✕" : "✓"} {t(l.st)}</span>
+          <span class="li-gap"></span>
+          <span class="li-s">{st}</span>
         </li>
       {/each}
     </ol>
@@ -649,7 +650,9 @@
     align-items: center;
     column-gap: 8px;
     animation: line-in 200ms var(--ease-out) both;
+    /* Même allure partout (17 novembre) : 22 ms par lettre, texte puis état. */
     --type: calc(var(--n, 20) * 22ms);
+    --type-s: calc(var(--m, 10) * 22ms);
   }
   /* Les anciennes lignes pâlissent : l'œil va à la dernière. */
   .ln:not(.last) {
@@ -706,21 +709,25 @@
       max-width: 0;
     }
   }
-  .li-dots {
-    height: 1px;
-    border-top: 1px dotted rgb(95 227 181 / 0.25);
+  /* Plus de ligne pointillée entre le texte et l'état (17 novembre) : un simple espace. */
+  .li-gap {
+    min-width: 0;
   }
   .li-s {
     min-width: 0;
+    max-width: calc(var(--m) * 1ch);
     overflow: hidden;
     color: var(--mint);
     font-weight: 600;
     white-space: nowrap;
-    text-overflow: ellipsis;
-    animation: line-in 160ms var(--ease-out) var(--type) both;
+    animation: type var(--type-s) steps(var(--m)) var(--type) both;
   }
   .ln.late .li-s {
     animation-delay: calc(900ms + var(--type));
+  }
+  /* Dernière ligne : place pour le curseur qui clignote au bout de l'état. */
+  .ln.last .li-s {
+    max-width: calc(var(--m) * 1ch + 14px);
   }
   .ln.atk .li-ic,
   .ln.atk .li-t,

@@ -77,7 +77,7 @@ describe("Home (UI §9.1)", () => {
     const card = (x: string) => document.querySelector(`[data-offer="${x}"]`)!;
     const norm = (s: string | null | undefined) => (s ?? "").replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
     expect(norm(card("free").querySelector("[data-price]")!.textContent)).toBe("0 € pour toujours");
-    expect(norm(card("plus").querySelector("[data-price]")!.textContent)).toBe(`${PAID.plus.month} € par mois, prévu ou ${PAID.plus.year} € par an`);
+    expect(norm(card("plus").querySelector("[data-price]")!.textContent)).toBe(`${PAID.plus.month} € / mois ou ${PAID.plus.year} € / an`);
     expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus"]);
     expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
     expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
@@ -110,20 +110,19 @@ describe("Home (UI §9.1)", () => {
     const copy = h1.querySelector('[aria-hidden="true"]')!;
     const words = [...copy.querySelectorAll<HTMLElement>(".w")];
     expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "plus", "rien."]);
-    const delays = words.map((w) => w.style.getPropertyValue("--d"));
-    expect(delays).toEqual(["0ms", "55ms", "110ms", "165ms", "220ms", "275ms", "370ms", "425ms", "480ms"]);
-    // « puis plus rien. » lettre par lettre (décision du 16 novembre) : extinction de gauche à
-    // droite ; chaque lettre plus pâle que la précédente, le point final invisible.
+    // Titre affiché d'emblée dans son état final (17 novembre) : aucun délai d'entrée par mot.
+    expect(words.map((w) => w.style.getPropertyValue("--d"))).toEqual(words.map(() => ""));
+    // « puis plus rien. » effacé lettre à lettre, d'emblée : chaque lettre plus pâle que la
+    // précédente, le point final invisible.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
     expect(letters.map((l) => l.textContent).join("")).toBe("puisplusrien.");
-    expect(letters.map((l) => l.style.getPropertyValue("--k"))).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]);
     const o = letters.map((l) => Number(l.style.getPropertyValue("--o")));
     expect(o[0]).toBe(0.55);
     expect(o[12]).toBe(0);
     for (let i = 1; i < o.length; i++) expect(o[i]).toBeLessThan(o[i - 1]!);
   });
 
-  it("entrée une seule fois (§20.4) : la classe reveal part après 1,3 s, l'effacement après 3,75 s, jamais rejoués", async () => {
+  it("entrée une seule fois (§20.4) : la classe reveal part après 1,3 s, jamais rejouée ; titre sans effacement animé (17 novembre)", async () => {
     vi.useFakeTimers();
     try {
       vi.resetModules(); // nouveau chargement de page : le drapeau « déjà joué » repart de zéro
@@ -133,21 +132,13 @@ describe("Home (UI §9.1)", () => {
       flushSync();
       const home = () => document.querySelector(".home")!.classList;
       expect(home().contains("reveal")).toBe(true);
-      expect(home().contains("erase")).toBe(true);
+      expect(home().contains("erase")).toBe(false);
       vi.advanceTimersByTime(1299);
       flushSync();
       expect(home().contains("reveal")).toBe(true);
       vi.advanceTimersByTime(1);
       flushSync();
       expect(home().contains("reveal")).toBe(false);
-      // L'effacement de « puis plus rien. » dure un peu plus (3,75 s), une seule fois, < 5 s.
-      expect(home().contains("erase")).toBe(true);
-      vi.advanceTimersByTime(3750 - 1300 - 1);
-      flushSync();
-      expect(home().contains("erase")).toBe(true);
-      vi.advanceTimersByTime(1);
-      flushSync();
-      expect(home().contains("erase")).toBe(false);
       // Changement de langue : les mots recréés n'ont plus d'entrée.
       setLang("en");
       flushSync();

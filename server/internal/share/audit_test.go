@@ -16,7 +16,7 @@ func TestAuditUnlockVsDestroyLeak(t *testing.T) {
 	for manche := 0; manche < 300; manche++ { // 600 dans l'audit : 0 à 4 manches touchées
 		s, _ := newSvc(t)
 		k := newKeys()
-		id := ready(t, s, k, 1, 24, 10)
+		id := ready(t, s, k, 1, 24, MaxOpens)
 		var wg sync.WaitGroup
 		for range 4 {
 			wg.Add(1)

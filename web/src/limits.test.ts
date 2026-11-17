@@ -20,7 +20,8 @@ describe("limites : mêmes valeurs côté serveur (Go)", () => {
     expect(/maxAttempts\s*=\s*(\d+)/.exec(service)?.[1]).toBe(String(PW_TRIES));
   });
   it("ouvertures : 1 à MAX_OPENS", () => {
-    expect(/MaxOpens < 1 \|\| r\.MaxOpens > (\d+)/.exec(service)?.[1]).toBe(String(MAX_OPENS));
+    expect(service).toContain("r.MaxOpens < 1 || r.MaxOpens > MaxOpens ||");
+    expect(/\nconst MaxOpens = (\d+)\n/.exec(service)?.[1]).toBe(String(MAX_OPENS));
   });
   it("durées proposées", () => {
     const m = /func validTTL\(h int\) bool \{ return ([^}]*) \}/.exec(service)?.[1] ?? "";

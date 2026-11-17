@@ -799,6 +799,7 @@ func TestFinalizeValidation(t *testing.T) {
 		func(r *FinalizeReq) { r.TTLHours = 48 },
 		func(r *FinalizeReq) { r.MaxOpens = 0 },
 		func(r *FinalizeReq) { r.MaxOpens = 11 },
+		func(r *FinalizeReq) { r.MaxOpens = MaxOpens + 1 }, // 6 : refusé depuis le 17 novembre
 		func(r *FinalizeReq) { r.KdfOps = 2 },
 		func(r *FinalizeReq) { r.KdfOps = 4 }, // audit F4 : plafond = paramètres de création (3 passes, 64 Mio)
 		func(r *FinalizeReq) { r.KdfMem = 67108863 },

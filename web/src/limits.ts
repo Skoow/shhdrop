@@ -12,8 +12,9 @@ export const TTL_MAX_HOURS = 24;
 /** Valeurs par défaut des options (UI §9.3). */
 export const TTL_DEFAULT: TtlHours = 12;
 export const OPENS_DEFAULT = 1;
-/** Ouvertures au choix, de 1 à MAX_OPENS (spec §4). */
-export const MAX_OPENS = 10;
+/** Ouvertures au choix, de 1 à MAX_OPENS (spec §4) ; 5 depuis le 17 novembre (décision du
+ *  propriétaire, 10 avant). Le serveur refuse au-delà (share.MaxOpens, même valeur). */
+export const MAX_OPENS = 5;
 /** Mots de passe faux avant destruction (spec §4). */
 export const PW_TRIES = 5;
 /** Images plus grosses : non lues en mémoire pour le nettoyage des métadonnées (UI §9.2.6). */
@@ -30,14 +31,14 @@ export const PENDING_MAX = 2;
  * seule ligne discrète du composeur et une feuille « Bientôt disponible » (décision du 11 novembre) ; rien n'est en
  * vente tant que les Tasks P1 à P3 ne sont pas faites. Le nombre d'éléments n'en fait pas
  * partie : MAX_ITEMS vaut pour toutes (D41-17). Aucune n'apporte de sécurité de plus (§38.9.0).
- * Ouvertures : Plus garde celles du gratuit, Pro va jusqu'à 50 (D41-36, retours OPT).
+ * Ouvertures et tailles : voir la décision du 17 novembre ci-dessous.
  */
 export type PaidTier = "plus" | "pro";
 export const PAID: Readonly<Record<PaidTier, { bytes: number; opens: number; ttlDays: readonly number[]; month: number; year: number }>> = {
-  // Décision du propriétaire du 16 novembre : Plus va jusqu'à 3 jours et 20 ouvertures ; Pro
-  // garde 7 jours et 50 ouvertures (remplace D41-36 pour Plus).
-  plus: { bytes: 10 * 1024 ** 3, opens: 20, ttlDays: [2, 3], month: 7, year: 70 },
-  pro: { bytes: 50 * 1024 ** 3, opens: 50, ttlDays: [2, 3, 7], month: 20, year: 200 },
+  // Décisions du propriétaire : 16 novembre, Plus jusqu'à 3 jours, Pro 7 jours ; 17 novembre,
+  // ouvertures gratuit 5, Plus 10, Pro 20, et Pro 30 Go (50 avant).
+  plus: { bytes: 10 * 1024 ** 3, opens: 10, ttlDays: [2, 3], month: 7, year: 70 },
+  pro: { bytes: 30 * 1024 ** 3, opens: 20, ttlDays: [2, 3, 7], month: 20, year: 200 },
 };
 
 /**

@@ -27,7 +27,7 @@ func TestAucunSQLSousGoneMu(t *testing.T) {
 		t.Run(nom, func(t *testing.T) {
 			s, _ := newSvc(t)
 			k := newKeys()
-			id := ready(t, s, k, 1, 24, 10)
+			id := ready(t, s, k, 1, 24, MaxOpens)
 			if _, err := s.UnlockGrant(id, k.acces, k.preuve, ""); err != nil {
 				t.Fatal(err)
 			}

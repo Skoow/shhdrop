@@ -76,6 +76,8 @@
       </div>
     {/each}
   </fieldset>
+  <!-- Prix affichés sans « TTC » à chaque ligne (17 novembre) : dit une fois ici. -->
+  <p class="ttc" data-ttc>{t("offers.ttc")}</p>
 
   {#if chosen}
     <section class="sum" aria-live="polite" data-summary>
@@ -204,8 +206,11 @@
       inset 0 0 0 2px var(--accent),
       0 18px 40px -24px rgb(95 227 181 / 0.6);
   }
+  /* Nom et prix centrés (retours du propriétaire du 17 novembre). */
   .nm {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: baseline;
     gap: 8px;
     margin: 0;
@@ -228,6 +233,7 @@
   }
   .pr {
     margin: 0;
+    text-align: center;
   }
   .pv {
     font-size: 1.75rem;
@@ -274,6 +280,13 @@
     background: var(--accent);
     box-shadow: none;
     color: var(--bg);
+  }
+  .ttc {
+    justify-self: center;
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--fs-small);
+    text-align: center;
   }
   .sum {
     display: grid;

@@ -17,7 +17,7 @@
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX, MAX_OPENS, PAID, TTL_MAX_HOURS, type PaidTier } from "../limits";
   import { reveal } from "./attach";
-  import { ArrowRight } from "./Icon";
+  import { ArrowRight, ChevronRight } from "./Icon";
 
   let { newTab = false, onpaid, cards = false }: { newTab?: boolean; onpaid?: (tier: PaidTier) => void; cards?: boolean } = $props();
   type Tier = "free" | PaidTier;
@@ -59,7 +59,9 @@
           <span class="dt num" data-details>
             {#each details(x) as d (d.k)}<span class="dr"><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></span>{/each}
           </span>
-          <span class="go" aria-hidden="true"><ArrowRight size={18} strokeWidth={2} /></span>
+          <!-- Plus de flèche ronde (retours du propriétaire du 17 novembre) : un bouton texte en bas
+               de la carte ; toute la carte reste le lien. -->
+          <span class="go">{t("offers.card.cta")}<ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" /></span>
         </a>
       </li>
     {/each}
@@ -269,6 +271,8 @@
   }
   .big .tier {
     position: relative;
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-4);
     min-height: 180px;
     padding: 22px 22px 20px;
@@ -287,6 +291,12 @@
   .big .tier.pro {
     background: linear-gradient(180deg, rgb(18 27 64 / 0.85), rgb(10 15 30 / 0.9));
     box-shadow: inset 0 0 0 1px rgb(52 97 255 / 0.55);
+  }
+  /* Nom et prix centrés (retours du propriétaire du 17 novembre), comme sur la page Offres. */
+  .big .nm,
+  .big .pr {
+    justify-content: center;
+    text-align: center;
   }
   .big .tn {
     font-size: 1.375rem;
@@ -320,10 +330,9 @@
     color: var(--text-3);
     font-size: var(--fs-micro);
   }
-  /* Détail : intitulé à gauche, valeur à droite, filet entre les lignes ; place pour la flèche. */
+  /* Détail : intitulé à gauche, valeur à droite, filet entre les lignes. */
   .dt {
     display: grid;
-    margin-block-end: 44px;
     font-size: var(--fs-small);
   }
   .dr {
@@ -341,19 +350,27 @@
     font-weight: 600;
     text-align: end;
   }
-  /* Flèche centrée en bas de la carte (décision du propriétaire du 16 novembre). */
+  /* « Voir l'offre › » en bas de la carte, sur toute sa largeur (17 novembre). */
   .go {
-    position: absolute;
-    inset-block-end: 14px;
-    inset-inline-start: calc(50% - 18px);
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgb(255 255 255 / 0.05);
-    color: var(--text-2);
-    transition: transform 420ms var(--ease-settle), color var(--dur-fast) var(--ease-out);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    margin-block-start: auto;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.06);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    color: var(--text);
+    font-size: var(--fs-small);
+    font-weight: 600;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .big .tier.plus .go {
+    color: var(--plus);
+  }
+  .big .tier.pro .go {
+    color: var(--pro);
   }
   .big .tier:focus-visible {
     outline: 2px solid var(--accent);
@@ -364,8 +381,7 @@
       transform: translateY(-3px);
     }
     .big .tier:hover .go {
-      transform: translateY(2px);
-      color: var(--text);
+      background: rgb(255 255 255 / 0.1);
     }
   }
   @media (max-width: 759px) {
@@ -381,8 +397,7 @@
     .go {
       transition: none;
     }
-    .big .tier:hover,
-    .big .tier:hover .go {
+    .big .tier:hover {
       transform: none;
     }
   }

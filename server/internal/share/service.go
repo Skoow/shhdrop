@@ -539,10 +539,14 @@ func validCreate(r CreateReq) error {
 // refuse d'ouvrir tout autre réglage, l'accepter ici créerait un partage que personne n'ouvre.
 const kdfOps, kdfMem = 3, 64 << 20
 
+// MaxOpens : ouvertures au plus d'un partage gratuit (spec §4) ; 5 depuis le 17 novembre
+// (décision du propriétaire, 10 avant ; web/src/limits.ts, MAX_OPENS, même valeur).
+const MaxOpens = 5
+
 // ValidateFinalize vérifie les champs d'une finalisation qui ne dépendent pas du palier
 // (le bourrage est vérifié par Finalize, contre le palier du partage).
 func ValidateFinalize(r FinalizeReq) error {
-	if !validTTL(r.TTLHours) || r.MaxOpens < 1 || r.MaxOpens > 10 ||
+	if !validTTL(r.TTLHours) || r.MaxOpens < 1 || r.MaxOpens > MaxOpens ||
 		r.KdfOps != kdfOps || r.KdfMem != kdfMem ||
 		len(r.Salt) != 16 || len(r.ProofV) != 32 || len(r.Envelope) != EnvelopeLen || !notEmptyHash(r.ProofV) {
 		return ErrBadRequest

@@ -79,26 +79,20 @@
   // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris (retours du
   // 11 novembre) ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
   /** `tiers` : « Plus » et « Pro » du libellé au bleu de leur offre, le reste comme les autres liens. */
-  type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean; tiers?: boolean };
+  type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean; tiers?: boolean; pair?: { label: string; url: string } };
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
-    {
-      id: "product",
-      title: t("foot.product"),
-      links: [
-        // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (retours du 16 novembre) :
-        // le logo, le menu et l'accueil y mènent déjà.
-        // Sans compte, pas de Téléchargements (retours du 15 novembre, comme le menu ☰).
-        ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
-        { label: t("foot.offers"), path: "/offres", tiers: true },
-      ],
-    },
+    // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (retours du 16 novembre) ;
+    // plus d'« Offres » (17 novembre : l'en-tête et le menu y mènent). Colonne « Produit »
+    // seulement avec un compte (Téléchargements, retours du 15 novembre, comme le menu ☰).
+    ...(accountFlag.connected ? [{ id: "product", title: t("foot.product"), links: [{ label: t("foot.downloads"), path: "/telechargements" }] }] : []),
     {
       id: "trust",
       title: t("foot.trust"),
       links: [
         { label: t("shell.security"), path: "/securite" },
         { label: t("shell.privacy"), path: "/confidentialite" },
-        { label: t("foot.source"), url: SOURCE_URL },
+        // Code source et licence sur la même ligne (17 novembre).
+        { label: t("foot.source"), url: SOURCE_URL, pair: { label: t("foot.license"), url: LICENSE_URL } },
         { label: t("foot.report"), path: "/signaler", report: true },
       ],
     },
@@ -108,7 +102,6 @@
       links: [
         { label: t("foot.terms"), path: "/conditions" },
         { label: t("foot.notice"), path: "/mentions-legales" },
-        { label: t("foot.license"), url: LICENSE_URL },
       ],
     },
   ]);
@@ -188,7 +181,7 @@
       <a class="foot-logo" href={href("/")} aria-label={t("shell.home")} {...off} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))}><Logo /></a>
       <p class="tag">{t("foot.tagline")}</p>
     </div>
-    <nav class="cols" aria-label={t("shell.nav")}>
+    <nav class={["cols", { two: footCols.length === 2 }]} aria-label={t("shell.nav")}>
       {#each footCols as col (col.id)}
         <div class="col">
           <p class="ch" id="foot-{col.id}">{col.title}</p>
@@ -205,6 +198,7 @@
                   <button type="button" class="fl" aria-haspopup="dialog" onclick={() => chrome.report?.()} data-report-share>{t("content.report")}</button>
                 {:else if l.url}
                   <a class="fl" href={l.url} target="_blank" rel="noopener noreferrer">{l.label}<span class="sr-only"> {t("foot.external")}</span></a>
+                  {#if l.pair}<span class="sep" aria-hidden="true">·</span><a class="fl" href={l.pair.url} target="_blank" rel="noopener noreferrer">{l.pair.label}<span class="sr-only"> {t("foot.external")}</span></a>{/if}
                 {:else if l.path && l.tiers}
                   <a class="fl tiers" href={href(l.path)} aria-current={pathHere(l.path)} onclick={(e) => followLink(e, l.path!)} data-foot-offers
                     ><span>{#each tierParts(l.label) as p, i (i)}{#if p.tier}<span class="tier {p.tier}">{p.text}</span>{:else}{p.text}{/if}{/each}</span></a
@@ -450,6 +444,19 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--sp-5) var(--sp-6);
   }
+  .cols.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* Code source · Licence sur une ligne (17 novembre) ; passe à la ligne si la place manque. */
+  .col li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 8px;
+  }
+  .col li .sep {
+    color: var(--text-3);
+  }
   .ch {
     margin: 0 0 var(--sp-3);
     color: var(--text-3);
@@ -636,12 +643,17 @@
     }
     /* Une seule grille de deux colonnes alignées à gauche (retours du 16 novembre : la suite de
        liens centrés se mélangeait) ; les trois listes partagent les mêmes colonnes. */
-    .cols {
+    .cols,
+    .cols.two {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 0;
       width: min(100%, 22rem);
       text-align: start;
+    }
+    /* Code source · Licence : sur toute la largeur de la grille. */
+    .col li:has(.sep) {
+      grid-column: 1 / -1;
     }
     .ch {
       position: absolute;
