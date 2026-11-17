@@ -37,7 +37,6 @@ export const fr = {
   "nav.offers": "Offres",
   "nav.home": "Accueil",
   "nav.shares": "Mes partages",
-  "nav.cta": "Partager",
   "demo.title": "Ce qui se passe quand vous partagez",
   "demo.bar": "photo.jpg · envoi chiffré",
   "demo.pause": "Mettre l'animation en pause",

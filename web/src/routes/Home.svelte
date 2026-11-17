@@ -26,7 +26,7 @@
   import { CONTENT_MAX } from "../limits";
   import { magnet } from "../ui/attach";
   import DropOverlay from "../ui/DropOverlay.svelte";
-  import { ArrowRight, Camera, Check, ChevronRight, Lock, Mic, Timer, Type, Upload, UserX } from "../ui/Icon";
+  import { ArrowRight, Camera, Check, ChevronRight, Lock, Mic, Type, Upload } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
   import PromiseBand from "../ui/PromiseBand.svelte";
@@ -166,9 +166,10 @@
       <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
            phrase et les cases cochées le disent déjà. -->
       {#if compact}
-        <!-- Page d'envoi (retours du propriétaire du 17 novembre) : son propre titre, visible, à la
-             place du slogan de l'accueil ; les trois assurances à côté (ordinateur) ou dessous. -->
-        <h1 id="hero-title" tabindex="-1" class="send-h1">{t("send.h1")}</h1>
+        <!-- Page d'envoi (retours du propriétaire du 17 novembre) : un titre pour les lecteurs
+             d'écran (« Votre envoi » est le titre visible) ; les trois assurances sont dans le cadre
+             de dépôt du composeur (ui/Assurances.svelte). -->
+        <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
       {:else}
         <h1 id="hero-title" tabindex="-1">
           <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
@@ -213,13 +214,6 @@
       {:else}
         <!-- Page d'envoi (retours du propriétaire du 12 novembre) : le titre reste visible, avec
              trois assurances courtes sous lui ; rien de plus haut que la zone de dépôt. -->
-        <!-- Trois pastilles de même taille, sur une ligne (17 novembre) : libellé complet, ou court
-             sur téléphone (jamais sur deux lignes). -->
-        <ul class="assure" aria-label={t("home.facts.label")} data-assure>
-          {#each [{ I: Lock, k: "send.assure.browser", s: "send.assure.browser.short" }, { I: UserX, k: "home.fact.account", s: "send.assure.account.short" }, { I: Timer, k: "send.assure.burn", s: "send.assure.burn.short" }] as const as a (a.k)}
-            <li><a.I size={15} strokeWidth={2} aria-hidden="true" /><span class="al">{t(a.k)}</span><span class="as" aria-hidden="true">{t(a.s)}</span></li>
-          {/each}
-        </ul>
         <!-- Plus de bouton Salon ici (17 novembre) : il est avec les autres actions du composeur
              (rangée sur ordinateur, menu « + » sur téléphone). -->
       {/if}
@@ -555,83 +549,6 @@
   }
   .home.compact .compose {
     order: 2;
-  }
-  .send-h1 {
-    order: 1;
-    flex: 0 0 auto;
-    margin: 0;
-    font-size: clamp(1.375rem, 1.15rem + 0.6vw, 1.75rem);
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: -0.015em;
-  }
-  .send-h1:focus {
-    outline: none;
-  }
-  /* Trois pastilles égales, une ligne, même hauteur (17 novembre). */
-  .assure {
-    order: 2;
-    flex: 1 1 34rem;
-    container: assure / inline-size;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-2);
-    color: var(--text-2);
-    font-size: var(--fs-small);
-  }
-  .assure li {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 0;
-    min-height: 44px;
-    padding-inline: 10px;
-    border-radius: 12px;
-    background: rgb(255 255 255 / 0.03);
-    box-shadow: inset 0 0 0 1px var(--hair);
-    white-space: nowrap;
-  }
-  .al,
-  .as {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .as {
-    display: none;
-  }
-  /* Pastilles étroites : le libellé court (« Chiffré », « Sans compte », « S'autodétruit »),
-     choisi d'après la largeur de la rangée elle-même (tablette comprise). */
-  @container assure (max-width: 820px) {
-    /* Le libellé complet reste lu par les lecteurs d'écran (le court est caché pour eux). */
-    .al {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-    }
-    .as {
-      display: inline;
-    }
-  }
-  /* Téléphone (17 novembre) : l'icône dans la pastille, au-dessus du libellé court. */
-  @container assure (max-width: 460px) {
-    .assure li {
-      flex-direction: column;
-      gap: 3px;
-      min-height: 56px;
-      padding: 6px;
-      font-size: var(--fs-micro);
-    }
-  }
-  .assure :global(svg) {
-    flex: none;
-    color: var(--accent);
   }
   /* Salon (bientôt) : à part des actions d'envoi, désactivé mais lisible. */
   .room {

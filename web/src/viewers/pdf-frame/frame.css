@@ -43,6 +43,9 @@ body {
 canvas {
   display: block;
   max-width: none;
+  /* iPhone : pas de menu « Enregistrer » à l'appui long (17 novembre). */
+  -webkit-touch-callout: none;
+  user-select: none;
   background: #fff;
   box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
 }

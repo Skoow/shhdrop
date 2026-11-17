@@ -337,3 +337,39 @@ test.describe("mouvement réduit", () => {
     await expect(rec.getByRole("button", { name: "Valider" })).toBeVisible({ timeout: 10_000 });
   });
 });
+
+// Décision du propriétaire du 17 novembre : un vocal et une note ne se téléchargent jamais,
+// même avec « Autoriser le téléchargement » ; le vocal s'écoute, la note se lit (et se copie).
+// Ni l'un ni l'autre dans « Tout télécharger » : ici, rien d'autre à télécharger, donc pas de barre.
+test("destinataire : un vocal s'écoute, jamais téléchargé ; la note se lit et se copie, jamais téléchargée", async ({ page, shh, browser }) => {
+  test.setTimeout(120_000);
+  await page.goto(shh.origin + "/");
+  const rec = await openVoice(page);
+  await rec.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(timer(rec)).toHaveText("0:02", { timeout: 4000 });
+  await rec.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+  await rec.getByRole("button", { name: "Valider" }).click();
+  await expect(page.locator("[data-row]").filter({ hasText: "Mémo vocal 1" })).toBeVisible();
+  await page.getByRole("button", { name: "Chiffrer et envoyer" }).click();
+  await expect(page.getByRole("heading", { name: "Lien prêt" })).toBeVisible({ timeout: 60_000 });
+  const read = async (name: string) => (await page.getByRole("group", { name, exact: true }).locator(".sr-only").first().textContent()) ?? "";
+  const [link, password] = [await read("Lien"), await read("Mot de passe")];
+
+  const ctx = await browser.newContext({ locale: "fr-FR" });
+  const r = await ctx.newPage();
+  await r.goto(link);
+  await r.getByLabel("Mot de passe", { exact: true }).fill(password);
+  await r.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ }).click();
+  await expect(r.getByRole("heading", { name: "Contenu", exact: true })).toBeVisible({ timeout: 30_000 });
+  const row = r.locator("li.row").filter({ hasText: "Mémo vocal 1" });
+  await expect(row.getByRole("button", { name: /^Écouter Mémo vocal 1/ })).toBeVisible();
+  await expect(row.getByRole("button", { name: /Télécharger/ })).toHaveCount(0);
+  await expect(r.getByRole("button", { name: /^Tout télécharger/ })).toHaveCount(0);
+  // La visionneuse du vocal : pas de bouton « Télécharger » non plus.
+  await row.getByRole("button", { name: /^Écouter Mémo vocal 1/ }).click();
+  const viewer = r.getByRole("dialog");
+  await expect(viewer.locator("audio")).toBeAttached({ timeout: 20_000 });
+  await expect(viewer.getByRole("button", { name: /Télécharger/ })).toHaveCount(0);
+  expect(await viewer.locator("audio").getAttribute("controlslist")).toBe("nodownload");
+  await ctx.close();
+});

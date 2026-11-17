@@ -37,7 +37,6 @@ export const en = {
   "nav.offers": "Plans",
   "nav.home": "Home",
   "nav.shares": "My shares",
-  "nav.cta": "Share",
   "demo.title": "What happens when you share",
   "demo.bar": "photo.jpg · encrypted upload",
   "demo.pause": "Pause the animation",

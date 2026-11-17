@@ -6,6 +6,7 @@
   import { flushSync, tick, untrack } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
+  import Assurances from "../ui/Assurances.svelte";
   import { CONTENT_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
   import { blockKey, canClean, createComposer, type AddReport, type ComposeItem, type Source } from "../flows/compose.svelte";
   import { rowStatus, toDraftList } from "../flows/preupload";
@@ -688,13 +689,17 @@
       </div>
       {#if narrow && !filled}
         <!-- Page d'envoi vide, téléphone : « Ajouter » au centre (ouvre la feuille d'ajout). -->
-        <button type="button" class="dropzone empty" aria-haspopup="dialog" onclick={() => (addOpen = true)}>
-          <span class="dz-ic" aria-hidden="true"><Plus size={22} strokeWidth={2.2} /></span>
-          <span class="dz-tx">
-            <span class="dz-t">{t("add.open")}</span>
-            <span class="dz-s">{t("add.big.sub")}</span>
-          </span>
-        </button>
+        <!-- Cadre de dépôt avec les trois assurances dessous (17 novembre). -->
+        <div class="dz-box" data-dz-box>
+          <button type="button" class="dropzone empty" aria-haspopup="dialog" onclick={() => (addOpen = true)}>
+            <span class="dz-ic" aria-hidden="true"><Plus size={22} strokeWidth={2.2} /></span>
+            <span class="dz-tx">
+              <span class="dz-t">{t("add.open")}</span>
+              <span class="dz-s">{t("add.big.sub")}</span>
+            </span>
+          </button>
+          <Assurances />
+        </div>
         <div class="offers after" data-offers-after>{@render offers()}</div>
       {:else if !narrow}
         <!-- Filigrane (retours DROP) : l'espace vide sous la liste est la zone de dépôt ; un clic y
@@ -702,14 +707,26 @@
              jamais tronqué. Liste vide (page d'envoi) : grand cadre au centre, texte blanc. -->
         <!-- Liste vide : la flèche SOUS le texte (retours du propriétaire du 11 novembre). -->
         {#snippet upIcon()}<span class="dz-ic" aria-hidden="true"><Upload size={18} strokeWidth={1.8} /></span>{/snippet}
-        <button type="button" class={["dropzone", filled ? "ghost" : "empty"]} onclick={() => filesIn?.click()}>
-          {#if filled}{@render upIcon()}{/if}
-          <span class="dz-tx">
-            <span class="dz-t">{t("compose.dropzone.title")}</span>
-            <span class="dz-s">{t("compose.dropzone.sub")}</span>
-          </span>
-          {#if !filled}{@render upIcon()}{/if}
-        </button>
+        {#snippet zone()}
+          <button type="button" class={["dropzone", filled ? "ghost" : "empty"]} onclick={() => filesIn?.click()}>
+            {#if filled}{@render upIcon()}{/if}
+            <span class="dz-tx">
+              <span class="dz-t">{t("compose.dropzone.title")}</span>
+              <span class="dz-s">{t("compose.dropzone.sub")}</span>
+            </span>
+            {#if !filled}{@render upIcon()}{/if}
+          </button>
+        {/snippet}
+        {#if filled}
+          {@render zone()}
+        {:else}
+          <!-- Liste vide (17 novembre) : le cadre remplit la colonne, son contenu au centre, et les
+               trois assurances sous « Déposez des fichiers ». -->
+          <div class="dz-box fill" data-dz-box>
+            {@render zone()}
+            <Assurances />
+          </div>
+        {/if}
       {/if}
       </div>
     </div>
@@ -1016,6 +1033,41 @@
       color var(--dur-fast) var(--ease-out),
       transform 400ms var(--ease-settle);
   }
+  /* Cadre de dépôt de la liste vide (17 novembre) : pointillés autour du bouton ET des trois
+     assurances ; sur ordinateur il remplit la colonne, contenu centré. Le bouton n'a plus de
+     cadre à lui. */
+  .dz-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+    border: 1.5px dashed rgb(233 236 242 / 0.34);
+    border-radius: var(--r-xl);
+    transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  }
+  .dz-box.fill {
+    flex: 1 1 auto;
+    min-height: 260px;
+  }
+  .dz-box .dropzone.empty {
+    border: 0;
+    min-height: 0;
+  }
+  @media (hover: hover) {
+    .dz-box:has(.dropzone:hover) {
+      border-color: rgb(95 227 181 / 0.55);
+      background: rgb(95 227 181 / 0.04);
+    }
+    .dz-box .dropzone:hover {
+      background: none;
+    }
+  }
+  :global(.vessel.drop) .dz-box {
+    border-color: var(--accent);
+    background: rgb(95 227 181 / 0.08);
+  }
   /* Page d'envoi vide (retours DROP) : cadre en tête de la liste, texte blanc entier. Compact
      depuis les retours du 12 novembre (il prenait tout l'écran) : titre, offres et Salon restent
      au premier écran ; la cible garde 120 px de haut au doigt, 184 px sur ordinateur. */
@@ -1067,12 +1119,13 @@
     padding: 0 14px 0 12px;
     border: 0;
     border-radius: var(--r-pill);
-    background: rgb(255 255 255 / 0.05);
-    box-shadow: inset 0 0 0 1px var(--hair);
+    /* Plus visibles (17 novembre) : teinte d'accent, contour d'accent, icône d'accent. */
+    background: rgb(95 227 181 / 0.08);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
     color: var(--text);
     font: inherit;
     font-size: var(--fs-small);
-    font-weight: 560;
+    font-weight: 600;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -1081,17 +1134,15 @@
       transform var(--dur-press) var(--ease-out);
   }
   .mk :global(svg) {
-    color: var(--text-2);
+    color: var(--accent);
   }
   .mk:active {
     transform: scale(0.96);
   }
   @media (hover: hover) {
     .mk:hover {
-      background: rgb(255 255 255 / 0.09);
-    }
-    .mk:hover :global(svg) {
-      color: var(--accent);
+      background: rgb(95 227 181 / 0.16);
+      box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.55);
     }
   }
   /* Téléphone : pastilles « Créer » plus serrées (deux rangées au plus). */
@@ -1103,6 +1154,9 @@
     border: 1px dashed rgb(233 236 242 / 0.24);
     background: transparent;
     box-shadow: none;
+    color: var(--text-2);
+  }
+  .mk.room :global(svg) {
     color: var(--text-2);
   }
   .mk .soon {

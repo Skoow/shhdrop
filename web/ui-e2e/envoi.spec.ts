@@ -51,8 +51,10 @@ test("ordinateur : la carte du composeur a un contour entier (pas d'ouverture en
 
 test("premier écran : titre, trois assurances, zone de dépôt compacte, offres et Salon, sans défiler", async ({ page, shh, isMobile }) => {
   await openSend(page, shh.origin);
-  // Plus le slogan de l'accueil (17 novembre) : son propre titre, visible, « Nouveau partage ».
-  await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toBeInViewport();
+  // Plus le slogan de l'accueil (17 novembre) : h1 « Nouveau partage » pour les lecteurs d'écran ;
+  // « Votre envoi » est le titre visible. Les assurances sont dans le cadre de dépôt.
+  await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toHaveCount(1);
+  await expect(page.locator("[data-dz-box] [data-assure]")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis plus rien." })).toHaveCount(0);
   // Trois assurances : libellés complets lus ; pastilles alignées, même hauteur, une seule ligne.
   const items = page.getByRole("list", { name: "En bref" }).getByRole("listitem");

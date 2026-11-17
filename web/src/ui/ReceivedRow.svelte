@@ -27,6 +27,8 @@
     kind: "file" | "text";
     /** Nettoyage dit par le manifeste chiffré (D41-35) ; absent : rien n'est affiché. */
     clean?: ManifestClean;
+    /** Faux : jamais téléchargé (vocal, 17 novembre) : « Écouter » seulement. */
+    savable?: boolean;
     /** Empreinte SHA-256 écrite par l'expéditeur dans le manifeste chiffré ; absente : rien. */
     sha256?: string;
     row: Row;
@@ -44,7 +46,7 @@
     onretry: () => void;
     oncopy: () => void;
   };
-  let { i, name, format, kind, clean, sha256, row, estimate, canView, risky, viewOnly, disabled, onview, ondownload, onpause, onresume, onstop, onretry, oncopy }: Props = $props();
+  let { i, name, format, kind, clean, savable = true, sha256, row, estimate, canView, risky, viewOnly, disabled, onview, ondownload, onpause, onresume, onstop, onretry, oncopy }: Props = $props();
   const lang = $derived(getLang());
 
   const dot = $derived(name.lastIndexOf("."));
@@ -112,7 +114,7 @@
         <span class="hide-narrow">{t(listen ? "content.listen" : "dl.view")}</span>
       </Button>
     {/if}
-    {#if !viewOnly}
+    {#if !viewOnly && (kind === "text" || savable)}
       {#if kind === "text"}
         <IconButton label={t("dl.row.copy", { name })} {disabled} onpress={oncopy}><Copy size={18} /></IconButton>
       {:else if row.state === "downloading" || row.state === "queued"}

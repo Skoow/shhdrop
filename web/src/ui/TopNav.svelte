@@ -17,6 +17,7 @@
   import { reducedMotion } from "./motion";
   import TabIcon from "./TabIcon.svelte";
   import { accountFlag } from "../app/account-flag.svelte";
+  import { presence } from "../history/presence.svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
 
@@ -201,10 +202,12 @@
     <!-- Connecté (conception compte §21.15.1) : « Mes partages » devient « Accueil » (la liste). -->
     {#if accountFlag.connected}
       <a class="btn ghost" href={href("/")} aria-current={here("/")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/"))} {...off}>{t("nav.home")}</a>
-    {:else}
+    {:else if presence.any}
+      <!-- Seulement s'il y a des partages sur cet appareil (décision du propriétaire du 17 novembre). -->
       <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off}>{t("nav.shares")}</a>
     {/if}
-    <a class="btn solid" href={href("/envoyer")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envoyer"))} {...off}>{t("nav.cta")}</a>
+    <!-- Plus de bouton « Partager » (décision du propriétaire du 17 novembre) : le lien se partage
+         depuis « Lien prêt », où il est créé ; la page d'envoi reste dans « Envoyer ». -->
   </div>
 </nav>
 

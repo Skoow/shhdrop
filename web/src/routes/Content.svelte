@@ -93,10 +93,16 @@
     return CATEGORY_ORDER.filter((c) => by.has(c)).map((c) => ({ c, items: by.get(c)! }));
   })();
   const all = entries.map((_, i) => i);
+  // Vocaux et notes : jamais téléchargés (décision du propriétaire du 17 novembre) ; le vocal
+  // s'écoute, la note se lit (et se copie si l'expéditeur autorise le téléchargement). Ni l'un
+  // ni l'autre dans « Tout télécharger » ni dans l'archive .zip. Vocal : nettoyage « vocal » dit
+  // par le manifeste (un vocal dont le nettoyage a échoué reste un fichier audio ordinaire).
+  const noSave = (i: number) => entries[i]!.kind === "text" || entries[i]!.clean === "vocal";
+  const savable = all.filter((i) => !noSave(i));
   const viewItems: ViewItem[] = groups.flatMap((g) =>
     g.items.flatMap((i) => {
       const k = viewKind(i);
-      return k ? [{ i, name: names[i]!, kind: k, size: totals[i]!, text: entries[i]!.kind === "text" ? (entries[i]!.text ?? "") : undefined }] : [];
+      return k ? [{ i, name: names[i]!, kind: k, size: totals[i]!, text: entries[i]!.kind === "text" ? (entries[i]!.text ?? "") : undefined, noSave: noSave(i) }] : [];
     }),
   );
 
@@ -214,7 +220,8 @@
   }
 
   // ---------- Archive .zip (spec §41.6) ----------
-  const zipBytes = totals.reduce((a, n) => a + n, 0) + entries.reduce((a, _, i) => a + 2 * fileName(i).length * 4 + 160, 0) + 120;
+  const savableBytes = savable.reduce((a, i) => a + totals[i]!, 0);
+  const zipBytes = savableBytes + savable.reduce((a, i) => a + 2 * fileName(i).length * 4 + 160, 0) + 120;
   const zipTooBig = !savePicker && typeof navigator !== "undefined" && zipBytes > (lowMemory(navigator, Number.MAX_SAFE_INTEGER) ? ZIP_BLOB_MAX_SMALL : ZIP_BLOB_MAX);
   // Sans sélecteur, un gros fichier est assemblé en mémoire : prévenir sur un petit appareil.
   const bigWarn = typeof navigator !== "undefined" && needsMemoryWarning(totals, savePicker !== undefined, navigator);
@@ -229,15 +236,15 @@
     }
     if (!sink) return;
     // L'archive enregistrée est un seul fichier : une seule entrée « shhgone.zip ».
-    const zipTotal = totals.reduce((a, n) => a + n, 0);
+    const zipTotal = savableBytes;
     const saved = afterSave(sink, () => recordDownload({ name, sizeBytes: zipTotal, format: { family: "archive", label: "ZIP" }, source: "partage", savedAt: Date.now() }));
     const z = createZip(saved as Parameters<typeof createZip>[0]);
     dl.startZip({
-      total: totals.reduce((a, n) => a + n, 0),
+      total: savableBytes,
       abort: () => z.abort(),
       run: async (pipe) => {
         const taken = new Set<string>();
-        for (const i of all) {
+        for (const i of savable) {
           const e = await z.entry(zipName(fileName(i), taken), totals[i]!);
           await pipe(i, (c) => e.write(c));
           await e.end();
@@ -256,7 +263,7 @@
     const s = summarize(dl.rows, items);
     return { ...s, bytes: s.done, n: items.length, finished: s.count.done, running: s.count.downloading + s.count.queued, paused: s.count.paused };
   };
-  const allSum = $derived(sum(all.filter((i) => entries[i]!.kind === "file")));
+  const allSum = $derived(sum(savable));
   // Titre de l'onglet pendant un téléchargement : « 42 % · Shhgone » (jamais un nom de fichier),
   // puis le titre de l'écran revient.
   const dlPct = $derived.by(() => {
@@ -419,16 +426,17 @@
   {#if lastOpen && !closer.closed}
     <p class="notice" data-last-top><Clock size={18} aria-hidden="true" /> <span>{t("content.lastOpen.top")}</span></p>
   {/if}
-  {#if !viewOnly}
-    <!-- « À télécharger » (conception compte §21.9) : nombre, taille et échéance du serveur. -->
+  {#if !viewOnly && savable.length > 0}
+    <!-- « À télécharger » (conception compte §21.9) : nombre, taille et échéance du serveur ;
+         sans les vocaux ni les notes, jamais téléchargés (17 novembre). -->
     <div class="todo" data-todo>
-      <h2 class="todo-t num">{t("downloads.todo", { n: entries.length, size: formatBytes(totalBytes, lang) })}</h2>
+      <h2 class="todo-t num">{t("downloads.todo", { n: savable.length, size: formatBytes(savableBytes, lang) })}</h2>
       {#if endsAt !== undefined}<p class="todo-m num">{t("downloads.until", { date: formatDayTime(endsAt, lang) })}</p>{/if}
     </div>
   {/if}
   {#if viewOnly}
     <p class="notice"><Eye size={18} aria-hidden="true" /> <span>{t("content.viewOnly")}</span></p>
-  {:else}
+  {:else if savable.length > 0}
     <DownloadBar
       all={allSum}
       zip={dl.zip}
@@ -437,7 +445,7 @@
       {risky}
       multi={!dirPicker}
       {disabled}
-      onall={() => batch(all)}
+      onall={() => batch(savable)}
       onzip={startZip}
       onpause={() => dl.pause(all)}
       onresume={() => dl.resume(all)}
@@ -449,7 +457,7 @@
   {/if}
 
   {#each groups as g (g.c)}
-    {@const files = g.items.filter((i) => entries[i]!.kind === "file")}
+    {@const files = g.items.filter((i) => !noSave(i))}
     {@const s = sum(files)}
     {@const bytes = g.items.reduce((a, i) => a + totals[i]!, 0)}
     {@const cat = t(CAT_KEY[g.c])}
@@ -488,6 +496,7 @@
             format={formats[i]!}
             kind={entries[i]!.kind}
             clean={entries[i]!.clean}
+            savable={!noSave(i)}
             sha256={entries[i]!.sha256}
             row={dl.rows[i]!}
             estimate={est(i)}

@@ -2,6 +2,7 @@
 // Barre du haut (refonte du 12 novembre), ordinateur et tablette : menus déroulants en motif
 // « disclosure » (bouton aria-expanded, liste de liens ou boutons), clavier (Entrée, Échap,
 // flèches, Tab), fermeture au clic extérieur ; « Envoyer ▾ » ouvre les gestes du composeur.
+import { presence } from "../history/presence.svelte";
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chrome } from "../app/chrome.svelte";
@@ -29,7 +30,8 @@ afterEach(() => {
 });
 
 describe("TopNav", () => {
-  it("menus, Salon bientôt, Offres, Mes partages et Partager ; le menu s'appelle « Envoyer », le bouton plein seul « Partager »", () => {
+  it("menus, Salon bientôt, Offres, Mes partages (s'il y a des partages) ; plus de bouton « Partager » (17 novembre)", () => {
+    presence.any = true;
     show();
     const nav = document.querySelector("nav")!;
     expect(nav.getAttribute("aria-label")).toBe("Menu principal");
@@ -42,10 +44,15 @@ describe("TopNav", () => {
     expect(room.getAttribute("aria-disabled")).toBe("true");
     expect(room.textContent).toContain("bientôt");
     const links = [...document.querySelectorAll("a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
-    expect(links).toEqual(expect.arrayContaining([["Offres", "/offres"], ["Mes partages", "/envois"], ["Partager", "/envoyer"]]));
+    expect(links).toEqual(expect.arrayContaining([["Offres", "/offres"], ["Mes partages", "/envois"]]));
     const named = (n: string) => [...nav.querySelectorAll("a, button")].filter((e) => e.textContent!.trim() === n);
-    expect(named("Partager")).toHaveLength(1);
-    expect(named("Partager")[0]!.tagName).toBe("A");
+    expect(named("Partager")).toHaveLength(0);
+  });
+
+  it("sans partage sur l'appareil : pas de « Mes partages »", () => {
+    presence.any = false;
+    show();
+    expect([...document.querySelectorAll("a")].map((a) => a.textContent!.trim())).not.toContain("Mes partages");
   });
 
   it("Envoyer : quatre gestes, chacun avec icône, titre et une ligne", () => {
@@ -150,6 +157,7 @@ describe("TopNav connecté", () => {
   it("« Accueil » (vers /) à la place de « Mes partages » tant qu'un compte est ouvert", async () => {
     const { setAccountPrefs } = await import("../history/live.svelte");
     const links = () => [...document.querySelectorAll<HTMLAnchorElement>(".acts a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
+    presence.any = true;
     show();
     expect(links()[0]).toEqual(["Mes partages", "/envois"]);
     setAccountPrefs({ keepReceived: true });

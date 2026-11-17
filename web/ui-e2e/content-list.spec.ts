@@ -294,8 +294,9 @@ test("archive .zip sans sélecteur : confirmation des fichiers à risque, archiv
     execFileSync("python3", ["-I", "-c", "import sys,zipfile,hashlib,json;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;print(json.dumps({i.filename:hashlib.sha256(z.read(i)).hexdigest() for i in z.infolist()}))", p]).toString(),
   ) as Record<string, string>;
   for (const n of NAMES) expect(out[n], n).toBe(sha(await sentBytes(n)));
-  expect(Object.keys(out)).toHaveLength(NAMES.length + 1); // + la note en .txt
-  expect(out["Note.txt"] ?? Object.entries(out).find(([k]) => k.endsWith(".txt"))?.[1]).toBe(createHash("sha256").update(TEXT).digest("hex"));
+  // La note n'est jamais téléchargée (décision du propriétaire du 17 novembre) : pas dans l'archive.
+  expect(Object.keys(out)).toHaveLength(NAMES.length);
+  expect(Object.keys(out).some((k) => k.endsWith(".txt"))).toBe(false);
 });
 
 test("« voir seulement » : aucune action de téléchargement ni de copie dans tout le DOM, visionneuse comprise ; mention honnête", async ({ page, shh, browser }) => {

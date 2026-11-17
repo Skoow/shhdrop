@@ -9,6 +9,7 @@ import { accountFlag } from "../app/account-flag.svelte";
 import { getDemo } from "../app/demo-hooks";
 import { destroyShare, fetchMeta, shareStatus } from "../index";
 import { destroyedPatch, missingPatch, pollHistory, statusPatch, type PollError, type Poller, type RefreshResult, type Status } from "./poll";
+import { presence } from "./presence.svelte";
 import { pageReturns } from "./returns";
 import { effectiveState, idbBackend, linkKey, memoryBackend, openHistory, type Backend, type History, type HistoryEntry, type NewEntry } from "./store";
 
@@ -121,6 +122,7 @@ async function getPoller(): Promise<Poller | null> {
 async function reload(h: History): Promise<void> {
   const list = await h.list();
   shares.all = list;
+  presence.any = list.length > 0;
   shares.entries = list.filter((e) => e.sorte === "envoi");
 }
 
@@ -132,6 +134,7 @@ export async function loadHistory(force = false): Promise<History | null> {
   if (h === "absent") {
     shares.entries = [];
     shares.all = [];
+    presence.any = false;
     shares.enabled = true;
     shares.status = "ready";
     return null;

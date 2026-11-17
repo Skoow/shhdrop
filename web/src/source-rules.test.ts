@@ -76,7 +76,7 @@ describe("règles de sources", () => {
     expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, inUiDir)).toEqual([]));
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts"),
     ).toEqual([]));
   // Spec §33, §33.1 : exception écrite, l'historique local chiffré des envois. Seul
   // history/live.svelte.ts lit `indexedDB` (pour le passer à history/store.ts, qui chiffre) ;

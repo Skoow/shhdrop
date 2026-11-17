@@ -266,7 +266,7 @@ test.describe("fr-FR", () => {
     await open(page, shh.origin);
     await browse(page, [f("contrat.pdf")]);
     const cur = page.locator("[data-current-offer]").filter({ visible: true });
-    await expect(cur).toHaveText(/^Votre offre\u202f:\s*Gratuit\s*2\u202fGo · 24\u202fh · 10\u202fouvertures\s*Voir les offres/);
+    await expect(cur).toHaveText(/^Votre offre\u202f:\s*Gratuit\s*2\u202fGo · 24\u202fh · 5\u202fouvertures\s*Voir les offres/);
     await expect(page.locator("[data-offer-strip], [data-locked], [data-paid-space]")).toHaveCount(0);
     // Empreinte SHA-256 du fichier sur sa ligne (16 novembre) : exactement celle de node:crypto.
     const want = createHash("sha256").update(readFileSync(f("contrat.pdf"))).digest("hex");

@@ -93,8 +93,9 @@ test.describe("téléphone façon app", () => {
     const closeButton = page.getByRole("banner").getByRole("button", { name: "Fermer le menu" });
     await expect(closeButton).toHaveAttribute("aria-expanded", "true");
     const menu = page.locator("[data-menu]");
-    // Décision du 16 novembre : Envoi, Mes partages, Offres ; le reste est dans le pied de page.
-    await expect(menu.getByRole("link")).toHaveText(["Partager", "Mes partages", "Offres"]);
+    // Décisions des 16 et 17 novembre : « Nouveau partage », « Mes partages » seulement s'il y a des
+    // partages sur l'appareil (aucun ici), « Offres » ; le reste est dans le pied de page.
+    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Offres"]);
     await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
     expect(await smallTargets(page, "header")).toEqual([]);
     await shot(page, "menu-ouvert");
@@ -102,16 +103,18 @@ test.describe("téléphone façon app", () => {
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
     await expect(menuButton).toBeFocused();
-    await menuButton.click();
-    await menu.getByRole("link", { name: "Mes partages" }).click();
-    await expect(page).toHaveURL(/\/envois$/);
+    await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
+    await page.goto(shh.origin + "/envois");
+    await expect(page).toHaveURL(/\/envois$/);
     await expect(page.getByRole("heading", { level: 1, name: "Mes partages" })).toBeVisible();
     // Plus un onglet racine : Retour en haut à gauche.
     await expect(page.getByRole("banner").getByRole("button", { name: "Retour" })).toBeVisible();
     expect(await noHScroll(page)).toBe(true);
     await page.getByRole("banner").getByRole("button", { name: "Retour" }).click();
     await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
+    // Entrée de l'accueil finie (le cadre de l'infographie grandit un instant) avant de mesurer.
+    await page.waitForTimeout(1500);
     expect(await smallTargets(page, "body")).toEqual([]);
     // Accueil vide : « tirer pour actualiser » permis (rien à perdre, 17 novembre).
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).not.toBe("none");

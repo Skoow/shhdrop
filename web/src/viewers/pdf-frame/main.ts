@@ -61,6 +61,10 @@ async function open(m: Msg): Promise<void> {
     button(m.labels.fit, "↔", () => setZoom(1)),
     button(m.labels.zoomIn, "+", () => setZoom(zoom * 1.25)),
   );
+  // Pas d'« Enregistrer l'image » des pages (clic droit, appui long, glisser) : le PDF ne se
+  // télécharge que par le bouton « Télécharger », quand l'expéditeur l'autorise (17 novembre).
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("dragstart", (e) => e.preventDefault());
   const pages = document.createElement("div");
   pages.className = "pages";
   document.body.append(bar, pages);

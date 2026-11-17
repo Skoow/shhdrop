@@ -1,5 +1,6 @@
 <script module lang="ts">
-  export type ViewItem = { i: number; name: string; kind: "image" | "video" | "audio" | "pdf" | "text"; size: number; text?: string };
+  /** `noSave` : jamais téléchargeable (vocal, 17 novembre), même si l'expéditeur l'autorise. */
+  export type ViewItem = { i: number; name: string; kind: "image" | "video" | "audio" | "pdf" | "text"; size: number; text?: string; noSave?: boolean };
 </script>
 
 <script lang="ts">
@@ -195,7 +196,7 @@
         {:else if cur.kind === "video"}
           <VideoViewer {url} label={cur.name} {viewOnly} onerror={() => (phase = "undecodable")} />
         {:else}
-          <AudioViewer {url} label={cur.name} {viewOnly} onerror={() => (phase = "undecodable")} />
+          <AudioViewer {url} label={cur.name} viewOnly={viewOnly || cur.noSave === true} onerror={() => (phase = "undecodable")} />
         {/if}
       {/if}
     </div>
@@ -206,7 +207,7 @@
       </div>
       {#if viewOnly}
         <p class="vo"><Eye size={16} aria-hidden="true" /> <span>{t("content.viewOnly")}</span></p>
-      {:else if cur.kind !== "text" && ondownload}
+      {:else if cur.kind !== "text" && !cur.noSave && ondownload}
         <Button variant="secondary" dense onpress={() => ondownload(cur.i)} aria-label={t("dl.row.download", { name: cur.name })}>
           {#snippet icon()}<Download size={18} />{/snippet}
           {t("dl.download")}

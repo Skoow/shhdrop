@@ -4,10 +4,13 @@
 // partages) chargent sa page (router.svelte.ts, setEntry).
 import { mount } from "svelte";
 import { setEntry } from "../app/router.svelte";
+import { probeHistory } from "../history/presence.svelte";
 import { langReady } from "../i18n/i18n.svelte";
 import PagesApp from "./PagesApp.svelte";
 
 setEntry("pages");
+// « Mes partages » dans l'en-tête seulement si l'historique existe sur cet appareil (17 novembre).
+void probeHistory();
 // Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau, titres « Démo · »).
 if (import.meta.env.MODE === "demo") await (await import("../demo/install")).installDemo(window);
 await langReady;
