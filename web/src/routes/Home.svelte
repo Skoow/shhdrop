@@ -166,9 +166,9 @@
       <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
            phrase et les cases cochées le disent déjà. -->
       {#if compact}
-        <!-- Page d'envoi (retours du propriétaire du 17 novembre) : plus le slogan de l'accueil,
-             qui ne servait pas ici ; un titre pour les lecteurs d'écran et le focus seulement. -->
-        <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
+        <!-- Page d'envoi (retours du propriétaire du 17 novembre) : son propre titre, visible, à la
+             place du slogan de l'accueil ; les trois assurances à côté (ordinateur) ou dessous. -->
+        <h1 id="hero-title" tabindex="-1" class="send-h1">{t("send.h1")}</h1>
       {:else}
         <h1 id="hero-title" tabindex="-1">
           <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
@@ -544,11 +544,10 @@
     padding-bottom: var(--sp-2);
     gap: var(--sp-3);
   }
-  /* Une rangée sur ordinateur (titre, assurances, Salon à droite) : la liste garde sa hauteur ;
-     les assurances passent dessous quand la place manque. */
+  /* Une rangée sur ordinateur (titre à gauche, assurances à droite) ; les assurances passent
+     sous le titre quand la place manque (téléphone). */
   .home.compact .pitch {
     order: 1;
-    container: send-pitch / inline-size;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -557,10 +556,23 @@
   .home.compact .compose {
     order: 2;
   }
+  .send-h1 {
+    order: 1;
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: clamp(1.375rem, 1.15rem + 0.6vw, 1.75rem);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+  .send-h1:focus {
+    outline: none;
+  }
   /* Trois pastilles égales, une ligne, même hauteur (17 novembre). */
   .assure {
     order: 2;
-    flex: 1 1 100%;
+    flex: 1 1 34rem;
+    container: assure / inline-size;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -592,8 +604,9 @@
   .as {
     display: none;
   }
-  /* Colonnes étroites : le libellé court (« Chiffré », « Sans compte », « S'autodétruit »). */
-  @container send-pitch (max-width: 620px) {
+  /* Pastilles étroites : le libellé court (« Chiffré », « Sans compte », « S'autodétruit »),
+     choisi d'après la largeur de la rangée elle-même (tablette comprise). */
+  @container assure (max-width: 820px) {
     /* Le libellé complet reste lu par les lecteurs d'écran (le court est caché pour eux). */
     .al {
       position: absolute;
@@ -605,18 +618,15 @@
     .as {
       display: inline;
     }
-    .assure li {
-      min-height: 40px;
-    }
   }
-  /* Téléphone étroit : texte seul, un peu plus petit, pour que rien ne soit coupé. */
-  @container send-pitch (max-width: 420px) {
+  /* Téléphone (17 novembre) : l'icône dans la pastille, au-dessus du libellé court. */
+  @container assure (max-width: 460px) {
     .assure li {
-      padding-inline: 6px;
+      flex-direction: column;
+      gap: 3px;
+      min-height: 56px;
+      padding: 6px;
       font-size: var(--fs-micro);
-    }
-    .assure li :global(svg) {
-      display: none;
     }
   }
   .assure :global(svg) {
