@@ -6,7 +6,7 @@
   import { inAppBrowser, isStandalone, isSupported } from "../app/env";
   import { guardFileDrop, reloadIfRestored } from "../app/lifecycle";
   import { readLink, readShare, scrubAddressBar, type LinkState, type ShareTake } from "../app/link";
-  import { href, router } from "../app/router.svelte";
+  import { href, router, shownPath } from "../app/router.svelte";
   import { applySeo } from "../app/seo";
   import { setScreenTitle } from "../app/title";
   import { watchKeyboard } from "../app/viewport";
@@ -24,7 +24,8 @@
 
   const inApp = () => inAppBrowser(navigator.userAgent, isStandalone(window)) !== null;
   function scrubHere(): void {
-    if (!scrubAddressBar(history, location.pathname)) scrubAddressBar(history, href("/s"));
+    // « /s » n'est plus montré une fois le lien lu (17 novembre) : l'adresse devient « / ».
+    if (!scrubAddressBar(history, shownPath(location.pathname))) scrubAddressBar(history, href("/"));
   }
   const takeShare = (): ShareTake => readShare(location.href);
   function takeManage(): LinkState {

@@ -17,7 +17,19 @@ import { createLeaveGuard } from "./leave-guard";
  */
 export const REOPEN_MARK = "shhOg";
 export function markReopen(h: History): void {
-  h.replaceState({ [REOPEN_MARK]: true }, "", location.pathname);
+  h.replaceState({ [REOPEN_MARK]: true }, "", shownPath(location.pathname));
+}
+
+/**
+ * Adresse affichée une fois le lien lu (décision du propriétaire du 17 novembre : « /s » n'est
+ * montré que quand il sert) : la page « /s » remplace son adresse par l'accueil (« / ») après
+ * avoir lu et retiré le « # ». Un rechargement de « / » marqué (markReopen) repart vers « /s »
+ * (moveLegacyLink), où l'écran d'ouverture retrouve l'octroi de l'onglet (spec §41.4). Toute
+ * autre adresse est rendue telle quelle.
+ */
+export function shownPath(pathname: string): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  return pathname === base + "/s" || pathname === base + "/s.html" ? base + "/" : pathname;
 }
 const reopenHere = () =>
   typeof history !== "undefined" && (history.state as Record<string, unknown> | null)?.[REOPEN_MARK] === true;
@@ -155,13 +167,15 @@ export function otherEntry(path: string): boolean {
 }
 
 /**
- * Ancien lien à la racine (« /#<clé> », avant le 16 novembre) : remplacé, sans nouvelle entrée
+ * Ancien lien à la racine (« /#<clé> », avant le 16 novembre), ou entrée « / » d'une ouverture
+ * déverrouillée (markReopen, 17 novembre) : remplacé, sans nouvelle entrée
  * d'historique, par « /s » et le même fragment (même origine : le fragment ne part jamais au
  * serveur). La requête (« ?fbclid=… » des messageries) n'est pas recopiée. Rend vrai si la page
  * part ; l'appelant n'affiche alors rien.
  */
-export function moveLegacyLink(loc: Pick<Location, "pathname" | "hash" | "replace">): boolean {
-  const name = match(loc.pathname, loc.hash).name;
+export function moveLegacyLink(loc: Pick<Location, "pathname" | "hash" | "replace">, reopen: boolean = reopenHere()): boolean {
+  // Ouverture déverrouillée rechargée sous « / » (adresse montrée, shownPath) : vers « /s » aussi.
+  const name = match(loc.pathname, loc.hash, undefined, reopen).name;
   // Déjà sur « /s » (serveur sans s.html, qui rendrait index.html) : jamais de boucle.
   const onS = loc.pathname === href("/s") || loc.pathname === href("/s.html");
   if (!LINK_ROUTES.has(name) || entry !== "app" || onS) return false;

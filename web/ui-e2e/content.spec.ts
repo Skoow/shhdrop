@@ -143,7 +143,7 @@ test("destruction par l'expéditeur pendant la lecture → l'interface se ferme 
   await goSecurity(page);
   await expect(page).toHaveURL(`${shh.origin}/securite`);
   await page.goBack();
-  await expect(page).toHaveURL(`${shh.origin}/s`);
+  await expect(page).toHaveURL(new RegExp(`^${shh.origin.replace(/\./g, "\\.")}/s?$`));
   await expect(page.getByRole("heading", { name: "Contenu", exact: true })).toHaveCount(0);
   expect(await page.content()).not.toContain("الطابق الثالث");
 });

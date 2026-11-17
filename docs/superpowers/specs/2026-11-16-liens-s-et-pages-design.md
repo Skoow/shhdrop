@@ -28,3 +28,12 @@ Clés, fragments, mot de passe, CSP, SRI, aucune requête de plus vers le serveu
 - **Moyenne, exploitation** : les liens déjà partagés à la racine continuent de marcher par la redirection ; à supprimer seulement par une décision explicite, quand plus aucun ancien lien ne peut être valide (7 jours au plus après la mise en ligne).
 - **Faible, confidentialité** : la redirection garde le fragment dans l'historique d'une entrée de plus (`replace` : aucune entrée ajoutée, l'adresse est remplacée), puis l'écran d'ouverture le retire comme avant.
 - **Faible, exactitude** : « Rouvrir » de « Mes partages » et les liens de gestion changent de page (navigation complète), comme aujourd'hui pour « Rouvrir » (`location.assign`).
+
+## Décision du 17 novembre : « /s » montré seulement quand il sert
+
+Demande du propriétaire : ne pas afficher `/s` quand on n'en a pas besoin. Le lien partagé garde `/s` (c'est lui qui charge la page d'ouverture). Une fois le lien lu et le « # » retiré, la page `/s` remplace son adresse par l'accueil (`/`, `replaceState`, aucune entrée de plus) : la barre d'adresse montre `shhgone.com/`.
+
+- **Rechargement d'une ouverture déverrouillée** : l'entrée porte la marque d'ouverture (`markReopen`, aucun secret) ; `/` (index.html) la voit avant tout affichage et repart vers `/s` (`location.replace`), où l'écran d'ouverture retrouve l'octroi de l'onglet comme avant (spec §41.4 : rechargement immédiat ; onglet restauré plus de 2 min après : « Lien incomplet »). La clé ne revient jamais dans l'adresse.
+- **Écran verrouillé (mot de passe pas encore saisi), gestion** : un rechargement mène à l'accueil, comme avant le 16 novembre (la confirmation du navigateur prévient déjà sur l'écran verrouillé).
+- **Navigateur intégré (S4)** : rien n'est retiré, l'adresse garde `/s#…` jusqu'à « Continuer ici ».
+- Signalement **faible, exactitude** : au rechargement, `/` charge son script avant de repartir vers `/s` (un aller-retour de plus, seulement dans ce cas).

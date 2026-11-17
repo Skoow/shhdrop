@@ -116,7 +116,8 @@ test.describe("fr-FR", () => {
     test(`lien court /shhgone/${start}#… (${what}) : route d'ouverture ou de gestion, # retiré, jamais envoyé`, async ({ page, demo }) => {
       const res = await page.goto(`${demo.url}${start}${frag}`);
       expect(res?.status()).toBe(200);
-      await expect.poll(() => page.url()).toBe(`${demo.url}s`);
+      // « /s » n'est plus montré une fois le lien lu (17 novembre).
+      await expect.poll(() => page.url()).toBe(demo.url);
       expect(await page.evaluate(() => location.hash)).toBe("");
       // Route d'ouverture ou de gestion : le faux serveur de cet onglet ne connaît pas ce partage.
       if (what.includes("partage")) {
@@ -138,7 +139,7 @@ test.describe("fr-FR", () => {
       expect(demo.requests.every((r) => !("referer" in r.headers) || !r.headers.referer!.includes("#"))).toBe(true);
       await page.goto(`${demo.url}securite`);
       await page.goBack();
-      await expect.poll(() => page.evaluate(() => location.href)).toBe(`${demo.url}s`);
+      await expect.poll(() => page.evaluate(() => location.href)).toBe(demo.url);
       expect(await storage(page)).toBe(0);
     });
   }
@@ -310,7 +311,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     // ouverture complète, puis destruction.
     await page.getByRole("button", { name: "Ouvrir comme destinataire (démo)" }).click();
     await expect(readyHeading(page)).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => location.pathname + location.hash)).toBe("/shhgone/s");
+    await expect.poll(() => page.evaluate(() => location.pathname + location.hash)).toBe("/shhgone/");
     await expect(page.getByRole("heading", { name: "Un partage chiffré vous attend" })).toBeVisible();
     await page.getByLabel("Mot de passe", { exact: true }).fill("pas-le-bon");
     await page.getByRole("button", { name: "Déverrouiller" }).click();

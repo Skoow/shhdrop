@@ -124,26 +124,27 @@ for (const [kind, start, frag] of [
     const api = apiRequests(page);
     const all = allRequests(page);
     await page.goto(`${shh.origin}${start}${frag}`);
-    await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
+    // « /s » n'est plus montré une fois le lien lu (17 novembre) : l'adresse est « / ».
+    await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
     expect(await hash(page)).toBe("");
     // La lecture de l'état part avant de quitter la page (sinon, sous charge, l'écran est
     // quitté avant elle et le décompte ci-dessous échoue).
     await expect.poll(() => api.length).toBe(1);
 
     // Retour / Avant : aucune entrée d'historique ne réaffiche le #, et le retrait n'a pas
-    // ajouté d'entrée (replace, replaceState) : une seule entrée « /s » avant « /securite ».
+    // ajouté d'entrée (replace, replaceState) : une seule entrée « / » avant « /securite ».
     await goSecurity(page);
     await expect(page).toHaveURL(`${shh.origin}/securite`);
     const forward = browserName !== "webkit";
-    expectOnlyOwnEntries(await walkHistory(page, [KEY], forward), shh.origin, ["/s", "/securite"]);
+    expectOnlyOwnEntries(await walkHistory(page, [KEY], forward), shh.origin, ["/", "/securite"]);
     // Rechargement : rien ne revient. Sans parcours Avant (WebKit, voir walkHistory), l'onglet est
     // resté sur la première entrée : on rouvre « / » directement (l'entrée « / » de l'historique
     // vient d'être vérifiée sans # par le parcours Retour).
     if (forward) await page.goBack();
-    else await page.goto(`${shh.origin}/s`);
-    await expect(page).toHaveURL(`${shh.origin}/s`);
+    else await page.goto(`${shh.origin}/`);
+    await expect(page).toHaveURL(`${shh.origin}/`);
     await page.reload();
-    expect(page.url()).toBe(`${shh.origin}/s`);
+    expect(page.url()).toBe(`${shh.origin}/`);
     expect(await page.content()).not.toContain(KEY);
     // Ouverture : une seule lecture de l'état (meta, avec K_accès dérivé, jamais la clé) ;
     // gestion : une lecture de l'état (manage/status). Aucune autre requête d'API.
@@ -163,17 +164,20 @@ test("# collé dans la barre sur la même page (navigation de fragment) : retir�
   await expect.poll(() => hash(page)).toBe("");
   await page.evaluate((k) => (location.hash = `m${k}`), KEY2);
   await expect.poll(() => hash(page)).toBe("");
-  // Chaque navigation de fragment a créé une entrée, aussitôt remplacée par « /s » nu : trois
-  // entrées « /s », aucune avec un « # », au Retour (et à l'Avant hors WebKit : walkHistory).
-  expectOnlyOwnEntries(await walkHistory(page, [KEY, KEY2], browserName !== "webkit"), shh.origin, ["/s", "/s", "/s"]);
+  // Chaque navigation de fragment a créé une entrée, aussitôt remplacée par « / » nu : trois
+  // entrées « / », aucune avec un « # », au Retour (et à l'Avant hors WebKit : walkHistory).
+  expectOnlyOwnEntries(await walkHistory(page, [KEY, KEY2], browserName !== "webkit"), shh.origin, ["/", "/", "/"]);
 });
 
 test("# de lien collé dans la barre sur l'accueil : part vers /s, retiré ; aucune entrée avec un #", async ({ page, shh, browserName }) => {
   await page.goto(`${shh.origin}/`);
   await expect(page.locator("main#contenu")).toBeVisible();
   await page.evaluate((k) => (location.hash = k), KEY2);
-  await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
-  expectOnlyOwnEntries(await walkHistory(page, [KEY2], browserName !== "webkit"), shh.origin, ["/", "/s"]);
+  // Page « /s » chargée (son script), puis adresse « / » une fois le lien lu (17 novembre).
+  await expect
+    .poll(() => page.evaluate(() => location.href + " " + !!document.querySelector('script[src*="/assets/s-"]')).catch(() => ""))
+    .toBe(`${shh.origin}/ true`);
+  expectOnlyOwnEntries(await walkHistory(page, [KEY2], browserName !== "webkit"), shh.origin, ["/", "/"]);
 });
 
 test.describe("navigateur intégré (Instagram)", () => {
@@ -243,14 +247,14 @@ test("fichier déposé sur /s/x : défaut empêché, l'adresse ne change pas", a
 // I1 : liens abîmés (ponctuation ajoutée par une messagerie, autre chemin, ancien format
 // /s/{id}, majuscule) : le routeur les classe en accueil ou en 404, le « # » est retiré quand même.
 // Sur « / », un lien abîmé reconnu comme lien (clé tronquée, mot de passe du QR mal formé) part
-// d'abord vers « /s » (16 novembre) : la page d'arrivée est alors « /s ».
+// d'abord vers « /s » (16 novembre), qui lit puis montre « / » (17 novembre).
 for (const [what, path, frag, at] of [
-  ["point collé", "/", `#${KEY}.`, "/s"],
+  ["point collé", "/", `#${KEY}.`, "/"],
   ["parenthèse collée", "/", `#${KEY})`, "/"],
-  ["clé tronquée", "/", `#${KEY.slice(1)}`, "/s"],
-  ["préfixe M majuscule", "/", `#M${KEY}`, "/s"],
-  ["point collé sous /s", "/s", `#${KEY}.`, "/s"],
-  ["clé tronquée sous /s", "/s", `#${KEY.slice(1)}`, "/s"],
+  ["clé tronquée", "/", `#${KEY.slice(1)}`, "/"],
+  ["préfixe M majuscule", "/", `#M${KEY}`, "/"],
+  ["point collé sous /s", "/s", `#${KEY}.`, "/"],
+  ["clé tronquée sous /s", "/s", `#${KEY.slice(1)}`, "/"],
   ["ancien format /s/{id}", "/s/AAAAAAAAAAAAAAAAAAAAAA", `#${KEY}`, "/s/AAAAAAAAAAAAAAAAAAAAAA"],
   ["/S/ majuscule", "/S/x", `#${KEY}`, "/S/x"],
   ["route inconnue", "/inconnu", `#${KEY}`, "/inconnu"],
@@ -287,14 +291,14 @@ test("/s : 200, pas de X-Robots-Tag (noindex dans la page) ; /s/<id>. (ancien li
 });
 
 // I2 : paramètre de suivi ajouté par l'application (Facebook, Messenger, Instagram).
-test("/s?fbclid=x#<clé> et ancien /?fbclid=x#<clé> : requête et # retirés, adresse = /s", async ({ page, shh }) => {
+test("/s?fbclid=x#<clé> et ancien /?fbclid=x#<clé> : requête et # retirés, adresse = /", async ({ page, shh }) => {
   const api = apiRequests(page);
   await page.goto(`${shh.origin}/s?fbclid=x#${KEY}`);
-  await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
+  await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
   await expect.poll(() => api.map((u) => new URL(u).pathname + new URL(u).search)).toEqual(["/api/shares/meta"]);
   api.length = 0;
   await page.goto(`${shh.origin}/?fbclid=x#${KEY}`);
-  await expect.poll(() => page.url()).toBe(`${shh.origin}/s`);
+  await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
   // Seule requête d'API : la lecture de l'état du partage (sans la clé ni la requête de suivi).
   await expect.poll(() => api.map((u) => new URL(u).pathname + new URL(u).search)).toEqual(["/api/shares/meta"]);
 });

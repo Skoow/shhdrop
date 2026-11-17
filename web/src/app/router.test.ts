@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { href, match, moveLegacyLink, navigate, otherEntry, router, setEntry, suite } from "./router.svelte";
+import { href, match, moveLegacyLink, navigate, otherEntry, router, setEntry, shownPath, suite } from "./router.svelte";
 
 const KEY = "A".repeat(42) + "Q"; // 43 caractères base64url (forme seulement)
 
@@ -181,6 +181,23 @@ describe("navigate", () => {
       setEntry("app");
     }
     expect(calls).toHaveLength(3);
+  });
+
+  // « /s » montré seulement quand il sert (17 novembre).
+  it("adresse montrée : /s et /s.html deviennent / ; tout le reste tel quel", () => {
+    expect(shownPath("/s")).toBe("/");
+    expect(shownPath("/s.html")).toBe("/");
+    for (const p of ["/", "/envoyer", "/s/", "/ss", "/securite"]) expect(shownPath(p), p).toBe(p);
+  });
+
+  it("entrée « / » marquée d'une ouverture déverrouillée : repart vers /s (sans fragment) ; sans marque : rien", () => {
+    const calls: string[] = [];
+    const loc = (pathname: string, hash: string) => ({ pathname, hash, replace: (u: string) => void calls.push(u) });
+    expect(moveLegacyLink(loc("/", ""), true)).toBe(true);
+    expect(moveLegacyLink(loc("/", ""), false)).toBe(false);
+    expect(moveLegacyLink(loc("/envoyer", ""), true)).toBe(false);
+    expect(moveLegacyLink(loc("/s", ""), true)).toBe(false); // déjà sur /s : jamais de boucle
+    expect(calls).toEqual(["/s"]);
   });
 
   it("refuse tout ce qui n'est pas un chemin interne", () => {

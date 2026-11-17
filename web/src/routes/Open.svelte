@@ -7,7 +7,7 @@
   import { inAppBrowser, isStandalone } from "../app/env";
   import type { ShareTake } from "../app/link";
   import { scrubAddressBar } from "../app/link";
-  import { followLink, href, markReopen } from "../app/router.svelte";
+  import { followLink, href, markReopen, shownPath } from "../app/router.svelte";
   import { createReceiver } from "../flows/receive.svelte";
   import { summarizeOpened } from "../flows/received";
   import { forgetReceived, keepReceivedDefault, loadHistory, recordReceived, shares } from "../history/live.svelte";
@@ -48,7 +48,8 @@
     inAppBrowser: () => inAppBrowser(navigator.userAgent, isStandalone(window)),
     // Chemin non nu (« //x », « \ ») : repli sur l'accueil plutôt que garder le « # ».
     scrub: () => {
-      if (!scrubAddressBar(history, location.pathname)) scrubAddressBar(history, href("/"));
+      // « /s » n'est plus montré une fois le lien lu (17 novembre) : l'adresse devient « / ».
+      if (!scrubAddressBar(history, shownPath(location.pathname))) scrubAddressBar(history, href("/"));
     },
     // Conception compte §21.7 : « Garder » (historique de l'appareil, chiffré) ; jamais le mot de passe.
     keepDefault: keepReceivedDefault,

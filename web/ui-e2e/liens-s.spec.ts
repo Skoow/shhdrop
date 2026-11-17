@@ -26,10 +26,16 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancien l
   await expect(a.page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ })).toBeVisible({ timeout: 30_000 });
   const direct = await a.page.evaluate(() => history.length);
   await unlock(a.page, sent.password);
-  expect(new URL(a.page.url()).pathname).toBe("/s");
+  // « /s » n'est plus montré une fois le lien lu (17 novembre).
+  expect(new URL(a.page.url()).pathname).toBe("/");
   expect(new URL(a.page.url()).hash).toBe("");
   expect(scripts.some((p) => /\/assets\/s-[^/]+\.js$/.test(p))).toBe(true);
   expect(scripts.filter((p) => /\/assets\/index-[^/]+\.js$/.test(p))).toEqual([]);
+  // Rechargement de l'ouverture déverrouillée : « / » repart vers « /s », l'onglet rouvre le
+  // partage (octroi de l'onglet, spec §41.4), et l'adresse redevient « / ».
+  await a.page.reload();
+  await expect(a.page.getByRole("heading", { name: "Contenu", exact: true }).or(a.page.getByRole("heading", { name: "Rouvrir ce partage" }))).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => new URL(a.page.url()).pathname).toBe("/");
   await a.ctx.close();
 
   // Ancien lien à la racine : la page part vers /s avec le même fragment, sans entrée de plus.
@@ -37,7 +43,7 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancien l
   const old = sent.link.replace("/s#", "/#");
   await b.page.goto(old);
   await expect(b.page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ })).toBeVisible({ timeout: 30_000 });
-  expect(new URL(b.page.url()).pathname).toBe("/s");
+  expect(new URL(b.page.url()).pathname).toBe("/");
   // Autant d'entrées qu'en ouvrant directement le lien /s : le remplacement n'en ajoute aucune.
   expect(await b.page.evaluate(() => history.length)).toBe(direct);
   await unlock(b.page, sent.password);
@@ -49,6 +55,6 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancien l
   await c.page.goto(sent.manage);
   await expect(c.page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => new URL(c.page.url()).hash).toBe("");
-  expect(new URL(c.page.url()).pathname).toBe("/s");
+  expect(new URL(c.page.url()).pathname).toBe("/");
   await c.ctx.close();
 });
