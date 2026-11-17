@@ -281,7 +281,7 @@ describe("audit web D4 : valeurs de meta bornées aux maxima de l'offre", () => 
   const META = { expires_in_s: 3600, salt: "s", kdf: { ops: 3, mem: 1 }, bucket: 1, segments: 1, opens_left: 2 };
   const call = (body: unknown, grant?: string) =>
     meta(ctx("http://x", { fetch: (async () => new Response(JSON.stringify(body))) as unknown as typeof fetch, retryDelayMs: 1 }), new Uint8Array(32) as KAcces, grant);
-  it("dans les bornes : accepté (24 h + 15 min d'arrondi, 10 ouvertures)", async () => {
+  it("dans les bornes : accepté (24 h + 15 min d'arrondi, 10 ouvertures : partage créé avant la limite de 5 du 17 novembre)", async () => {
     expect((await call({ ...META, expires_in_s: 24 * 3600 + 900, opens_left: 10 })).opensLeft).toBe(10);
     expect((await call({ ...META, expires_in_s: 0 })).expiresInS).toBe(0);
   });

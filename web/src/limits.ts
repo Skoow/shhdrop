@@ -15,6 +15,10 @@ export const OPENS_DEFAULT = 1;
 /** Ouvertures au choix, de 1 à MAX_OPENS (spec §4) ; 5 depuis le 17 novembre (décision du
  *  propriétaire, 10 avant). Le serveur refuse au-delà (share.MaxOpens, même valeur). */
 export const MAX_OPENS = 5;
+/** Plus grand nombre d'ouvertures qu'un partage existant peut avoir : 10, l'ancienne limite (avant
+ *  le 17 novembre). Sert seulement à vérifier les réponses du serveur, pour qu'un partage créé
+ *  avant ce changement s'ouvre encore ; jamais pour en créer un. */
+export const OPENS_SEEN_MAX = 10;
 /** Mots de passe faux avant destruction (spec §4). */
 export const PW_TRIES = 5;
 /** Images plus grosses : non lues en mémoire pour le nettoyage des métadonnées (UI §9.2.6). */
