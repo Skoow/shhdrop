@@ -239,7 +239,8 @@
             ><span class="li-t">{t(l.text)}</span>{#if i === lines.length - 1}<span class="cur"></span>{/if}</span
           >
           <span class="li-gap"></span>
-          <span class="li-s">{st}</span>
+          <!-- État : tapé de gauche à droite, à la même allure, avec son curseur (17 novembre). -->
+          <span class="li-sw"><span class="li-s">{st}</span><span class="cur2"></span></span>
         </li>
       {/each}
     </ol>
@@ -261,7 +262,7 @@
 </div>
 </div>
 
-<figcaption class="figcap" aria-hidden="true"><span class="fig-n">{t("demo.fig")}</span> {t("demo.title")}</figcaption>
+<!-- Plus de légende « Fig. 01 » (17 novembre). -->
 </figure>
 
 
@@ -650,9 +651,9 @@
     align-items: center;
     column-gap: 8px;
     animation: line-in 200ms var(--ease-out) both;
-    /* Même allure partout (17 novembre) : 22 ms par lettre, texte puis état. */
-    --type: calc(var(--n, 20) * 22ms);
-    --type-s: calc(var(--m, 10) * 22ms);
+    /* Même allure partout, un peu plus lente (17 novembre) : 40 ms par lettre, texte puis état. */
+    --type: calc(var(--n, 20) * 40ms);
+    --type-s: calc(var(--m, 10) * 40ms);
   }
   /* Les anciennes lignes pâlissent : l'œil va à la dernière. */
   .ln:not(.last) {
@@ -713,6 +714,15 @@
   .li-gap {
     min-width: 0;
   }
+  /* Case de l'état, de largeur fixe : le texte y grandit de gauche à droite (sa colonne ne
+     bouge pas pendant la frappe). */
+  .li-sw {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: calc(var(--m) * 1ch + 10px);
+    min-width: 0;
+  }
   .li-s {
     min-width: 0;
     max-width: calc(var(--m) * 1ch);
@@ -725,9 +735,37 @@
   .ln.late .li-s {
     animation-delay: calc(900ms + var(--type));
   }
-  /* Dernière ligne : place pour le curseur qui clignote au bout de l'état. */
-  .ln.last .li-s {
-    max-width: calc(var(--m) * 1ch + 14px);
+  /* Curseur de l'état : paraît quand la frappe de l'état commence, la suit, puis s'éteint ; sur
+     la dernière ligne, il reste et clignote. */
+  .cur2 {
+    flex: none;
+    width: 7px;
+    height: 13px;
+    margin-inline-start: 1px;
+    background: #9ff5d3;
+    box-shadow: 0 0 8px rgb(95 227 181 / 0.7);
+    animation:
+      cur-on 1ms linear var(--type) both,
+      cur-off 1ms linear calc(var(--type) + var(--type-s)) forwards;
+  }
+  .ln.late .cur2 {
+    animation-delay: calc(900ms + var(--type)), calc(900ms + var(--type) + var(--type-s));
+  }
+  .ln.last .cur2 {
+    animation:
+      cur-on 1ms linear var(--type) both,
+      blink 1s steps(1) calc(var(--type) + var(--type-s)) infinite;
+  }
+  .ln.last.late .cur2 {
+    animation-delay: calc(900ms + var(--type)), calc(900ms + var(--type) + var(--type-s));
+  }
+  @keyframes cur-on {
+    from {
+      visibility: hidden;
+    }
+    to {
+      visibility: visible;
+    }
   }
   .ln.atk .li-ic,
   .ln.atk .li-t,
@@ -737,18 +775,6 @@
   }
   .ln.end .li-s {
     color: var(--text);
-  }
-  /* Curseur plein qui clignote au bout de la dernière ligne. */
-  .ln.last .li-s::after {
-    content: "";
-    display: inline-block;
-    width: 7px;
-    height: 13px;
-    margin-inline-start: 6px;
-    vertical-align: -2px;
-    background: #9ff5d3;
-    box-shadow: 0 0 8px rgb(95 227 181 / 0.7);
-    animation: blink 1s steps(1) infinite;
   }
   @keyframes blink {
     50% {
@@ -809,19 +835,10 @@
       linear-gradient(var(--k), var(--k)) 100% 100% / 14px 1.5px no-repeat,
       linear-gradient(var(--k), var(--k)) 100% 100% / 1.5px 14px no-repeat;
   }
-  .figcap {
-    margin-top: 12px;
-    color: var(--text-2);
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    letter-spacing: 0.04em;
-  }
-  .fig-n {
-    color: var(--mint);
-    font-weight: 600;
-  }
+  
+  
   /* Pause : la seule boucle (le curseur) s'arrête ; les animations finies vont à leur terme. */
-  .paused .ln.last .li-s::after {
+  .paused .ln.last .cur2 {
     animation-play-state: paused;
   }
 

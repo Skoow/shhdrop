@@ -10,7 +10,7 @@ import type { Page } from "@playwright/test";
 import { openShare } from "../src/index";
 import { captureOf, expect, test } from "./fixtures";
 import { file, freshPage, unlock } from "./open-helpers";
-import { addText, noViewTransition, openFilePicker, readyHeading, sendButton } from "./send-helpers";
+import { addText, closeAddSheet, noViewTransition, openFilePicker, readyHeading, sendButton } from "./send-helpers";
 
 const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-DROP/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
@@ -113,9 +113,10 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
 test("page d'envoi vide « /envoyer » : atteinte par « Commencer » ou directement ; cadre compact en tête de liste (ordinateur, retours du 12 novembre), « Ajouter » (téléphone) ; captures", async ({ page, shh, isMobile }) => {
   await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto(shh.origin + "/");
-  await page.getByRole("button", { name: /^(Commencer|Ou créez sur place)/ }).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: /^(Commencer|Créer sur place)/ }).filter({ visible: true }).first().click();
   await expect(page).toHaveURL(shh.origin + "/envoyer");
   await noViewTransition(page);
+  await closeAddSheet(page);
   await expect(page.getByRole("heading", { name: "Votre envoi" })).toBeVisible();
   await expect(page.locator("[data-row]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Tout supprimer" })).toHaveCount(0);

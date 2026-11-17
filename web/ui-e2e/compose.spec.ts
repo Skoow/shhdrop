@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
 import { axe, capture, expect, test } from "./fixtures";
-import { clearAll, composerFits, openFilePicker, pickInAddSheet, enterComposer } from "./send-helpers";
+import { clearAll, closeAddSheet, composerFits, openFilePicker, pickInAddSheet, enterComposer } from "./send-helpers";
 import { MIMES } from "../src/media/capture";
 
 /** Le navigateur testé sait-il enregistrer un vocal ? Sinon le site masque « Vocal » (media/capture.ts, captureSupport). */
@@ -30,7 +30,7 @@ const MIXED = [...PHOTOS, f("anniversaire-lou.webm"), f("contrat.pdf"), f("archi
 async function open(page: Page, origin: string) {
   await page.goto(origin + "/");
   // Accueil : « Commencer » (mène à la page d'envoi, D41-37).
-  await expect(page.getByRole("button", { name: /^(Commencer|Ou créez sur place)/ }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Commencer|Créer sur place)/ }).filter({ visible: true }).first()).toBeVisible();
 }
 /** Choisit des fichiers par la feuille d'ajout (« Commencer » ou « Ajouter ») ou la zone de dépôt (composeur). */
 async function browse(page: Page, files: string[] | { name: string; mimeType: string; buffer: Buffer }[], wait = true) {
@@ -43,7 +43,7 @@ async function addNote(page: Page, body: string, title = "") {
   if (!(await pickInAddSheet(page, "Note"))) {
     const inComposer = page.getByRole("group", { name: "Créer sur place" });
     if (await inComposer.isVisible()) await inComposer.getByRole("button", { name: "Note", exact: true }).click();
-    else await page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button", { name: "Note", exact: true }).click();
+    else await page.getByRole("group", { name: "Créer sur place" }).getByRole("button", { name: "Note", exact: true }).click();
   }
   const dlg = page.getByRole("dialog", { name: "Nouveau texte" });
   if (title) await dlg.getByLabel("Titre").fill(title);
@@ -667,8 +667,9 @@ test.describe("en-US", () => {
     if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(shh.origin + "/");
     // « Get started » mène à la page d'envoi (D41-37) ; puis « Add » (téléphone) ou la zone de dépôt.
-    await page.getByRole("button", { name: /^(Get started|Or create one here)/ }).filter({ visible: true }).first().click();
+    await page.getByRole("button", { name: /^(Get started|Create here)/ }).filter({ visible: true }).first().click();
     await expect(page).toHaveURL(/\/envoyer$/);
+    await closeAddSheet(page);
     const chooser = page.waitForEvent("filechooser");
     if (isMobile) {
       await page.getByRole("button", { name: "Add", exact: true }).click();

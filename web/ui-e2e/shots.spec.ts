@@ -64,7 +64,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
     await page.getByRole("button", { name: "Ajouter", exact: true }).click();
     await shot(page, "03b-feuille-ajouter");
     await page.getByRole("dialog", { name: "Ajouter" }).getByRole("button", { name: /^Photo ou vidéo/ }).click();
-  } else await page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button", { name: "Photo ou vidéo", exact: true }).click();
+  } else await page.getByRole("group", { name: "Créer sur place" }).getByRole("button", { name: "Photo ou vidéo", exact: true }).click();
   const cam = page.getByRole("dialog", { name: "Prendre une photo" });
   await expect(cam.getByRole("button", { name: "Prendre la photo" })).toBeEnabled({ timeout: 15_000 });
   await page.waitForTimeout(800);

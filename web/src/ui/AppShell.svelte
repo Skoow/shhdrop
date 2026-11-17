@@ -384,7 +384,7 @@
     z-index: 1;
     isolation: isolate;
     margin-block-start: var(--sp-8);
-    padding-block: var(--sp-7) calc(var(--sp-6) + env(safe-area-inset-bottom));
+    padding-block: var(--sp-7) calc(var(--sp-4) + env(safe-area-inset-bottom));
     background:
       radial-gradient(60% 120% at 12% 0%, rgb(95 227 181 / 0.07), transparent 70%),
       radial-gradient(50% 90% at 88% 100%, rgb(85 150 248 / 0.05), transparent 70%),
@@ -585,16 +585,18 @@
     line-height: var(--lh-small);
     text-wrap: pretty;
   }
+  /* Bas du pied (17 novembre) : plus bas, le nom à gauche plus gros que la version, à droite. */
   .base {
     grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2) var(--sp-5);
-    padding-block-start: var(--sp-5);
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-1) var(--sp-4);
+    padding-block-start: var(--sp-3);
     border-block-start: 1px solid var(--hair);
     color: var(--text-3);
-    font-size: var(--fs-small);
+    font-size: var(--fs-micro);
   }
   .base p {
     margin: 0;
@@ -606,10 +608,8 @@
   }
   .wm {
     color: var(--text-2);
-    font-weight: 600;
-  }
-  .base .num {
-    margin-inline-start: auto;
+    font-size: var(--fs-body);
+    font-weight: 650;
   }
   /* Téléphone et tablette (retours du propriétaire du 15 novembre) : un seul bloc centré, plus
      de colonnes. Marque et phrase, puis tous les liens à la suite ; les intitulés de colonne
@@ -631,15 +631,19 @@
     .tag {
       max-width: 34ch;
     }
-    /* Une seule grille de deux colonnes alignées à gauche (retours du 16 novembre : la suite de
-       liens centrés se mélangeait) ; les trois listes partagent les mêmes colonnes. */
+    /* Une seule grille de deux colonnes, chaque lien centré dans la sienne, comme la marque et la
+       phrase au-dessus (17 novembre) ; les listes partagent les mêmes colonnes. */
     .cols,
     .cols.two {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 0;
       width: min(100%, 22rem);
-      text-align: start;
+      text-align: center;
+    }
+    .col li {
+      display: flex;
+      justify-content: center;
     }
     .ch {
       position: absolute;
@@ -663,12 +667,6 @@
     }
     .base {
       justify-self: stretch;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--sp-1);
-    }
-    .base .num {
-      margin-inline-start: 0;
     }
   }
   @media (prefers-reduced-motion: reduce) {

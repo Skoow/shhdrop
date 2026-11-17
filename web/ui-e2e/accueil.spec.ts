@@ -1,6 +1,6 @@
 // Refonte de l'accueil (UI §25, 12 novembre) : barre du haut et ses menus au clavier, bouton
 // « Choisir des fichiers » qui ouvre le sélecteur du composeur, premier écran, infographie
-// (pause, survol, hors écran, mouvement réduit), bande des engagements, accessibilité.
+// (pause, survol, hors écran, mouvement réduit), accessibilité.
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { axe, expect, test } from "./fixtures";
@@ -26,7 +26,7 @@ test("premier écran : « Choisir des fichiers » visible ; ordinateur : le haut
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("« Choisir des fichiers » ouvre directement le sélecteur ; les fichiers vont au composeur", async ({ page, shh }) => {
+test("« Choisir des fichiers » ouvre directement le sélecteur et mène à la page d'envoi (zone de dépôt en avant) ; les fichiers vont au composeur", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Choisir des fichiers" }).click();
@@ -34,7 +34,7 @@ test("« Choisir des fichiers » ouvre directement le sélecteur ; les fichiers 
   expect(fc.isMultiple()).toBe(true);
   await fc.setFiles({ name: "foret-brume.jpg", mimeType: "image/jpeg", buffer: readFileSync(file("foret-brume.jpg")) });
   await expect(page.locator("[data-row]").filter({ hasText: "foret-brume" }).first()).toBeVisible();
-  await expect(page).toHaveURL(shh.origin + "/");
+  await expect(page).toHaveURL(shh.origin + "/envoyer");
 });
 
 test.describe("barre du haut (ordinateur)", () => {
@@ -122,34 +122,19 @@ test("infographie : la boucle démarre seule, le bouton pause l'arrête, le surv
   expect(await demo.evaluate((e) => e.classList.contains("paused"))).toBe(true);
 });
 
-test("mouvement réduit : storyboard statique, bande immobile, aucune animation dans l'infographie ni la bande", async ({ page, shh }) => {
+test("mouvement réduit : storyboard statique, aucune animation dans l'infographie", async ({ page, shh }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(shh.origin + "/");
   const demo = page.locator("[data-demo]");
   await expect(demo).toHaveClass(/board/);
   await expect(page.locator("[data-demo-steps] li")).toHaveCount(7);
   await expect(page.locator("[data-demo-steps] li").first()).toBeVisible();
-  await expect(page.locator("[data-band]")).toHaveClass(/still/);
   await page.waitForTimeout(2200);
   const running = await page.evaluate(
-    () => document.getAnimations().filter((a) => a.playState === "running" && ((a.effect as KeyframeEffect).target as Element | null)?.closest("[data-demo], [data-band]")).length,
+    () => document.getAnimations().filter((a) => a.playState === "running" && ((a.effect as KeyframeEffect).target as Element | null)?.closest("[data-demo]")).length,
   );
   expect(running).toBe(0);
   expect(await axe(page)).toEqual([]);
-});
-
-test("bande des engagements : promesses vraies, défile seule, bouton d'arrêt", async ({ page, shh }) => {
-  await page.goto(shh.origin + "/");
-  const band = page.locator("[data-band]");
-  await expect(band.getByRole("listitem")).toHaveCount(6);
-  await band.scrollIntoViewIfNeeded();
-  await page.mouse.move(1, 1);
-  expect(await band.locator(".track").evaluate((e) => e.getAnimations().map((a) => a.playState))).toEqual(["running"]);
-  await band.getByRole("button", { name: "Arrêter le défilement" }).click();
-  await expect(band).toHaveClass(/stopped/);
-  await page.mouse.move(1, 1);
-  const t = await band.locator(".track").evaluate((e) => e.getAnimations().map((a) => a.playState));
-  expect(t).toEqual(["paused"]);
 });
 
 test("rien n'a l'air d'une commande sans en être une : tout ce qui montre une main est un lien, un bouton ou une question", async ({ page, shh }) => {

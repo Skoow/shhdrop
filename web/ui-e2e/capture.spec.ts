@@ -38,12 +38,12 @@ const opened = (page: Page) => page.evaluate(() => (window as unknown as { __str
 
 /** Téléphone : « Commencer » (page d'envoi, D41-37) puis feuille « Ajouter » ; ordinateur : tuile de l'accueil. */
 async function pick(page: Page, name: "Photo ou vidéo" | "Vocal") {
-  if (!(await page.getByRole("group", { name: "Ou créez sur place" }).isVisible().catch(() => false))) await enterComposer(page);
+  if (!(await page.getByRole("group", { name: "Créer sur place" }).isVisible().catch(() => false))) await enterComposer(page);
   const add = page.getByRole("button", { name: /^Ajouter/ }).filter({ visible: true }).first();
   if (await add.isVisible().catch(() => false)) {
     await add.click();
     await page.getByRole("dialog", { name: "Ajouter" }).getByRole("button", { name: new RegExp(`^${name}`) }).click();
-  } else await page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button", { name, exact: true }).click();
+  } else await page.getByRole("group", { name: "Créer sur place" }).getByRole("button", { name, exact: true }).click();
 }
 const camera = (page: Page) => page.locator("dialog[data-capture]");
 

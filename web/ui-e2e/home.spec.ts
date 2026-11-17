@@ -31,16 +31,16 @@ test.describe("fr-FR", () => {
     await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1280, height: 900 });
     await page.goto(shh.origin + "/");
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
-    await expect(page.getByText(/^Fichiers, photos, vidéos, vocaux et notes, chiffrés sur votre appareil/)).toBeVisible();
+    await expect(page.locator("[data-lede]")).toHaveText(/^Vos fichiers, mais aussi des messages vocaux, des notes et bientôt un salon de discussion/);
     const certs = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
     await expect(certs).toHaveCount(3);
-    // Ordinateur : « Commencer » dans la carte de dépôt ; téléphone (retours du 15 novembre) : la
-    // carte n'est plus sur l'accueil, « Ou créez sur place » mène à la page d'envoi. Plus de « Parcourir ».
-    await expect(page.getByRole("button", { name: isMobile ? /^Ou créez sur place/ : /^Commencer/ }).filter({ visible: true }).first()).toBeVisible();
+    // Deux boutons (17 novembre) : « Choisir des fichiers » et « Créer sur place ». Plus de « Parcourir ».
+    await expect(page.getByRole("button", { name: /^Choisir des fichiers/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Créer sur place/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
     // Limites gratuites (spec §41.2), lues des constantes.
     if (!isMobile) await expect(page.locator("p.proof")).toHaveText("Jusqu'à 2\u202fGo au total");
-    for (const h of ["Ce qui se passe quand vous partagez", "Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
+    for (const h of ["Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     // Infographie : sept étapes lisibles en liste, le dessin caché.
     await expect(page.locator("[data-demo-steps] li")).toHaveCount(7);
@@ -59,7 +59,7 @@ test.describe("fr-FR", () => {
     await expect(page).toHaveURL(shh.origin + "/securite");
   });
 
-  test("téléphone 390 × 844 : « Choisir des fichiers » et le salon dans le cadre, au premier écran ; infographie dessous ; plus de carte de dépôt (retours du 15 novembre)", async ({ page, shh, isMobile }) => {
+  test("téléphone 390 × 844 : « Choisir des fichiers » et « Créer sur place » dans le cadre, au premier écran ; infographie dessous ; plus de carte de dépôt (retours du 15 novembre)", async ({ page, shh, isMobile }) => {
     test.skip(!isMobile, "projets téléphone seulement");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(shh.origin + "/");
@@ -68,19 +68,20 @@ test.describe("fr-FR", () => {
     await expect(page.locator('[data-slot="compose"]')).toBeHidden();
     const frame = (await page.locator("[data-ctas]").boundingBox())!;
     const pick = (await page.locator("[data-pick]").boundingBox())!;
-    const room = (await page.locator("[data-ctas] [data-room]").boundingBox())!;
-    const more = (await page.locator("[data-more]").boundingBox())!;
+    const make = (await page.locator("[data-create]").boundingBox())!;
     expect(pick.height).toBeGreaterThanOrEqual(48);
-    // Les boutons occupent la largeur du cadre ; ordre : fichiers, salon, « Ou créez sur place ».
+    expect(make.height).toBeGreaterThanOrEqual(48);
+    // Les boutons occupent la largeur du cadre ; ordre : fichiers, puis « Créer sur place ».
     expect(pick.width).toBeGreaterThan(frame.width - 40);
-    expect(room.y).toBeGreaterThan(pick.y);
-    expect(more.y).toBeGreaterThan(room.y);
-    expect(more.y + more.height).toBeLessThanOrEqual(844);
+    expect(make.y).toBeGreaterThan(pick.y);
+    expect(make.y + make.height).toBeLessThanOrEqual(844);
     expect(await page.evaluate(() => scrollY)).toBe(0);
     const demo = (await page.locator("[data-demo]").boundingBox())!;
     expect(demo.y).toBeGreaterThan(frame.y + frame.height);
-    await page.locator("[data-more]").click();
+    // « Créer sur place » : page d'envoi, feuille « Ajouter » ouverte.
+    await page.locator("[data-create]").click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
+    await expect(page.getByRole("dialog", { name: "Ajouter" })).toBeVisible();
   });
 
   test("320 px : rien ne déborde ; capture", async ({ page, shh }) => {
@@ -103,11 +104,10 @@ test.describe("fr-FR", () => {
     // Plus strict que la page : aucune section ne déborde de sa colonne. Dans Chromium, un mot trop
     // long (« s'autodétruit », question de la FAQ) débordait de 14 px dans la marge sans créer de
     // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un (CI b155911).
-    // La bande des engagements défile exprès (sa piste est plus large que sa fenêtre) : écartée ;
-    // le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi.
+    // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".band, .tile, .sr-only"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );
@@ -205,7 +205,7 @@ test.describe("fr-FR", () => {
       if (typeof MediaDevices !== "undefined")
         Object.defineProperty(MediaDevices.prototype, "getUserMedia", { configurable: true, value: () => Promise.reject(new DOMException("aucune", "NotFoundError")) });
     });
-    await page.goto(shh.origin + "/");
+    await page.goto(shh.origin + "/envoyer"); // « Créer sur place » : sur la page d'envoi (17 novembre)
     await page.waitForTimeout(900);
     // Compte les événements « close » des boîtes de dialogue (écouteur en phase de capture : il passe avant le
     // site) : on attend l'événement lui-même, qui remet `open` à faux, au lieu d'un délai fixe.
@@ -225,7 +225,7 @@ test.describe("fr-FR", () => {
     );
     if (browserName === "chromium") expect(canVideo, "Chromium enregistre la vidéo : le tour Vidéo y reste vérifié").toBe(true);
     for (const [mode, accept, fallback] of [["Photo", "image/*", "Choisir une photo"], ["Vidéo", "video/*", "Choisir une vidéo"]] as const) {
-      await page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button", { name: "Photo ou vidéo", exact: true }).click();
+      await page.getByRole("group", { name: "Créer sur place" }).getByRole("button", { name: "Photo ou vidéo", exact: true }).click();
       const cam = page.locator("dialog[data-capture]");
       if (mode === "Vidéo" && !canVideo) {
         await expect(cam.getByRole("alert")).toContainText("Aucune caméra ni aucun micro utilisable");
@@ -258,8 +258,7 @@ test.describe("fr-FR", () => {
       await expect(cam).toBeHidden();
       await page.waitForTimeout(100);
     }
-    await page.getByRole("button", { name: "Commencer" }).first().click();
-    const chooser = page.waitForEvent("filechooser");
+    const chooser = page.waitForEvent("filechooser"); // déjà sur la page d'envoi
     await page.locator(".dropzone.empty").click();
     await (await chooser).setFiles([
       { name: "a.txt", mimeType: "text/plain", buffer: Buffer.from("a") },
@@ -291,13 +290,18 @@ test.describe("fr-FR", () => {
     expect(page.url()).toBe(shh.origin + "/");
   });
 
-  test("« Commencer » (carte de dépôt) ou « Ou créez sur place » (téléphone) mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
+  test("« Commencer » (carte de dépôt) ou « Créer sur place » (téléphone) mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
-    const cta = isMobile ? page.locator("[data-more]") : page.locator('[data-slot="compose"]').getByRole("button", { name: "Commencer" });
+    const cta = isMobile ? page.locator("[data-create]") : page.locator('[data-slot="compose"]').getByRole("button", { name: "Commencer" });
     await cta.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await cta.click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
     await expect(page.getByRole("heading", { name: "Votre envoi" })).toBeVisible();
+    // Téléphone : « Créer sur place » a ouvert la feuille « Ajouter » ; la refermer d'abord.
+    if (isMobile) {
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog", { name: "Ajouter" })).toBeHidden();
+    }
     await page.goBack();
     await expect(page).toHaveURL(shh.origin + "/");
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
@@ -377,17 +381,15 @@ test.describe("fr-FR", () => {
           const el = (a.effect as KeyframeEffect).target as Element;
           const root = el.closest("[data-ambient]");
           if (!root || a.effect?.getComputedTiming().iterations !== Infinity) continue;
-          const k = el.closest(".aurora") ? "aurora" : el.closest("[data-demo]") ? "demo" : el.closest("[data-band]") ? "band" : "other";
+          const k = el.closest(".aurora") ? "aurora" : el.closest("[data-demo]") ? "demo" : "other";
           (out[k] ??= []).push(a.playState);
         }
         return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...new Set(v)].sort().join(",")]));
       });
-    // Haut de page : l'infographie (curseur du journal) et la bande tournent.
+    // Haut de page : l'infographie (curseur du journal) tourne ; hors écran, elle s'arrête.
     await expect.poll(async () => (await state()).demo).toBe("running");
-    await expect.poll(async () => (await state()).band).toBe("running");
     await page.locator("footer[data-foot]").evaluate((e) => e.scrollIntoView({ block: "end" }));
     await expect.poll(async () => (await state()).demo).toBe("paused");
-    await expect.poll(async () => (await state()).band).toBe("paused");
     await page.evaluate(() => scrollTo(0, 0));
     await expect.poll(async () => (await state()).demo).toBe("running");
     const setHidden = (v: boolean) =>
@@ -461,8 +463,8 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
     for (const sel of [".aurora", ".grain", ".trame"])
       expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).display), sel).toBe("none");
-    for (const name of isMobile ? ["Choisir des fichiers"] : ["Commencer", "Photo ou vidéo"]) {
-      const b = page.getByRole("button", { name, exact: true }).first();
+    for (const name of isMobile ? ["Choisir des fichiers", "Créer sur place"] : ["Choisir des fichiers", "Créer sur place", "Commencer"]) {
+      const b = page.getByRole("button", { name: new RegExp(`^${name}`) }).filter({ visible: true }).first();
       // La tuile « Choisir des fichiers » est une zone de dépôt : pointillé (16 novembre).
       expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe(name === "Choisir des fichiers" ? "dashed" : "solid");
     }
@@ -498,8 +500,8 @@ test.describe("en-US", () => {
     await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then nothing." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^(Get started|Or create one here)/ }).filter({ visible: true }).first()).toBeVisible();
-    for (const h of ["What happens when you share", "How it works", "Built for privacy", "Plans", "Your questions"])
+    await expect(page.getByRole("button", { name: /^(Get started|Create here)/ }).filter({ visible: true }).first()).toBeVisible();
+    for (const h of ["How it works", "Built for privacy", "Plans", "Your questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     expect(await noHScroll(page)).toBe(true);
     expect(await axe(page)).toEqual([]);

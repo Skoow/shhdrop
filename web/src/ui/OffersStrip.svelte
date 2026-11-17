@@ -61,7 +61,8 @@
           </span>
           <!-- Plus de flèche ronde (retours du propriétaire du 17 novembre) : un bouton texte en bas
                de la carte ; toute la carte reste le lien. -->
-          <span class="go">{t("offers.card.cta")}<ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" /></span>
+          <!-- Gratuit : pas de « Voir l'offre » (17 novembre), c'est l'offre en cours. -->
+          {#if x !== "free"}<span class="go">{t("offers.card.cta")}<ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" /></span>{/if}
         </a>
       </li>
     {/each}

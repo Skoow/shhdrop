@@ -6,8 +6,11 @@ import { href, navigate, otherEntry } from "./router.svelte";
 // novembre) ; null hors de l'accueil et de la page d'envoi. `pending` : geste choisi ailleurs,
 // joué par le composeur à son montage sur la page d'envoi.
 export type AddGesture = "fichiers" | "texte" | "vocal" | "media";
-export const chrome = $state<{ composing: boolean; report: (() => void) | null; add: ((g: AddGesture) => void) | null; pending: AddGesture | null }>({
+// `spot` (17 novembre) : depuis l'accueil, « Choisir des fichiers » (drop) ou « Créer sur place »
+// (make) : la page d'envoi fait ressortir un instant la zone de dépôt ou les actions.
+export const chrome = $state<{ composing: boolean; report: (() => void) | null; add: ((g: AddGesture) => void) | null; pending: AddGesture | null; spot: "drop" | "make" | null }>({
   composing: false,
+  spot: null,
   report: null,
   add: null,
   pending: null,

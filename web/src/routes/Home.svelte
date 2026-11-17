@@ -24,15 +24,11 @@
   import { t, getLang } from "../i18n/i18n.svelte";
   import { limitParams } from "../i18n/limit-params";
   import { CONTENT_MAX } from "../limits";
-  import { magnet } from "../ui/attach";
   import DropOverlay from "../ui/DropOverlay.svelte";
-  import { ArrowRight, Camera, Check, ChevronRight, Lock, Mic, Type, Upload } from "../ui/Icon";
+  import { ArrowRight, Check, ChevronRight, Plus, Upload } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
-  import PromiseBand from "../ui/PromiseBand.svelte";
   import SecureDemo from "../ui/SecureDemo.svelte";
-  import TabIcon from "../ui/TabIcon.svelte";
-  import { announce } from "../ui/announce";
   import Faq from "./home/Faq.svelte";
   import Sections from "./home/Sections.svelte";
 
@@ -43,16 +39,16 @@
     children?: Snippet;
     /** Fichiers choisis ou déposés (composer.add) ; `folders` : dossiers déposés, refusés. */
     onfiles?: (files: File[], source: Source, folders: string[]) => void;
-    /** Vocal, Texte : ouvrent leur interface dans la page (le collage passe par Ctrl/Cmd + V). */
-    onaction?: (action: Action) => void;
     /** Faux pendant un envoi : le glisser-déposer n'ouvre pas le voile et n'ajoute rien (S9). */
     active?: boolean;
     /** « Commencer » (carte de dépôt, téléphone) : mène à la page d'envoi « /envoyer » (Compose, retours DROP). */
     onadd?: () => void;
     /** « Choisir des fichiers » (héros) : ouvre directement le sélecteur de fichiers du composeur. */
     onpick?: () => void;
+    /** « Créer sur place » (héros, 17 novembre) : page d'envoi, actions mises en avant. */
+    oncreate?: () => void;
   };
-  let { compact = false, children, onfiles, onaction, active = true, onadd, onpick }: Props = $props();
+  let { compact = false, children, onfiles, active = true, onadd, onpick, oncreate }: Props = $props();
 
   // Décidé au montage seulement : un repli ultérieur ne rejoue pas l'entrée.
   let reveal = $state(!revealed && !untrack(() => compact));
@@ -97,17 +93,19 @@
     }));
   });
 
+  // Accroche coupée autour des mots mis en avant (sans HTML dans les textes).
+  const lede = $derived.by(() => {
+    const marks: Record<string, string> = { "\u0000": t("hero.lede.voice"), "\u0001": t("hero.lede.notes"), "\u0002": t("hero.lede.room") };
+    return t("hero.lede2", { voice: "\u0000", notes: "\u0001", room: "\u0002" })
+      .split(/(\u0000|\u0001|\u0002)/)
+      .map((p) => (p in marks ? { b: marks[p]! } : { s: p }));
+  });
+
   // Ligne de méta : la limite gratuite vient de limits.ts (jamais écrite dans les textes).
   const meta = $derived([t("hero.meta.free", { size: formatBytes(CONTENT_MAX, getLang()) }), t("home.fact.account"), t("hero.meta.erase")]);
 
-  // UI §9.2.1 : Vocal masqué sans MediaRecorder. Pas de bouton Coller (décision du propriétaire) : Ctrl/Cmd + V suffit.
-  const canVoice = typeof MediaRecorder !== "undefined";
-
   function give(list: File[], source: Source, folders: string[] = []) {
     if (list.length > 0 || folders.length > 0) onfiles?.(list, source, folders);
-  }
-  function act(a: Action) {
-    onaction?.(a);
   }
 
   // UI §9.2.2 : glisser de fichiers sur toute la page ; compteur contre le clignotement ;
@@ -149,17 +147,6 @@
   onkeydown={(e) => e.key === "Escape" && over && close()}
 />
 
-{#snippet tile(label: string, Icon: typeof Lock, onclick: () => void, extra: "flash" | "rec" | "bars" | "caret" | "")}
-  <button type="button" class="tile" {onclick} {@attach magnet}>
-    <span class="ic">
-      <Icon size={24} strokeWidth={1.75} aria-hidden="true" />
-      {#if extra === "bars"}<span class="bars" aria-hidden="true"><b></b><b></b><b></b></span>
-      {:else if extra}<span class={extra} aria-hidden="true"></span>{/if}
-    </span>
-    <span class="lb">{label}</span>
-  </button>
-{/snippet}
-
 <div class={["home", { compact, reveal }]}>
   <section class="hero" aria-labelledby="hero-title">
     <div class="pitch">
@@ -183,7 +170,11 @@
       {/if}
 
       {#if !compact}
-        <p class="lede">{t("hero.lede")}</p>
+        <!-- Accroche (17 novembre) : « fichiers » en général, et ce qu'on ne devine pas sans bouton
+             exprès mis en avant : vocaux, notes, salon de discussion. -->
+        <p class="lede" data-lede>
+          {#each lede as p, i (i)}{#if "b" in p}<b class="hl">{p.b}</b>{:else}{p.s}{/if}{/each}
+        </p>
         <!-- Cadre des deux actions (retours du 15 novembre) : les deux boutons ressortent. -->
         <div class="ctas" data-ctas>
           <!-- Tuile (décisions du propriétaire du 16 novembre) : aussi une zone de dépôt, ce que disent
@@ -194,18 +185,13 @@
             <span class="pk-tx"><span class="pk-t">{t("hero.pick")}</span><span class="pk-s" aria-hidden="true">{t("hero.pick.sub")}</span></span>
             <ChevronRight size={20} strokeWidth={2} aria-hidden="true" />
           </button>
-          <!-- Salon (spec §39 : « le bouton du salon est à part, pour qu'on le voie ») : pas encore
-               construit (désactivé, « bientôt ») ; même icône que l'onglet du téléphone. -->
-          <div class="room" data-room>
-            <button type="button" class="room-b hero-room" aria-disabled="true" aria-describedby="room-soon" onclick={() => announce(t("tabs.soon.chat"))}>
-              <TabIcon id="chat" size={20} /><span>{t("hero.room")}</span><span class="room-soon">{t("foot.soon")}</span>
-            </button>
-            <p id="room-soon" class="sr-only">{t("tabs.soon.chat")}</p>
-          </div>
-          <!-- Téléphone : le bloc « Que voulez-vous envoyer ? » est retiré de l'accueil (doublon de
-               « Choisir des fichiers ») ; la création sur place reste à un geste, par la page d'envoi. -->
-          <button type="button" class="more" data-more onclick={() => onadd?.()}>
-            <span>{t("hero.more")}</span><ArrowRight size={18} strokeWidth={2} aria-hidden="true" />
+          <!-- Second bouton (17 novembre) : tout ce qui se crée dans Shhgone, au même endroit (note,
+               vocal, photo ou vidéo, salon bientôt) ; mène à la page d'envoi, où ces actions
+               s'allument un instant (téléphone : la feuille « Ajouter » s'ouvre). -->
+          <button type="button" class="pick create" data-create onclick={() => oncreate?.()}>
+            <span class="pk-ic" aria-hidden="true"><Plus size={20} strokeWidth={2.2} /></span>
+            <span class="pk-tx"><span class="pk-t">{t("hero.create")}</span><span class="pk-s">{t("hero.create.sub")}</span></span>
+            <ChevronRight size={20} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
         <ul class="meta" aria-label={t("home.facts.label")} data-meta>
@@ -221,7 +207,8 @@
     {#if !compact}<div class="demo-slot"><SecureDemo /></div>{/if}
   </section>
 
-  {#if !compact}<div class="band-slot"><PromiseBand /></div>{/if}
+  <!-- Plus de bande d'engagements (17 novembre) : la sécurité et la confidentialité sont dites
+       dans leurs pages. -->
 
   <!-- « Vos partages actifs » (spec §33.1, UI §9.6.1) : lecture locale seulement, rien sans partage actif. -->
   {#if !compact}<div class="shares"><ActiveSharesStrip /></div>{/if}
@@ -242,14 +229,7 @@
             <span>{t("home.end.cta")}</span>
             <ArrowRight size={20} strokeWidth={1.9} aria-hidden="true" />
           </button>
-          <div class="make" role="group" aria-labelledby="make-title">
-            <p class="make-t" id="make-title">{t("compose.add.make")}</p>
-            <div class="tiles">
-              {@render tile(t("compose.add.media"), Camera, () => act("media"), "flash")}
-              {#if canVoice}{@render tile(t("compose.add.voice"), Mic, () => act("vocal"), "bars")}{/if}
-              {@render tile(t("compose.add.text"), Type, () => act("texte"), "caret")}
-            </div>
-          </div>
+          <!-- Plus de tuiles Photo, Vocal, Note ici (17 novembre) : « Créer sur place », en haut. -->
           <p class="proof num">{t("home.proof", limitParams(getLang()))}</p>
           <!-- Téléphone : une seule action, « Commencer », vers la page d'envoi (retours DROP). -->
           <button type="button" class="add-big" onclick={() => onadd?.()}>
@@ -342,38 +322,10 @@
     gap: var(--sp-3);
     margin-top: var(--sp-2);
   }
-  /* « Ou créez sur place » : téléphone seulement (sur ordinateur, la zone de dépôt de l'accueil
-     propose déjà Photo, Vocal et Texte). */
-  .more {
-    display: none;
-  }
   @media (max-width: 767px) {
-    .more {
-      /* Après « Ouvrir un salon » (.room : order 4). */
-      order: 5;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      min-height: 44px;
-      width: 100%;
-      border: 0;
-      border-radius: 12px;
-      background: transparent;
-      color: var(--text-2);
-      font: inherit;
-      font-size: var(--fs-small);
-      font-weight: 560;
-      cursor: pointer;
-    }
-    .more:hover,
-    .more:focus-visible {
-      color: var(--text);
-    }
-    .more:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
+    
+    
+    
     /* Le bloc « Que voulez-vous envoyer ? » ne reste que sur la page d'envoi. */
     .home:not(.compact) .compose {
       display: none;
@@ -406,7 +358,11 @@
       transform 360ms var(--ease-settle),
       border-color var(--dur-base) var(--ease-out),
       box-shadow var(--dur-base) var(--ease-out);
+  }  /* « Créer sur place » n'est pas une zone de dépôt : bordure pleine (le pointillé reste au dépôt). */
+  .pick.create {
+    border-style: solid;
   }
+
   /* Des fichiers glissés sur la page : la tuile s'allume (le dépôt marche partout sur la page). */
   .pick.over {
     border-style: solid;
@@ -463,20 +419,7 @@
     outline-offset: 3px;
   }
   /* Secondaire : contour, désactivé (bientôt) mais lisible. */
-  .room-b.hero-room {
-    /* Texte agrandi sur 320 px : « bientôt » passe dessous au lieu de déborder. */
-    flex-wrap: wrap;
-    row-gap: 2px;
-    padding-block: 8px;
-    min-height: 52px;
-    padding: 0 18px;
-    gap: 10px;
-    border-style: solid;
-    border-color: rgb(150 175 255 / 0.26);
-    border-radius: 14px;
-    background: rgb(255 255 255 / 0.02);
-    color: var(--text);
-  }
+  
   .meta {
     display: flex;
     flex-wrap: wrap;
@@ -506,13 +449,9 @@
   .w.hl {
     color: var(--accent);
   }
-  .band-slot {
-    min-width: 0;
-    margin-block: 0 var(--sp-6);
-  }
+  
   @media (max-width: 599px) {
-    .ctas,
-    .ctas > .room {
+    .ctas{
       display: grid;
       width: 100%;
     }
@@ -522,8 +461,7 @@
       justify-content: stretch;
     }
 
-    .pick,
-    .ctas .room-b.hero-room {
+    .pick{
       width: 100%;
       justify-content: center;
     }
@@ -551,56 +489,12 @@
     order: 2;
   }
   /* Salon (bientôt) : à part des actions d'envoi, désactivé mais lisible. */
-  .room {
-    order: 4;
-    display: grid;
-    justify-items: start;
-    gap: 6px;
-  }
-  .room-b {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 48px;
-    padding: 6px 14px 6px 6px;
-    border: 1px dashed rgb(233 236 242 / 0.24);
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.03);
-    color: var(--text-2);
-    font: inherit;
-    font-size: 0.9375rem;
-    font-weight: 640;
-    cursor: not-allowed;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .room-b:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .room-ic {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgb(255 255 255 / 0.06);
-    color: var(--text-2);
-  }
-  .room-soon {
-    padding: 1px 8px;
-    border-radius: var(--r-pill);
-    background: var(--surface-2);
-    color: var(--text-2);
-    font-size: var(--fs-micro);
-    font-weight: 560;
-  }
-  @media (forced-colors: active) {
-    .room-b {
-      border: 1px dashed GrayText;
-      color: GrayText;
-    }
-  }
+  
+  
+  
+  
+  
+  
 
   .drop-say {
     display: grid;
@@ -664,18 +558,14 @@
     transform: scale(0.97);
   }
 
-  .make {
-    display: grid;
-    gap: 10px;
-  }
+  
 
   /* Téléphone : « Ajouter » remplace « Commencer » et la rangée de tuiles (aucun doublon). */
   .add-big {
     display: none;
   }
   @media (max-width: 759px) {
-    .browse,
-    .make {
+    .browse{
       display: none;
     }
     .add-big {
@@ -746,165 +636,23 @@
   .home.compact .compose :global(.vessel:not(.drop) .track) {
     stroke-dasharray: none;
   }
-  .make-t {
-    margin: 0;
-    padding-inline: 4px;
-    color: var(--text-2);
-    font-size: var(--fs-small);
-  }
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.5rem), 1fr));
-    gap: var(--sp-2);
-  }
-  .tile {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    display: grid;
-    justify-items: center;
-    align-content: center;
-    gap: var(--sp-2);
-    min-height: 84px;
-    min-width: 0;
-    padding: var(--sp-3) var(--sp-1);
-    border: 0;
-    border-radius: 18px;
-    background: rgb(255 255 255 / 0.045);
-    box-shadow:
-      inset 0 0 0 1px var(--hair),
-      inset 0 1px 0 rgb(255 255 255 / 0.05);
-    color: var(--text);
-    font: inherit;
-    font-size: var(--fs-small);
-    font-weight: 560;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(var(--s, 1));
-    transition:
-      transform 520ms var(--ease-settle),
-      background-color var(--dur-fast) var(--ease-out),
-      box-shadow var(--dur-fast) var(--ease-out);
-  }
+  
+  
+  
   /* Reflet sous le pointeur (magnet). */
-  .tile::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    left: 0;
-    top: 0;
-    width: 160px;
-    height: 160px;
-    margin: -80px 0 0 -80px;
-    border-radius: 50%;
-    background: radial-gradient(closest-side, rgb(95 227 181 / 0.16), transparent);
-    opacity: 0;
-    transform: translate(var(--lx, 50%), var(--ly, 50%));
-    transition: opacity var(--dur-base) var(--ease-out);
-  }
-  .ic {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    color: var(--text-2);
-    transition:
-      color var(--dur-fast) var(--ease-out),
-      transform 520ms var(--ease-settle);
-  }
-  .lb {
-    max-width: 100%;
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-  }
-  @media (hover: hover) {
-    .tile:hover {
-      background: rgb(255 255 255 / 0.075);
-      box-shadow:
-        inset 0 0 0 1px var(--hair-2),
-        inset 0 1px 0 rgb(255 255 255 / 0.08);
-    }
-    .tile:hover::before {
-      opacity: 1;
-    }
-    .tile:hover .ic {
-      color: var(--accent);
-      transform: translateY(-3px) scale(1.08);
-    }
-  }
-  .tile:active {
-    --s: 0.95;
-    transition-duration: var(--dur-press);
-  }
+  
+  
+  
+  
+  
   /* Petits gestes propres à chaque tuile, au survol seulement : déclencheur, voyant, niveaux, curseur. */
-  .flash,
-  .rec,
-  .bars,
-  .caret {
-    position: absolute;
-    opacity: 0;
-  }
-  .flash {
-    inset: -6px;
-    border-radius: 50%;
-    background: radial-gradient(closest-side, rgb(201 251 232 / 0.85), transparent);
-  }
-  .rec {
-    right: -3px;
-    top: -1px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-  }
-  .bars {
-    left: 100%;
-    margin-left: 3px;
-    display: flex;
-    gap: 2px;
-    align-items: center;
-    height: 18px;
-  }
-  .bars b {
-    width: 2px;
-    height: 14px;
-    border-radius: 2px;
-    background: currentColor;
-    transform: scaleY(0.3);
-  }
-  .caret {
-    left: 100%;
-    margin-left: 2px;
-    top: 4px;
-    width: 2px;
-    height: 20px;
-    background: currentColor;
-  }
-  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-    .tile:hover .flash {
-      animation: flash 520ms var(--ease-out) 1;
-    }
-    .tile:hover .rec {
-      animation: rec 1s var(--ease-in-out) 2 both;
-    }
-    .tile:hover .bars {
-      opacity: 1;
-    }
-    .tile:hover .bars b {
-      animation: level 900ms var(--ease-in-out) 4 alternate;
-    }
-    .tile:hover .bars b:nth-child(2) {
-      animation-delay: -300ms;
-    }
-    .tile:hover .bars b:nth-child(3) {
-      animation-delay: -600ms;
-    }
-    .tile:hover .caret {
-      animation: caret 1s steps(1) 2;
-    }
-  }
+  
+  
+  
+  
+  
+  
+  
   @keyframes flash {
     30% {
       opacity: 0.9;
@@ -1067,31 +815,28 @@
     .drop-title {
       font-size: 1.625rem;
     }
-    .tile {
-      min-height: 92px;
-    }
+    
     /* Carte vide : titre et « Commencer » sur une ligne, gestes dessous. */
     .home:not(.compact) .empty {
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
       column-gap: var(--sp-4);
     }
-    .home:not(.compact) .make,
+    
     .home:not(.compact) .proof {
       grid-column: 1 / -1;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .tile,
-    .ic,
+    
     .pick,
     .pick :global(svg),
     .browse,
     .browse :global(svg) {
       transition: none;
     }
-    .tile:active,
+    
     .pick:active,
     .pick:hover,
     .browse:active {
@@ -1104,19 +849,17 @@
     h1 {
       line-height: 1.15;
     }
-    .home:not(.compact) .hero::before,
-    .tile::before,
-    .flash {
+    .home:not(.compact) .hero::before{
       display: none;
     }
-    .tile,
+    
     .pick,
     .browse,
     .add-big {
       border: 1px solid ButtonText;
       box-shadow: none;
     }
-    .pick {
+    .pick:not(.create) {
       border-style: dashed;
     }
   }

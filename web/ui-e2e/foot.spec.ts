@@ -86,7 +86,7 @@ test.describe("fr-FR", () => {
     await expect(sec).toHaveAttribute("aria-disabled", "true");
     await expect(sec).toHaveAccessibleDescription(/désactivés pendant l'envoi/);
     await expect(sec).not.toHaveAttribute("tabindex", "-1");
-    await expect(footLink(page, /^Code source/)).toHaveAttribute("aria-disabled", "true");
+    await expect(footLink(page, /^Open source sur GitHub/)).toHaveAttribute("aria-disabled", "true");
     await expect(f.getByRole("link", { name: "Shhgone, accueil" })).toHaveAttribute("aria-disabled", "true");
     for (const l of await f.getByRole("link").all()) await expect(l).toHaveAttribute("aria-disabled", "true");
     await sec.click({ force: true });
@@ -96,19 +96,22 @@ test.describe("fr-FR", () => {
     await expect(readyHeading(page)).toBeVisible({ timeout: 90_000 });
   });
 
-  test("accueil : bouton Salon à part, visible, « bientôt », désactivé avec sa raison", async ({ page, shh }) => {
+  test("Salon : plus de bouton à part sur l'accueil ; avec les autres actions de « Créer sur place », « bientôt », désactivé avec sa raison", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
-    // Refonte du 12 novembre : bouton secondaire « Ouvrir un salon » à côté de « Choisir des fichiers ».
-    const room = page.locator("[data-room]").getByRole("button", { name: /^Ouvrir un salon/ });
+    // Retours du 17 novembre : deux boutons seulement dans le héros (fichiers, créer sur place).
+    await expect(page.locator("[data-room]")).toHaveCount(0);
+    await expect(page.locator("[data-ctas] button")).toHaveCount(2);
+    await page.locator("[data-create]").click();
+    await expect(page).toHaveURL(shh.origin + "/envoyer");
+    // Téléphone : la feuille « Ajouter » s'ouvre ; ordinateur : la rangée « Créer sur place ».
+    const scope = isMobile ? page.getByRole("dialog", { name: "Ajouter" }) : page.getByRole("group", { name: "Créer sur place" });
+    const room = scope.getByRole("button", { name: /^Salon/ });
     await expect(room).toBeVisible();
-    await expect(room).toBeInViewport();
     await expect(room).toHaveAttribute("aria-disabled", "true");
     await expect(room).toContainText("bientôt");
-    await expect(room).toHaveAccessibleDescription("Bientôt\u202f: un salon de discussion chiffré et éphémère.");
-    // À part des actions d'envoi : hors du coffre (Commencer, Créer sur place).
-    await expect(page.locator('[data-slot="compose"] [data-room]')).toHaveCount(0);
+    await expect(room).toBeInViewport(); // feuille du bas : attendre la fin de sa montée
     await room.click({ force: true }); // aria-disabled : un appui annonce « Bientôt », rien d'autre
-    await expect(page).toHaveURL(new RegExp(`${shh.origin.replace(/[.:/]/g, "\\$&")}/$`));
+    await expect(page).toHaveURL(shh.origin + "/envoyer");
   });
 
   test("ordinateur : plus de lumière au pointeur (contour lumineux gardé) ; « Créer sur place » en haut ; flèche sous le texte", async ({ page, shh, isMobile }) => {

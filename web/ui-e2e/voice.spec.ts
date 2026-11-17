@@ -47,12 +47,12 @@ const liveTracks = (page: Page) =>
 
 async function openVoice(page: Page) {
   // Téléphone : « Commencer » mène d'abord à la page d'envoi (D41-37).
-  if (!(await page.getByRole("group", { name: "Ou créez sur place" }).isVisible().catch(() => false))) await enterComposer(page);
+  if (!(await page.getByRole("group", { name: "Créer sur place" }).isVisible().catch(() => false))) await enterComposer(page);
   const add = page.getByRole("button", { name: /^Ajouter/ }).filter({ visible: true }).first();
   if (await add.isVisible().catch(() => false)) {
     await add.click();
     await page.getByRole("dialog", { name: "Ajouter" }).getByRole("button", { name: /^Vocal/ }).click();
-  } else await page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button", { name: "Vocal", exact: true }).click();
+  } else await page.getByRole("group", { name: "Créer sur place" }).getByRole("button", { name: "Vocal", exact: true }).click();
   const rec = page.getByRole("dialog", { name: "Enregistrer un vocal" });
   await expect(rec.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 15_000 });
   return rec;
@@ -307,12 +307,12 @@ test("micro refusé : message clair et marche à suivre", async ({ page, shh }) 
   });
   await page.goto(shh.origin + "/");
   // Téléphone : « Commencer » mène d'abord à la page d'envoi (D41-37).
-  if (!(await page.getByRole("group", { name: "Ou créez sur place" }).isVisible().catch(() => false))) await enterComposer(page);
+  if (!(await page.getByRole("group", { name: "Créer sur place" }).isVisible().catch(() => false))) await enterComposer(page);
   const add = page.getByRole("button", { name: /^Ajouter/ }).filter({ visible: true }).first();
   if (await add.isVisible().catch(() => false)) {
     await add.click();
     await page.getByRole("dialog", { name: "Ajouter" }).getByRole("button", { name: /^Vocal/ }).click();
-  } else await page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button", { name: "Vocal", exact: true }).click();
+  } else await page.getByRole("group", { name: "Créer sur place" }).getByRole("button", { name: "Vocal", exact: true }).click();
   const alert = page.getByRole("dialog", { name: "Enregistrer un vocal" }).getByRole("alert");
   await expect(alert).toContainText("L'accès au micro a été refusé.");
   await expect(alert).toContainText("autorisez le micro dans les réglages du site");

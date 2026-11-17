@@ -297,6 +297,28 @@
       if (chrome.add === run) chrome.add = null;
     };
   });
+  // Accueil → page d'envoi (17 novembre) : « Choisir des fichiers » ouvre le sélecteur (même
+  // geste) et mène à la page d'envoi, zone de dépôt mise en avant ; « Créer sur place » y mène,
+  // actions mises en avant (téléphone : la feuille « Ajouter » s'ouvre). Un instant seulement.
+  let spot = $state<"drop" | "make" | null>(null);
+  function pickFromHome() {
+    filesIn?.click();
+    chrome.spot = "drop";
+    navigate("/envoyer");
+  }
+  function create() {
+    chrome.spot = "make";
+    navigate("/envoyer");
+  }
+  $effect(() => {
+    const s = chrome.spot;
+    if (!s || !shown) return;
+    chrome.spot = null;
+    spot = s;
+    if (s === "make" && narrow) addOpen = true;
+    const timer = setTimeout(() => (spot = null), 2400);
+    return () => clearTimeout(timer);
+  });
   // Ordinateur, composeur ouvert : <main> resserré (règle globale plus bas).
   $effect(() => {
     document.documentElement.classList.toggle("composing", shown && !narrow);
@@ -582,18 +604,18 @@
   <!-- Ordinateur : sous l'en-tête de la liste, la même liste d'actions que la feuille du téléphone ;
        la zone de dépôt (« Fichiers ») est dessous, en filigrane dans l'espace vide (retours DROP). -->
   <div class="adder bar">
-    <div class="make" role="group" aria-label={t("compose.create.label")}>
+    <div class={["make", { spot: spot === "make" }]} role="group" aria-label={t("compose.create.label")}>
       {#each rowActions as a (a.id)}
         {#if a.id === "room"}
           <!-- Salon, avec les autres actions (17 novembre) : pas encore construit, désactivé avec sa raison. -->
           <button type="button" class="mk room" data-add="room" aria-disabled="true" aria-describedby="room-soon-row" onclick={() => addAct("room")}>
-            <AddIcon id="room" size={18} />
+            <AddIcon id="room" size={22} />
             <span>{t("compose.row.room")}</span><span class="soon">{t("foot.soon")}</span>
           </button>
           <span id="room-soon-row" class="sr-only">{t("tabs.soon.chat")}</span>
         {:else}
           <button type="button" class="mk" data-add={a.id} onclick={() => addAct(a.id, a.live)}>
-            <AddIcon id={a.id} size={18} />
+            <AddIcon id={a.id} size={22} />
             <span>{t(`compose.row.${a.id as "media" | "voice" | "note"}`)}</span>
           </button>
         {/if}
@@ -722,7 +744,7 @@
         {:else}
           <!-- Liste vide (17 novembre) : le cadre remplit la colonne, son contenu au centre, et les
                trois assurances sous « Déposez des fichiers ». -->
-          <div class="dz-box fill" data-dz-box>
+          <div class={["dz-box fill", { spot: spot === "drop" }]} data-dz-box>
             {@render zone()}
             <Assurances />
           </div>
@@ -779,7 +801,7 @@
 <input bind:this={videoIn} type="file" accept="video/*" capture="environment" hidden tabindex="-1" onchange={(e) => picked(e.currentTarget, "video")} />
 
 <!-- « Commencer » (accueil) mène à la page d'envoi « /envoyer » (retours DROP). -->
-<Home {active} compact={shown} onadd={() => navigate("/envoyer")} onpick={() => filesIn?.click()} children={shown ? app : undefined} onfiles={(f, s, folders) => void addFiles(f, s, folders)} onaction={act} />
+<Home {active} compact={shown} onadd={() => navigate("/envoyer")} onpick={pickFromHome} children={shown ? app : undefined} onfiles={(f, s, folders) => void addFiles(f, s, folders)} oncreate={create} />
 
 <Sheet bind:open={editorOpen} title={editorId ? t("text.title.edit") : t("text.title.new")}>
   <div class="editor">
@@ -1047,6 +1069,31 @@
     border-radius: var(--r-xl);
     transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
   }
+  /* Mise en avant à l'arrivée depuis l'accueil (17 novembre) : deux pulsations douces. */
+  .dz-box.spot,
+  .make.spot {
+    border-color: var(--accent);
+    animation: spot-pulse 1100ms var(--ease-out) 2;
+  }
+  .make.spot {
+    border-radius: 18px;
+    outline: 2px solid rgb(95 227 181 / 0.55);
+    outline-offset: 6px;
+  }
+  @keyframes spot-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgb(95 227 181 / 0.45);
+    }
+    100% {
+      box-shadow: 0 0 0 14px rgb(95 227 181 / 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dz-box.spot,
+    .make.spot {
+      animation: none;
+    }
+  }
   .dz-box.fill {
     flex: 1 1 auto;
     min-height: 260px;
@@ -1106,19 +1153,23 @@
     color: var(--text-2);
     font-size: var(--fs-small);
   }
+  /* Actions « Créer sur place » (17 novembre) : des tuiles égales, icône au-dessus du libellé,
+     pour qu'on les voie comme des boutons (elles se perdaient en petites pastilles). */
   .make {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
     gap: var(--sp-2);
   }
   .mk {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 0 14px 0 12px;
+    justify-content: center;
+    gap: 6px;
+    min-height: 72px;
+    padding: 10px 8px;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: 16px;
     /* Plus visibles (17 novembre) : teinte d'accent, contour d'accent, icône d'accent. */
     background: rgb(95 227 181 / 0.08);
     box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
@@ -1160,6 +1211,7 @@
     color: var(--text-2);
   }
   .mk .soon {
+    margin-block-start: -2px;
     padding: 1px 7px;
     border-radius: var(--r-pill);
     background: rgb(255 255 255 / 0.06);
@@ -1574,10 +1626,11 @@
     .groups > :global(section.media) {
       flex: 1 1 200px;
     }
+    /* Tuiles égales sur toute la largeur de la liste (17 novembre). */
     .adder.bar .make {
-      flex: none;
-      flex-wrap: nowrap;
-      gap: 6px;
+      flex: 1 1 auto;
+      grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+      gap: var(--sp-2);
     }
     /* Liste très étroite seulement : les pastilles « Créer » gardent leur icône, le libellé passe
        aux lecteurs d'écran ; la zone de dépôt garde sa phrase. */
@@ -1586,7 +1639,7 @@
     }
     @container (max-width: 380px) {
       .adder.bar .mk {
-        padding: 0 12px;
+        padding: 8px 6px;
       }
       .adder.bar .mk > span {
         position: absolute;

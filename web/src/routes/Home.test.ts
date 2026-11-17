@@ -32,24 +32,28 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(h1.classList.contains("compact")).toBe(false);
-    // Plus de sur-titre (retours du 15 novembre) ; les deux boutons dans un cadre, avec
-    // « Ou créez sur place » (téléphone) qui mène à la page d'envoi.
+    // Plus de sur-titre (retours du 15 novembre). Deux boutons (17 novembre) : « Choisir des
+    // fichiers » et « Créer sur place » (note, vocal, photo, salon) ; plus de bouton Salon à part.
     expect(document.querySelector("[data-eyebrow]")).toBeNull();
     expect(document.querySelector("[data-ctas] [data-pick]")).not.toBeNull();
-    expect(document.querySelector("[data-ctas] [data-room]")).not.toBeNull();
-    expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Ou créez sur place : note, vocal, photo");
-    expect(document.querySelector(".lede")!.textContent!.length).toBeGreaterThan(20);
+    expect(document.querySelector("[data-ctas] [data-create]")).not.toBeNull();
+    expect(document.querySelectorAll("[data-ctas] button")).toHaveLength(2);
+    expect(document.querySelector("[data-room]")).toBeNull();
+    expect(document.querySelector("[data-more]")).toBeNull();
+    // Phrase : les fonctions moins visibles mises en avant.
+    const lede = document.querySelector("[data-lede]")!;
+    expect(lede.textContent).toMatch(/^Vos fichiers, mais aussi des messages vocaux, des notes et bientôt un salon de discussion\u202f: /);
+    expect([...lede.querySelectorAll("b.hl")].map((b) => b.textContent)).toEqual(["messages vocaux", "notes", "salon de discussion"]);
     const pick = document.querySelector<HTMLButtonElement>("[data-pick]")!;
     expect(pick.querySelector(".pk-t")!.textContent).toBe("Choisir des fichiers");
     expect(pick.querySelector(".pk-s")!.textContent).toBe("ou glissez-les ici"); // tuile : aussi une zone de dépôt (16 novembre)
     expect(pick.querySelector(".pk-s")!.getAttribute("aria-hidden")).toBe("true");
     expect(pick.querySelector("svg")).not.toBeNull();
-    const room = document.querySelector<HTMLButtonElement>("[data-room] button")!;
-    expect(room.textContent).toContain("Ouvrir un salon");
-    expect(room.textContent).toContain("bientôt");
-    expect(room.getAttribute("aria-disabled")).toBe("true");
+    const make = document.querySelector<HTMLButtonElement>("[data-create]")!;
+    expect(make.textContent).toContain("Créer sur place");
+    expect(make.textContent).toContain("salon bientôt");
     const meta = [...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim());
-    expect(meta).toEqual(["Gratuit jusqu'à 2\u202fGo", "Partage sans compte", "S'efface après ouverture"]);
+    expect(meta).toEqual(["Gratuit jusqu'à 2\u202fGo", "Partage sans compte", "Durée et ouvertures au choix"]);
     expect(document.querySelector("[data-demo]")).not.toBeNull();
     const a = [...document.querySelectorAll("a")].find((x) => x.textContent?.trim() === "Tous les détails de sécurité")!;
     expect(a.getAttribute("href")).toBe("/securite");
@@ -57,8 +61,7 @@ describe("Home (UI §9.1)", () => {
     // Sections sous le pli, chacune titrée.
     const h2 = [...document.querySelectorAll("h2")].map((h) => h.textContent!.trim());
     expect(h2).toEqual([
-      "Ce qui se passe quand vous partagez",
-      "Nos engagements",
+      "Ce qui se passe quand vous partagez", // titre de l'infographie, pour les lecteurs d'écran
       "Glissez vos fichiers iciQue voulez-vous envoyer\u202f?",
       "Comment ça marche",
       "Pensé pour la confidentialité",
@@ -66,10 +69,13 @@ describe("Home (UI §9.1)", () => {
       "Vos questions",
     ]);
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
+    // « Comment ça marche » : une frise numérotée, distincte des cartes de la confidentialité.
+    expect(document.querySelectorAll("ol.flow > li[data-how-card] .nb")).toHaveLength(3);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
-    for (const c of [...document.querySelectorAll("[data-how-card], [data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
+    for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
+    for (const c of [...document.querySelectorAll("[data-how-card]")]) expect(c.querySelector(".node svg")).not.toBeNull();
     // Plus de ligne sur la clé après le « # » sur l'accueil (décision du 16 novembre).
     expect(document.querySelector("[data-key-note]")).toBeNull();
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);
@@ -158,12 +164,12 @@ describe("Home (UI §9.1)", () => {
     }
   });
 
-  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; « Commencer » (fenêtre, téléphone) mène à la page d'envoi (onadd) ; un clic sur le verre n'ouvre rien", () => {
+  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; « Créer sur place » appelle oncreate ; « Commencer » (fenêtre, téléphone) mène à la page d'envoi (onadd) ; un clic sur le verre n'ouvre rien", () => {
     const onfiles = vi.fn();
-    const onaction = vi.fn();
+    const oncreate = vi.fn();
     const onadd = vi.fn();
     const onpick = vi.fn();
-    show({ onfiles, onaction, onadd, onpick });
+    show({ onfiles, oncreate, onadd, onpick });
     // Plus de sélecteur propre à l'accueil : le composeur tient le seul champ fichier.
     expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
     (document.querySelector("[data-pick]") as HTMLButtonElement).click();
@@ -175,8 +181,9 @@ describe("Home (UI §9.1)", () => {
     expect(starts[0]!.hasAttribute("aria-haspopup")).toBe(false); // une navigation, pas une feuille
     starts[0]!.click();
     expect(onadd).toHaveBeenCalledTimes(1);
-    buttons("Photo ou vidéo")[0]!.click();
-    expect(onaction.mock.calls).toEqual([["media"]]);
+    // « Créer sur place » : page d'envoi, options de création en avant (oncreate).
+    (document.querySelector("[data-create]") as HTMLButtonElement).click();
+    expect(oncreate).toHaveBeenCalledTimes(1);
     const big = document.querySelector(".add-big") as HTMLButtonElement;
     expect(big.querySelector(".ab-t")!.textContent).toBe("Commencer");
     big.click();
@@ -187,37 +194,6 @@ describe("Home (UI §9.1)", () => {
     expect(onadd).toHaveBeenCalledTimes(2);
     expect(onpick).toHaveBeenCalledTimes(1);
     expect(onfiles).not.toHaveBeenCalled();
-  });
-
-  it("actions : groupe nommé ; Vocal masqué sans MediaRecorder ; jamais de bouton Coller (Ctrl/Cmd + V suffit)", () => {
-    const clip = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read: async () => [] } });
-    try {
-      show();
-    } finally {
-      if (clip) Object.defineProperty(navigator, "clipboard", clip);
-      else delete (navigator as { clipboard?: unknown }).clipboard;
-    }
-    const group = document.querySelector('.make[role="group"]')!;
-    expect(document.getElementById(group.getAttribute("aria-labelledby")!)!.textContent).toBe("Ou créez sur place");
-    const names = [...group.querySelectorAll("button")].map((b) => b.textContent!.trim());
-    expect(names).toEqual(["Photo ou vidéo", "Note"]);
-  });
-
-  it("actions : Vocal présent quand MediaRecorder existe ; rappel onaction", () => {
-    vi.stubGlobal("MediaRecorder", class {});
-    try {
-      const onaction = vi.fn();
-      show({ onaction });
-      const group = document.querySelector('.make[role="group"]')!;
-      const buttons = [...group.querySelectorAll("button")];
-      expect(buttons.map((b) => b.textContent!.trim())).toEqual(["Photo ou vidéo", "Vocal", "Note"]);
-      buttons[1]!.click();
-      buttons[2]!.click();
-      expect(onaction.mock.calls).toEqual([["vocal"], ["texte"]]);
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 
   it("dépôt : les fichiers vont à onfiles, les dossiers sont remis à part (refusés, pas aplatis)", async () => {
@@ -256,9 +232,10 @@ describe("Home (UI §9.1)", () => {
     setLang("en");
     show();
     expect(title(document.querySelector("h1")!)).toBe("One link, one password, then nothing.");
-    expect(document.querySelector("[data-more]")!.textContent!.trim()).toBe("Or create one here: note, voice, photo");
+    expect(document.querySelector("[data-create]")!.textContent).toContain("Create here");
+    expect([...document.querySelectorAll("[data-lede] b.hl")].map((b) => b.textContent)).toEqual(["voice messages", "notes", "chat room"]);
     expect(document.querySelector("[data-pick] .pk-t")!.textContent).toBe("Choose files");
     expect(document.querySelector("[data-pick] .pk-s")!.textContent).toBe("or drop them here");
-    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Erased after opening"]);
+    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Lifetime and opens of your choice"]);
   });
 });

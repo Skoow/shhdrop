@@ -31,12 +31,14 @@
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
   </div>
-  <ol class="cards three">
+  <!-- Frise en trois étapes reliées (17 novembre) : plus des cartes comme « Pensé pour la
+       confidentialité », qui ressemblait trop à cette section. -->
+  <ol class="flow">
     {#each how as c, i (c.k)}
-      <li class="card rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
-        <span class="num" aria-hidden="true">{i + 1}</span>
-        <span class="tile-ic {c.tint}" aria-hidden="true">
-          {#if c.k === "add"}<AddIcon id="files" size={22} />{:else if c.k === "seal"}<Lock size={22} strokeWidth={1.8} />{:else}<Link2 size={22} strokeWidth={1.8} />{/if}
+      <li class="step rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
+        <span class="node {c.tint}" aria-hidden="true">
+          {#if c.k === "add"}<AddIcon id="files" size={26} />{:else if c.k === "seal"}<Lock size={26} strokeWidth={1.8} />{:else}<Link2 size={26} strokeWidth={1.8} />{/if}
+          <span class="nb">{i + 1}</span>
         </span>
         <h3>{t(`home.how.${c.k}.t` as Key)}</h3>
         <p>{t(`home.how.${c.k}.p` as Key, limitParams(getLang()))}</p>
@@ -137,9 +139,104 @@
       text-align: center;
     }
   }
+  /* Frise : trois étapes, reliées par une ligne (ordinateur : à l'horizontale, entre les cercles ;
+     téléphone : à la verticale, à gauche). */
+  .flow {
+    position: relative;
+    display: grid;
+    gap: var(--sp-6);
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .step {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-2);
+    min-width: 0;
+    text-align: center;
+  }
+  .step p {
+    margin: 0;
+    max-width: 30ch;
+    color: #aab6d3;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+  }
+  .node {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    margin-bottom: var(--sp-2);
+    border-radius: 50%;
+    background-color: var(--bg);
+  }
+  .nb {
+    position: absolute;
+    inset-block-start: -4px;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  /* Ligne entre deux cercles (sauf après le dernier). */
+  .step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    background: linear-gradient(90deg, rgb(95 227 181 / 0.55), rgb(92 128 255 / 0.4));
+  }
+  @media (max-width: 759px) {
+    .flow {
+      gap: var(--sp-5);
+      max-width: 30rem;
+      margin-inline: auto;
+    }
+    .step {
+      grid-template-columns: 56px minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+      justify-items: start;
+      column-gap: var(--sp-4);
+      row-gap: var(--sp-1);
+      text-align: start;
+    }
+    .node {
+      grid-row: 1 / span 2;
+      width: 56px;
+      height: 56px;
+      margin-bottom: 0;
+    }
+    .step h3 {
+      align-self: end;
+      margin-top: var(--sp-2);
+    }
+    .step:not(:last-child)::after {
+      inset-block: 64px calc(-1 * var(--sp-5) + 8px);
+      inset-inline-start: 27px;
+      width: 2px;
+      background: linear-gradient(180deg, rgb(95 227 181 / 0.55), rgb(92 128 255 / 0.25));
+      opacity: 0.6;
+    }
+  }
   @media (min-width: 760px) {
-    .three {
+    .flow {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .step:not(:last-child)::after {
+      inset-block-start: 36px;
+      inset-inline: calc(50% + 46px) calc(-50% + 46px);
+      height: 2px;
     }
     .four {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -193,14 +290,7 @@
       opacity: 1;
     }
   }
-  .num {
-    position: absolute;
-    inset-block-start: 22px;
-    inset-inline-end: 24px;
-    color: rgb(150 175 255 / 0.55);
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
-  }
+  
   .tile-ic {
     position: relative;
     display: grid;

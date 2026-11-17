@@ -70,7 +70,7 @@ describe("SecureDemo", () => {
     tickSteps(1);
     expect(step()).toBe(1);
     expect(STEP_MS * 7).toBeGreaterThanOrEqual(10_000);
-    expect(STEP_MS * 7).toBeLessThanOrEqual(14_000);
+    expect(STEP_MS * 7).toBeLessThanOrEqual(21_000);
   });
 
   it("bouton pause/lecture visible : arrête puis reprend la boucle", () => {
