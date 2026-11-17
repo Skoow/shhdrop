@@ -47,7 +47,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator("[data-demo] svg").first()).toHaveAttribute("focusable", "false");
     await expect(page.getByRole("link", { name: "Tous les détails de sécurité" })).toHaveAttribute("href", "/securite");
     // Le code public (pied de page) : lien sortant sans référent.
-    await expect(page.locator("footer").getByRole("link", { name: /^Code source sur GitHub/ })).toHaveAttribute("rel", "noopener noreferrer");
+    await expect(page.locator("footer").getByRole("link", { name: /^Open source sur GitHub/ })).toHaveAttribute("rel", "noopener noreferrer");
     // Aucun « # » dans un lien de la page (réservé aux clés, UI §12.1).
     expect(await page.locator("main a[href*='#']").count()).toBe(0);
     expect(await noHScroll(page)).toBe(true);
@@ -120,7 +120,7 @@ test.describe("fr-FR", () => {
     await capture(page, "home-320-200pct-securite");
   });
 
-  test("K1 : toutes les animations d'entrée sont finies à 1,3 s (hors ambiance et défilement) ; l'effacement du titre à moins de 5 s", async ({ page, shh, isMobile }) => {
+  test("K1 : toutes les animations d'entrée sont finies à 1,3 s (hors ambiance et défilement) ; titre sans animation (17 novembre)", async ({ page, shh, isMobile }) => {
     // Cause de l'instabilité : document.getAnimations() ne liste que les animations vivantes. Sur une
     // machine chargée, le chargement dure plus de 900 ms, les entrées sont déjà finies (donc retirées
     // de la liste) au moment de l'échantillon, et il en restait 0. On enregistre donc chaque animation
@@ -152,15 +152,14 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     type Rec = { name: string; end: number; ambient: boolean; infinite: boolean };
     const recorded = () => page.evaluate(() => (window as unknown as { __anims: Rec[] }).__anims);
-    // Titre (9 mots), phrase, boutons, cases cochées, infographie (et carte de dépôt sur ordinateur) :
-    // 13 entrées au moins (retours du 15 novembre : plus de sur-titre ; entrée revue, 1,3 s),
-    // attendues jusqu'à ce que tous les départs aient eu lieu. « puis plus rien. » se défait
-    // ensuite (letter-fade) : une fois, fini avant 5 s (WCAG 2.2.2).
-    const erase = (r: Rec) => /letter-fade$/.test(r.name);
-    await expect.poll(async () => (await recorded()).filter((r) => !r.ambient && !erase(r)).length, { timeout: 30_000 }).toBeGreaterThanOrEqual(13);
+    // Phrase, boutons, cases cochées, infographie (et carte de dépôt sur ordinateur) : 4 entrées
+    // au moins, attendues jusqu'à ce que tous les départs aient eu lieu. Le titre, lui, n'a plus
+    // d'animation (17 novembre : affiché d'emblée, « puis plus rien. » déjà effacé).
+    const title = (r: Rec) => /(word-in|letter-fade)$/.test(r.name);
+    await expect.poll(async () => (await recorded()).filter((r) => !r.ambient).length, { timeout: 30_000 }).toBeGreaterThanOrEqual(4);
     const all = await recorded();
-    for (const e of all.filter((r) => !r.ambient && !erase(r))) expect(e.end, e.name).toBeLessThanOrEqual(1300);
-    for (const e of all.filter(erase)) expect(e.end, e.name).toBeLessThan(5000);
+    expect(all.filter(title)).toEqual([]);
+    for (const e of all.filter((r) => !r.ambient)) expect(e.end, e.name).toBeLessThanOrEqual(1300);
     // Seule l'ambiance boucle.
     const infinite = all.filter((r) => r.infinite);
     expect(infinite.length).toBeGreaterThan(0);

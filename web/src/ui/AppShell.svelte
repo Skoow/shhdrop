@@ -3,7 +3,7 @@
   import { BUILD_ID } from "../app/build";
   import { chrome } from "../app/chrome.svelte";
   import { currentPath, followLink, href, navigate, router } from "../app/router.svelte";
-  import { LICENSE_URL, SOURCE_URL } from "../routes/pages/content";
+  import { SOURCE_URL } from "../routes/pages/content";
   import { t } from "../i18n/i18n.svelte";
   import Aurora from "./Aurora.svelte";
   import { ChevronLeft } from "./Icon";
@@ -79,7 +79,7 @@
   // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris (retours du
   // 11 novembre) ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
   /** `tiers` : « Plus » et « Pro » du libellé au bleu de leur offre, le reste comme les autres liens. */
-  type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean; tiers?: boolean; pair?: { label: string; url: string } };
+  type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean; tiers?: boolean };
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
     // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (retours du 16 novembre) ;
     // plus d'« Offres » (17 novembre : l'en-tête et le menu y mènent). Colonne « Produit »
@@ -91,8 +91,9 @@
       links: [
         { label: t("shell.security"), path: "/securite" },
         { label: t("shell.privacy"), path: "/confidentialite" },
-        // Code source et licence sur la même ligne (17 novembre).
-        { label: t("foot.source"), url: SOURCE_URL, pair: { label: t("foot.license"), url: LICENSE_URL } },
+        // « Open source sur GitHub » ; la licence (AGPL-3.0) est dite sur GitHub, plus dans le pied
+        // (décision du propriétaire du 17 novembre).
+        { label: t("foot.source"), url: SOURCE_URL },
         { label: t("foot.report"), path: "/signaler", report: true },
       ],
     },
@@ -198,7 +199,6 @@
                   <button type="button" class="fl" aria-haspopup="dialog" onclick={() => chrome.report?.()} data-report-share>{t("content.report")}</button>
                 {:else if l.url}
                   <a class="fl" href={l.url} target="_blank" rel="noopener noreferrer">{l.label}<span class="sr-only"> {t("foot.external")}</span></a>
-                  {#if l.pair}<span class="sep" aria-hidden="true">·</span><a class="fl" href={l.pair.url} target="_blank" rel="noopener noreferrer">{l.pair.label}<span class="sr-only"> {t("foot.external")}</span></a>{/if}
                 {:else if l.path && l.tiers}
                   <a class="fl tiers" href={href(l.path)} aria-current={pathHere(l.path)} onclick={(e) => followLink(e, l.path!)} data-foot-offers
                     ><span>{#each tierParts(l.label) as p, i (i)}{#if p.tier}<span class="tier {p.tier}">{p.text}</span>{:else}{p.text}{/if}{/each}</span></a
@@ -447,16 +447,6 @@
   .cols.two {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  /* Code source · Licence sur une ligne (17 novembre) ; passe à la ligne si la place manque. */
-  .col li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: 8px;
-  }
-  .col li .sep {
-    color: var(--text-3);
-  }
   .ch {
     margin: 0 0 var(--sp-3);
     color: var(--text-3);
@@ -650,10 +640,6 @@
       gap: 0;
       width: min(100%, 22rem);
       text-align: start;
-    }
-    /* Code source · Licence : sur toute la largeur de la grille. */
-    .col li:has(.sep) {
-      grid-column: 1 / -1;
     }
     .ch {
       position: absolute;

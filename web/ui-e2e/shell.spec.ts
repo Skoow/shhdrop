@@ -31,22 +31,26 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await expect(foot).toBeVisible();
   // Ordinateur : trois colonnes titrées ; téléphone (retours du 15 novembre) : un seul bloc, les
   // titres restent pour les lecteurs d'écran (chaque liste garde son nom).
-  for (const c of ["Produit", "Confiance", "Légal"]) {
+  for (const c of ["Confiance", "Légal"]) {
     if (isMobile) await expect(foot.getByRole("list", { name: c })).toBeVisible();
     else await expect(foot.getByText(c, { exact: true })).toBeVisible();
   }
+  // Sans compte, plus de colonne « Produit » (17 novembre : « Offres » retiré du pied).
+  await expect(foot.getByText("Produit", { exact: true })).toHaveCount(0);
   // Sans compte, pas de « Téléchargements » (retours du 15 novembre).
   await expect(foot.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
   // Plus d'« Envoyer », de « Mes partages » ni de « Salon » (16 novembre) : le logo et le menu y mènent.
   for (const l of ["Envoyer", "Mes partages"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}$`) })).toHaveCount(0);
   await expect(foot.getByText(/^Salon/)).toHaveCount(0);
-  for (const l of ["Offres Plus et Pro", "Sécurité", "Confidentialité", "Code source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales", "Licence AGPL-3.0"])
+  // Plus d'« Offres » ni de « Licence » (17 novembre) : la licence est dite sur GitHub.
+  for (const l of ["Sécurité", "Confidentialité", "Open source sur GitHub", "Signaler un abus", "Conditions d'utilisation", "Mentions légales"])
     await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toBeVisible();
-  // 8 liens, plus le logo (retour à l'accueil, UI7).
-  await expect(foot.getByRole("link")).toHaveCount(9);
+  for (const l of ["Offres", "Licence"]) await expect(foot.getByRole("link", { name: new RegExp(`^${l}`) })).toHaveCount(0);
+  // 6 liens, plus le logo (retour à l'accueil, UI7).
+  await expect(foot.getByRole("link")).toHaveCount(7);
   await expect(foot.getByRole("link", { name: "Shhgone, accueil" })).toBeVisible();
-  await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
-  await expect(foot.getByRole("link", { name: /^Code source/ })).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(foot.getByRole("link", { name: /^Open source/ })).toHaveAttribute("href", "https://github.com/Skoow/shhgone");
+  await expect(foot.getByRole("link", { name: /^Open source/ })).toHaveAttribute("rel", "noopener noreferrer");
   // Retours UI9 : plus de mention « aucune publicité » ; le nom en bas à gauche, « © 2026 » à côté.
   await expect(foot.getByText(/publicité/)).toHaveCount(0);
   await expect(foot.locator(".base .sig")).toHaveText(/^Shhgone\s*©\s2026$/);
