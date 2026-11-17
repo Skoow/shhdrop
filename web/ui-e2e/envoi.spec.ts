@@ -74,14 +74,20 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   expect(norm(await offers.innerText())).toMatch(/Votre offre :[\s\S]*Gratuit[\s\S]*2 Go · 24 h · 5 ouvertures/);
   await expect(offers.getByRole("link", { name: /^Voir les offres/ })).toHaveAttribute("href", "/offres");
   await expect(offers.locator("input, form, button")).toHaveCount(0);
-  // Salon : même icône et même mot que l'onglet, « bientôt », désactivé avec sa raison.
-  const room = page.locator("[data-room]").getByRole("button", { name: /^Salon/ });
-  await expect(room).toBeInViewport({ ratio: 1 });
-  await expect(room).toHaveAttribute("aria-disabled", "true");
-  await expect(room).toContainText("bientôt");
-  await expect(room).toHaveAccessibleDescription("Bientôt : un salon de discussion chiffré et éphémère.");
-  await room.click({ force: true });
-  await expect(page).toHaveURL(/\/envoyer$/);
+  // Salon (17 novembre) : plus en haut de la page ; avec les autres actions (rangée sur
+  // ordinateur, menu « + » sur téléphone), « bientôt », désactivé avec sa raison.
+  await expect(page.locator("[data-room]")).toHaveCount(0);
+  if (!isMobile) {
+    const room = page.locator("[data-add=room]");
+    await expect(room).toBeInViewport({ ratio: 1 });
+    await expect(room).toHaveAttribute("aria-disabled", "true");
+    await expect(room).toContainText("bientôt");
+    await expect(room).toHaveAccessibleDescription("Bientôt : un salon de discussion chiffré et éphémère.");
+    await room.click({ force: true });
+    await expect(page).toHaveURL(/\/envoyer$/);
+  }
+  // Téléphone : plus de ligne « Rien à envoyer… » (la limite est dans « Votre offre »).
+  if (isMobile) await expect(page.getByText(/^Rien à envoyer pour l'instant/)).toBeHidden();
   await axe(page);
 });
 

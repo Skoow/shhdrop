@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Feuille « Ajouter » (téléphone) : une liste façon app native, quatre lignes : Photo ou vidéo
-  // (caméra intégrée, qui mène aussi à la galerie), Vocal, Note, Fichiers. Icône maison, action,
+  // Feuille « Ajouter » (téléphone) : une liste façon app native : Photo ou vidéo (caméra
+  // intégrée, qui mène aussi à la galerie), Vocal, Note, Fichiers, et Salon (bientôt, 17 novembre). Icône maison, action,
   // précision honnête. Rien n'est en double.
   import { flushSync } from "svelte";
   import type { AddAction, AddId } from "../flows/add-actions";
@@ -33,10 +33,10 @@
   <ul>
     {#each actions as a (a.id)}
       <li>
-        <button type="button" class={["row", a.id]} data-add={a.id} onclick={() => pick(a.id, a.live)}>
+        <button type="button" class={["row", a.id]} data-add={a.id} aria-disabled={a.id === "room" ? "true" : undefined} onclick={() => pick(a.id, a.live)}>
           <span class="ic"><AddIcon id={a.id} /></span>
           <span class="tx">
-            <span class="lb">{t(`add.${a.id}`)}</span>
+            <span class="lb">{t(`add.${a.id}`)}{#if a.id === "room"}<span class="soon">{t("foot.soon")}</span>{/if}</span>
             <span class="sb">{sub(a)}</span>
           </span>
           <span class="chev" aria-hidden="true"><ChevronDown size={18} strokeWidth={1.9} /></span>
@@ -49,6 +49,18 @@
 </Sheet>
 
 <style>
+  .row.room {
+    color: var(--text-2);
+  }
+  .soon {
+    margin-inline-start: 8px;
+    padding: 1px 8px;
+    border-radius: var(--r-pill);
+    background: rgb(255 255 255 / 0.06);
+    color: var(--text-2);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
   .lim {
     margin: var(--sp-3) 0 0;
     color: var(--text-2);

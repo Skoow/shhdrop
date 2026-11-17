@@ -41,6 +41,7 @@
 </script>
 
 {#if count === 0}
+  <!-- Téléphone : rien (17 novembre) ; la limite est dite dans « Votre offre » et dès le premier élément. -->
   <p class="empty num">{t("compose.gauge.empty", { size: max })}</p>
 {:else if head}
   <div class={["gh", level]}>
@@ -153,6 +154,11 @@
     margin: 0;
     color: var(--text-2);
     font-size: var(--fs-small);
+  }
+  @media (max-width: 767px) {
+    .empty {
+      display: none;
+    }
   }
   .gauge {
     display: grid;

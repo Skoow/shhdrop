@@ -17,7 +17,7 @@
   // page d'envoi « /envoyer », retours DROP), « Comment ça marche », « Pensé pour la
   // confidentialité », « Offres » et les questions. Voile de dépôt pleine page : un dépôt ouvre
   // le composeur avec ses fichiers. Un clic sur le verre n'ouvre rien.
-  // Composeur rempli ou page d'envoi (`compact`) : le titre replié, trois assurances, le Salon.
+  // Page d'envoi (`compact`) : trois assurances ; le Salon est avec les actions du composeur.
   import { untrack, type Snippet } from "svelte";
   import { dragDepth, dragHasFiles, filesFromDrop } from "../flows/intake";
   import { formatBytes } from "../i18n/format";
@@ -220,14 +220,8 @@
             <li><a.I size={15} strokeWidth={2} aria-hidden="true" /><span class="al">{t(a.k)}</span><span class="as" aria-hidden="true">{t(a.s)}</span></li>
           {/each}
         </ul>
-        <div class="room compact" data-room>
-          <button type="button" class="room-b" aria-disabled="true" aria-describedby="room-soon" onclick={() => announce(t("tabs.soon.chat"))}>
-            <span class="room-ic" aria-hidden="true"><TabIcon id="chat" size={22} /></span>
-            <span class="room-t">{t("foot.room")}</span>
-            <span class="room-soon">{t("foot.soon")}</span>
-          </button>
-          <p id="room-soon" class="sr-only">{t("tabs.soon.chat")}</p>
-        </div>
+        <!-- Plus de bouton Salon ici (17 novembre) : il est avec les autres actions du composeur
+             (rangée sur ordinateur, menu « + » sur téléphone). -->
       {/if}
     </div>
     {#if !compact}<div class="demo-slot"><SecureDemo /></div>{/if}
@@ -566,7 +560,7 @@
   /* Trois pastilles égales, une ligne, même hauteur (17 novembre). */
   .assure {
     order: 2;
-    flex: 1 1 30rem;
+    flex: 1 1 100%;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -583,7 +577,7 @@
     justify-content: center;
     gap: 6px;
     min-width: 0;
-    min-height: 48px; /* même hauteur que le bouton Salon, sur la même rangée (ordinateur) */
+    min-height: 44px;
     padding-inline: 10px;
     border-radius: 12px;
     background: rgb(255 255 255 / 0.03);
@@ -628,18 +622,6 @@
   .assure :global(svg) {
     flex: none;
     color: var(--accent);
-  }
-  .room.compact {
-    order: 3;
-    margin-inline-start: auto;
-  }
-  /* Téléphone : titre, assurances, puis Salon, les uns sous les autres, à gauche. */
-  @media (max-width: 599px) {
-    .assure,
-    .room.compact {
-      flex-basis: 100%;
-      margin-inline-start: 0;
-    }
   }
   /* Salon (bientôt) : à part des actions d'envoi, désactivé mais lisible. */
   .room {

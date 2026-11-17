@@ -169,7 +169,8 @@
 
   /** Une action d'ajout ; `live` faux : la galerie du système (appel synchrone, même geste). */
   function addAct(id: AddId, live = sheetActions.find((a) => a.id === id)?.live ?? false) {
-    if (id === "note") openEditor(null, "");
+    if (id === "room") say(t("tabs.soon.chat")); // Salon : bientôt (spec §39), rien à ouvrir
+    else if (id === "note") openEditor(null, "");
     else if (id === "files") filesIn?.click();
     else if (id === "voice") voiceOpen = true;
     else if (live) capOpen = true;
@@ -582,10 +583,19 @@
   <div class="adder bar">
     <div class="make" role="group" aria-label={t("compose.create.label")}>
       {#each rowActions as a (a.id)}
-        <button type="button" class="mk" data-add={a.id} onclick={() => addAct(a.id, a.live)}>
-          <AddIcon id={a.id} size={18} />
-          <span>{t(`compose.row.${a.id as "media" | "voice" | "note"}`)}</span>
-        </button>
+        {#if a.id === "room"}
+          <!-- Salon, avec les autres actions (17 novembre) : pas encore construit, désactivé avec sa raison. -->
+          <button type="button" class="mk room" data-add="room" aria-disabled="true" aria-describedby="room-soon-row" onclick={() => addAct("room")}>
+            <AddIcon id="room" size={18} />
+            <span>{t("compose.row.room")}</span><span class="soon">{t("foot.soon")}</span>
+          </button>
+          <span id="room-soon-row" class="sr-only">{t("tabs.soon.chat")}</span>
+        {:else}
+          <button type="button" class="mk" data-add={a.id} onclick={() => addAct(a.id, a.live)}>
+            <AddIcon id={a.id} size={18} />
+            <span>{t(`compose.row.${a.id as "media" | "voice" | "note"}`)}</span>
+          </button>
+        {/if}
       {/each}
     </div>
   </div>
@@ -1087,6 +1097,20 @@
   /* Téléphone : pastilles « Créer » plus serrées (deux rangées au plus). */
   .narrow .make {
     gap: 6px;
+  }
+  /* Salon (bientôt) : même bouton que les autres, en retrait, avec son badge. */
+  .mk.room {
+    border: 1px dashed rgb(233 236 242 / 0.24);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-2);
+  }
+  .mk .soon {
+    padding: 1px 7px;
+    border-radius: var(--r-pill);
+    background: rgb(255 255 255 / 0.06);
+    font-size: 0.6875rem;
+    font-weight: 500;
   }
   .narrow .mk {
     min-height: 44px;

@@ -16,6 +16,10 @@
   {:else if id === "note"}
     <path d="M6.5 3.5h8L19 8v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1.5-1.5z" />
     <path d="M14 3.5V8h5M8.5 12.5h7M8.5 16h4.5" />
+  {:else if id === "room"}
+    <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h7A2.5 2.5 0 0 1 16 6.5v4A2.5 2.5 0 0 1 13.5 13H9l-3.5 3v-3.2A2.5 2.5 0 0 1 4 10.5z" />
+    <path d="M18.5 9.5A2 2 0 0 1 20 11.4v3.6a2 2 0 0 1-1.5 1.9V19l-2.8-2H12" />
+    <circle cx="10" cy="8.5" r="0.6" fill="currentColor" stroke="none" />
   {:else if id === "gallery"}
     <rect x="3" y="7" width="14" height="13" rx="2.5" />
     <path d="M7 4h11.5A2.5 2.5 0 0 1 21 6.5V16" />

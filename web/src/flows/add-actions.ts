@@ -5,7 +5,9 @@
 // Le vocal n'a pas de repli : sans enregistreur, il n'est pas proposé.
 import type { CaptureMode } from "../media/capture";
 
-export type AddId = "media" | "voice" | "note" | "files";
+// « room » : le Salon, avec les autres actions (décision du propriétaire du 17 novembre) ;
+// pas encore construit : « bientôt », sans effet que de le dire.
+export type AddId = "media" | "voice" | "note" | "files" | "room";
 export type AddAction = { id: AddId; live: boolean };
 
 const media = (support: Record<CaptureMode, boolean>): AddAction => ({ id: "media", live: support.photo });
@@ -13,10 +15,10 @@ const voice = (support: Record<CaptureMode, boolean>): AddAction[] => (support.v
 
 /** Feuille « Ajouter » (téléphone). */
 export function addActions(support: Record<CaptureMode, boolean>): AddAction[] {
-  return [media(support), ...voice(support), { id: "note", live: false }, { id: "files", live: false }];
+  return [media(support), ...voice(support), { id: "note", live: false }, { id: "files", live: false }, { id: "room", live: false }];
 }
 
 /** Rangée de l'ordinateur : la zone de dépôt tient lieu de « Fichiers ». */
 export function desktopActions(support: Record<CaptureMode, boolean>): AddAction[] {
-  return [media(support), ...voice(support), { id: "note", live: false }];
+  return [media(support), ...voice(support), { id: "note", live: false }, { id: "room", live: false }];
 }

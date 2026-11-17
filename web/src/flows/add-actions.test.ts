@@ -5,9 +5,9 @@ const all = { photo: true, video: true, voice: true };
 const none = { photo: false, video: false, voice: false };
 
 describe("feuille « Ajouter » (téléphone)", () => {
-  it("Photo ou vidéo, Vocal, Note, Fichiers ; aucun doublon ; la caméra intégrée d'abord", () => {
+  it("Photo ou vidéo, Vocal, Note, Fichiers, Salon (17 novembre) ; aucun doublon ; la caméra intégrée d'abord", () => {
     const a = addActions(all);
-    expect(a.map((x) => x.id)).toEqual(["media", "voice", "note", "files"]);
+    expect(a.map((x) => x.id)).toEqual(["media", "voice", "note", "files", "room"]);
     expect(a[0]).toEqual({ id: "media", live: true });
   });
   it("sans caméra dans la page : Photo ou vidéo ouvre la galerie ; vocal masqué", () => {
@@ -15,6 +15,7 @@ describe("feuille « Ajouter » (téléphone)", () => {
       { id: "media", live: false },
       { id: "note", live: false },
       { id: "files", live: false },
+      { id: "room", live: false },
     ]);
   });
   it("caméra sans MediaRecorder : caméra intégrée (photo seule), pas de vocal", () => {
@@ -22,13 +23,14 @@ describe("feuille « Ajouter » (téléphone)", () => {
       ["media", true],
       ["note", false],
       ["files", false],
+      ["room", false],
     ]);
   });
 });
 
 describe("rangée sobre (ordinateur) : la zone de dépôt tient lieu de « Fichiers »", () => {
-  it("Photo ou vidéo, vocal, note", () => {
-    expect(desktopActions(all).map((a) => a.id)).toEqual(["media", "voice", "note"]);
-    expect(desktopActions(none).map((a) => a.id)).toEqual(["media", "note"]);
+  it("Photo ou vidéo, vocal, note, Salon", () => {
+    expect(desktopActions(all).map((a) => a.id)).toEqual(["media", "voice", "note", "room"]);
+    expect(desktopActions(none).map((a) => a.id)).toEqual(["media", "note", "room"]);
   });
 });

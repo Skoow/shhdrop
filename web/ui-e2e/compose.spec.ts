@@ -169,7 +169,8 @@ test.describe("fr-FR", () => {
       // Ordinateur : une seule présentation (ni grille ni tableau) ; « Créer sur place » sans Photo ni Vidéo.
       await expect(page.locator(".groups .grid, .groups table, .groups .tile")).toHaveCount(0);
       // Même liste d'actions que la feuille du téléphone ; la zone de dépôt tient lieu de « Fichiers ».
-      const made = (await canVoice(page)) ? ["Photo ou vidéo", "Vocal", "Note"] : ["Photo ou vidéo", "Note"];
+      // Salon avec les autres actions (17 novembre), « bientôt ».
+      const made = (await canVoice(page)) ? ["Photo ou vidéo", "Vocal", "Note", "Salonbientôt"] : ["Photo ou vidéo", "Note", "Salonbientôt"];
       await expect(page.getByRole("group", { name: "Créer sur place" }).getByRole("button")).toHaveText(made);
       await expect(page.getByRole("button", { name: /^Déposez des fichiers n'importe où sur la page/ })).toBeVisible();
       // Exigence du propriétaire : tout le composeur tient dans l'écran (le pied de page est dessous) ; le bouton
@@ -179,7 +180,7 @@ test.describe("fr-FR", () => {
         await page.waitForTimeout(700);
         expect(await composerFits(page), `${size.width} : le composeur tient dans l'écran, pied dessous`).toBe(true);
         expect(await inViewport(send(page)), `${size.width} : bouton visible`).toBe(true);
-        for (const l of [page.locator(".top .ht"), page.getByRole("radiogroup", { name: "Durée" }), page.getByRole("radiogroup", { name: "Ouvertures" }), page.locator(".box"), page.getByRole("switch", { name: "Autoriser le téléchargement" }), page.locator(".summary")])
+        for (const l of [page.locator(".top .ht"), page.getByRole("radiogroup", { name: "Durée" }), page.getByRole("radiogroup", { name: "Ouvertures" }), page.getByRole("switch", { name: "Autoriser le téléchargement" }), page.locator(".summary")])
           expect(await inViewport(l), `${size.width} : ${await l.first().evaluate((e) => e.className)}`).toBe(true);
       }
       await page.setViewportSize({ width: 1440, height: 900 });
@@ -628,7 +629,8 @@ test.describe("fr-FR", () => {
       const sheet = page.getByRole("dialog", { name: "Ajouter" });
       const labels = await sheet.locator("[data-add] .lb").allTextContents();
       const voice = await canVoice(page);
-      expect(labels).toEqual(voice ? ["Photo ou vidéo", "Vocal", "Note", "Fichiers"] : ["Photo ou vidéo", "Note", "Fichiers"]);
+      expect(labels).toEqual(voice ? ["Photo ou vidéo", "Vocal", "Note", "Fichiers", "Salonbientôt"] : ["Photo ou vidéo", "Note", "Fichiers", "Salonbientôt"]);
+      await expect(sheet.locator("[data-add=room]")).toHaveAttribute("aria-disabled", "true");
       if (voice) await expect(sheet.locator("[data-add=voice]")).toContainText("Micro seulement, 30\u202fmin\u202fmaximum");
       for (const b of await sheet.locator("[data-add]").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(56);
       await capture(page, "add-sheet");
