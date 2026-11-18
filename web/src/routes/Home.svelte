@@ -13,8 +13,7 @@
   // Accueil, refonte du 12 novembre (décision du propriétaire) : sur-titre, titre, phrase, deux
   // boutons (« Choisir des fichiers » ouvre le sélecteur du composeur ; « Ouvrir un salon »,
   // bientôt), ligne de méta lue dans limits.ts ; l'infographie animée à côté (ordinateur) ou
-  // dessous (téléphone) ; puis la carte de dépôt (le composeur vide : « Commencer » mène à la
-  // page d'envoi « /envoyer », retours DROP), « Comment ça marche », « Pensé pour la
+  // dessous (téléphone) ; puis « Comment ça marche », « Pensé pour la
   // confidentialité », « Offres » et les questions. Voile de dépôt pleine page : un dépôt ouvre
   // le composeur avec ses fichiers. Un clic sur le verre n'ouvre rien.
   // Page d'envoi (`compact`) : trois assurances ; le Salon est avec les actions du composeur.
@@ -22,10 +21,9 @@
   import { dragDepth, dragHasFiles, filesFromDrop } from "../flows/intake";
   import { formatBytes } from "../i18n/format";
   import { t, getLang } from "../i18n/i18n.svelte";
-  import { limitParams } from "../i18n/limit-params";
   import { CONTENT_MAX } from "../limits";
   import DropOverlay from "../ui/DropOverlay.svelte";
-  import { ArrowRight, Check, ChevronRight, Plus, Upload } from "../ui/Icon";
+  import { Check, ChevronRight, Plus, Upload } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
   import SecureDemo from "../ui/SecureDemo.svelte";
@@ -41,14 +39,12 @@
     onfiles?: (files: File[], source: Source, folders: string[]) => void;
     /** Faux pendant un envoi : le glisser-déposer n'ouvre pas le voile et n'ajoute rien (S9). */
     active?: boolean;
-    /** « Commencer » (carte de dépôt, téléphone) : mène à la page d'envoi « /envoyer » (Compose, retours DROP). */
-    onadd?: () => void;
     /** « Choisir des fichiers » (héros) : ouvre directement le sélecteur de fichiers du composeur. */
     onpick?: () => void;
     /** « Créer sur place » (héros, 17 novembre) : page d'envoi, actions mises en avant. */
     oncreate?: () => void;
   };
-  let { compact = false, children, onfiles, active = true, onadd, onpick, oncreate }: Props = $props();
+  let { compact = false, children, onfiles, active = true, onpick, oncreate }: Props = $props();
 
   // Décidé au montage seulement : un repli ultérieur ne rejoue pas l'entrée.
   let reveal = $state(!revealed && !untrack(() => compact));
@@ -213,33 +209,16 @@
   <!-- « Vos partages actifs » (spec §33.1, UI §9.6.1) : lecture locale seulement, rien sans partage actif. -->
   {#if !compact}<div class="shares"><ActiveSharesStrip /></div>{/if}
 
-  <div class="compose" data-slot="compose">
-    <Vessel empty={!children} drop={over}>
-      {#if children}
+  <!-- Le composeur (page d'envoi) seulement : plus de carte de dépôt « Glissez vos fichiers ici »
+       sur l'accueil (18 novembre, doublon de « Choisir des fichiers » ; le dépôt sur toute la page
+       reste possible). -->
+  {#if children}
+    <div class="compose" data-slot="compose">
+      <Vessel empty={false} drop={over}>
         {@render children()}
-      {:else}
-        <div class="empty">
-          <span class="drop-ic" aria-hidden="true"><Upload size={22} strokeWidth={1.9} /></span>
-          <div class="drop-say">
-            <h2 class="drop-title">
-              <span class="t-fine">{t("compose.drop.title")}</span><span class="t-touch">{t("compose.drop.titleTouch")}</span>
-            </h2>
-          </div>
-          <button type="button" class="browse" onclick={() => onadd?.()}>
-            <span>{t("home.end.cta")}</span>
-            <ArrowRight size={20} strokeWidth={1.9} aria-hidden="true" />
-          </button>
-          <!-- Plus de tuiles Photo, Vocal, Note ici (17 novembre) : « Créer sur place », en haut. -->
-          <p class="proof num">{t("home.proof", limitParams(getLang()))}</p>
-          <!-- Téléphone : une seule action, « Commencer », vers la page d'envoi (retours DROP). -->
-          <button type="button" class="add-big" onclick={() => onadd?.()}>
-            <span class="ab-ic" aria-hidden="true"><ArrowRight size={26} strokeWidth={2.2} /></span>
-            <span class="ab-tx"><span class="ab-t">{t("home.end.cta")}</span><span class="ab-s">{t("add.big.sub")}</span></span>
-          </button>
-        </div>
-      {/if}
-    </Vessel>
-  </div>
+      </Vessel>
+    </div>
+  {/if}
 
   {#if !compact}
     <Sections />
@@ -496,131 +475,30 @@
   
   
 
-  .drop-say {
-    display: grid;
-    gap: var(--sp-1);
-    padding-inline: 4px;
-  }
-  .drop-title {
-    font-size: 1.375rem;
-    line-height: 1.2;
-    font-weight: 640;
-    font-stretch: 108%;
-    letter-spacing: -0.015em;
-  }
-  .t-touch {
-    display: none;
-  }
-  @media (hover: none) and (pointer: coarse) {
-    .t-fine {
-      display: none;
-    }
-    .t-touch {
-      display: inline;
-    }
-  }
+  
+  
+  
+  
 
   /* « Commencer » (page d'envoi) : bouton contour ; le blanc plein reste au héros (refonte du 12 novembre). */
-  .browse {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    min-height: 52px;
-    padding: 0 var(--sp-5);
-    border: 1px solid rgb(150 175 255 / 0.28);
-    border-radius: 14px;
-    background: rgb(255 255 255 / 0.03);
-    color: var(--text);
-    font: inherit;
-    font-size: 1rem;
-    font-weight: 620;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    transition:
-      transform var(--dur-press) var(--ease-out),
-      background-color var(--dur-fast) var(--ease-out);
-  }
-  .browse :global(svg) {
-    transition: transform 500ms var(--ease-settle);
-  }
-  @media (hover: hover) {
-    .browse:hover {
-      border-color: rgb(150 175 255 / 0.5);
-      background: rgb(255 255 255 / 0.06);
-    }
-    .browse:hover :global(svg) {
-      transform: translateX(4px);
-    }
-  }
-  .browse:active {
-    transform: scale(0.97);
-  }
+  
+  
+  
+  
 
   
 
   /* Téléphone : « Ajouter » remplace « Commencer » et la rangée de tuiles (aucun doublon). */
-  .add-big {
-    display: none;
-  }
+  
   @media (max-width: 759px) {
-    .browse{
-      display: none;
-    }
-    .add-big {
-      display: grid;
-      grid-template-columns: 56px minmax(0, 1fr);
-      align-items: center;
-      gap: var(--sp-4);
-      width: 100%;
-      min-height: 80px;
-      padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-3);
-      border: 0;
-      border-radius: var(--r-xl);
-      background: var(--paper);
-      color: var(--ink);
-      font: inherit;
-      text-align: start;
-      cursor: pointer;
-      box-shadow:
-        0 14px 30px -18px rgb(0 0 0 / 0.9),
-        inset 0 -2px 0 rgb(11 13 18 / 0.12);
-      transition: transform var(--dur-press) var(--ease-out);
-    }
-    .add-big:active {
-      transform: scale(0.98);
-    }
-    .ab-ic {
-      display: grid;
-      place-items: center;
-      width: 56px;
-      height: 56px;
-      border-radius: 18px;
-      background: var(--ink);
-      color: var(--accent);
-    }
-    .ab-tx {
-      display: grid;
-      gap: 2px;
-      min-width: 0;
-    }
-    .ab-t {
-      font-size: 1.25rem;
-      font-weight: 650;
-      font-stretch: 108%;
-      /* « Commencer » à 200 % sur 320 px : coupé (avec trait d'union) plutôt que débordé. */
-      hyphens: auto;
-      overflow-wrap: anywhere;
-    }
-    .ab-s {
-      color: rgb(11 13 18 / 0.68);
-      font-size: var(--fs-small);
-      line-height: var(--lh-small);
-    }
-    .empty {
-      gap: var(--sp-5);
-    }
+    
+    
+    
+    
+    
+    
+    
+    
     /* Composeur : un écran d'app, pas une carte dans la page (ni cadre, ni liseré). */
     .home.compact .compose :global(.vessel) {
       background: transparent;
@@ -680,14 +558,7 @@
     }
   }
 
-  .proof {
-    max-width: none;
-    margin: 0;
-    padding: var(--sp-3) 4px 0;
-    border-top: 1px solid var(--hair);
-    color: var(--text-2);
-    font-size: 0.8125rem;
-  }
+  
 
 
   /* ---------- Carte de dépôt : le composeur vide ---------- */
@@ -707,22 +578,8 @@
     max-width: 880px;
     margin-inline: auto;
   }
-  .empty {
-    position: relative;
-    display: grid;
-    gap: var(--sp-4);
-    padding: var(--sp-5) var(--sp-4);
-  }
-  .drop-ic {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: rgb(95 227 181 / 0.12);
-    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.25);
-    color: var(--accent);
-  }
+  
+  
 
   /* ---------- Entrée (K1 : tout fini à 900 ms au plus, tout cliquable dès l'affichage) ---------- */
   @media (prefers-reduced-motion: no-preference) {
@@ -772,11 +629,7 @@
     }
   }
 
-  @media (min-width: 600px) {
-    .empty {
-      padding: var(--sp-6) var(--sp-6) var(--sp-5);
-    }
-  }
+  
   /* Téléphone et tablette (téléphone ajouté le 15 novembre : centrage revu) : texte centré,
      infographie dessous, à largeur lisible. */
   @media (max-width: 1023px) {
@@ -812,34 +665,23 @@
     .lede {
       font-size: 1.1875rem;
     }
-    .drop-title {
-      font-size: 1.625rem;
-    }
+    
     
     /* Carte vide : titre et « Commencer » sur une ligne, gestes dessous. */
-    .home:not(.compact) .empty {
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      align-items: center;
-      column-gap: var(--sp-4);
-    }
     
-    .home:not(.compact) .proof {
-      grid-column: 1 / -1;
-    }
+    
+    
   }
 
   @media (prefers-reduced-motion: reduce) {
     
     .pick,
-    .pick :global(svg),
-    .browse,
-    .browse :global(svg) {
+    .pick :global(svg){
       transition: none;
     }
     
     .pick:active,
-    .pick:hover,
-    .browse:active {
+    .pick:hover{
       transform: none;
     }
   }
@@ -853,9 +695,7 @@
       display: none;
     }
     
-    .pick,
-    .browse,
-    .add-big {
+    .pick{
       border: 1px solid ButtonText;
       box-shadow: none;
     }

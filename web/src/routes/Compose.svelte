@@ -801,7 +801,7 @@
 <input bind:this={videoIn} type="file" accept="video/*" capture="environment" hidden tabindex="-1" onchange={(e) => picked(e.currentTarget, "video")} />
 
 <!-- « Commencer » (accueil) mène à la page d'envoi « /envoyer » (retours DROP). -->
-<Home {active} compact={shown} onadd={() => navigate("/envoyer")} onpick={pickFromHome} children={shown ? app : undefined} onfiles={(f, s, folders) => void addFiles(f, s, folders)} oncreate={create} />
+<Home {active} compact={shown} onpick={pickFromHome} children={shown ? app : undefined} onfiles={(f, s, folders) => void addFiles(f, s, folders)} oncreate={create} />
 
 <Sheet bind:open={editorOpen} title={editorId ? t("text.title.edit") : t("text.title.new")}>
   <div class="editor">

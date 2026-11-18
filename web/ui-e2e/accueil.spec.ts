@@ -15,14 +15,12 @@ const inView = (page: Page, sel: string) =>
     return r.top >= 0 && r.bottom <= innerHeight && r.width > 0;
   });
 
-test("premier écran : « Choisir des fichiers » visible ; ordinateur : le haut de la carte de dépôt aussi", async ({ page, shh, isMobile }) => {
+test("premier écran : « Choisir des fichiers » et « Créer sur place » visibles ; plus de carte de dépôt (18 novembre)", async ({ page, shh }) => {
   await page.goto(shh.origin + "/");
   await expect(page.getByRole("button", { name: "Choisir des fichiers" })).toBeVisible();
   expect(await inView(page, "[data-pick]")).toBe(true);
-  if (!isMobile) {
-    const top = await page.locator('[data-slot="compose"]').evaluate((e) => e.getBoundingClientRect().top);
-    expect(top).toBeLessThan(900 - 40);
-  }
+  expect(await inView(page, "[data-create]")).toBe(true);
+  await expect(page.locator('[data-slot="compose"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

@@ -79,11 +79,12 @@ jobs:
       # Toutes les dépendances, outils de build et de test compris (audit du 11 novembre, M11) :
       # Vite, Vitest, Playwright, svelte-check tournent dans la CI et produisent le site. Cet
       # audit contient celui des seules dépendances d'exécution (--omit=dev), au même niveau.
+      # Exceptions datées et motivées, validées par le propriétaire : web/audit-exceptions.json.
       - name: npm audit
         working-directory: web
         run: |
-          npm audit --audit-level=high
-          cd tools/svelte-check && npm audit --audit-level=high
+          node scripts/audit.mjs .
+          node scripts/audit.mjs tools/svelte-check
   e2e:
     needs: [go, web]
     runs-on: ubuntu-latest

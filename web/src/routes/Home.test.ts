@@ -62,7 +62,6 @@ describe("Home (UI §9.1)", () => {
     const h2 = [...document.querySelectorAll("h2")].map((h) => h.textContent!.trim());
     expect(h2).toEqual([
       "Ce qui se passe quand vous partagez", // titre de l'infographie, pour les lecteurs d'écran
-      "Glissez vos fichiers iciQue voulez-vous envoyer\u202f?",
       "Comment ça marche",
       "Pensé pour la confidentialité",
       "Offres",
@@ -87,7 +86,7 @@ describe("Home (UI §9.1)", () => {
     expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus"]);
     expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
     expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
-    expect(document.querySelector('[data-slot="compose"]')).not.toBeNull();
+    expect(document.querySelector('[data-slot="compose"]')).toBeNull(); // composeur : page d'envoi seulement
   });
 
   it("compact (page d'envoi) : plus le slogan de l'accueil, un h1 « Nouveau partage » pour les lecteurs d'écran (« Votre envoi » est le titre visible) ; phrase et schéma retirés", () => {
@@ -102,7 +101,6 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector("[data-pick]")).toBeNull();
     expect(document.querySelector("[data-eyebrow]")).toBeNull();
     expect(document.querySelector("a")).toBeNull();
-    expect(document.querySelector('[data-slot="compose"]')).not.toBeNull();
   });
 
   it("le composeur fourni remplace l'emplacement réservé", () => {
@@ -164,35 +162,20 @@ describe("Home (UI §9.1)", () => {
     }
   });
 
-  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; « Créer sur place » appelle oncreate ; « Commencer » (fenêtre, téléphone) mène à la page d'envoi (onadd) ; un clic sur le verre n'ouvre rien", () => {
+  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; « Créer sur place » appelle oncreate ; plus de carte de dépôt sur l'accueil (18 novembre)", () => {
     const onfiles = vi.fn();
     const oncreate = vi.fn();
-    const onadd = vi.fn();
     const onpick = vi.fn();
-    show({ onfiles, oncreate, onadd, onpick });
+    show({ onfiles, oncreate, onpick });
     // Plus de sélecteur propre à l'accueil : le composeur tient le seul champ fichier.
     expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
     (document.querySelector("[data-pick]") as HTMLButtonElement).click();
     expect(onpick).toHaveBeenCalledTimes(1);
-    expect(onadd).not.toHaveBeenCalled();
-    const buttons = (name: string) => [...document.querySelectorAll("button")].filter((b) => b.textContent!.trim() === name);
-    const starts = buttons("Commencer");
-    expect(starts).toHaveLength(1); // fenêtre de dépôt ; le grand bouton du téléphone a aussi un sous-titre
-    expect(starts[0]!.hasAttribute("aria-haspopup")).toBe(false); // une navigation, pas une feuille
-    starts[0]!.click();
-    expect(onadd).toHaveBeenCalledTimes(1);
-    // « Créer sur place » : page d'envoi, options de création en avant (oncreate).
     (document.querySelector("[data-create]") as HTMLButtonElement).click();
     expect(oncreate).toHaveBeenCalledTimes(1);
-    const big = document.querySelector(".add-big") as HTMLButtonElement;
-    expect(big.querySelector(".ab-t")!.textContent).toBe("Commencer");
-    big.click();
-    expect(onadd).toHaveBeenCalledTimes(2);
-    // Le verre n'est qu'une cible de dépôt (décision du propriétaire).
-    (document.querySelector(".empty") as HTMLElement).click();
-    (document.querySelector(".drop-title") as HTMLElement).click();
-    expect(onadd).toHaveBeenCalledTimes(2);
-    expect(onpick).toHaveBeenCalledTimes(1);
+    // Ni « Commencer », ni carte « Glissez vos fichiers ici » : doublons des deux boutons du héros.
+    expect([...document.querySelectorAll("button")].some((b) => b.textContent!.trim().startsWith("Commencer"))).toBe(false);
+    expect(document.querySelector('[data-slot="compose"]')).toBeNull();
     expect(onfiles).not.toHaveBeenCalled();
   });
 

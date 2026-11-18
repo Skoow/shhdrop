@@ -1,5 +1,5 @@
 // Accueil (UI §9.1, §20.4 ; refonte du 12 novembre, UI §25) : titre mot par mot, cases cochées,
-// infographie, fenêtre de dépôt (Commencer, qui mène à la page d'envoi « /envoyer » ; Photo ou
+// infographie, boutons du héros (qui mènent à la page d'envoi « /envoyer » ; Photo ou
 // vidéo, Vocal, Note), voile de dépôt pleine page, sections sous le pli (Comment ça marche,
 // Pensé pour la confidentialité, Offres, questions), révélations au défilement.
 import type { Page } from "@playwright/test";
@@ -39,7 +39,6 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("button", { name: /^Créer sur place/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
     // Limites gratuites (spec §41.2), lues des constantes.
-    if (!isMobile) await expect(page.locator("p.proof")).toHaveText("Jusqu'à 2\u202fGo au total");
     for (const h of ["Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     // Infographie : sept étapes lisibles en liste, le dessin caché.
@@ -174,19 +173,12 @@ test.describe("fr-FR", () => {
     await expect(h1.locator(".words .w")).toHaveCount(9);
   });
 
-  test("rien n'attend : à 100 ms, « Commencer » mène à la page d'envoi vide (grand cadre de dépôt), puis le sélecteur multiple ; un clic sur le verre n'ouvre rien", async ({ page, shh, isMobile }) => {
+  test("rien n'attend : à 100 ms, « Créer sur place » mène à la page d'envoi vide (grand cadre de dépôt), puis le sélecteur multiple", async ({ page, shh, isMobile }) => {
     test.skip(isMobile, "téléphone : page d'envoi vide, « Ajouter » (drop.spec.ts)");
     await page.goto(shh.origin + "/", { waitUntil: "domcontentloaded" });
-    const start = page.getByRole("button", { name: "Commencer" }).first();
+    const start = page.locator("[data-create]");
     await expect(start).toBeAttached();
     await page.waitForTimeout(100);
-    let opened = 0;
-    page.on("filechooser", () => opened++);
-    // force : pas d'attente de stabilité (le coffre monte encore de quelques pixels).
-    await page.locator(".drop-title").click({ force: true });
-    await page.locator(".drop-ic").click({ force: true });
-    await page.waitForTimeout(300);
-    expect(opened).toBe(0);
     await start.click({ force: true });
     await expect(page).toHaveURL(shh.origin + "/envoyer");
     const zone = page.locator(".dropzone.empty");
@@ -195,6 +187,7 @@ test.describe("fr-FR", () => {
     await zone.click();
     expect((await chooser).isMultiple()).toBe(true);
   });
+
 
   test("Photo ou vidéo : caméra dans la page ; sans caméra, repli sur le sélecteur filtré (capture) ; les fichiers choisis ouvrent le composeur", async ({ page, shh, isMobile, browserName }) => {
     test.skip(isMobile, "téléphone : feuille « Ajouter » (capture.spec.ts)");
@@ -274,7 +267,7 @@ test.describe("fr-FR", () => {
     await expect(overlay).toBeHidden();
     await drag(page, "dragenter", ["a.txt"]);
     await expect(overlay).toBeVisible();
-    await expect(page.locator(".vessel.drop")).toHaveCount(1);
+    await expect(page.locator("[data-pick].over")).toHaveCount(1); // la tuile de dépôt s'allume
     await page.waitForTimeout(600);
     await capture(page, "home-drop");
     await page.keyboard.press("Escape");
@@ -290,9 +283,9 @@ test.describe("fr-FR", () => {
     expect(page.url()).toBe(shh.origin + "/");
   });
 
-  test("« Commencer » (carte de dépôt) ou « Créer sur place » (téléphone) mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
+  test("« Créer sur place » mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
-    const cta = isMobile ? page.locator("[data-create]") : page.locator('[data-slot="compose"]').getByRole("button", { name: "Commencer" });
+    const cta = page.locator("[data-create]");
     await cta.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await cta.click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
@@ -409,12 +402,7 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
-    // m6 : l'ouverture du contour (état drop) n'est pas animée, seule sa couleur l'est.
-    // (Ordinateur seulement : la carte de dépôt n'est plus sur l'accueil du téléphone.)
-    if (!isMobile) {
-      const props = await page.locator(".vessel .track").evaluate((e) => getComputedStyle(e).transitionProperty);
-      expect(props).not.toMatch(/stroke-dasharray|all/);
-    }
+    // (m6, contour de la carte de dépôt : la carte n'est plus sur l'accueil, 18 novembre.)
     await capture(page, "home-v3-reduced");
     await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(200);
@@ -463,7 +451,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
     for (const sel of [".aurora", ".grain", ".trame"])
       expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).display), sel).toBe("none");
-    for (const name of isMobile ? ["Choisir des fichiers", "Créer sur place"] : ["Choisir des fichiers", "Créer sur place", "Commencer"]) {
+    for (const name of isMobile ? ["Choisir des fichiers", "Créer sur place"] : ["Choisir des fichiers", "Créer sur place"]) {
       const b = page.getByRole("button", { name: new RegExp(`^${name}`) }).filter({ visible: true }).first();
       // La tuile « Choisir des fichiers » est une zone de dépôt : pointillé (16 novembre).
       expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe(name === "Choisir des fichiers" ? "dashed" : "solid");
