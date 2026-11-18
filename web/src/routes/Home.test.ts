@@ -68,13 +68,13 @@ describe("Home (UI §9.1)", () => {
       "Vos questions",
     ]);
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
-    // « Comment ça marche » : une frise numérotée, distincte des cartes de la confidentialité.
-    expect(document.querySelectorAll("ol.flow > li[data-how-card] .nb")).toHaveLength(3);
+    // « Comment ça marche » (A2, 18 novembre) : cartes à grand chiffre en filigrane.
+    expect([...document.querySelectorAll("ol.steps > li[data-how-card] .big")].map((e) => e.textContent)).toEqual(["1", "2", "3"]);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
-    for (const c of [...document.querySelectorAll("[data-how-card]")]) expect(c.querySelector(".node svg")).not.toBeNull();
+    for (const c of [...document.querySelectorAll("[data-how-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
     // Plus de ligne sur la clé après le « # » sur l'accueil (décision du 16 novembre).
     expect(document.querySelector("[data-key-note]")).toBeNull();
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);

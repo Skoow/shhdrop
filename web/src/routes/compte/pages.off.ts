@@ -10,6 +10,8 @@ export const Inscription = absente;
 export const Oubli = absente;
 export const restaurer = async (): Promise<void> => undefined;
 export const seDeconnecter = async (): Promise<void> => undefined;
+export const ecouterAutresOnglets = (): (() => void) => () => undefined;
+export const verifierAuRetour = async (): Promise<void> => undefined;
 export const Accueil = absente;
 export const Parametres = absente;
 export const Profil = absente;

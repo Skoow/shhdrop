@@ -80,7 +80,7 @@ async function erreur(r: Response): Promise<CompteError> {
   });
 }
 
-async function appel(n: Net, method: "GET" | "POST" | "PUT", route: string, opts: { session?: string; body?: Obj } = {}): Promise<Obj> {
+async function appel(n: Net, method: "GET" | "POST" | "PUT", route: string, opts: { session?: string; body?: Obj; keepalive?: boolean } = {}): Promise<Obj> {
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   if (opts.session !== undefined) headers["X-Shh-Session"] = opts.session;
@@ -93,6 +93,7 @@ async function appel(n: Net, method: "GET" | "POST" | "PUT", route: string, opts
       credentials: "omit",
       redirect: "error",
       cache: "no-store",
+      ...(opts.keepalive ? { keepalive: true } : {}),
     });
   } catch {
     throw new Error("reseau");
@@ -298,8 +299,9 @@ export async function etiquetterSession(n: Net, session: string, etiquette: Byte
   await appel(n, "POST", "sessions/etiquette", { session, body: { etiquette: b64u(etiquette) } });
 }
 
+/** Déconnexion : `keepalive` (audit du 18 novembre) pour qu'elle parte même si l'onglet se ferme aussitôt. */
 export async function deconnexion(n: Net, session: string): Promise<void> {
-  await appel(n, "POST", "deconnexion", { session, body: {} });
+  await appel(n, "POST", "deconnexion", { session, body: {}, keepalive: true });
 }
 
 // --- Paramètres (lot 13 ; routes du lot 5, handlers_compte.go) ---------------------------------

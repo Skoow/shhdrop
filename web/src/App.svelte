@@ -24,7 +24,7 @@
   // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, restaurer, seDeconnecter, supprime } from "./routes/compte/pages";
+  import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, ecouterAutresOnglets, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
 
   // UI §9 : vérifié une fois, avant toute route. Sans ces capacités, aucune route ne démarre
   // (ni lecture du lien, ni requête).
@@ -108,7 +108,14 @@
   $effect(() => watchOpenGrant(window));
   // « Rester connecté » (conception compte §9) : la session gardée sur cet appareil est rouverte
   // au démarrage ; échue ou fermée ailleurs, elle est oubliée. Seulement avec __COMPTES__.
-  if (__COMPTES__ && supported) restaurer().catch(() => undefined);
+  if (__COMPTES__ && supported) {
+    restaurer().catch(() => undefined);
+    // Audit du 18 novembre : déconnexion faite dans un autre onglet, session fermée ailleurs.
+    ecouterAutresOnglets();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") void verifierAuRetour();
+    });
+  }
   // « Se déconnecter » du menu (18 novembre) : la coque n'importe rien du compte ; elle appelle ceci.
   if (__COMPTES__)
     accountFlag.logout = async () => {

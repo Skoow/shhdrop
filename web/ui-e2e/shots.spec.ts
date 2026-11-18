@@ -55,7 +55,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   await page.locator("section.priv").scrollIntoViewIfNeeded();
   await shot(page, "02-pourquoi");
   // Plus de panneau Réglages : son contenu est dans le pied de page.
-  await page.locator("footer[data-foot] [data-foot-prefs]").scrollIntoViewIfNeeded();
+  await page.locator("footer[data-foot] .base").scrollIntoViewIfNeeded();
   await shot(page, "03-reglages-pied");
   await page.evaluate(() => scrollTo(0, 0));
   await page.evaluate(() => scrollTo(0, 0));

@@ -122,7 +122,12 @@ describe("règles de sources", () => {
     expect(offenders(/X-Shh-Session/i, (r) => r !== "account/api.ts")).toEqual([]);
     expect(files.find((f) => f.rel === "account/api.ts")?.text).toMatch(/X-Shh-Session/);
     expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("account/") && r !== "account/api.ts")).toEqual([]);
-    expect(offenders(/XMLHttpRequest|sendBeacon|WebSocket|EventSource|keepalive/, (r) => r === "account/api.ts")).toEqual([]);
+    expect(offenders(/XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r === "account/api.ts")).toEqual([]);
+    // keepalive (audit du 18 novembre) : seulement pour la déconnexion, pour qu'elle parte même si
+    // l'onglet se ferme aussitôt ; aucune autre requête ne survit à la page.
+    const apiTs = files.find((f) => f.rel === "account/api.ts")!.text;
+    expect([...apiTs.matchAll(/keepalive: true/g)]).toHaveLength(2); // l'option d'appel, et son seul usage
+    expect(apiTs).toMatch(/export async function deconnexion[\s\S]{0,160}keepalive: true/);
   });
   it("compte : s_profil et K_compte seulement dans account/", () => {
     expect(offenders(/s_profil|sProfil|kCompte|K_compte/, (r) => !r.startsWith("account/") && !r.startsWith("engine/"))).toEqual([]);

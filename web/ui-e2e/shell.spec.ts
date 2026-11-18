@@ -59,9 +59,8 @@ test("pied de page (UI5) : Produit, Confiance, Légal ; langue, nettoyage, À pr
   await expect(foot.getByRole("combobox")).toHaveCount(0);
   await expect(foot.getByRole("group", { name: "Langue" })).toHaveCount(0);
   await expect(foot.getByRole("switch")).toHaveCount(0);
-  // « À propos » : ordinateur seulement (sur téléphone, il redisait la phrase de la marque).
-  if (isMobile) await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toBeHidden();
-  else await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toBeVisible();
+  // Plus de « À propos » (pied B2, 18 novembre) : la phrase de la marque le dit déjà.
+  await expect(foot.getByText("Shhgone chiffre sur votre appareil avant l'envoi.", { exact: false })).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(600); // fin des apparitions au défilement
   expect(await axe(page)).toEqual([]);

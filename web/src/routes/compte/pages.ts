@@ -4,7 +4,7 @@
 export { default as Connexion } from "./Connexion.svelte";
 export { default as Inscription } from "./Inscription.svelte";
 export { default as Oubli } from "./Oubli.svelte";
-export { restaurer, seDeconnecter } from "../../account/session.svelte";
+export { ecouterAutresOnglets, restaurer, seDeconnecter, verifierAuRetour } from "../../account/session.svelte";
 export { default as Accueil } from "./Accueil.svelte";
 export { default as Parametres } from "./Parametres.svelte";
 export { default as Profil } from "./Profil.svelte";

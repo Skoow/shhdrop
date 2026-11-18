@@ -29,9 +29,8 @@ async function fullFoot(page: Page) {
   await expect(footLink(page, "Conditions d'utilisation")).toBeVisible();
   await expect(f.getByRole("group", { name: /^(Langue|Language)$/ })).toHaveCount(0);
   await expect(f.getByRole("switch")).toHaveCount(0);
-  // « À propos » : ordinateur seulement (< 900 px, pied d'un seul bloc, retours du 15 novembre).
-  if ((page.viewportSize()?.width ?? 1280) >= 900) await expect(f.getByText("À propos", { exact: true })).toBeVisible();
-  else await expect(f.getByText("À propos", { exact: true })).toBeHidden();
+  // Plus de « À propos » (pied B2, 18 novembre) : la phrase de la marque le dit déjà.
+  await expect(f.getByText("À propos", { exact: true })).toHaveCount(0);
   await page.evaluate(() => scrollTo(0, 0));
 }
 

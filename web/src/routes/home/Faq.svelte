@@ -34,7 +34,22 @@
     max-width: 52rem;
     margin-inline: auto;
     padding-block-start: 120px;
+  }  /* Ordinateur (18 novembre) : une bande à part, comme les autres sections de l'accueil. */
+  @media (min-width: 1024px) {
+    .faq::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset-block: 0;
+      left: 50%;
+      width: 100cqw;
+      transform: translateX(-50%);
+      border-block-start: 1px solid rgb(150 175 255 / 0.1);
+      background: radial-gradient(60% 120px at 50% 0%, rgb(95 227 181 / 0.05), transparent 100%), rgb(255 255 255 / 0.018);
+      pointer-events: none;
+    }
   }
+
   details {
     scroll-margin-top: 96px;
   }

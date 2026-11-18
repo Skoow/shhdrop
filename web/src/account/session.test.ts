@@ -735,3 +735,49 @@ describe("paramètres (lot 13)", () => {
     expect([...idb.raw().keys()]).toEqual([]);
   });
 });
+
+describe("déconnexion (audit du 18 novembre)", () => {
+  it("part avec keepalive ; sans réseau, réessayée jusqu'à ce que le serveur réponde ; jamais réécrite sur l'appareil", async () => {
+    await inscription();
+    const f = srv.fetch;
+    let tentatives = 0;
+    const vues: RequestInit[] = [];
+    configurerFetch((async (u: string, i: RequestInit) => {
+      if (u.endsWith("/deconnexion")) {
+        vues.push(i);
+        if (++tentatives < 3) throw new TypeError("réseau");
+      }
+      return f(u, i);
+    }) as never);
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const p = C.seDeconnecter();
+      await vi.advanceTimersByTimeAsync(20_000);
+      await p;
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(C.account.etat).toBe("absent");
+    expect(tentatives).toBe(3);
+    expect(vues.every((i) => i.keepalive === true)).toBe(true);
+  });
+
+  it("autre onglet : un signal de déconnexion efface la mémoire du compte ici ; aucun secret sur le canal", async () => {
+    await inscription();
+    expect(C.account.etat).toBe("ouvert");
+    const arret = C.ecouterAutresOnglets();
+    const vus: unknown[] = [];
+    const espion = new BroadcastChannel("shh-compte-onglets");
+    espion.onmessage = (e) => vus.push(e.data);
+    try {
+      const autre = new BroadcastChannel("shh-compte-onglets");
+      autre.postMessage("deconnexion");
+      autre.close();
+      await vi.waitFor(() => expect(C.account.etat).toBe("absent"));
+      expect(vus).toEqual(["deconnexion"]);
+    } finally {
+      arret();
+      espion.close();
+    }
+  });
+});

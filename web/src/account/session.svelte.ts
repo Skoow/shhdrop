@@ -219,7 +219,8 @@ async function synchroniser(o: Ouverte, recuperation: boolean): Promise<void> {
 
 async function memoriser(o: Ouverte): Promise<void> {
   const idb = deps.idb();
-  if (!o.persistante || !idb) return;
+  // Session oubliée entre-temps (déconnexion ici ou dans un autre onglet) : jamais réécrite.
+  if (!o.persistante || !idb || ouverte !== o) return;
   await sauver(idb, { jeton: o.jeton, h: o.h, kCompte: o.kCompte, sProfil: o.sProfil, genProfil: o.profil.gen, genPrive: o.prive.gen }).catch(() => undefined);
 }
 
@@ -593,11 +594,66 @@ export async function restaurer(): Promise<void> {
   }
 }
 
-/** Déconnexion : l'appareil oublie tout, même si le serveur ne répond pas. */
+/**
+ * Déconnexion : l'appareil oublie tout, même si le serveur ne répond pas ; les autres onglets du
+ * site aussi (audit du 18 novembre, BroadcastChannel). Sans réseau, la révocation de la session
+ * est réessayée trois fois dans la minute (la session reste sinon valable côté serveur jusqu'à son
+ * échéance) ; le jeton n'est jamais réécrit sur l'appareil pour cela.
+ */
 export async function seDeconnecter(): Promise<void> {
   const jeton = ouverte?.jeton;
   await oublierAppareil();
-  if (jeton !== undefined) await api.deconnexion(deps.net, jeton).catch(() => undefined);
+  annoncerDeconnexion();
+  if (jeton === undefined) return;
+  if (!(await revoquer(jeton))) void reessayerRevocation(jeton); // en arrière-plan : l'écran n'attend pas
+}
+/** Vrai si la révocation est faite ou inutile (refus du serveur, 401) ; faux sans réseau. */
+async function revoquer(jeton: string): Promise<boolean> {
+  try {
+    await api.deconnexion(deps.net, jeton);
+    return true;
+  } catch (e) {
+    return e instanceof api.CompteError;
+  }
+}
+async function reessayerRevocation(jeton: string): Promise<void> {
+  for (let essai = 1; essai <= 3; essai++) {
+    await new Promise((r) => setTimeout(r, 5_000 * essai));
+    if (await revoquer(jeton)) return;
+  }
+}
+
+// Autres onglets (audit du 18 novembre) : une déconnexion ici efface la mémoire du compte partout
+// sur ce site ; aucun secret ne passe sur le canal (un simple signal).
+const CANAL = "shh-compte-onglets";
+function canal(): BroadcastChannel | null {
+  try {
+    return typeof BroadcastChannel === "function" ? new BroadcastChannel(CANAL) : null;
+  } catch {
+    return null;
+  }
+}
+function annoncerDeconnexion(): void {
+  const c = canal();
+  c?.postMessage("deconnexion");
+  c?.close();
+}
+/** Écoute les déconnexions faites dans un autre onglet ; rend l'arrêt. */
+export function ecouterAutresOnglets(): () => void {
+  const c = canal();
+  if (!c) return () => undefined;
+  c.onmessage = (e) => {
+    if (e.data === "deconnexion" && ouverte) oublierMemoire();
+  };
+  return () => c.close();
+}
+/**
+ * Retour sur l'onglet (audit du 18 novembre) : une session fermée depuis un autre appareil ou
+ * échue est vue tout de suite (401 → l'appareil oublie tout), sans attendre une action.
+ */
+export async function verifierAuRetour(): Promise<void> {
+  if (!ouverte) return;
+  await etatCompte().catch(() => undefined);
 }
 
 // --- Paramètres (plan, lot 13 ; conception compte §21.15.4) --------------------------------------

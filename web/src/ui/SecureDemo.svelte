@@ -176,6 +176,9 @@
       <g class="node">
         <text class="lbl" x="66" y="40">{t("demo.you")}</text>
         <rect class="dev" x="24" y="52" width="84" height="104" rx="14" />
+        <!-- Écran d'appareil (18 novembre) : encoche en haut, barre du bas. -->
+        <rect class="notch" x="56" y="57" width="20" height="3" rx="1.5" />
+        <rect class="home-bar" x="54" y="149" width="24" height="2" rx="1" />
         <g class={["photo", { on: at(shown, 1) }]}>
           <rect x="40" y="70" width="52" height="40" rx="6" class="ph-bg" />
           <circle cx="80" cy="80" r="5" class="ph-sun" />
@@ -185,6 +188,11 @@
         <g class={["cipher", { on: at(shown, 2, 3, 4, 5, 6) }]}>
           {#each cipher as line, i (i)}<text class="mono" x="66" y={76 + i * 11}>{line}</text>{/each}
           <text class="fname x" x="66" y="138">Xq9#7b.z</text>
+        </g>
+        <g class={["sent", { on: at(shown, 7) }]}>
+          <circle cx="66" cy="96" r="13" />
+          <path d="M60 96.5l4 4 8-8.5" />
+          <text x="66" y="128">{t("demo.st.sent")}</text>
         </g>
         <g transform="translate(100 56)">
           <g class={["lock", { on: at(shown, 2, 3, 4, 5, 6) }]}>
@@ -208,6 +216,10 @@
         <text class="lbl" x="200" y="40">{t("demo.server")}</text>
         <rect class={["srv", { gone: at(shown, 7) }]} x="158" y="52" width="84" height="104" rx="12" />
         <g class="leds"><circle cx="170" cy="63" r="2" /><circle cx="177" cy="63" r="2" /><circle cx="184" cy="63" r="2" /></g>
+        <!-- Baies du serveur (18 novembre) : trois emplacements vides, que les blocs chiffrés remplissent. -->
+        <g class={["slots", { off: at(shown, 7) }]}>
+          {#each [0, 1, 2] as k (k)}<rect x="172" y={74 + k * 14} width="56" height="10" rx="3" />{/each}
+        </g>
         <g class={["blocks", { on: at(shown, 4, 5, 6) }]}>
           {#each [0, 1, 2] as k (k)}<rect x="172" y={74 + k * 14} width="56" height="10" rx="3" />{/each}
         </g>
@@ -225,6 +237,14 @@
       <g class="node">
         <text class="lbl" x="334" y="40">{t("demo.to")}</text>
         <rect class="dev" x="292" y="52" width="84" height="104" rx="14" />
+        <rect class="notch" x="324" y="57" width="20" height="3" rx="1.5" />
+        <rect class="home-bar" x="322" y="149" width="24" height="2" rx="1" />
+        <!-- Avant l'ouverture : l'appareil attend le lien et le mot de passe. -->
+        <g class={["wait", { on: at(shown, 1, 2, 3, 4, 5) }]}>
+          <rect x="324" y="86" width="20" height="15" rx="3.5" />
+          <path d="M328.5 86v-3.5a5.5 5.5 0 0 1 11 0V86" />
+          <text x="334" y="122">{t("demo.st.waiting")}</text>
+        </g>
         <g class={["photo", "peer", { on: at(shown, 6) }]}>
           <rect x="308" y="70" width="52" height="40" rx="6" class="ph-bg" />
           <circle cx="348" cy="80" r="5" class="ph-sun" />
@@ -401,6 +421,47 @@
     fill: var(--mint);
     opacity: 0.55;
   }
+  .notch,
+  .home-bar {
+    fill: rgb(150 175 255 / 0.25);
+  }
+  .slots rect {
+    fill: rgb(255 255 255 / 0.02);
+    stroke: rgb(150 175 255 / 0.18);
+    stroke-width: 0.8;
+    stroke-dasharray: 2 2;
+  }
+  .slots {
+    transition: opacity 420ms var(--ease-out);
+  }
+  .slots.off {
+    opacity: 0;
+  }
+  .wait rect,
+  .wait path {
+    fill: none;
+    stroke: rgb(150 175 255 / 0.45);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+  }
+  .wait text,
+  .sent text {
+    fill: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    text-anchor: middle;
+  }
+  .sent circle {
+    fill: rgb(95 227 181 / 0.14);
+    stroke: rgb(95 227 181 / 0.6);
+  }
+  .sent path {
+    fill: none;
+    stroke: var(--mint);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .ph-bg {
     fill: #1d3a6b;
   }
@@ -450,7 +511,9 @@
   .keys,
   .thief,
   .tags,
-  .packet {
+  .packet,
+  .wait,
+  .sent {
     opacity: 0;
     transition:
       opacity 420ms var(--ease-out),

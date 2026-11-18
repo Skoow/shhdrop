@@ -596,11 +596,19 @@
   }
   /* Ordinateur : texte à gauche, l'écran de démonstration à droite, sur le premier écran. */
   @media (min-width: 1024px) {
-    .hero {
-      grid-template-columns: minmax(0, 1fr) minmax(440px, 540px);
+    /* Premier écran (propriétaire, 18 novembre) : plus large, l'infographie plus grande, et le
+       héros remplit l'écran avant « Comment ça marche ». */
+    .home:not(.compact) .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(480px, 1.15fr);
       align-items: center;
-      column-gap: clamp(48px, 6vw, 96px);
-      padding-block: var(--sp-6) var(--sp-7);
+      column-gap: clamp(48px, 5vw, 88px);
+      min-height: calc(100svh - 76px - var(--banner-h, 0px));
+      padding-block: var(--sp-5) var(--sp-7);
+    }
+    .home:not(.compact) .demo-slot {
+      max-width: 760px;
+      justify-self: end;
+      width: 100%;
     }
     .home.compact .hero {
       grid-template-columns: minmax(0, 1fr);

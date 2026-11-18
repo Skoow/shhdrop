@@ -212,15 +212,8 @@
         </div>
       {/each}
     </nav>
-    <!-- Ex-panneau Réglages : seul « À propos » reste (retours du propriétaire du 12 novembre) :
-         la langue suit le navigateur (UI §10), plus de choix dans le pied ; plus de réglage
-         « Nettoyage automatique » (le balai de chaque fichier, spec §35.2). -->
-    <div class="prefs" data-foot-prefs>
-      <section class="pref" aria-labelledby="foot-about">
-        <p class="ch" id="foot-about">{t("settings.about")}</p>
-        <p class="about">{t("settings.about.body")}</p>
-      </section>
-    </div>
+    <!-- Proposition B2 retenue (propriétaire, 18 novembre) : trois colonnes resserrées, sans le
+         bloc « À propos » (la phrase de la marque le dit déjà). -->
     <div class="base">
       <!-- Retours UI9 : le nom en bas à gauche, « © 2026 » à côté (plus de mention « aucune publicité »). -->
       <p class="sig"><span class="wm" translate="no">Shhgone</span><span>{t("foot.copy")}</span></p>
@@ -384,7 +377,7 @@
     z-index: 1;
     isolation: isolate;
     margin-block-start: var(--sp-8);
-    padding-block: var(--sp-7) calc(var(--sp-4) + env(safe-area-inset-bottom));
+    padding-block: var(--sp-6) calc(var(--sp-4) + env(safe-area-inset-bottom));
     background:
       radial-gradient(60% 120% at 12% 0%, rgb(95 227 181 / 0.07), transparent 70%),
       radial-gradient(50% 90% at 88% 100%, rgb(85 150 248 / 0.05), transparent 70%),
@@ -415,8 +408,8 @@
   }
   .foot-in {
     display: grid;
-    grid-template-columns: minmax(14rem, 1fr) minmax(0, 2.4fr);
-    gap: var(--sp-7) var(--sp-6);
+    grid-template-columns: minmax(14rem, 1.4fr) minmax(0, 2fr);
+    gap: var(--sp-5) var(--sp-6);
   }
   .brand {
     display: grid;
@@ -563,28 +556,6 @@
   .busy .tier {
     color: inherit;
   }
-  /* Ex-panneau Réglages : « À propos » seulement. */
-  .prefs {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5) var(--sp-6);
-    padding-block-start: var(--sp-5);
-    border-block-start: 1px solid var(--hair);
-  }
-  .pref {
-    display: grid;
-    align-content: start;
-    min-width: 0;
-  }
-  .about {
-    margin: 0;
-    max-width: 40ch;
-    color: var(--text-2);
-    font-size: var(--fs-small);
-    line-height: var(--lh-small);
-    text-wrap: pretty;
-  }
   /* Bas du pied (17 novembre) : plus bas, le nom à gauche plus gros que la version, à droite. */
   .base {
     grid-column: 1 / -1;
@@ -668,9 +639,6 @@
     .fl,
     .off {
       min-height: 44px;
-    }
-    .prefs {
-      display: none;
     }
     .base {
       justify-self: stretch;

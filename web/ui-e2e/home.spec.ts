@@ -301,18 +301,11 @@ test.describe("fr-FR", () => {
     }
   });
 
-  test("fond : nuit et trame en CSS pur (ni image ni data:), sans défilement horizontal, sous le plafond de luminance K5", async ({ page, shh, browserName }) => {
+  test("fond : nuit et pictogrammes, plus de trame de croix, sans défilement horizontal, sous le plafond de luminance K5", async ({ page, shh, browserName }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(shh.origin + "/");
-    const trame = await page.locator("[data-trame] i").evaluate((e) => {
-      const c = getComputedStyle(e, "::before");
-      return { bg: c.backgroundImage, lines: c.maskImage || c.webkitMaskImage, disc: getComputedStyle(e).maskImage || getComputedStyle(e).webkitMaskImage, pos: getComputedStyle(e.parentElement!).position };
-    });
-    expect(trame.bg).toBe("none");
-    expect(trame.lines).toMatch(/linear-gradient/);
-    expect(trame.disc).toMatch(/radial-gradient/);
-    expect(`${trame.lines} ${trame.disc}`).not.toMatch(/url\(|data:/);
-    expect(trame.pos).toBe("fixed");
+    // Un seul motif (18 novembre) : les pictogrammes ; plus de trame de croix.
+    await expect(page.locator("[data-trame]")).toHaveCount(0);
     expect(await noHScroll(page)).toBe(true);
     test.skip(browserName !== "chromium", "luminance mesurée sur la capture Chromium");
     // K5 : contenu caché (CSSOM), fonds seuls (nuit, trame, aurore), en haut et plus bas dans la page.
@@ -419,7 +412,7 @@ test.describe("fr-FR", () => {
     await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
     await page.goto(shh.origin + "/");
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
-    for (const sel of [".aurora", ".grain", ".trame"])
+    for (const sel of [".aurora", ".grain"])
       expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).display), sel).toBe("none");
     for (const name of isMobile ? ["Choisir des fichiers", "Créer sur place"] : ["Choisir des fichiers", "Créer sur place"]) {
       const b = page.getByRole("button", { name: new RegExp(`^${name}`) }).filter({ visible: true }).first();
