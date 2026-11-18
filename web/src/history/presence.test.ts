@@ -1,17 +1,63 @@
 import { describe, expect, it } from "vitest";
 import { presence, probeHistory } from "./presence.svelte";
 
+/** Fausse fabrique IndexedDB : `count` entrées dans « entries » ; `created` : la base n'existait plus. */
+function fake(names: string[], count: number, opts: { created?: boolean; stores?: string[] } = {}) {
+  const log = { aborted: 0, closed: 0 };
+  const factory = {
+    databases: async () => names.map((name) => ({ name, version: 1 })),
+    open: () => {
+      const r: Record<string, unknown> = {};
+      queueMicrotask(() => {
+        if (opts.created) {
+          r.transaction = { abort: () => log.aborted++ };
+          (r.onupgradeneeded as () => void)();
+          return;
+        }
+        const stores = opts.stores ?? ["meta", "entries"];
+        r.result = {
+          objectStoreNames: { contains: (n: string) => stores.includes(n) },
+          close: () => log.closed++,
+          transaction: () => ({
+            objectStore: () => {
+              const c: Record<string, unknown> = { result: count };
+              queueMicrotask(() => (c.onsuccess as () => void)());
+              return { count: () => c };
+            },
+          }),
+        };
+        (r.onsuccess as () => void)();
+      });
+      return r;
+    },
+  };
+  return { factory: factory as unknown as Pick<IDBFactory, "databases" | "open">, log };
+}
+
 describe("« Mes partages » seulement s'il y a des partages (17 novembre)", () => {
-  it("pages d'information : vrai seulement si la base de l'historique existe ; rien n'est créé ni ouvert", async () => {
+  it("pages d'information : vrai seulement si la base existe ET contient une entrée (18 novembre)", async () => {
     presence.any = false;
-    await probeHistory({ databases: async () => [{ name: "autre", version: 1 }] });
+    await probeHistory(fake(["autre"], 3).factory);
     expect(presence.any).toBe(false);
-    await probeHistory({ databases: async () => [{ name: "shhdrop-history", version: 1 }] });
+    const empty = fake(["shhdrop-history"], 0);
+    await probeHistory(empty.factory);
+    expect(presence.any).toBe(false); // base vide (« Ne pas garder », « Effacer ») : rien
+    expect(empty.log.closed).toBe(1);
+    await probeHistory(fake(["shhdrop-history"], 0, { stores: [] }).factory);
+    expect(presence.any).toBe(false);
+    await probeHistory(fake(["shhdrop-history"], 2).factory);
     expect(presence.any).toBe(true);
+  });
+  it("base supprimée entre-temps : sa création est annulée, rien à montrer", async () => {
+    presence.any = false;
+    const f = fake(["shhdrop-history"], 0, { created: true });
+    await probeHistory(f.factory);
+    expect(f.log.aborted).toBe(1);
+    expect(presence.any).toBe(false);
   });
   it("stockage refusé ou absent : rien à montrer, aucune erreur", async () => {
     presence.any = false;
-    await probeHistory({ databases: async () => Promise.reject(new Error("refusé")) });
+    await probeHistory({ databases: async () => Promise.reject(new Error("refusé")), open: () => { throw new Error("x"); } } as unknown as Pick<IDBFactory, "databases" | "open">);
     await probeHistory(undefined);
     expect(presence.any).toBe(false);
   });

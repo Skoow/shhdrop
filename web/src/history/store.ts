@@ -138,6 +138,9 @@ export function idbBackend(idb: IDBFactory, name = DB): Backend {
       r.onsuccess = () => ok(yieldOn(r.result));
       r.onerror = () => ko(r.error ?? new Error("idb"));
       r.onblocked = () => ko(new Error("idb_bloquee"));
+    }).catch((e: unknown) => {
+      opened = undefined; // échec passager (base occupée) : la prochaine opération rouvre (18 novembre)
+      throw e;
     }));
   async function write(store: string, fn: (s: IDBObjectStore) => void): Promise<void> {
     const tx = (await db()).transaction(store, "readwrite");

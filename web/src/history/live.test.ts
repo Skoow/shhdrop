@@ -5,8 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeIndexedDB, type FakeIdb } from "./fake-idb.test-helper";
 
-const MANAGE = "https://x.test/#m" + "A".repeat(43);
-const OTHER = "https://x.test/#m" + "B".repeat(43);
+const MANAGE = "https://x.test/s#m" + "A".repeat(43);
+const OTHER = "https://x.test/s#m" + "B".repeat(43);
 let idb: FakeIdb;
 let live: typeof import("./live.svelte");
 
@@ -164,5 +164,18 @@ describe("partages reçus (lot 11)", () => {
     expect(live.shares.entries).toHaveLength(2);
     await live.dropAccountEntries();
     expect(live.shares.entries.map((e) => e.id)).toEqual([env.id]);
+  });
+});
+
+describe("ouverture de l'historique : un échec passager n'est pas gardé (relecture du 18 novembre)", () => {
+  it("premier essai refusé (base occupée) : le partage suivant est quand même gardé", async () => {
+    idb.failOpen = true;
+    const now = Date.now();
+    const first = await live.recordShare({ manage: MANAGE, createdAt: now, sizeBytes: 1, itemsCount: 1, expiresAt: now + 3600_000, maxOpens: 1 });
+    expect(first).toBeNull();
+    idb.failOpen = false;
+    const second = await live.recordShare({ manage: OTHER, createdAt: now, sizeBytes: 1, itemsCount: 1, expiresAt: now + 3600_000, maxOpens: 1 });
+    expect(second).not.toBeNull();
+    expect(live.shares.entries.map((e) => e.manage)).toEqual([OTHER]);
   });
 });

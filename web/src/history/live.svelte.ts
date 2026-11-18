@@ -84,9 +84,19 @@ const theBackend = () => (chosen === undefined ? (chosen = backend()) : chosen);
 const persistStorage = async (): Promise<unknown> => globalThis.navigator?.storage?.persist?.();
 
 let opening: Promise<History | null> | undefined;
-/** Ouvre l'historique, en le créant au besoin (clé, base) : seulement pour y écrire. */
+/**
+ * Ouvre l'historique, en le créant au besoin (clé, base) : seulement pour y écrire. Un échec
+ * n'est pas gardé (relecture du 18 novembre : un premier échec passager, base occupée par un
+ * autre onglet par exemple, empêchait de garder tout envoi suivant dans cet onglet) : le prochain
+ * appel réessaie.
+ */
 function store(): Promise<History | null> {
-  return (opening ??= openHistory({ backend: theBackend(), persist: persistStorage }).catch(() => null));
+  return (opening ??= openHistory({ backend: theBackend(), persist: persistStorage })
+    .catch(() => null)
+    .then((h) => {
+      if (h === null) opening = undefined;
+      return h;
+    }));
 }
 /**
  * Ouvre sans rien créer : une simple visite (accueil, « Vos envois ») n'écrit rien dans le

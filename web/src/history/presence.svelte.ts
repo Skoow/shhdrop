@@ -10,11 +10,43 @@ export const presence = $state({ any: false });
 
 const HISTORY_DB = "shhdrop-history";
 
-/** Pages d'information : vrai si la base de l'historique existe sur cet appareil. */
-export async function probeHistory(idb: Pick<IDBFactory, "databases"> | undefined = globalThis.indexedDB): Promise<void> {
+/**
+ * Pages d'information : vrai si la base de l'historique existe ET contient au moins une entrée
+ * (relecture du 18 novembre : une base restée vide, après « Ne pas garder » ou « Effacer
+ * l'historique », ne montre plus « Mes partages »). Les entrées sont chiffrées : on ne fait que
+ * les compter, sans clé. Rien n'est créé : la base n'est ouverte que si elle existe, et une
+ * création (base supprimée entre-temps) est annulée.
+ */
+export async function probeHistory(idb: Pick<IDBFactory, "databases" | "open"> | undefined = globalThis.indexedDB): Promise<void> {
   try {
     const dbs = (await idb?.databases?.()) ?? [];
-    if (dbs.some((d) => d.name === HISTORY_DB)) presence.any = true;
+    if (!idb || !dbs.some((d) => d.name === HISTORY_DB)) return;
+    const n = await new Promise<number>((ok) => {
+      const r = idb.open(HISTORY_DB);
+      r.onupgradeneeded = () => {
+        r.transaction?.abort(); // la base n'existait plus : ne pas la créer vide
+        ok(0);
+      };
+      r.onerror = () => ok(0);
+      r.onblocked = () => ok(0);
+      r.onsuccess = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains("entries")) {
+          d.close();
+          return ok(0);
+        }
+        const c = d.transaction("entries", "readonly").objectStore("entries").count();
+        c.onsuccess = () => {
+          d.close();
+          ok(c.result);
+        };
+        c.onerror = () => {
+          d.close();
+          ok(0);
+        };
+      };
+    });
+    if (n > 0) presence.any = true;
   } catch {
     // Navigation privée, stockage refusé : rien à montrer.
   }
