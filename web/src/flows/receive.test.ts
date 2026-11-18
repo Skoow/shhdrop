@@ -3,7 +3,7 @@ import { BadPasswordError, CorruptError, GrantInvalidError, LimitError, NotFound
 import type { OpenGrantEntry } from "../session/open-grant";
 import { createReceiver, type ReceiverDeps } from "./receive.svelte";
 
-const LINK = "https://x.test/#" + "A".repeat(43);
+const LINK = "https://x.test/s#" + "A".repeat(43);
 const PW = "mot-de-passe-repere-91";
 const flush = () => new Promise((r) => setTimeout(r, 0));
 

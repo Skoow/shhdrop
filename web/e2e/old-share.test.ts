@@ -91,7 +91,7 @@ describe("partage de l'ancien moteur, servi par le vrai serveur, ouvert par le n
       tail: V.tail,
     });
     // Ouverture par le site (nouveau moteur), lien du vecteur à l'origine du serveur.
-    const link = `${srv.origin}/#${b64u(kLien)}`;
+    const link = `${srv.origin}/s#${b64u(kLien)}`;
     expect(link.slice(link.indexOf("#"))).toBe(V.link.slice(V.link.indexOf("#")));
     const o = await openShare(link, V.password, srv.origin);
     expect(o.manifest.rights).toBe(V.rights);

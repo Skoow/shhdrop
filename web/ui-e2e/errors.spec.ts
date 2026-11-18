@@ -42,7 +42,11 @@ test.describe("pages d'erreur", () => {
     // Page d'ouverture « /s » déjà chargée (16 novembre) ; le lien y est collé hors ligne.
     await page.goto(shh.origin + "/s");
     await context.setOffline(true);
-    await page.evaluate((k) => (location.hash = k), KEY);
+    // La page montre « / » (adresse montrée, 17 novembre) : le lien est collé sous « /s ».
+    await page.evaluate((k) => {
+      history.replaceState(null, "", "/s");
+      location.hash = k;
+    }, KEY);
     await expect(page.getByRole("heading", { level: 1, name: "Vous êtes hors ligne." })).toBeVisible();
     await expect(page).toHaveTitle("Hors ligne · Shhgone");
     expect(api).toEqual([]);
@@ -59,7 +63,7 @@ test.describe("pages d'erreur", () => {
   test("erreur du serveur (5xx persistant) : page fixe, Réessayer", async ({ page, shh }) => {
     test.setTimeout(90_000);
     await page.route("**/api/shares/meta", (r) => r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"internal"}' }));
-    await page.goto(`${shh.origin}/#${KEY}`);
+    await page.goto(`${shh.origin}/s#${KEY}`);
     await expect(page.getByRole("heading", { level: 1, name: "Le serveur a un problème." })).toBeVisible({ timeout: 40_000 });
     await expect(page).toHaveTitle("Erreur du serveur · Shhgone");
     await expect(page.getByRole("button", { name: "Réessayer" })).toBeEnabled();
@@ -70,7 +74,7 @@ test.describe("pages d'erreur", () => {
   test("trop de demandes (429, Retry-After) : compte à rebours, Réessayer à zéro", async ({ page, shh }) => {
     test.setTimeout(90_000);
     await page.route("**/api/shares/meta", (r) => r.fulfill({ status: 429, headers: { "Retry-After": "1" }, body: "trop" }));
-    await page.goto(`${shh.origin}/#${KEY}`);
+    await page.goto(`${shh.origin}/s#${KEY}`);
     await expect(page.getByRole("heading", { level: 1, name: "Trop de demandes rapprochées." })).toBeVisible({ timeout: 40_000 });
     await expect(page).toHaveTitle("Trop de demandes · Shhgone");
     await expect(page.getByRole("button", { name: "Réessayer" })).toBeEnabled({ timeout: 5_000 });

@@ -321,7 +321,7 @@ describe("le serveur ne voit rien : compte (lot 16)", () => {
     await C.ecrirePrive(
       (p) => ({
         ...p,
-        recus: [...p.recus, { id: "recu-1", cree: now, expire: now + 3_600_000, lien: `${srv.origin}/#${b64u(LIEN_RECU)}`, taille: 10, elements: 1, format: "texte" }],
+        recus: [...p.recus, { id: "recu-1", cree: now, expire: now + 3_600_000, lien: `${srv.origin}/s#${b64u(LIEN_RECU)}`, taille: 10, elements: 1, format: "texte" }],
         rejoints: [...p.rejoints, { id: "salon-1", cree: now, expire: now + 3_600_000, invitation: `${srv.origin}/#c${b64u(INVITATION)}`, libelle: LIBELLE }],
       }),
       { differe: false },

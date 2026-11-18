@@ -135,7 +135,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
   });
 
   it("link : chaque fonction, chaque cas (écart IDN documenté)", async () => {
-    const IDN = "https://été.example/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
+    const IDN = "https://été.example/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
     const seen = new Map<string, number>();
     let idn = 0;
     for (const c of linkCases()) {
@@ -523,7 +523,7 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
     expect([hex(da.kAcces), hex(da.vAcces), hex(W.shareId(kLien))]).toEqual([sh.k_acces, sh.v_acces, sh.id]);
 
     // Ouverture (Review Focus 2) : lien → Argon2id → enveloppe → engagement → manifeste.
-    const parsed = W.parseLink(utf8(sh.link), "/");
+    const parsed = W.parseLink(utf8(toS(sh.link)), "/"); // seule la forme sous /s est lue (18 novembre)
     expect(parsed.kind).toBe("s");
     if (parsed.kind !== "s") return;
     expect(parsed.origin).toBe(sh.origin);

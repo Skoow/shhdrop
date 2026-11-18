@@ -133,7 +133,7 @@ fn parsed(p: ParsedLink) -> Parsed {
 }
 
 /// Seul cas `link` dont le résultat Rust diffère du vecteur (hôte IDN, voir README).
-const IDN_LINK: &str = "https://été.example/#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
+const IDN_LINK: &str = "https://été.example/s#MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8";
 
 /// Cas de `v2.json` remplacés par `v3-liens.json` (liens sous `/s`, 16 novembre) : les liens
 /// écrits (forme racine) et les deux refus de `…/s#…`. `v2.json` est figé : ils y restent.
@@ -149,14 +149,25 @@ fn superseded_by_v3(c: &Value) -> bool {
     }
 }
 
+/// Lien lu à la racine (avant le 18 novembre) : remplacé par v4-liens-s.json (refus, et la même
+/// adresse sous /s quand la forme s'y prête).
+fn read_at_root(c: &Value) -> bool {
+    if c["fn"].as_str() != Some("parseLink") || c.get("result").is_none() {
+        return false;
+    }
+    let path = arg(c, 0).split(['#', '?']).next().unwrap_or("");
+    !path.ends_with("/s")
+}
+
 #[test]
 fn link() {
     let v = vectors();
     let mut cases: Vec<Value> = v["link"].as_array().unwrap().clone();
     let before = cases.len();
-    cases.retain(|c| !superseded_by_v3(c));
-    // 10 liens écrits (5 origines ou bases × 2) et 2 refus : remplacés, rien d'autre.
-    assert_eq!(before - cases.len(), 12, "cas remplacés de v2.json");
+    cases.retain(|c| !superseded_by_v3(c) && !read_at_root(c));
+    // 10 liens écrits (5 origines ou bases × 2) et 2 refus (v3-liens.json), puis 20 lectures à la
+    // racine (v4-liens-s.json) : remplacés, rien d'autre.
+    assert_eq!(before - cases.len(), 32, "cas remplacés de v2.json");
     let v3: Value = serde_json::from_str(
         &std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -167,7 +178,24 @@ fn link() {
     .unwrap();
     let added = v3["link"].as_array().unwrap();
     assert_eq!(added.len(), 49);
-    cases.extend(added.iter().cloned());
+    let kept3: Vec<Value> = added.iter().filter(|c| !read_at_root(c)).cloned().collect();
+    assert_eq!(
+        added.len() - kept3.len(),
+        6,
+        "lectures à la racine de v3-liens.json"
+    );
+    cases.extend(kept3);
+    let v4: Value = serde_json::from_str(
+        &std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../vectors/v4-liens-s.json"
+        ))
+        .expect("lecture de v4-liens-s.json"),
+    )
+    .unwrap();
+    let added4 = v4["link"].as_array().unwrap();
+    assert_eq!(added4.len(), 42);
+    cases.extend(added4.iter().cloned());
     let mut seen = std::collections::BTreeMap::<String, usize>::new();
     let mut idn_seen = 0;
     for c in &cases {
@@ -996,7 +1024,8 @@ fn share_opened_cases() {
     let sh = &v["share"];
     let files = ShareFiles(share_server_files(&v), Default::default());
     let ParsedLink::Share { origin, k_lien } =
-        parse_link(sh["link"].as_str().unwrap(), "/").unwrap()
+        // Lien de v2.json écrit à la racine : lu sous /s (seule forme lue, 18 novembre).
+        parse_link(&sh["link"].as_str().unwrap().replacen('#', "s#", 1), "/").unwrap()
     else {
         panic!("lien de partage attendu");
     };

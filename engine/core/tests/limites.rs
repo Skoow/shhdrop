@@ -171,11 +171,11 @@ fn links() -> Value {
     let body = "Q".repeat(42);
     let mut urls: Vec<(String, String)> = Vec::new();
     for c in B64U.chars() {
-        urls.push((format!("partage_fin_{c}"), format!("{ORIGIN}/#{body}{c}")));
-        urls.push((format!("gestion_fin_{c}"), format!("{ORIGIN}/#m{body}{c}")));
+        urls.push((format!("partage_fin_{c}"), format!("{ORIGIN}/s#{body}{c}")));
+        urls.push((format!("gestion_fin_{c}"), format!("{ORIGIN}/s#m{body}{c}")));
         urls.push((
             format!("partage_m_fin_{c}"),
-            format!("{ORIGIN}/#m{}{c}", &body[1..]),
+            format!("{ORIGIN}/s#m{}{c}", &body[1..]),
         ));
     }
     for (label, frag) in [
@@ -192,7 +192,7 @@ fn links() -> Value {
         ("partage_42_caracteres", body.clone()),
         ("partage_44_caracteres", format!("{body}AA")),
     ] {
-        urls.push((label.to_owned(), format!("{ORIGIN}/#{frag}")));
+        urls.push((label.to_owned(), format!("{ORIGIN}/s#{frag}")));
     }
     let parse: Vec<Value> = urls
         .into_iter()

@@ -14,13 +14,14 @@ export type ShareTake = { state: LinkState; password: string | null };
 const INCOMPLETE: LinkState = Object.freeze({ kind: "incomplete" });
 
 /**
- * Lit le lien de l'adresse courante (spec §32 : `${base}#<clé>` ou `${base}#m<clé>`).
+ * Lit le lien de l'adresse courante (spec §32 : `${base}s#<clé>` ou `${base}s#m<clé>` ; l'ancienne
+ * forme à la racine est refusée depuis le 18 novembre).
  * Seule la forme est vérifiée (linkForm, mêmes refus que parseLink du moteur) : la clé n'est pas
  * décodée ici, mais par le moteur au moment de l'utiliser (transfer/client.ts). Le chemin
- * doit être celui de la base (« / », ou « /shhgone/ » en démo) ; la requête est
+ * doit être « /s » sous la base (« /s », ou « /shhgone/s » en démo) ; la requête est
  * ignorée : nos liens n'en portent jamais, mais les applications ajoutent des paramètres de
- * suivi (`?fbclid=…`) en gardant le fragment. Le lien rendu est remis à la racine de
- * l'origine (`${origin}/#…`), la forme qu'attendent les fonctions du client. Tout échec (pas
+ * suivi (`?fbclid=…`) en gardant le fragment. Le lien rendu est remis sous « /s » à la racine
+ * de l'origine (`${origin}/s#…`), la forme qu'attendent les fonctions du client. Tout échec (pas
  * de « # », clé mal formée, autre chemin, type différent de `expected`) donne « incomplet » :
  * rien n'est levé.
  */
@@ -28,7 +29,7 @@ export function readLink(href: string, expected: "s" | "m", base: string = impor
   try {
     const p = linkForm(href, base);
     if (p.kind !== expected) return INCOMPLETE;
-    return { kind: p.kind, link: `${p.origin}/#${p.kind === "m" ? "m" : ""}${p.key}` };
+    return { kind: p.kind, link: `${p.origin}/s#${p.kind === "m" ? "m" : ""}${p.key}` };
   } catch {
     return INCOMPLETE;
   }

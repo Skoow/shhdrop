@@ -5,30 +5,34 @@ import { readShare, readLink, scrubAddressBar } from "./link";
 const KEY = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => 255 - i * 3)).toString("base64url");
 const O = "https://shhdrop.example";
 
-describe("readLink (spec §32 : lien à la racine)", () => {
+describe("readLink (spec §32 : lien sous /s)", () => {
+  it("ancienne forme à la racine (refusée depuis le 18 novembre) → incomplet", () => {
+    for (const h of [`${O}/#${KEY}`, `${O}/#m${KEY}`, `${O}#${KEY}`]) expect(readLink(h, h.includes("#m") ? "m" : "s", "/"), h).toEqual({ kind: "incomplete" });
+  });
+
   it("lien de partage et de gestion valides : rend le lien tel que le client l'attend", () => {
-    expect(readLink(`${O}/#${KEY}`, "s", "/")).toEqual({ kind: "s", link: `${O}/#${KEY}` });
-    expect(readLink(`${O}/#m${KEY}`, "m", "/")).toEqual({ kind: "m", link: `${O}/#m${KEY}` });
+    expect(readLink(`${O}/s#${KEY}`, "s", "/")).toEqual({ kind: "s", link: `${O}/s#${KEY}` });
+    expect(readLink(`${O}/s#m${KEY}`, "m", "/")).toEqual({ kind: "m", link: `${O}/s#m${KEY}` });
   });
 
   it("clé de partage qui commence par « m » (une fois sur 64) : partage, pas gestion ni « incomplet »", () => {
     const mKey = "m" + KEY.slice(1);
-    expect(readLink(`${O}/#${mKey}`, "s", "/")).toEqual({ kind: "s", link: `${O}/#${mKey}` });
-    expect(readLink(`${O}/#m${mKey}`, "m", "/")).toEqual({ kind: "m", link: `${O}/#m${mKey}` });
+    expect(readLink(`${O}/s#${mKey}`, "s", "/")).toEqual({ kind: "s", link: `${O}/s#${mKey}` });
+    expect(readLink(`${O}/s#m${mKey}`, "m", "/")).toEqual({ kind: "m", link: `${O}/s#m${mKey}` });
   });
 
   it("sans # ou avec # vide → incomplet", () => {
     expect(readLink(`${O}/`, "s", "/")).toEqual({ kind: "incomplete" });
-    expect(readLink(`${O}/#`, "s", "/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${O}/s#`, "s", "/")).toEqual({ kind: "incomplete" });
   });
 
   it("clé tronquée ou trop longue, autre chemin, ancien format, adresse illisible → incomplet", () => {
     for (const h of [
-      `${O}/#${KEY.slice(0, -1)}`,
-      `${O}/#${KEY}A`,
+      `${O}/s#${KEY.slice(0, -1)}`,
+      `${O}/s#${KEY}A`,
       `${O}/x#${KEY}`,
       `${O}/s/AAAAAAAAAAAAAAAAAAAAAA#${KEY}`,
-      `https://u:p@shhdrop.example/#${KEY}`,
+      `https://u:p@shhdrop.example/s#${KEY}`,
       "pas une adresse",
       "",
     ])
@@ -36,28 +40,28 @@ describe("readLink (spec §32 : lien à la racine)", () => {
   });
 
   it("requête ignorée (?fbclid= ajouté par Facebook, Messenger, Instagram) : lien valide, rendu sans la requête", () => {
-    expect(readLink(`${O}/?fbclid=x#${KEY}`, "s", "/")).toEqual({ kind: "s", link: `${O}/#${KEY}` });
-    expect(readLink(`${O}/?a=1&b=2#m${KEY}`, "m", "/")).toEqual({ kind: "m", link: `${O}/#m${KEY}` });
-    expect(readLink(`${O}/shhdrop/?fbclid=x#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "s", link: `${O}/#${KEY}` });
-    expect(readLink(`${O}/?fbclid=x`, "s", "/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${O}/s?fbclid=x#${KEY}`, "s", "/")).toEqual({ kind: "s", link: `${O}/s#${KEY}` });
+    expect(readLink(`${O}/s?a=1&b=2#m${KEY}`, "m", "/")).toEqual({ kind: "m", link: `${O}/s#m${KEY}` });
+    expect(readLink(`${O}/shhdrop/s?fbclid=x#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "s", link: `${O}/s#${KEY}` });
+    expect(readLink(`${O}/s?fbclid=x`, "s", "/")).toEqual({ kind: "incomplete" });
   });
 
   it("mauvais type : un lien de gestion n'est pas accepté comme lien de partage, ni l'inverse", () => {
-    expect(readLink(`${O}/#m${KEY}`, "s", "/")).toEqual({ kind: "incomplete" });
-    expect(readLink(`${O}/#${KEY}`, "m", "/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${O}/s#m${KEY}`, "s", "/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${O}/s#${KEY}`, "m", "/")).toEqual({ kind: "incomplete" });
   });
 
   it("base de dépôt /shhdrop/ : exigée ; le lien rendu est à la racine de l'origine", () => {
     const local = "http://127.0.0.1:5173";
-    expect(readLink(`${local}/shhdrop/#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "s", link: `${local}/#${KEY}` });
-    expect(readLink(`${O}/shhdrop/#m${KEY}`, "m", "/shhdrop/")).toEqual({ kind: "m", link: `${O}/#m${KEY}` });
-    expect(readLink(`${O}/#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "incomplete" });
-    expect(readLink(`${O}/shhdropx/#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "incomplete" });
-    expect(readLink(`${O}/shhdrop/shhdrop/#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${local}/shhdrop/s#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "s", link: `${local}/s#${KEY}` });
+    expect(readLink(`${O}/shhdrop/s#m${KEY}`, "m", "/shhdrop/")).toEqual({ kind: "m", link: `${O}/s#m${KEY}` });
+    expect(readLink(`${O}/s#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${O}/shhdropx/s#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "incomplete" });
+    expect(readLink(`${O}/shhdrop/shhdrop/s#${KEY}`, "s", "/shhdrop/")).toEqual({ kind: "incomplete" });
   });
 
   it("base par défaut : celle de Vite (« / » hors démo)", () => {
-    expect(readLink(`${O}/#${KEY}`, "s")).toEqual({ kind: "s", link: `${O}/#${KEY}` });
+    expect(readLink(`${O}/s#${KEY}`, "s")).toEqual({ kind: "s", link: `${O}/s#${KEY}` });
   });
 });
 
@@ -93,9 +97,9 @@ describe("readShare : lien + mot de passe du QR code (D41-29)", () => {
   it("sépare le mot de passe, rend le lien simple ; mal formé ou absent → null ; autre type → incomplet", () => {
     const pw = "aC3!cD5?#Fg";
     const enc = btoa(pw).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-    expect(readShare(`${O}/#${KEY}.${enc}`, "/")).toEqual({ state: { kind: "s", link: `${O}/#${KEY}` }, password: pw });
-    expect(readShare(`${O}/#${KEY}`, "/")).toEqual({ state: { kind: "s", link: `${O}/#${KEY}` }, password: null });
-    expect(readShare(`${O}/#${KEY}.%%`, "/")).toEqual({ state: { kind: "s", link: `${O}/#${KEY}` }, password: null });
-    expect(readShare(`${O}/#m${KEY}.${enc}`, "/")).toEqual({ state: { kind: "incomplete" }, password: null });
+    expect(readShare(`${O}/s#${KEY}.${enc}`, "/")).toEqual({ state: { kind: "s", link: `${O}/s#${KEY}` }, password: pw });
+    expect(readShare(`${O}/s#${KEY}`, "/")).toEqual({ state: { kind: "s", link: `${O}/s#${KEY}` }, password: null });
+    expect(readShare(`${O}/s#${KEY}.%%`, "/")).toEqual({ state: { kind: "s", link: `${O}/s#${KEY}` }, password: null });
+    expect(readShare(`${O}/s#m${KEY}.${enc}`, "/")).toEqual({ state: { kind: "incomplete" }, password: null });
   });
 });

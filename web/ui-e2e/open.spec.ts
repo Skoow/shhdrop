@@ -128,7 +128,7 @@ test("cinq mauvais mots de passe → « Le partage a été détruit. », partage
 test("clé mal formée (« # » abîmé) → « Lien incomplet », aucune requête /api/ ; « # » retiré", async ({ page, shh }) => {
   const api = apiPaths(page);
   // 43 caractères, mais encodage non canonique (bits de bourrage) : parseLink refuse localement.
-  await page.goto(`${shh.origin}/#${"A".repeat(42)}B`);
+  await page.goto(`${shh.origin}/s#${"A".repeat(42)}B`);
   await expect(page.getByRole("heading", { name: "Lien incomplet", exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
   expect(api).toEqual([]);
@@ -138,23 +138,24 @@ test("clé mal formée (« # » abîmé) → « Lien incomplet », aucune requê
 test("lien coupé (fragment de 20 à 44 caractères qui n'est pas une clé) → « Lien incomplet » expliqué, aucune requête ; « # » retiré (ruling 2)", async ({ page, shh }) => {
   const api = apiPaths(page);
   for (const frag of ["Lr97TWFReo303xtSXonjjKhgrah", `m${"A".repeat(30)}`, "A".repeat(44)]) {
-    await page.goto(`${shh.origin}/#${frag}`);
+    await page.goto(`${shh.origin}/s#${frag}`);
     await expect(page.getByRole("heading", { name: "Lien incomplet", exact: true })).toBeVisible();
     await expect(page.getByText("Il manque une partie du lien", { exact: false })).toBeVisible();
     await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
   }
   // Une ancre courte reste l'accueil.
+  await page.goto("about:blank");
   await page.goto(`${shh.origin}/#contenu`);
   await expect(page.getByRole("heading", { name: "Lien incomplet", exact: true })).toHaveCount(0);
   expect(api).toEqual([]);
-  await page.goto(`${shh.origin}/#Lr97TWFReo303xtSXonjjKhgrah`);
+  await page.goto(`${shh.origin}/s#Lr97TWFReo303xtSXonjjKhgrah`);
   await expect(page.getByText("Il manque une partie du lien", { exact: false })).toBeVisible();
   await capture(page, "incomplete-truncated");
 });
 
 test("lien inconnu → « Lien invalide » (message unique), sans phrase de démo ; capture", async ({ page, shh }) => {
   const key = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => i * 7)).toString("base64url");
-  await page.goto(`${shh.origin}/#${key}`);
+  await page.goto(`${shh.origin}/s#${key}`);
   await expect(page.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();
   await expect(page.locator(".demo-note")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Envoyer quelque chose" })).toBeVisible();

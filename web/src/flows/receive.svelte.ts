@@ -167,7 +167,7 @@ export type Receiver = {
 
 const isCode = (e: unknown, code: string) => e instanceof Error && e.message === code;
 
-/** K_lien (43 caractères) d'un lien de partage `${origin}/#<clé>`. */
+/** K_lien (43 caractères) d'un lien de partage `${origin}/s#<clé>`. */
 const keyOf = (l: string) => l.slice(l.lastIndexOf("#") + 1);
 
 export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}): Receiver {
@@ -224,7 +224,7 @@ export function createReceiver(link: LinkState, deps: Partial<ReceiverDeps> = {}
   // Hors rechargement, l'entrée ne vaut que RESTORE_MS après la dernière sortie de page.
   else if (stored !== null && d.navType() !== "reload" && d.now() - stored.last >= RESTORE_MS) d.grants.clear();
   else if (stored !== null) {
-    if (secret === null) secret = d.origin + "/#" + stored.link; // rechargement : plus de « # »
+    if (secret === null) secret = d.origin + "/s#" + stored.link; // rechargement : plus de « # »
     grant = stored.grant;
     reloaded = true;
   }

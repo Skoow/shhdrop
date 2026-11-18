@@ -339,7 +339,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await expect(page.locator("[data-receipt]")).toBeVisible();
     expect(await storage(page)).toBe(0);
     // Le lien collé à nouveau dans le même onglet : le partage n'existe plus.
-    // Le lien est à la racine (« /shhgone/#clé ») : depuis la page d'envoi (/envoyer, D41-37),
+    // Le lien est sous « /shhgone/s#clé » : depuis la page d'envoi (/envoyer, D41-37),
     // on l'ouvre en entier dans le même onglet, comme un lien collé dans la barre d'adresse.
     await page.evaluate((l) => (location.href = l), link);
     await expect(page.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();
@@ -356,7 +356,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Partage supprimé" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Connexion impossible\u202f: le partage n'a pas été supprimé.")).toHaveCount(0);
-    // Le lien est à la racine (« /shhgone/#clé ») : depuis la page d'envoi (/envoyer, D41-37),
+    // Le lien est sous « /shhgone/s#clé » : depuis la page d'envoi (/envoyer, D41-37),
     // on l'ouvre en entier dans le même onglet, comme un lien collé dans la barre d'adresse.
     await page.evaluate((l) => (location.href = l), link);
     await expect(page.getByRole("heading", { name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();

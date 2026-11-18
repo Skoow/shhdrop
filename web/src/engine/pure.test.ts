@@ -121,7 +121,7 @@ describe("base64url : TypeScript = vecteurs = moteur", () => {
   });
 });
 
-describe("liens : TypeScript = vecteurs = moteur (v2.json et v3-liens.json)", () => {
+describe("liens : TypeScript = vecteurs = moteur (v2.json, v3-liens.json, v4-liens-s.json)", () => {
   const cases = linkCases();
 
   it("checkOrigin, shareLinkWithPassword, splitPassword", () => {
@@ -148,12 +148,12 @@ describe("liens : TypeScript = vecteurs = moteur (v2.json et v3-liens.json)", ()
       const [url, base] = c.args as [string, string];
       const ts = out(() => P.linkForm(url, base));
       let eng = out(() => W.parseLink(utf8(url), base));
-      if (url.includes("été.example")) {
+      if (url.includes("été.example") && c.error === undefined) {
         // Écart documenté (engine/vectors/README.md) : le moteur refuse un hôte non ASCII ; le site
         // ne lui passe que le lien normalisé par linkForm (origine en Punycode, comme location.href).
         expect(eng).toEqual({ error: "lien_invalide" });
         const f = (ts as { ok: P.LinkForm }).ok;
-        eng = out(() => W.parseLink(utf8(`${f.origin}/#${f.key}`), base));
+        eng = out(() => W.parseLink(utf8(`${f.origin}/s#${f.key}`), base));
       }
       if (c.error !== undefined) {
         expect(ts, JSON.stringify(c)).toEqual({ error: c.error });
@@ -169,15 +169,16 @@ describe("liens : TypeScript = vecteurs = moteur (v2.json et v3-liens.json)", ()
       }
       n++;
     }
-    // 58 cas de v2.json, moins 2 remplacés, plus 25 de v3-liens.json (liens sous /s).
-    expect(n).toBe(81);
+    // 58 cas de v2.json, moins 2 remplacés, plus 25 de v3-liens.json (liens sous /s) ; moins les
+    // 26 lectures à la racine (v2 : 20, v3 : 6), plus les 42 de v4-liens-s.json (18 novembre).
+    expect(n).toBe(97);
   });
 
   it("linkForm : genre (partage ou gestion) comme le moteur, quel que soit le PREMIER caractère de la clé (une clé de partage commençant par « m » reste un partage)", () => {
     const tail = "DEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTkA"; // 42 caractères, dernier canonique
     for (const ch of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") {
       for (const [pre, kind] of [["#", "s"], ["#m", "m"]] as const) {
-        const url = `https://x.test/${pre}${ch}${tail}`;
+        const url = `https://x.test/s${pre}${ch}${tail}`;
         const f = P.linkForm(url, "/");
         expect({ kind: f.kind, key: f.key }, url).toEqual({ kind, key: ch + tail });
         const p = W.parseLink(utf8(url), "/") as { kind: string };
@@ -190,7 +191,7 @@ describe("liens : TypeScript = vecteurs = moteur (v2.json et v3-liens.json)", ()
     const head = "MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk";
     for (const ch of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") {
       for (const pre of ["#", "#m"]) {
-        const url = `https://x.test/${pre}${head}${ch}`;
+        const url = `https://x.test/s${pre}${head}${ch}`;
         const ts = out(() => P.linkForm(url, "/"));
         const eng = out(() => W.parseLink(utf8(url), "/"));
         expect("error" in ts, url).toBe("error" in eng);

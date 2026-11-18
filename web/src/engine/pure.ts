@@ -433,7 +433,8 @@ export function linkForm(url: string, base = "/"): LinkForm {
   }
   if (!allowedScheme(u) || u.username !== "" || u.password !== "") throw invalid();
   // Forme écrite depuis le 16 novembre : « {base}s » ; ancienne forme à la racine encore lue.
-  if (u.pathname !== base + LINK_PATH && u.pathname !== base && u.pathname + "/" !== base) throw invalid();
+  // Sous « /s » seulement : l'ancienne forme à la racine est refusée (propriétaire, 18 novembre).
+  if (u.pathname !== base + LINK_PATH) throw invalid();
   // Le genre vient de la forme entière (longueur), jamais du seul « m » de tête : une clé de
   // partage commence par « m » une fois sur 64 (« #m » + 42 caractères = partage).
   const kind = SHARE_FRAGMENT.test(u.hash) ? "s" : MANAGE_FRAGMENT.test(u.hash) ? "m" : null;

@@ -83,7 +83,7 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   await page.goto(shh.origin + "/nope");
   await shot(page, "15-erreur-404");
   const KEY = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => 255 - i * 3)).toString("base64url");
-  await page.goto(`${shh.origin}/#${KEY}`);
+  await page.goto(`${shh.origin}/s#${KEY}`);
   await expect(page.getByRole("heading", { level: 1, name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible({ timeout: 20_000 });
   await shot(page, "16-erreur-lien-invalide");
 

@@ -22,7 +22,7 @@ function manageFrom(page: Page, origin: string): { link: () => string | undefine
       // allHeaders() : headers() peut omettre des en-têtes posés par la page (doc Playwright).
       void r.allHeaders().then((h) => {
         const m = h["x-shh-manage"];
-        if (m) link = `${origin}/#m${m}`;
+        if (m) link = `${origin}/s#m${m}`;
       });
     }
   });

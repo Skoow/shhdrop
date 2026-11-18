@@ -111,13 +111,10 @@ function expectOnlyOwnEntries(urls: string[], origin: string, paths: string[]): 
 }
 
 // Spec §32 : lien court sous « /s » (16 novembre), « /s#<clé> » (partage) ou « /s#m<clé> »
-// (gestion) ; ancien lien à la racine (« /#… ») : remplacé par « /s » et le même fragment, sans
-// entrée d'historique de plus, puis retiré de même.
+// (gestion) ; l'ancienne forme à la racine est refusée (18 novembre, test plus bas).
 for (const [kind, start, frag] of [
   ["partage", "/s", `#${KEY}`],
   ["gestion", "/s", `#m${KEY}`],
-  ["ancien lien de partage", "/", `#${KEY}`],
-  ["ancien lien de gestion", "/", `#m${KEY}`],
 ] as const) {
   const share = kind.includes("partage");
   test(`${start}${frag.slice(0, 2)}… (${kind}) : le # est retiré de l'adresse et de l'historique, jamais envoyé`, async ({ page, shh, browserName }) => {
@@ -169,14 +166,14 @@ test("# collé dans la barre sur la même page (navigation de fragment) : retir�
   expectOnlyOwnEntries(await walkHistory(page, [KEY, KEY2], browserName !== "webkit"), shh.origin, ["/", "/", "/"]);
 });
 
-test("# de lien collé dans la barre sur l'accueil : part vers /s, retiré ; aucune entrée avec un #", async ({ page, shh, browserName }) => {
+test("# de lien collé dans la barre sur l'accueil (ancienne forme, refusée le 18 novembre) : rien ouvert, # retiré ; aucune entrée avec un #", async ({ page, shh, browserName }) => {
+  const api = apiRequests(page);
   await page.goto(`${shh.origin}/`);
   await expect(page.locator("main#contenu")).toBeVisible();
   await page.evaluate((k) => (location.hash = k), KEY2);
-  // Page « /s » chargée (son script), puis adresse « / » une fois le lien lu (17 novembre).
-  await expect
-    .poll(() => page.evaluate(() => location.href + " " + !!document.querySelector('script[src*="/assets/s-"]')).catch(() => ""))
-    .toBe(`${shh.origin}/ true`);
+  await expect.poll(() => page.evaluate(() => location.href)).toBe(`${shh.origin}/`);
+  expect(await page.evaluate(() => !!document.querySelector('script[src*="/assets/s-"]'))).toBe(false);
+  expect(api).toEqual([]);
   expectOnlyOwnEntries(await walkHistory(page, [KEY2], browserName !== "webkit"), shh.origin, ["/", "/"]);
 });
 
@@ -202,7 +199,7 @@ test.describe("navigateur sans crypto.subtle", () => {
 
   test("« non pris en charge », aucune route ne démarre, aucune requête /api/", async ({ page, shh }) => {
     const api = apiRequests(page);
-    await page.goto(`${shh.origin}/#${KEY}`);
+    await page.goto(`${shh.origin}/s#${KEY}`);
     await expect(
       page.getByRole("heading", { name: "Ce navigateur ne permet pas de chiffrer en sécurité.", exact: false }),
     ).toBeVisible();
@@ -290,29 +287,40 @@ test("/s : 200, pas de X-Robots-Tag (noindex dans la page) ; /s/<id>. (ancien li
   expect(old.status()).toBe(404);
 });
 
+// Ancienne forme à la racine (refusée, 18 novembre) : l'accueil, le # retiré, rien envoyé.
+test("ancien lien /#<clé> et /#m<clé> : accueil, # retiré de l'adresse, aucune requête d'API", async ({ page, shh }) => {
+  const api = apiRequests(page);
+  for (const frag of [`#${KEY}`, `#m${KEY}`]) {
+    await page.goto(`${shh.origin}/${frag}`);
+    await expect(page.locator("[data-pick]")).toBeVisible();
+    await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
+  }
+  expect(api).toEqual([]);
+});
+
 // I2 : paramètre de suivi ajouté par l'application (Facebook, Messenger, Instagram).
-test("/s?fbclid=x#<clé> et ancien /?fbclid=x#<clé> : requête et # retirés, adresse = /", async ({ page, shh }) => {
+test("/s?fbclid=x#<clé> : requête et # retirés, adresse = / ; ancien /?fbclid=x#<clé> : accueil, rien envoyé", async ({ page, shh }) => {
   const api = apiRequests(page);
   await page.goto(`${shh.origin}/s?fbclid=x#${KEY}`);
   await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
   await expect.poll(() => api.map((u) => new URL(u).pathname + new URL(u).search)).toEqual(["/api/shares/meta"]);
   api.length = 0;
   await page.goto(`${shh.origin}/?fbclid=x#${KEY}`);
-  await expect.poll(() => page.url()).toBe(`${shh.origin}/`);
-  // Seule requête d'API : la lecture de l'état du partage (sans la clé ni la requête de suivi).
-  await expect.poll(() => api.map((u) => new URL(u).pathname + new URL(u).search)).toEqual(["/api/shares/meta"]);
+  await expect(page.locator("[data-pick]")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).hash).toBe("");
+  expect(api).toEqual([]);
 });
 
 test.describe("navigateur intégré (Facebook) avec ?fbclid=", () => {
   test.use({ userAgent: INSTAGRAM.replace(/Instagram .*$/, "[FBAN/FBIOS;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/17.1]") });
 
   test("rien n'est retiré (S4), même avec un fragment invalide ou sur une route 404", async ({ page, shh }) => {
-    // Ancien lien à la racine : il part quand même vers « /s » (même fragment, gardé ici).
+    // Ancienne forme à la racine (refusée, 18 novembre) : l'accueil, fragment gardé ici aussi.
     for (const [path, frag, at] of [
       ["/s?fbclid=x", `#${KEY}`, "/s?fbclid=x"],
       ["/s?fbclid=x", `#m${KEY}`, "/s?fbclid=x"],
-      ["/?fbclid=x", `#${KEY}`, "/s"],
-      ["/", `#${KEY}.`, "/s"],
+      ["/?fbclid=x", `#${KEY}`, "/?fbclid=x"],
+      ["/", `#${KEY}.`, "/"],
       ["/inconnu", `#${KEY}`, "/inconnu"],
     ] as const) {
       await page.goto(`${shh.origin}${path}${frag}`);

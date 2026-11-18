@@ -1,11 +1,9 @@
-// Routeur interne (UI §9). Il lit le chemin et, à la racine seulement, la FORME du « # »
-// (spec §32 : « #<43> » partage, « #m<43> » gestion) sans jamais en garder le contenu : la
-// clé est lue une fois par readLink (app/link.ts), puis retirée de l'adresse.
+// Routeur interne (UI §9). Il lit le chemin et, sous « /s » seulement, la FORME du « # »
+// (spec §32 : « #m<43> » gestion, sinon ouverture) sans jamais en garder le contenu : la clé est
+// lue une fois par readLink (app/link.ts), puis retirée de l'adresse. Un « # » à la racine (ancienne
+// forme, refusée depuis le 18 novembre) n'ouvre rien : l'accueil le retire de l'adresse.
 import { flushSync } from "svelte";
-import { MANAGE_FRAGMENT, SHARE_FRAGMENT } from "../engine/pure";
-
-// Lien du QR code (D41-29) : « #<K_lien>. » suivi du mot de passe, même mal formé (écran de saisie).
-const SHARE_PW_PREFIX = /^#[A-Za-z0-9_-]{43}\./;
+import { MANAGE_FRAGMENT } from "../engine/pure";
 import { runTransition } from "../ui/viewTransition";
 import { createLeaveGuard } from "./leave-guard";
 
@@ -24,7 +22,7 @@ export function markReopen(h: History): void {
  * Adresse affichée une fois le lien lu (décision du propriétaire du 17 novembre : « /s » n'est
  * montré que quand il sert) : la page « /s » remplace son adresse par l'accueil (« / ») après
  * avoir lu et retiré le « # ». Un rechargement de « / » marqué (markReopen) repart vers « /s »
- * (moveLegacyLink), où l'écran d'ouverture retrouve l'octroi de l'onglet (spec §41.4). Toute
+ * (moveToLinkPage), où l'écran d'ouverture retrouve l'octroi de l'onglet (spec §41.4). Toute
  * autre adresse est rendue telle quelle.
  */
 export function shownPath(pathname: string): string {
@@ -70,13 +68,6 @@ export function suite(search: string): "salon" | null {
   return search === "?suite=salon" ? "salon" : null;
 }
 
-/**
- * Fragment de 20 à 44 caractères de l'alphabet des clés qui n'est pas une clé valide : un lien
- * coupé (copier-coller, message tronqué). L'écran d'ouverture dit « Lien incomplet » au lieu de
- * l'accueil, qui laisserait croire que le lien n'était qu'une adresse du site (ruling 2).
- */
-const TRUNCATED_FRAGMENT = /^#[A-Za-z0-9_-]{20,44}$/;
-
 export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false, comptes: boolean = __COMPTES__): Route {
   const prefix = base.endsWith("/") ? base.slice(0, -1) : base; // "" ou "/shhdrop"
   let p = pathname;
@@ -86,9 +77,7 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
     else return { name: "notfound" };
   }
   if (p === "/") {
-    if (SHARE_FRAGMENT.test(hash) || SHARE_PW_PREFIX.test(hash)) return { name: "open" };
-    if (MANAGE_FRAGMENT.test(hash)) return { name: "manage" };
-    if (TRUNCATED_FRAGMENT.test(hash)) return { name: "open" };
+    // Ouverture déverrouillée rechargée sous « / » (adresse montrée, shownPath) : retour à « /s ».
     if (hash === "" && reopen) return { name: "open" };
     return { name: "home" };
   }
@@ -167,19 +156,16 @@ export function otherEntry(path: string): boolean {
 }
 
 /**
- * Ancien lien à la racine (« /#<clé> », avant le 16 novembre), ou entrée « / » d'une ouverture
- * déverrouillée (markReopen, 17 novembre) : remplacé, sans nouvelle entrée
- * d'historique, par « /s » et le même fragment (même origine : le fragment ne part jamais au
- * serveur). La requête (« ?fbclid=… » des messageries) n'est pas recopiée. Rend vrai si la page
- * part ; l'appelant n'affiche alors rien.
+ * Entrée « / » d'une ouverture déverrouillée (markReopen, 17 novembre), rechargée : remplacée,
+ * sans nouvelle entrée d'historique, par « /s » (où l'écran d'ouverture retrouve l'octroi de
+ * l'onglet). Rend vrai si la page part ; l'appelant n'affiche alors rien.
  */
-export function moveLegacyLink(loc: Pick<Location, "pathname" | "hash" | "replace">, reopen: boolean = reopenHere()): boolean {
-  // Ouverture déverrouillée rechargée sous « / » (adresse montrée, shownPath) : vers « /s » aussi.
+export function moveToLinkPage(loc: Pick<Location, "pathname" | "hash" | "replace">, reopen: boolean = reopenHere()): boolean {
   const name = match(loc.pathname, loc.hash, undefined, reopen).name;
   // Déjà sur « /s » (serveur sans s.html, qui rendrait index.html) : jamais de boucle.
   const onS = loc.pathname === href("/s") || loc.pathname === href("/s.html");
   if (!LINK_ROUTES.has(name) || entry !== "app" || onS) return false;
-  loc.replace(href("/s") + loc.hash);
+  loc.replace(href("/s"));
   return true;
 }
 

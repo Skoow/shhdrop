@@ -37,3 +37,9 @@ Demande du propriétaire : ne pas afficher `/s` quand on n'en a pas besoin. Le l
 - **Écran verrouillé (mot de passe pas encore saisi), gestion** : un rechargement mène à l'accueil, comme avant le 16 novembre (la confirmation du navigateur prévient déjà sur l'écran verrouillé).
 - **Navigateur intégré (S4)** : rien n'est retiré, l'adresse garde `/s#…` jusqu'à « Continuer ici ».
 - Signalement **faible, exactitude** : au rechargement, `/` charge son script avant de repartir vers `/s` (un aller-retour de plus, seulement dans ce cas).
+
+## Ancienne forme à la racine retirée (décision du propriétaire, 18 novembre)
+
+Le service n'étant pas lancé, aucun lien à la racine ne peut circuler : la redirection `/#…` → `/s#…` est retirée (point « Moyenne, exploitation » ci-dessus, levé). Le moteur (`parse_link`) et `linkForm` ne lisent plus que `{base}s#…` ; un `#` à la racine donne l'accueil, et l'accueil le retire de l'adresse sans rien envoyer. Vecteurs : `engine/vectors/v4-liens-s.json` (README des vecteurs). Le rechargement d'une ouverture déverrouillée sous « / » (marque `REOPEN_MARK`, 17 novembre) repart toujours vers « /s » (`moveToLinkPage`) : ce n'est pas une compatibilité, c'est l'adresse montrée.
+
+**À signaler (faible)** : les invitations de salon prévues (`#c<clé>`, spec salon v3) sont encore écrites à la racine dans les données de test du compte ; à aligner sur `/s` quand le client du salon sera construit.

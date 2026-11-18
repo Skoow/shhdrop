@@ -10,7 +10,7 @@ import type { HistoryEntry } from "../history/store";
 import { priveVide, type CoffrePrive } from "./vaults";
 
 const ORIGIN = "https://shh.test";
-const G = (c: string) => `${ORIGIN}/#m${c.repeat(42)}A`; // dernier caractère canonique (32 octets)
+const G = (c: string) => `${ORIGIN}/s#m${c.repeat(42)}A`; // dernier caractère canonique (32 octets)
 const NOW = 1_800_000_000_000;
 
 function envoi(manage: string, p: Partial<HistoryEntry> = {}): HistoryEntry {
@@ -32,14 +32,14 @@ describe("partagesConnus", () => {
         { id: "b", cree: 1, expire: NOW - 1, gestion: G("B"), taille: 1, elements: 1, ouvertures_max: 1 }, // échu
         { id: "c", cree: 1, expire: NOW + 1000, gestion: "pas un lien", taille: 1, elements: 1, ouvertures_max: 1 },
       ],
-      recus: [{ id: "r", cree: 1, expire: NOW + 1000, lien: `${ORIGIN}/#${"R".repeat(43)}`, taille: 1, elements: 1, format: "pdf" }],
+      recus: [{ id: "r", cree: 1, expire: NOW + 1000, lien: `${ORIGIN}/s#${"R".repeat(43)}`, taille: 1, elements: 1, format: "pdf" }],
     };
     const local = [
       envoi(G("A")), // déjà dans le coffre
       envoi(G("D")),
       envoi(G("E"), { state: "gone", endedAt: NOW - 10 }),
       envoi(G("F"), { expiresAt: NOW - 1 }),
-      { ...envoi(""), sorte: "recu" as const, link: `${ORIGIN}/#${"S".repeat(43)}` },
+      { ...envoi(""), sorte: "recu" as const, link: `${ORIGIN}/s#${"S".repeat(43)}` },
     ];
     expect(partagesConnus(prive, local, NOW)).toEqual([G("A"), G("D")]);
   });

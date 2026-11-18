@@ -32,8 +32,8 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
 
   it("un secret qui commence par « m » reste un lien de partage (longueurs distinctes)", async () => {
     const k = `m${K.slice(1)}`;
-    expect((await parseLink(`https://x.test/#${k}`)).kind).toBe("s");
-    expect((await parseLink(`https://x.test/#m${k}`)).kind).toBe("m");
+    expect((await parseLink(`https://x.test/s#${k}`)).kind).toBe("s");
+    expect((await parseLink(`https://x.test/s#m${k}`)).kind).toBe("m");
   });
 
   it("formes de fragment pour le routeur", async () => {
@@ -71,7 +71,7 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
   });
 
   it("requête ignorée (?fbclid= ajouté par les messageries) : le secret est dans le fragment", async () => {
-    const p = await parseLink(`https://x.test/?fbclid=abc&utm=1#${K}`);
+    const p = await parseLink(`https://x.test/s?fbclid=abc&utm=1#${K}`);
     expect(p.kind === "s" && b64u(p.kLien)).toBe(K);
     expect(p.origin).toBe("https://x.test");
   });
@@ -81,14 +81,13 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
     const link = await shareLink("https://skoow.github.io", k, "/shhdrop/");
     expect(link).toBe(`https://skoow.github.io/shhdrop/s#${b64u(k)}`);
     expect(await parseLink(link, "/shhdrop/")).toEqual({ kind: "s", origin: "https://skoow.github.io", kLien: k });
-    expect((await parseLink(`https://skoow.github.io/shhdrop#${K}`, "/shhdrop/")).kind).toBe("s");
     const s = newSGestion();
     expect(await parseLink(await manageLink("https://skoow.github.io", s, "/shhdrop/"), "/shhdrop/")).toEqual({
       kind: "m",
       origin: "https://skoow.github.io",
       sGestion: s,
     });
-    for (const u of [`https://x/#${K}`, `https://x/shhdropx/#${K}`, `https://x/shhdrop/shhdrop/#${K}`, `https://x/s#${K}`, `https://x/shhdrop/s/#${K}`])
+    for (const u of [`https://x/#${K}`, `https://x/shhdropx/#${K}`, `https://x/shhdrop/shhdrop/#${K}`, `https://x/s#${K}`, `https://x/shhdrop/s/#${K}`, `https://skoow.github.io/shhdrop#${K}`, `https://skoow.github.io/shhdrop/#${K}`])
       await expect(parseLink(u, "/shhdrop/"), u).rejects.toThrow("lien_invalide");
     for (const b of ["", "Shhdrop/", "/shhdrop", "//", "/a b/"]) {
       await expect(parseLink(`https://x/#${K}`, b), b).rejects.toThrow("base_invalide");
@@ -98,13 +97,13 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
 
   it("n'accepte http: que pour la boucle locale", async () => {
     for (const host of ["localhost", "localhost:8080", "127.0.0.1", "127.0.0.1:4000", "[::1]", "[::1]:4000"]) {
-      expect((await parseLink(`http://${host}/#${K}`)).kind, host).toBe("s");
+      expect((await parseLink(`http://${host}/s#${K}`)).kind, host).toBe("s");
     }
     for (const host of ["shhdrop.example", "127.0.0.2", "10.0.0.1", "localhost.example", "[::2]"]) {
-      await expect(parseLink(`http://${host}/#${K}`), host).rejects.toThrow("lien_invalide");
+      await expect(parseLink(`http://${host}/s#${K}`), host).rejects.toThrow("lien_invalide");
     }
     for (const proto of ["ftp:", "file:", "javascript:"]) {
-      await expect(parseLink(`${proto}//x/#${K}`), proto).rejects.toThrow("lien_invalide");
+      await expect(parseLink(`${proto}//x/s#${K}`), proto).rejects.toThrow("lien_invalide");
     }
   });
 
@@ -116,11 +115,17 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
     expect(link.slice("https://shhdrop.app/s#".length)).toBe(b64u(k));
   });
 
-  it("anciens liens à la racine (avant le 16 novembre) : toujours lus, jamais plus écrits", async () => {
+  it("ancienne forme à la racine refusée (propriétaire, 18 novembre) ; seule la forme sous /s est lue", async () => {
     for (const [u, b] of [
       [`https://x.test/#${K}`, "/"],
-      [`https://x.test/s#${K}`, "/"],
+      [`https://x.test/#m${K}`, "/"],
+      [`https://x.test#${K}`, "/"],
       [`https://x.test/shhdrop/#${K}`, "/shhdrop/"],
+      [`https://x.test/shhdrop#${K}`, "/shhdrop/"],
+    ] as const)
+      await expect(parseLink(u, b), u).rejects.toThrow("lien_invalide");
+    for (const [u, b] of [
+      [`https://x.test/s#${K}`, "/"],
       [`https://x.test/shhdrop/s#${K}`, "/shhdrop/"],
     ] as const) {
       const p = await parseLink(u, b);
@@ -132,13 +137,13 @@ describe("liens (spec §32, sous /s depuis le 16 novembre : secret après #)", (
 
 describe("origine (audit F1)", () => {
   it("parseLink rend l'origine et refuse les identifiants dans l'URL", async () => {
-    expect((await parseLink(`https://srv.test:8443/#${K}`)).origin).toBe("https://srv.test:8443");
-    for (const u of [`https://user:pw@srv.test/#${K}`, `https://user@srv.test/#${K}`, `https://:pw@srv.test/#${K}`]) {
+    expect((await parseLink(`https://srv.test:8443/s#${K}`)).origin).toBe("https://srv.test:8443");
+    for (const u of [`https://user:pw@srv.test/s#${K}`, `https://user@srv.test/s#${K}`, `https://:pw@srv.test/s#${K}`]) {
       await expect(parseLink(u), u).rejects.toThrow("lien_invalide");
     }
   });
   it("parseLink rend l'origine du lien : à l'appelant de la comparer à la sienne", async () => {
-    expect((await parseLink(`https://autre.example/#${K}`)).origin).toBe("https://autre.example");
+    expect((await parseLink(`https://autre.example/s#${K}`)).origin).toBe("https://autre.example");
   });
   it("checkOrigin : https (http en boucle locale), sans chemin, requête, fragment ni identifiants", async () => {
     for (const o of ["https://srv.test", "https://srv.test:8443", "http://localhost:8080", "http://127.0.0.1:4000", "http://[::1]:4000"]) {

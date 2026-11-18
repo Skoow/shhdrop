@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { href, match, moveLegacyLink, navigate, otherEntry, router, setEntry, shownPath, suite } from "./router.svelte";
+import { href, match, moveToLinkPage, navigate, otherEntry, router, setEntry, shownPath, suite } from "./router.svelte";
 
 const KEY = "A".repeat(42) + "Q"; // 43 caractères base64url (forme seulement)
 
@@ -24,26 +24,10 @@ describe("match", () => {
     expect(match("/securite", "", "/", true)).toEqual({ name: "securite" });
   });
 
-  it("spec §32 : « / » + fragment de partage ou de gestion → ouverture ou gestion ; la clé n'est pas gardée", () => {
-    expect(match("/", `#${KEY}`)).toEqual({ name: "open" });
-    expect(match("/", `#m${KEY}`)).toEqual({ name: "manage" });
-    expect(JSON.stringify(match("/", `#${KEY}`))).not.toContain(KEY);
-  });
-  it("D41-29 : lien du QR code (« #<K_lien>.<mot de passe> », même mal formé) → ouverture", () => {
-    expect(match("/", `#${KEY}.YUMzIWNENT8jRmc`)).toEqual({ name: "open" });
-    expect(match("/", `#${KEY}.%%`)).toEqual({ name: "open" });
-    expect(match("/", `#${KEY}.`)).toEqual({ name: "open" });
-  });
-
-  it("fragment sans rapport avec une clé → accueil (App retire ensuite le « # »)", () => {
-    for (const h of ["", "#", "#contenu", `#${KEY.slice(0, 19)}`, `#m${KEY}A`, `#${KEY.slice(1)}+`, `#${KEY.slice(0, 30)}é`])
+  it("ancienne forme à la racine (refusée, 18 novembre) : « / » + fragment, quel qu'il soit → accueil (App retire le « # ») ; la clé n'est pas gardée", () => {
+    for (const h of [`#${KEY}`, `#m${KEY}`, `#${KEY}.YUMzIWNENT8jRmc`, `#${KEY}.`, `#${KEY.slice(0, 20)}`, `#x${KEY}`, "", "#", "#contenu"])
       expect(match("/", h), h).toEqual({ name: "home" });
-  });
-
-  it("fragment de 20 à 44 caractères qui n'est pas une clé valide → ouverture, qui dira « Lien incomplet » (ruling 2)", () => {
-    for (const h of [`#${KEY.slice(0, 20)}`, `#${KEY.slice(1)}`, `#${KEY}A`, `#m${KEY.slice(2)}`, `#x${KEY}`])
-      expect(match("/", h), h).toEqual({ name: "open" });
-    expect(match("/shhdrop/", `#${KEY.slice(0, 30)}`, "/shhdrop/")).toEqual({ name: "open" });
+    expect(JSON.stringify(match("/", `#${KEY}`))).not.toContain(KEY);
   });
 
   it("fragment de bonne forme ailleurs qu'à la racine : pas d'ouverture", () => {
@@ -69,8 +53,8 @@ describe("match", () => {
 
   it("avec une base de dépôt (démo)", () => {
     const base = "/shhdrop/";
-    expect(match("/shhdrop/", `#${KEY}`, base)).toEqual({ name: "open" });
-    expect(match("/shhdrop", `#m${KEY}`, base)).toEqual({ name: "manage" });
+    expect(match("/shhdrop/", `#${KEY}`, base)).toEqual({ name: "home" }); // ancienne forme refusée
+    expect(match("/shhdrop/s", `#${KEY}`, base)).toEqual({ name: "open" });
     expect(match("/shhdrop/", "", base)).toEqual({ name: "home" });
     expect(match("/shhdrop", "", base)).toEqual({ name: "home" });
     expect(match("/shhdrop/securite", "", base)).toEqual({ name: "securite" });
@@ -165,22 +149,14 @@ describe("navigate", () => {
     }
   });
 
-  it("ancien lien à la racine : remplacé par /s et le même fragment (requête non recopiée) ; rien ailleurs, jamais en boucle", () => {
+  it("ancienne forme à la racine (refusée, 18 novembre) : l'accueil, jamais l'ouverture ni la page /s", () => {
     const calls: string[] = [];
     const loc = (pathname: string, hash: string) => ({ pathname, hash, replace: (u: string) => void calls.push(u) });
-    expect(moveLegacyLink(loc("/", `#${KEY}`))).toBe(true);
-    expect(moveLegacyLink(loc("/", `#m${KEY}`))).toBe(true);
-    expect(moveLegacyLink(loc("/", `#${KEY}.YWJj`))).toBe(true);
-    expect(calls).toEqual([`/s#${KEY}`, `/s#m${KEY}`, `/s#${KEY}.YWJj`]);
-    for (const [p, h] of [["/", ""], ["/", "#x"], ["/envoyer", `#${KEY}`], ["/s", `#${KEY}`], ["/s", ""], ["/s.html", `#${KEY}`]] as const)
-      expect(moveLegacyLink(loc(p, h)), `${p}${h}`).toBe(false);
-    setEntry("s");
-    try {
-      expect(moveLegacyLink(loc("/", `#${KEY}`))).toBe(false);
-    } finally {
-      setEntry("app");
+    for (const h of [`#${KEY}`, `#m${KEY}`, `#${KEY}.YWJj`, `#${KEY.slice(0, 30)}`]) {
+      expect(match("/", h).name, h).toBe("home");
+      expect(moveToLinkPage(loc("/", h), false), h).toBe(false);
     }
-    expect(calls).toHaveLength(3);
+    expect(calls).toEqual([]);
   });
 
   // « /s » montré seulement quand il sert (17 novembre).
@@ -193,10 +169,10 @@ describe("navigate", () => {
   it("entrée « / » marquée d'une ouverture déverrouillée : repart vers /s (sans fragment) ; sans marque : rien", () => {
     const calls: string[] = [];
     const loc = (pathname: string, hash: string) => ({ pathname, hash, replace: (u: string) => void calls.push(u) });
-    expect(moveLegacyLink(loc("/", ""), true)).toBe(true);
-    expect(moveLegacyLink(loc("/", ""), false)).toBe(false);
-    expect(moveLegacyLink(loc("/envoyer", ""), true)).toBe(false);
-    expect(moveLegacyLink(loc("/s", ""), true)).toBe(false); // déjà sur /s : jamais de boucle
+    expect(moveToLinkPage(loc("/", ""), true)).toBe(true);
+    expect(moveToLinkPage(loc("/", ""), false)).toBe(false);
+    expect(moveToLinkPage(loc("/envoyer", ""), true)).toBe(false);
+    expect(moveToLinkPage(loc("/s", ""), true)).toBe(false); // déjà sur /s : jamais de boucle
     expect(calls).toEqual(["/s"]);
   });
 
@@ -208,7 +184,7 @@ describe("navigate", () => {
 
   it("popstate resynchronise la route, fragment compris (lien collé dans la barre)", () => {
     navigate("/envois");
-    history.replaceState(null, "", `/#m${KEY}`);
+    history.replaceState(null, "", `/s#m${KEY}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(router.current).toEqual({ name: "manage" });
     history.replaceState(null, "", "/");

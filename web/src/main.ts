@@ -1,15 +1,15 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
-import { moveLegacyLink } from "./app/router.svelte";
+import { moveToLinkPage } from "./app/router.svelte";
 import { pageReturns } from "./history/returns";
 import { langReady } from "./i18n/i18n.svelte";
 import { blockZoom } from "./app/no-zoom";
 
 blockZoom(); // zoom bloqué (propriétaire, 18 novembre)
 
-// Ancien lien à la racine (« /#<clé> », avant le 16 novembre) : la page « /s » l'ouvre, avant
+// Ouverture déverrouillée rechargée sous « / » (adresse montrée) : la page « /s » la rouvre, avant
 // tout le reste ; rien n'est monté ici (aucun écran affiché un instant).
-const moved = moveLegacyLink(location);
+const moved = moveToLinkPage(location);
 
 // Démo GitHub Pages (UI §14.3) : en production, la condition vaut false à la compilation et le
 // module disparaît du build (garde demoGuard de vite.config.ts, scripts/check-dist.mjs).

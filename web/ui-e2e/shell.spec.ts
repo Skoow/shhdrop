@@ -11,7 +11,7 @@ test("l'accueil se charge sous la CSP, sans violation ni requête tierce", async
   await capture(page, "accueil");
 });
 
-// Spec §32 : les liens sont à la racine ; /s/ et /m/ ne sont plus des routes (404 de
+// Spec §32 : les liens sont sous « /s#… » ; /s/ et /m/ ne sont pas des routes (404 de
 // l'interface), et X-Robots-Tag a disparu.
 for (const p of ["/s/x", "/m/x"]) {
   test(`${p} : 404 de l'interface, sans X-Robots-Tag`, async ({ page, shh }) => {
@@ -89,8 +89,8 @@ test("référencement : robots.txt et sitemap.xml ; pages publiques indexées, p
     await expect(meta("robots"), p).toHaveAttribute("content", "noindex");
     await expect(page.locator('link[rel="canonical"]'), p).toHaveCount(0);
   }
-  // Un partage ouvert (« /#clé ») n'est jamais indexé, et la canonique ne garde aucun fragment.
-  await page.goto(shh.origin + "/#AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+  // Un partage ouvert (« /s#clé ») n'est jamais indexé, et la canonique ne garde aucun fragment.
+  await page.goto(shh.origin + "/s#AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
   await expect(meta("robots")).toHaveAttribute("content", "noindex");
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
 });

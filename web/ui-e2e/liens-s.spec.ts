@@ -1,14 +1,14 @@
 // Liens sous « /s » et page d'ouverture séparée (décision du propriétaire du 16 novembre,
 // docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md) : le lien rendu est « /s#… » ;
-// la page /s ne charge pas le script de l'application d'envoi ; un ancien lien à la racine est
-// remplacé par /s et le même fragment, sans entrée d'historique de plus ; la clé est retirée de
-// l'adresse après lecture, comme avant.
+// la page /s ne charge pas le script de l'application d'envoi ; l'ancienne forme à la racine est
+// refusée (18 novembre : l'accueil, la clé retirée de l'adresse) ; la clé est retirée de l'adresse
+// après lecture, comme avant.
 import { expect, test } from "./fixtures";
 import { file, freshPage, sendShare, unlock } from "./open-helpers";
 
 test.use({ locale: "fr-FR" });
 
-test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancien lien /#… : même partage, par /s", async ({ browser, shh }) => {
+test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancienne forme /#… : accueil, rien ouvert", async ({ browser, shh }) => {
   test.setTimeout(120_000);
   const s = await freshPage(browser);
   const sent = await sendShare(s.page, shh.origin + "/", { text: "Bonjour", files: [file("contrat.pdf")], opens: 3 });
@@ -24,7 +24,6 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancien l
   });
   await a.page.goto(sent.link);
   await expect(a.page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ })).toBeVisible({ timeout: 30_000 });
-  const direct = await a.page.evaluate(() => history.length);
   await unlock(a.page, sent.password);
   // « /s » n'est plus montré une fois le lien lu (17 novembre).
   expect(new URL(a.page.url()).pathname).toBe("/");
@@ -38,16 +37,17 @@ test("lien /s#… : ouverture dans la page /s, sans le script d'envoi ; ancien l
   await expect.poll(() => new URL(a.page.url()).pathname).toBe("/");
   await a.ctx.close();
 
-  // Ancien lien à la racine : la page part vers /s avec le même fragment, sans entrée de plus.
+  // Ancienne forme à la racine (refusée, 18 novembre) : l'accueil, la clé retirée, aucune requête.
   const b = await freshPage(browser);
-  const old = sent.link.replace("/s#", "/#");
-  await b.page.goto(old);
-  await expect(b.page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ })).toBeVisible({ timeout: 30_000 });
-  expect(new URL(b.page.url()).pathname).toBe("/");
-  // Autant d'entrées qu'en ouvrant directement le lien /s : le remplacement n'en ajoute aucune.
-  expect(await b.page.evaluate(() => history.length)).toBe(direct);
-  await unlock(b.page, sent.password);
-  expect(new URL(b.page.url()).hash).toBe("");
+  const api: string[] = [];
+  b.page.on("request", (r) => {
+    if (new URL(r.url()).pathname.startsWith("/api/")) api.push(r.url());
+  });
+  await b.page.goto(sent.link.replace("/s#", "/#"));
+  await expect(b.page.locator("[data-pick]")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => new URL(b.page.url()).hash).toBe("");
+  await expect(b.page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ })).toHaveCount(0);
+  expect(api).toEqual([]);
   await b.ctx.close();
 
   // Lien de gestion sous /s : écran de gestion, clé retirée de l'adresse.

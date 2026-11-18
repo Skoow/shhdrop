@@ -4,7 +4,7 @@
   import { inAppBrowser, isStandalone, isSupported } from "./app/env";
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
   import { scrubAddressBar } from "./app/link";
-  import { href, LINK_ROUTES, moveLegacyLink, PAGE_ROUTES, router } from "./app/router.svelte";
+  import { href, LINK_ROUTES, moveToLinkPage, PAGE_ROUTES, router } from "./app/router.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
   import { getLang } from "./i18n/i18n.svelte";
@@ -59,9 +59,9 @@
 
   /**
    * UI §12.1, spec §32 : l'ouverture et la gestion ont leur page, « /s » (s.html, 16 novembre).
-   * Un ancien lien à la racine (« /#<clé> », ou collé ensuite dans la barre) y est envoyé tel
-   * quel (moveLegacyLink : remplacement, même fragment). Toute autre route (accueil avec un
-   * « # » mal formé, 404, hors base de démo) : un « # » non vide est retiré de l'adresse.
+   * Une ouverture déverrouillée rechargée sous « / » y retourne (moveToLinkPage). Toute autre
+   * route (accueil avec un « # », dont l'ancienne forme de lien refusée depuis le 18 novembre,
+   * 404, hors base de démo) : un « # » non vide est retiré de l'adresse.
    */
   const inApp = () => inAppBrowser(navigator.userAgent, isStandalone(window)) !== null;
   function scrubHere(): void {
@@ -71,7 +71,7 @@
 
   function onRoute(): void {
     if (LINK_ROUTES.has(router.current.name)) {
-      moveLegacyLink(location);
+      moveToLinkPage(location);
       return;
     }
     if (location.hash !== "" && !inApp()) scrubHere();
@@ -131,7 +131,7 @@
          la liste. -->
     <SendFlow sendPage={router.current.name === "envoyer"} onbusy={(b) => (sending = b)} />
   {:else if LINK_ROUTES.has(router.current.name)}
-    <!-- Ancien lien à la racine : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
+    <!-- Ouverture rechargée sous « / » : la page part vers « /s » (onRoute), rien n'est affiché ici. -->
   {:else if router.current.name === "envois"}
     <History />
   {:else if router.current.name === "telechargements"}

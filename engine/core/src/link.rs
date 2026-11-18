@@ -1,6 +1,7 @@
 //! Liens de partage et de gestion (spec §32, `transfer/link.ts`) : sous `/s` (décision du
 //! propriétaire du 16 novembre, docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md),
-//! le secret après le « # ». Les anciens liens à la racine du site restent lus. Le fragment n'est jamais envoyé au serveur ; ni le lien ni la page ne portent
+//! le secret après le « # ». Seule cette forme est lue (l'ancienne, à la racine, est refusée depuis le
+//! 18 novembre). Le fragment n'est jamais envoyé au serveur ; ni le lien ni la page ne portent
 //! d'identifiant (l'id du partage se calcule à partir de K_lien).
 use crate::encoding::{b64u, unb64u};
 use crate::error::{Error, Result};
@@ -106,9 +107,9 @@ pub fn parse_link(url: &str, base: &str) -> Result<ParsedLink> {
     if !allowed_scheme(&u) || u.has_credentials() {
         return Err(Error::LienInvalide);
     }
-    let path = u.pathname();
-    let new_form = path.strip_prefix(base) == Some(LINK_PATH);
-    if !new_form && path != base && format!("{path}/") != base {
+    // Liens sous « /s » seulement (décision du propriétaire du 18 novembre : l'ancienne forme à
+    // la racine, « base#… », est refusée ; aucune compatibilité à garder avant le lancement).
+    if u.pathname().strip_prefix(base) != Some(LINK_PATH) {
         return Err(Error::LienInvalide);
     }
     let hash = u.hash();
@@ -274,11 +275,11 @@ mod tests {
     fn secret_qui_commence_par_m() {
         let km = format!("m{}", &k()[1..]);
         assert_eq!(
-            kind(&parse_link(&format!("https://x.test/#{km}"), "/").unwrap()),
+            kind(&parse_link(&format!("https://x.test/s#{km}"), "/").unwrap()),
             's'
         );
         assert_eq!(
-            kind(&parse_link(&format!("https://x.test/#m{km}"), "/").unwrap()),
+            kind(&parse_link(&format!("https://x.test/s#m{km}"), "/").unwrap()),
             'm'
         );
     }
@@ -341,7 +342,7 @@ mod tests {
 
     #[test]
     fn requete_ignoree() {
-        let p = parse_link(&format!("https://x.test/?fbclid=abc&utm=1#{}", k()), "/").unwrap();
+        let p = parse_link(&format!("https://x.test/s?fbclid=abc&utm=1#{}", k()), "/").unwrap();
         assert_eq!(kind(&p), 's');
         assert_eq!(key(&p), K1);
         assert_eq!(origin(&p), "https://x.test");
@@ -361,8 +362,6 @@ mod tests {
             (kind(&p), origin(&p), key(&p)),
             ('s', "https://skoow.github.io", [3; 32])
         );
-        let u = format!("https://skoow.github.io/shhdrop#{k}");
-        assert_eq!(kind(&parse_link(&u, "/shhdrop/").unwrap()), 's');
         let s = SGestion::from_bytes([4; 32]);
         let m = manage_link("https://skoow.github.io", &s, "/shhdrop/").unwrap();
         let p = parse_link(&m, "/shhdrop/").unwrap();
@@ -377,6 +376,9 @@ mod tests {
             format!("https://x/s#{k}"),
             format!("https://x/shhdrop/s/#{k}"),
             format!("https://x/shhdrops#{k}"),
+            // Ancienne forme à la racine de la base : refusée (18 novembre).
+            format!("https://skoow.github.io/shhdrop#{k}"),
+            format!("https://skoow.github.io/shhdrop/#{k}"),
         ] {
             assert_eq!(err(parse_link(&u, "/shhdrop/")), Error::LienInvalide, "{u}");
         }
@@ -403,7 +405,7 @@ mod tests {
             "[::1]:4000",
         ] {
             assert_eq!(
-                kind(&parse_link(&format!("http://{host}/#{k}"), "/").unwrap()),
+                kind(&parse_link(&format!("http://{host}/s#{k}"), "/").unwrap()),
                 's',
                 "{host}"
             );
@@ -416,14 +418,14 @@ mod tests {
             "[::2]",
         ] {
             assert_eq!(
-                err(parse_link(&format!("http://{host}/#{k}"), "/")),
+                err(parse_link(&format!("http://{host}/s#{k}"), "/")),
                 Error::LienInvalide,
                 "{host}"
             );
         }
         for proto in ["ftp:", "file:", "javascript:"] {
             assert_eq!(
-                err(parse_link(&format!("{proto}//x/#{k}"), "/")),
+                err(parse_link(&format!("{proto}//x/s#{k}"), "/")),
                 Error::LienInvalide,
                 "{proto}"
             );
@@ -439,14 +441,21 @@ mod tests {
     }
 
     #[test]
-    fn ancienne_forme_a_la_racine_toujours_lue() {
-        // Liens écrits avant le 16 novembre : à la racine, lus comme avant ; jamais plus écrits.
+    fn ancienne_forme_a_la_racine_refusee() {
+        // Décision du propriétaire du 18 novembre : seuls les liens sous « /s » sont lus ;
+        // l'ancienne forme à la racine (avant le 16 novembre) est refusée.
         let k = k();
         for (u, b) in [
             (format!("https://x.test/#{k}"), "/"),
-            (format!("https://x.test/s#{k}"), "/"),
+            (format!("https://x.test/#m{k}"), "/"),
+            (format!("https://x.test#{k}"), "/"),
             (format!("https://x.test/shhdrop/#{k}"), "/shhdrop/"),
             (format!("https://x.test/shhdrop#{k}"), "/shhdrop/"),
+        ] {
+            assert_eq!(err(parse_link(&u, b)), Error::LienInvalide, "{u}");
+        }
+        for (u, b) in [
+            (format!("https://x.test/s#{k}"), "/"),
             (format!("https://x.test/shhdrop/s#{k}"), "/shhdrop/"),
         ] {
             let p = parse_link(&u, b).unwrap();
@@ -460,18 +469,18 @@ mod tests {
     fn origine_et_identifiants() {
         let k = k();
         assert_eq!(
-            origin(&parse_link(&format!("https://srv.test:8443/#{k}"), "/").unwrap()),
+            origin(&parse_link(&format!("https://srv.test:8443/s#{k}"), "/").unwrap()),
             "https://srv.test:8443"
         );
         for u in [
-            format!("https://user:pw@srv.test/#{k}"),
-            format!("https://user@srv.test/#{k}"),
-            format!("https://:pw@srv.test/#{k}"),
+            format!("https://user:pw@srv.test/s#{k}"),
+            format!("https://user@srv.test/s#{k}"),
+            format!("https://:pw@srv.test/s#{k}"),
         ] {
             assert_eq!(err(parse_link(&u, "/")), Error::LienInvalide, "{u}");
         }
         assert_eq!(
-            origin(&parse_link(&format!("https://autre.example/#{k}"), "/").unwrap()),
+            origin(&parse_link(&format!("https://autre.example/s#{k}"), "/").unwrap()),
             "https://autre.example"
         );
     }

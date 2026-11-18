@@ -151,3 +151,7 @@ Extension facultative du manifeste v2 (décision du propriétaire du 16 novembre
 
 Décision du propriétaire du 16 novembre (spec §32, `docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md`) : les liens écrits ont un « s » avant le « # » (`https://hôte/s#<clé>`, `…/s#m<clé>`), et `parseLink` lit les deux formes. `v2.json` n'est pas modifié : ses 10 cas `shareLink`/`manageLink` réussis (forme racine) et ses 2 cas `parseLink` qui refusaient `…/s#…` sont **remplacés** par les 49 cas de `v3-liens.json` ; tous ses autres cas restent valables. Lu par `engine/core/tests/vectors.rs` et, côté site, par `web/src/engine/link-vectors.testutil.ts`.
 
+
+## Liens sous `/s` seulement (`v4-liens-s.json`)
+
+Décision du propriétaire du 18 novembre : l'ancienne forme à la racine (`https://hôte/#<clé>`, `…/#m<clé>`, et `…/base#…` en démo) n'est plus lue, le service n'étant pas lancé (aucune compatibilité à garder). Chaque cas `parseLink` qui lisait un lien à la racine — 20 dans `v2.json`, 6 dans `v3-liens.json` — est **remplacé** par les 42 cas de `v4-liens-s.json` : son refus (`lien_invalide`) et, quand la forme s'y prête, la même adresse sous `/s` avec le même résultat (mêmes cas limites d'analyse : majuscules, port 443, blancs, barres obliques inverses, `%2e`, IPv6, IDN). `v2.json` et `v3-liens.json` ne sont pas modifiés. Les URL de `v2-limites.json` (cas limites des clés) sont écrites sous `/s`, avec les mêmes résultats. Lu par `engine/core/tests/vectors.rs` et `web/src/engine/link-vectors.testutil.ts`.
