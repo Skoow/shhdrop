@@ -284,7 +284,7 @@
     padding: var(--sp-4);
     overflow: auto;
     background: var(--bg-deep);
-    touch-action: pan-y pinch-zoom;
+    touch-action: pan-y; /* zoom bloqué partout (18 novembre) */
   }
   .stage[data-kind="text"] {
     place-items: start center;

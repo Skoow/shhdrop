@@ -3,6 +3,9 @@ import App from "./App.svelte";
 import { moveLegacyLink } from "./app/router.svelte";
 import { pageReturns } from "./history/returns";
 import { langReady } from "./i18n/i18n.svelte";
+import { blockZoom } from "./app/no-zoom";
+
+blockZoom(); // zoom bloqué (propriétaire, 18 novembre)
 
 // Ancien lien à la racine (« /#<clé> », avant le 16 novembre) : la page « /s » l'ouvre, avant
 // tout le reste ; rien n'est monté ici (aucun écran affiché un instant).

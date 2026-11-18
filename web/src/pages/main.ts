@@ -3,12 +3,14 @@
 // (même texte, ou la langue du navigateur). Les liens vers l'application (accueil, envoi, Mes
 // partages) chargent sa page (router.svelte.ts, setEntry).
 import { mount } from "svelte";
+import { blockZoom } from "../app/no-zoom";
 import { setEntry } from "../app/router.svelte";
 import { probeHistory } from "../history/presence.svelte";
 import { langReady } from "../i18n/i18n.svelte";
 import PagesApp from "./PagesApp.svelte";
 
 setEntry("pages");
+blockZoom(); // zoom bloqué (propriétaire, 18 novembre)
 // « Mes partages » dans l'en-tête seulement si l'historique existe sur cet appareil (17 novembre).
 void probeHistory();
 // Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau, titres « Démo · »).

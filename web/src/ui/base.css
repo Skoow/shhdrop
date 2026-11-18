@@ -9,6 +9,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Zoom bloqué (propriétaire, 18 novembre) : pas de zoom au double-toucher, nulle part (app/no-zoom.ts). */
+  touch-action: manipulation;
 }
 
 /* Accueil v4 : les fonds de section s'étendent sur 100cqw de ce conteneur (pas de 100vw, qui
