@@ -148,3 +148,32 @@ describe("SecureDemo", () => {
     }
   });
 });
+
+describe("journal tapé (18 novembre) : un seul curseur, mots entiers", () => {
+  it("à chaque étape : jamais plus d'un curseur ; tout est tapé en entier avant l'étape suivante", () => {
+    show();
+    for (let n = 1; n <= STEPS.length; n++) {
+      // Pendant la frappe : un curseur au plus.
+      // Pas de 35 ms (TYPE_MS) : chaque lettre relance son minuteur au passage des effets.
+      const ticks = Math.floor((STEP_MS - 100) / 35);
+      for (let k = 0; k < ticks; k++) {
+        vi.advanceTimersByTime(35);
+        flushSync();
+        expect(document.querySelectorAll(".log .cur").length).toBeLessThanOrEqual(1);
+      }
+      // Juste avant l'étape suivante : chaque ligne visible est tapée en entier, état compris,
+      // et le curseur clignote au bout de la dernière.
+      const rows = [...document.querySelectorAll(".log .ln")];
+      expect(rows.length).toBeGreaterThan(0);
+      for (const r of rows) {
+        expect(r.querySelector(".li-t")!.textContent!.length, r.textContent!).toBeGreaterThan(3);
+        expect(r.querySelector(".li-s")!.textContent).toMatch(/^[✓✕] \S/);
+      }
+      const last = rows.at(-1)!;
+      expect(last.querySelector(".cur.idle")).not.toBeNull();
+      expect(document.querySelectorAll(".log .cur")).toHaveLength(1);
+      vi.advanceTimersByTime(STEP_MS - ticks * 35);
+      flushSync();
+    }
+  });
+});

@@ -7,9 +7,9 @@
   // nom, le mot de passe ni l'adresse IP ; tout est effacé après ouverture ou à l'échéance.
   // Le brouillé est décoratif (decor.ts : générateur à graine fixe, jamais de crypto).
   import { t, type Key } from "../i18n/i18n.svelte";
-  import { Pause, Play } from "./Icon";
+  import { Lock, Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
-  import { STEP_MS, STEPS } from "./demo-steps";
+  import { PAUSE, STEP_MS, STEPS, TYPE_MS } from "./demo-steps";
 
   const uid = $props.id();
 
@@ -40,7 +40,10 @@
   $effect(() => {
     if (!playing) return;
     const now = step; // relu à chaque étape : un minuteur par étape
-    const timer = setTimeout(() => (step = now === STEPS.length ? 1 : now + 1), STEP_MS);
+    const timer = setTimeout(() => {
+      step = now === STEPS.length ? 1 : now + 1;
+      typed = 0; // la frappe de l'étape suivante repart du début
+    }, STEP_MS);
     return () => clearTimeout(timer);
   });
 
@@ -80,9 +83,11 @@
   const at = (n: number, ...steps: number[]) => steps.includes(n);
 
   // Journal façon terminal (décision du propriétaire du 16 novembre) : une ligne courte par étape,
-  // tapée lettre par lettre derrière une invite (« $ », « ! » pour l'attaquant), puis l'état à
-  // droite, tapé à la même allure (17 novembre : plus rien n'apparaît d'un coup) ; les lignes « late » (l'attaquant) arrivent un instant après celle de leur
-  // étape ; quatre lignes au plus à l'écran. Les dessins au-dessus ne changent pas.
+  // derrière une invite (« $ », « ! » pour l'attaquant), puis son état à droite ; quatre lignes au
+  // plus à l'écran. Frappe en JavaScript (18 novembre) : UN seul curseur, qui tape le texte lettre
+  // par lettre (il passe à la ligne si la place manque, aucun mot n'est coupé), puis l'état, puis
+  // descend à la ligne suivante ; à la fin, il reste et clignote au bout de la dernière ligne. La
+  // ligne de l'attaquant (« late ») commence un court instant après celle de l'étape.
   type Line = { n: number; text: Key; st: Key; tone: "ok" | "atk" | "end"; late?: boolean };
   const LOG: Line[] = [
     { n: 1, text: "demo.log.drop", st: "demo.st.ready", tone: "ok" },
@@ -95,7 +100,39 @@
     { n: 6, text: "demo.log.open", st: "demo.st.decrypted", tone: "ok" },
     { n: 7, text: "demo.log.erase", st: "demo.st.done", tone: "end" },
   ];
-  const lines = $derived(LOG.filter((l) => l.n <= shown).slice(-4));
+  /** Lettres tapées depuis le début de l'étape (une toutes les TYPE_MS, seulement en lecture). */
+  let typed = $state(0);
+  type Row = { key: string; tone: Line["tone"]; text: string[]; st: string[]; start: number; full: boolean };
+  // Lignes visibles et, pour celles de l'étape courante, la lettre où leur frappe commence.
+  const rows = $derived.by((): Row[] => {
+    let at = 0;
+    const all = LOG.filter((l) => l.n <= shown).map((l): Row => {
+      const text = [...t(l.text)];
+      const st = [...`${l.tone === "atk" ? "✕" : "✓"} ${t(l.st)}`];
+      if (l.n < shown) return { key: l.text, tone: l.tone, text, st, start: 0, full: true };
+      if (l.late) at += PAUSE;
+      const row = { key: l.text, tone: l.tone, text, st, start: at, full: false };
+      at += text.length + st.length;
+      return row;
+    });
+    return all.slice(-4);
+  });
+  /** Fin de la frappe de l'étape (en lettres) : le minuteur s'arrête là. */
+  const total = $derived(rows.reduce((m, r) => (r.full ? m : Math.max(m, r.start + r.text.length + r.st.length)), 0));
+  $effect(() => {
+    if (!playing || typed >= total) return;
+    const id = setTimeout(() => (typed += 1), TYPE_MS);
+    return () => clearTimeout(id);
+  });
+  /** Ce qui est tapé d'une ligne, et où est le curseur (« t » texte, « s » état, null ailleurs). */
+  function shownOf(r: Row, last: boolean) {
+    const k = r.full ? Infinity : typed - r.start;
+    const nt = Math.max(0, Math.min(r.text.length, k));
+    const ns = Math.max(0, Math.min(r.st.length, k - r.text.length));
+    const typing = !r.full && k >= 0 && k < r.text.length + r.st.length;
+    const cur = typing ? (k < r.text.length ? "t" : "s") : last && (r.full || k >= r.text.length + r.st.length) ? "s" : null;
+    return { text: r.text.slice(0, nt).join(""), st: r.st.slice(0, ns).join(""), cur, visible: r.full || k >= 0, idle: !typing };
+  }
 </script>
 
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
@@ -231,23 +268,21 @@
        ci-dessous est lue en entier par le lecteur d'écran, sans rien annoncer à chaque ligne. -->
   {#if !reduced}
     <ol class="log" aria-hidden="true">
-      {#each lines as l, i (l.text)}
-        {@const st = `${l.tone === "atk" ? "✕" : "✓"} ${t(l.st)}`}
-        <li class={["ln", l.tone, { late: l.late, last: i === lines.length - 1 }]} style:--n={[...t(l.text)].length} style:--m={[...st].length}>
-          <span class="li-ic">{l.tone === "atk" ? "!" : "$"}</span>
-          <span class="li-tw"
-            ><span class="li-t">{t(l.text)}</span>{#if i === lines.length - 1}<span class="cur"></span>{/if}</span
-          >
-          <span class="li-gap"></span>
-          <!-- État : tapé de gauche à droite, à la même allure, avec son curseur (17 novembre). -->
-          <span class="li-sw"><span class="li-s">{st}</span><span class="cur2"></span></span>
-        </li>
+      {#each rows as r, i (r.key)}
+        {@const v = shownOf(r, i === rows.length - 1)}
+        {#if v.visible}
+          <li class={["ln", r.tone, { last: i === rows.length - 1 }]} style:--m={r.st.length}>
+            <span class="li-ic">{r.tone === "atk" ? "!" : "$"}</span>
+            <span class="li-t">{v.text}{#if v.cur === "t"}<span class="cur"></span>{/if}</span>
+            <span class="li-s">{v.st}{#if v.cur === "s"}<span class={["cur", { idle: v.idle }]}></span>{/if}</span>
+          </li>
+        {/if}
       {/each}
     </ol>
   {/if}
   </div>
   <div class="info">
-    <span class="info-t" aria-hidden="true">{t("demo.info")}</span>
+    <span class="info-t" aria-hidden="true"><Lock size={12} strokeWidth={2.2} />{t("demo.info")}</span>
     {#if !reduced}
       <button type="button" class="toggle" data-demo-toggle aria-label={playing ? t("demo.pause") : t("demo.play")} onclick={toggle}>
         {#if !playing}<Play size={14} strokeWidth={2.2} aria-hidden="true" />{:else}<Pause size={14} strokeWidth={2.2} aria-hidden="true" />{/if}
@@ -647,125 +682,43 @@
     flex: none;
     min-width: 0;
     display: grid;
-    grid-template-columns: 12px minmax(0, max-content) minmax(8px, 1fr) minmax(0, max-content);
-    align-items: center;
+    /* Texte (il passe à la ligne si besoin, jamais coupé) ; état à droite, place réservée pour
+       qu'il ne pousse rien pendant sa frappe. */
+    grid-template-columns: 12px minmax(0, 1fr) calc(var(--m, 10) * 1ch + 9px);
+    align-items: start;
     column-gap: 8px;
-    animation: line-in 200ms var(--ease-out) both;
-    /* Même allure partout, un peu plus lente (17 novembre) : 40 ms par lettre, texte puis état. */
-    --type: calc(var(--n, 20) * 40ms);
-    --type-s: calc(var(--m, 10) * 40ms);
   }
   /* Les anciennes lignes pâlissent : l'œil va à la dernière. */
   .ln:not(.last) {
     color: #4f8f78;
     text-shadow: none;
   }
-  .ln.late {
-    animation-delay: 900ms;
-  }
-  @keyframes line-in {
-    from {
-      opacity: 0;
-    }
-  }
   .li-ic {
     color: #5596f8;
     font-weight: 700;
   }
-  /* Texte et curseur qui le suit pendant la frappe (16 novembre : lettres une par une, vite). */
-  .li-tw {
-    display: inline-flex;
-    align-items: center;
-    min-width: 0;
-  }
-  .cur {
-    flex: none;
-    width: 7px;
-    height: 13px;
-    margin-inline-start: 1px;
-    background: #9ff5d3;
-    box-shadow: 0 0 8px rgb(95 227 181 / 0.7);
-    animation: cur-off 1ms linear var(--type) forwards;
-  }
-  .ln.late .cur {
-    animation-delay: calc(900ms + var(--type));
-  }
-  @keyframes cur-off {
-    to {
-      visibility: hidden;
-    }
-  }
   .li-t {
     min-width: 0;
-    max-width: calc(var(--n) * 1ch);
-    overflow: hidden;
-    white-space: nowrap;
-    animation: type var(--type) steps(var(--n)) both;
-  }
-  .ln.late .li-t {
-    animation-delay: 900ms;
-  }
-  @keyframes type {
-    from {
-      max-width: 0;
-    }
-  }
-  /* Plus de ligne pointillée entre le texte et l'état (17 novembre) : un simple espace. */
-  .li-gap {
-    min-width: 0;
-  }
-  /* Case de l'état, de largeur fixe : le texte y grandit de gauche à droite (sa colonne ne
-     bouge pas pendant la frappe). */
-  .li-sw {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-start;
-    width: calc(var(--m) * 1ch + 10px);
-    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .li-s {
     min-width: 0;
-    max-width: calc(var(--m) * 1ch);
-    overflow: hidden;
     color: var(--mint);
     font-weight: 600;
     white-space: nowrap;
-    animation: type var(--type-s) steps(var(--m)) var(--type) both;
   }
-  .ln.late .li-s {
-    animation-delay: calc(900ms + var(--type));
-  }
-  /* Curseur de l'état : paraît quand la frappe de l'état commence, la suit, puis s'éteint ; sur
-     la dernière ligne, il reste et clignote. */
-  .cur2 {
-    flex: none;
-    width: 7px;
-    height: 13px;
+  /* Le seul curseur : au bout de ce qui se tape ; à la fin, il clignote au bout de la dernière ligne. */
+  .cur {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.15em;
     margin-inline-start: 1px;
+    vertical-align: text-bottom;
     background: #9ff5d3;
     box-shadow: 0 0 8px rgb(95 227 181 / 0.7);
-    animation:
-      cur-on 1ms linear var(--type) both,
-      cur-off 1ms linear calc(var(--type) + var(--type-s)) forwards;
   }
-  .ln.late .cur2 {
-    animation-delay: calc(900ms + var(--type)), calc(900ms + var(--type) + var(--type-s));
-  }
-  .ln.last .cur2 {
-    animation:
-      cur-on 1ms linear var(--type) both,
-      blink 1s steps(1) calc(var(--type) + var(--type-s)) infinite;
-  }
-  .ln.last.late .cur2 {
-    animation-delay: calc(900ms + var(--type)), calc(900ms + var(--type) + var(--type-s));
-  }
-  @keyframes cur-on {
-    from {
-      visibility: hidden;
-    }
-    to {
-      visibility: visible;
-    }
+  .cur.idle {
+    animation: blink 1s steps(1) infinite;
   }
   .ln.atk .li-ic,
   .ln.atk .li-t,
@@ -795,7 +748,14 @@
     letter-spacing: 0.02em;
   }
   .info-t {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
+  }
+  .info-t :global(svg) {
+    flex: none;
+    color: var(--mint);
   }
   .toggle {
     flex: none;
@@ -838,7 +798,7 @@
   
   
   /* Pause : la seule boucle (le curseur) s'arrête ; les animations finies vont à leur terme. */
-  .paused .ln.last .cur2 {
+  .paused .cur.idle {
     animation-play-state: paused;
   }
 
