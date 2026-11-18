@@ -1,7 +1,6 @@
 <script module lang="ts">
-  // UI §20.4 : l'entrée de la page (phrase, boutons) une seule fois par chargement. Le titre, lui,
-  // s'affiche d'emblée dans son état final (17 novembre).
-  let revealed = false;
+  // Plus d'entrée animée (18 novembre) : l'accueil est écrit au build et affiché avant le
+  // script (référencement) ; le titre s'affiche d'emblée dans son état final (17 novembre).
 
   /** D'où viennent les fichiers remis à `onfiles` (composer.add, Task 10). */
   export type Source = "fichiers" | "photo" | "video" | "depot";
@@ -17,7 +16,7 @@
   // confidentialité », « Offres » et les questions. Voile de dépôt pleine page : un dépôt ouvre
   // le composeur avec ses fichiers. Un clic sur le verre n'ouvre rien.
   // Page d'envoi (`compact`) : trois assurances ; le Salon est avec les actions du composeur.
-  import { untrack, type Snippet } from "svelte";
+  import type { Snippet } from "svelte";
   import { dragDepth, dragHasFiles, filesFromDrop } from "../flows/intake";
   import { formatBytes } from "../i18n/format";
   import { t, getLang } from "../i18n/i18n.svelte";
@@ -46,17 +45,6 @@
   };
   let { compact = false, children, onfiles, active = true, onpick, oncreate }: Props = $props();
 
-  // Décidé au montage seulement : un repli ultérieur ne rejoue pas l'entrée.
-  let reveal = $state(!revealed && !untrack(() => compact));
-  revealed = true;
-  // Retirée une fois l'entrée finie (≈ 1,25 s, K1 revu le 15 novembre) : un changement de langue
-  // ou un compact qui repasse à faux ne rejoue pas l'entrée sur les nœuds recréés (§20.4 : une
-  // seule fois).
-  $effect(() => {
-    if (!reveal) return;
-    const timer = setTimeout(() => (reveal = false), 1300);
-    return () => clearTimeout(timer);
-  });
   // « puis plus rien. » effacé vers la dernière lettre (proposition G du 16 novembre) : affiché
   // d'emblée dans cet état, sans entrée ni extinction animée (décision du propriétaire du
   // 17 novembre) ; chaque lettre plus pâle que la précédente, le point final invisible. La phrase
@@ -143,7 +131,7 @@
   onkeydown={(e) => e.key === "Escape" && over && close()}
 />
 
-<div class={["home", { compact, reveal }]}>
+<div class={["home", { compact }]}>
   <section class="hero" aria-labelledby="hero-title">
     <div class="pitch">
       <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
@@ -581,55 +569,11 @@
   
   
 
-  /* ---------- Entrée (K1 : tout fini à 900 ms au plus, tout cliquable dès l'affichage) ---------- */
-  @media (prefers-reduced-motion: no-preference) {
-    /* Audit performance (5 novembre) : le texte au-dessus de la ligne de flottaison ne part
-       jamais d'une opacité nulle (le LCP attendait la fin de l'entrée) ; montée et flou seulement. */
-    .reveal .lede,
-    .reveal .ctas,
-    .reveal .meta {
-      animation: rise-only 560ms var(--ease-out) var(--i, 0ms) both;
-    }
-    .reveal .lede {
-      --i: 120ms;
-    }
-    .reveal .ctas {
-      --i: 200ms;
-    }
-    .reveal .meta {
-      --i: 260ms;
-    }
-    .reveal .demo-slot {
-      animation: vault-in var(--dur-moment) var(--ease-settle) 120ms both;
-    }
-    .reveal .compose {
-      animation: rise-in 560ms var(--ease-settle) 240ms both;
-    }
-  }
   /* « puis plus rien. » effacé vers la dernière lettre, d'emblée (17 novembre). */
   .l {
     display: inline-block;
     opacity: var(--o, 1);
   }
-  @keyframes rise-only {
-    from {
-      transform: translateY(var(--rise));
-    }
-  }
-  @keyframes rise-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--rise));
-    }
-  }
-  @keyframes vault-in {
-    from {
-      opacity: 0;
-      transform: translateY(24px) scale(0.985);
-    }
-  }
-
-  
   /* Téléphone et tablette (téléphone ajouté le 15 novembre : centrage revu) : texte centré,
      infographie dessous, à largeur lisible. */
   @media (max-width: 1023px) {

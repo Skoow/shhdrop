@@ -77,8 +77,15 @@ func staticHandler(dir string, comptes bool) (http.Handler, error) {
 			if !appRoutes[r.URL.Path] && !(comptes && compteRoutes[r.URL.Path]) {
 				status = http.StatusNotFound
 			}
-			name = "index.html"
+			// app.html (18 novembre) : la page de l'application sans l'accueil écrit au build
+			// (référencement), pour que « /envoyer », « /envois » ou un 404 ne l'affichent pas
+			// avant le script ; index.html si le build n'en a pas (anciens dossiers, tests).
+			name = "app.html"
 			f, fi, err = openRegular(fsys, name)
+			if errors.Is(err, fs.ErrNotExist) {
+				name = "index.html"
+				f, fi, err = openRegular(fsys, name)
+			}
 		}
 		if err != nil {
 			http.NotFound(w, r)

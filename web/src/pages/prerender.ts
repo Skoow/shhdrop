@@ -6,6 +6,7 @@ import { router, type Route } from "../app/router.svelte";
 import { INDEXED } from "../app/seo";
 import { routeTitle } from "../app/title";
 import { setLang, t } from "../i18n/i18n.svelte";
+import HomeStatic from "./HomeStatic.svelte";
 import PagesApp from "./PagesApp.svelte";
 
 /** Page d'information → fichier HTML écrit au build (l'adresse publique est sans « .html »). */
@@ -32,4 +33,12 @@ export function renderPage(name: Route["name"]): Rendered {
     description: t(path !== undefined ? (`seo.${name as keyof typeof INDEXED}` as "seo.home") : "seo.home"),
     path,
   };
+}
+
+/** Accueil (18 novembre, référencement) : contenu de « / » écrit dans index.html au build. */
+export function renderHome(): Rendered {
+  void setLang("fr");
+  router.current = { name: "home" };
+  const { body } = render(HomeStatic);
+  return { body, title: routeTitle("home"), description: t("seo.home"), path: INDEXED.home };
 }

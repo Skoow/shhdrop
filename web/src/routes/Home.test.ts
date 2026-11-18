@@ -129,38 +129,11 @@ describe("Home (UI §9.1)", () => {
     for (let i = 1; i < o.length; i++) expect(o[i]).toBeLessThan(o[i - 1]!);
   });
 
-  it("entrée une seule fois (§20.4) : la classe reveal part après 1,3 s, jamais rejouée ; titre sans effacement animé (17 novembre)", async () => {
-    vi.useFakeTimers();
-    try {
-      vi.resetModules(); // nouveau chargement de page : le drapeau « déjà joué » repart de zéro
-      const { default: Fresh } = await import("./Home.svelte");
-      const { mount, flushSync, unmount } = await import("svelte");
-      const a = mount(Fresh as never, { target: document.body, props: {} });
-      flushSync();
-      const home = () => document.querySelector(".home")!.classList;
-      expect(home().contains("reveal")).toBe(true);
-      expect(home().contains("erase")).toBe(false);
-      vi.advanceTimersByTime(1299);
-      flushSync();
-      expect(home().contains("reveal")).toBe(true);
-      vi.advanceTimersByTime(1);
-      flushSync();
-      expect(home().contains("reveal")).toBe(false);
-      // Changement de langue : les mots recréés n'ont plus d'entrée.
-      setLang("en");
-      flushSync();
-      expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(false);
-      void unmount(a);
-      document.body.innerHTML = "";
-      // Second montage dans le même chargement : pas d'entrée du tout.
-      const b = mount(Fresh as never, { target: document.body, props: {} });
-      flushSync();
-      expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(false);
-      void unmount(b);
-    } finally {
-      vi.useRealTimers();
-    }
+  it("plus d'entrée animée (18 novembre : accueil écrit au build, affiché avant le script)", () => {
+    show();
+    expect(document.querySelector(".home")!.classList.contains("reveal")).toBe(false);
   });
+
 
   it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; « Créer sur place » appelle oncreate ; plus de carte de dépôt sur l'accueil (18 novembre)", () => {
     const onfiles = vi.fn();

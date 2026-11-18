@@ -23,5 +23,7 @@ await langReady;
 
 const target = document.getElementById("app");
 if (!target) throw new Error("#app introuvable");
+// Accueil écrit au build (référencement, 18 novembre) : remplacé par l'application vivante.
+if (!moved) target.replaceChildren();
 
 export default moved ? undefined : mount(App, { target });

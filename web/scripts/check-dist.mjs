@@ -149,6 +149,25 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     }
   }
 
+  // Accueil écrit au build (18 novembre, référencement) : index.html porte le contenu de
+  // l'accueil (titre h1) avant le script, sans attribut style ni adresse de développement ;
+  // app.html (autres adresses de l'application, 404) est la même page sans ce contenu.
+  if (pages.length > 0) {
+    const home = /<!--shh-home-->([\s\S]*?)<!--\/shh-home-->/.exec(index)?.[1];
+    if (home === undefined) problems.push("index.html : accueil non écrit (repères <!--shh-home--> absents)");
+    else {
+      if (!/<h1[^>]*>/.test(home)) problems.push("index.html : accueil écrit sans titre h1");
+      if (/\sstyle="/.test(home)) problems.push("index.html : attribut style dans l'accueil écrit (CSP)");
+      if (/\/src\//.test(home)) problems.push("index.html : adresse de développement (/src/) dans l'accueil écrit");
+    }
+    const appHtml = byRel.get("app.html")?.toString("utf8");
+    if (appHtml === undefined) problems.push("app.html : page de l'application sans accueil écrit absente");
+    else {
+      problems.push(...checkSri("app.html", appHtml, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
+      if (!appHtml.includes('<div id="app"><!--shh-home--></div>')) problems.push("app.html : contient l'accueil écrit (il ne doit pas s'afficher sur les autres adresses)");
+    }
+  }
+
   // Page « /s » (16 novembre) : ouverture et gestion d'un partage, son propre fichier, ses
   // empreintes SRI, jamais indexée, sans le script de l'application d'envoi (assets/index-*.js).
   if (pages.length > 0) {
@@ -168,7 +187,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     // Pages d'information : leur contenu écrit cite des liens sortants (<a href>, ouverts par la
     // personne, jamais chargés par la page) ; seuls ces liens-là sont admis.
     let text = f.data.toString("utf8");
-    if (INFO_PAGES.includes(f.rel))
+    if (INFO_PAGES.includes(f.rel) || f.rel === "index.html")
       text = text.replace(/<a\b[^>]*\shref="https:\/\/[^"]*"[^>]*>/g, "<a>").replace(/<link rel="canonical" href="https:\/\/shhgone\.com\/[a-z-]*" \/>/g, "");
     for (const url of findExternalUrls(text)) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
   }
@@ -283,7 +302,9 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     rest = rest.slice(m[0].length).trimStart();
   }
   if (!existsSync(join(dir, "404.html"))) problems.push("404.html absent (adresses profondes sur Pages)");
-  else if (readFileSync(join(dir, "404.html"), "utf8") !== index) problems.push("404.html différent de index.html");
+  // 404.html = app.html : index.html sans l'accueil écrit au build (18 novembre).
+  else if (readFileSync(join(dir, "404.html"), "utf8") !== (existsSync(join(dir, "app.html")) ? readFileSync(join(dir, "app.html"), "utf8") : index))
+    problems.push("404.html différent de app.html");
   for (const [, url] of index.matchAll(/(?:src|href)="(\/[^"]*)"/g))
     if (!url.startsWith(DEMO_BASE)) problems.push(`index.html : « ${url} » hors de la base ${DEMO_BASE}`);
   return problems;

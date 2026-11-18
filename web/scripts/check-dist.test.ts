@@ -68,9 +68,20 @@ describe("check-dist.mjs, production", () => {
       `<!doctype html><html><head>\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app">${body}</div></body></html>`;
     const S = (robots = '<meta name="robots" content="noindex" />', js = "s-a.js") =>
       `<!doctype html><html><head>\n${robots}\n<script type="module" crossorigin src="/assets/${js}"></script>\n</head><body><div id="app"></div></body></html>`;
-    const ok = { "index.html": PROD_INDEX, "securite.html": PAGE("<h1>Sécurité</h1><p>…</p>"), "assets/page-a.js": "console.info(2)", "s.html": S(), "assets/s-a.js": "console.info(3)" };
+    // Accueil écrit au build (18 novembre) : index.html avec son contenu entre repères, app.html sans.
+    const HOME = (body: string) => PROD_INDEX.replace("<body></body>", `<body><div id="app"><!--shh-home-->${body}<!--/shh-home--></div></body>`);
+    const APP = PROD_INDEX.replace("<body></body>", '<body><div id="app"><!--shh-home--></div></body>');
+    const ok = { "index.html": HOME("<h1>Un lien</h1>"), "app.html": APP, "assets/index-a.js": "console.info(1)", "securite.html": PAGE("<h1>Sécurité</h1><p>…</p>"), "assets/page-a.js": "console.info(2)", "s.html": S(), "assets/s-a.js": "console.info(3)" };
     expect(checkDist(site(ok), false, false, ["securite.html"])).toEqual([]);
-    expect(checkDist(site({ "index.html": PROD_INDEX }), false, false, ["securite.html"])).toContain("securite.html : page d'information absente");
+    expect(checkDist(site({ ...ok, "index.html": PROD_INDEX }), false, false, ["securite.html"])).toContain("index.html : accueil non écrit (repères <!--shh-home--> absents)");
+    expect(checkDist(site({ ...ok, "index.html": HOME("<p>x</p>") }), false, false, ["securite.html"])).toContain("index.html : accueil écrit sans titre h1");
+    expect(checkDist(site({ ...ok, "index.html": HOME('<h1 style="x">U</h1>') }), false, false, ["securite.html"])).toContain("index.html : attribut style dans l'accueil écrit (CSP)");
+    expect(checkDist(site({ ...ok, "index.html": HOME('<h1>U</h1><a href="https://github.com/x">code</a>') }), false, false, ["securite.html"])).toEqual([]);
+    const { "app.html": _a, ...noApp } = ok;
+    expect(checkDist(site(noApp), false, false, ["securite.html"])).toContain("app.html : page de l'application sans accueil écrit absente");
+    expect(checkDist(site({ ...ok, "app.html": HOME("<h1>U</h1>") }), false, false, ["securite.html"])).toContain("app.html : contient l'accueil écrit (il ne doit pas s'afficher sur les autres adresses)");
+    const { "securite.html": _p, ...noPage } = ok;
+    expect(checkDist(site(noPage), false, false, ["securite.html"])).toContain("securite.html : page d'information absente");
     expect(checkDist(site({ ...ok, "securite.html": PAGE("") }), false, false, ["securite.html"]).join("\n")).toMatch(/contenu non écrit/);
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1 style="x">S</h1>') }), false, false, ["securite.html"]).join("\n")).toMatch(/attribut style/);
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><img src="/src/assets/a.png">') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse de développement/);
@@ -383,10 +394,10 @@ describe("check-dist.mjs --demo", () => {
     }
   });
 
-  it("échoue sans 404.html, ou s'il diffère de index.html", () => {
+  it("échoue sans 404.html, ou s'il diffère de app.html (index.html sans accueil écrit)", () => {
     const { "404.html": _, ...no404 } = good();
     expect(checkDist(site(no404), true)).toEqual(["404.html absent (adresses profondes sur Pages)"]);
-    expect(checkDist(site({ ...good(), "404.html": "autre" }), true)).toEqual(["404.html différent de index.html"]);
+    expect(checkDist(site({ ...good(), "404.html": "autre" }), true)).toEqual(["404.html différent de app.html"]);
   });
 
   it("moteur WebAssembly intégré au script (connect-src 'none') : aucun fichier .wasm dans la démo", () => {

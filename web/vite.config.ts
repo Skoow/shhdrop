@@ -1,6 +1,6 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
@@ -238,7 +238,10 @@ export function demoMeta(): Plugin {
     },
     // GitHub Pages n'a pas de repli monopage : une adresse profonde reçoit 404.html.
     writeBundle() {
-      copyFileSync(join(outDir, "index.html"), join(outDir, "404.html"));
+      // Sans l'accueil écrit au build (app.html, infoPages) : une adresse profonde ne l'affiche
+      // pas avant le script.
+      const app = join(outDir, "app.html");
+      copyFileSync(existsSync(app) ? app : join(outDir, "index.html"), join(outDir, "404.html"));
     },
   };
 }
@@ -292,13 +295,13 @@ export function infoPages(base: string, demo: boolean): Plugin {
         const { createServer } = await import("vite");
         const vite = await createServer({ configFile, mode, server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
         try {
-          const { renderPage, PAGE_FILES } = (await vite.ssrLoadModule("/src/pages/prerender.ts")) as {
+          const { renderPage, renderHome, PAGE_FILES } = (await vite.ssrLoadModule("/src/pages/prerender.ts")) as {
             renderPage: (n: string) => { body: string; title: string; description: string; path: string | undefined };
+            renderHome: () => { body: string; title: string; description: string; path: string | undefined };
             PAGE_FILES: Record<string, string>;
           };
-          for (const [name, file] of Object.entries(PAGE_FILES)) {
-            const r = renderPage(name);
-            const body = r.body
+          const clean = (raw: string, file: string) => {
+            const body = raw
               .replace(/\sstyle="[^"]*"/g, "")
               .replace(/\ssrc="([^"]*?\/src\/[^"]+)"/g, (_m, u: string) => {
                 // Adresse de développement, avec ou sans la base (« /shhgone/src/… » en démo).
@@ -307,9 +310,29 @@ export function infoPages(base: string, demo: boolean): Plugin {
                 return ` src="${to}"`;
               });
             if (/\b(?:href|src)="[^"]*\/src\//.test(body)) throw new Error(`pages séparées : ${file} cite encore /src/`);
+            return body;
+          };
+          const robots = (path: string | undefined) =>
+            demo ? "" : path !== undefined ? `<meta name="robots" content="index, follow" />\n    <link rel="canonical" href="${SITE_ORIGIN}${path}" />\n  ` : `<meta name="robots" content="noindex" />\n  `;
+          // Accueil (18 novembre, référencement) : son contenu écrit dans index.html, entre deux
+          // repères (le 404, copié d'index.html, les retire : shh-404).
+          {
+            const indexFile = join(outDir, "index.html");
+            // app.html : la même page sans l'accueil écrit, servie pour les autres adresses de
+            // l'application (« /envoyer », « /envois »…) et le 404 (serveur Go, static.go) :
+            // l'accueil ne s'y affiche jamais avant le script.
+            copyFileSync(indexFile, join(outDir, "app.html"));
+            const r = renderHome();
+            const body = clean(r.body, "index.html");
+            const html = readFileSync(indexFile, "utf8");
+            if (!html.includes("<!--shh-home-->")) throw new Error("index.html sans repère <!--shh-home-->");
+            writeFileSync(indexFile, html.replace("</head>", robots(r.path) + "</head>").replace("<!--shh-home-->", `<!--shh-home-->${body}<!--/shh-home-->`));
+          }
+          for (const [name, file] of Object.entries(PAGE_FILES)) {
+            const r = renderPage(name);
+            const body = clean(r.body, file);
             const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-            let head = "";
-            if (!demo) head += r.path !== undefined ? `<meta name="robots" content="index, follow" />\n    <link rel="canonical" href="${SITE_ORIGIN}${r.path}" />\n  ` : `<meta name="robots" content="noindex" />\n  `;
+            const head = robots(r.path);
             const html = template
               .replace(/<title>[^<]*<\/title>/, `<title>${esc(demo ? "Démo · " + r.title : r.title)}</title>`)
               .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, (_m, a: string, b: string) => a + esc(r.description) + b)
