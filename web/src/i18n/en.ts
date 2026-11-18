@@ -1015,6 +1015,7 @@ export const en = {
   "foot.version": "Version {v}",
   "foot.busy": "Footer links are disabled while sending and on the link screen, so nothing is interrupted or lost.",
   "info.draft": "Being drafted",
+  "info.toc": "Contents",
   "offers.title": "Plans",
   "offers.lede": "Free forever, no account. Plus and Pro give more space, time and opens, with the same encryption.",
   "offers.steps.label": "Steps",

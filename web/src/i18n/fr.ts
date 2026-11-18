@@ -1019,6 +1019,7 @@ export const fr = {
   "foot.version": "Version {v}",
   "foot.busy": "Liens du pied de page désactivés pendant l'envoi et sur l'écran du lien, pour ne rien interrompre ni perdre.",
   "info.draft": "En cours de rédaction",
+  "info.toc": "Sommaire",
   "offers.title": "Offres",
   "offers.lede": "Gratuit pour toujours, sans compte. Plus et Pro donnent plus de place, de durée et d'ouvertures, avec le même chiffrement.",
   "offers.steps.label": "Étapes",

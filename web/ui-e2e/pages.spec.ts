@@ -62,20 +62,20 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   // Trois offres, une seule fois chacune (plus de tableau qui redisait les cartes).
   await expect(co.locator("[data-tier]")).toHaveCount(3);
   await expect(page.locator("[data-offers], [data-prices]")).toHaveCount(0);
-  for (const [x, size] of [["free", "2 Go"], ["plus", "10 Go"], ["pro", "50 Go"]] as const) expect(norm(await co.locator(`[data-tier="${x}"]`).innerText())).toContain(size);
-  // Mensuel par défaut (16 novembre) ; annuel au choix.
-  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s+par mois, TTC/);
+  for (const [x, size] of [["free", "2 Go"], ["plus", "10 Go"], ["pro", "30 Go"]] as const) expect(norm(await co.locator(`[data-tier="${x}"]`).innerText())).toContain(size);
+  // Mensuel par défaut (16 novembre) ; annuel au choix. Prix « 7 € / mois », TTC dit une fois (17 novembre).
+  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s*\/\s*mois/);
   await co.locator("[data-billing]").getByText("Annuel").click();
-  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/70 €\s+par an, TTC/);
+  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/70 €\s*\/\s*an/);
   await co.locator("[data-billing]").getByText("Mensuel").click();
-  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s+par mois, TTC/);
-  expect(norm(await co.locator('[data-tier="pro"] [data-price]').innerText())).toMatch(/20 €\s+par mois, TTC/);
+  expect(norm(await co.locator('[data-tier="plus"] [data-price]').innerText())).toMatch(/7 €\s*\/\s*mois/);
+  expect(norm(await co.locator('[data-tier="pro"] [data-price]').innerText())).toMatch(/20 €\s*\/\s*mois/);
   // Gratuit : l'offre en cours, rien à choisir.
   await expect(co.locator('[data-tier="free"] input')).toHaveCount(0);
   await expect(co.locator("[data-summary]")).toHaveCount(0);
   await co.locator('[data-tier="pro"]').getByText("Choisir Pro").click();
   const sum = co.locator("[data-summary]");
-  expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € par mois, TTC/);
+  expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € \/ mois/);
   // Compte et paiement pas encore ouverts : le bouton le dit, aucun champ, aucun prélèvement.
   const go = sum.getByRole("button", { name: "Créer mon compte et payer" });
   await expect(go).toBeDisabled();
