@@ -69,7 +69,14 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   await expect(dz).toBeInViewport({ ratio: 1 });
   const h = await dz.evaluate((e) => e.getBoundingClientRect().height);
   expect(h).toBeGreaterThanOrEqual(88); // facile à viser au doigt
-  expect(h).toBeLessThanOrEqual(isMobile ? 150 : 220);
+  // Téléphone (18 novembre) : le cadre grandit pour que la barre d'envoi tombe en bas de l'écran.
+  if (!isMobile) expect(h).toBeLessThanOrEqual(220);
+  else {
+    const bar = (await page.locator(".sendbar.m").boundingBox())!;
+    const vh = page.viewportSize()!.height;
+    expect(bar.y + bar.height).toBeGreaterThan(vh - 40);
+    expect(bar.y + bar.height).toBeLessThanOrEqual(vh + 1);
+  }
   // Offre en cours (décision du 16 novembre) : petit cadre, limites lues dans les constantes, lien vers /offres.
   const offers = page.locator("[data-current-offer]");
   await expect(offers).toBeInViewport({ ratio: 1 });

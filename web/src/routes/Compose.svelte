@@ -261,7 +261,10 @@
       const r = node.getBoundingClientRect();
       const end = document.querySelector("main") ?? document.body;
       const tail = end.getBoundingClientRect().bottom - r.bottom;
-      node.style.setProperty("--app-h", `${Math.max(520, Math.floor(innerHeight - (r.top + scrollY) - tail))}px`);
+      // Téléphone (18 novembre) : la page remplit aussi l'écran ; le cadre de dépôt grandit pour
+      // que la barre d'envoi (+, « Chiffrer et envoyer », la phrase) tombe en bas de l'écran.
+      const floor = innerWidth < 760 ? 360 : 520;
+      node.style.setProperty("--app-h", `${Math.max(floor, Math.floor(innerHeight - (r.top + scrollY) - tail))}px`);
     };
     const queue = () => {
       if (!raf) raf = requestAnimationFrame(fit);
@@ -628,7 +631,7 @@
 {#snippet offers()}<CurrentOffer newTab={filled} />{/snippet}
 
 {#snippet app()}
-  <div class={["app", { narrow }]} data-composer {@attach narrow ? null : fitViewport}>
+  <div class={["app", { narrow }]} data-composer {@attach fitViewport}>
     <div class="list-col">
       <!-- Offres (retours du propriétaire du 12 novembre, remplace la ligne discrète d'audit M17) :
            Gratuit, Plus, Pro et leurs limites, « bientôt », lien vers /offres (nouvel onglet si la
@@ -937,6 +940,26 @@
   .app.narrow {
     gap: var(--sp-3);
     padding: var(--sp-2) 0 0;
+    /* Hauteur de l'écran sous l'en-tête (--app-h, fitViewport) : la barre d'envoi en bas. */
+    min-height: var(--app-h, auto);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .app.narrow .list-col {
+    display: flex;
+    flex-direction: column;
+  }
+  .app.narrow .lc-scroll {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+  /* Liste vide : le cadre de dépôt prend la place libre, son contenu au centre. */
+  .app.narrow .dz-box {
+    flex: 1 1 auto;
+  }
+  .app.narrow .dz-box .dropzone.empty {
+    flex: 1 1 auto;
   }
   .app.narrow .sendbar {
     margin-inline: calc(-1 * var(--sp-4));
