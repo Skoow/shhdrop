@@ -206,6 +206,14 @@
       <!-- Seulement s'il y a des partages sur cet appareil (décision du propriétaire du 17 novembre). -->
       <a class="btn ghost" href={href("/envois")} aria-current={here("/envois")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/envois"))} {...off}>{t("nav.shares")}</a>
     {/if}
+    {#if __COMPTES__}
+      <!-- Compte (18 novembre) : « Se connecter », ou « Mon compte » une fois connecté. -->
+      {#if accountFlag.connected}
+        <a class="btn ghost" href={href("/compte/profil")} aria-current={here("/compte/profil")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/profil"))} {...off}>{t("nav.menu.myAccount")}</a>
+      {:else}
+        <a class="btn ghost" href={href("/compte/connexion")} aria-current={here("/compte/connexion")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/connexion"))} {...off}>{t("account.login.title")}</a>
+      {/if}
+    {/if}
     <!-- Plus de bouton « Partager » (décision du propriétaire du 17 novembre) : le lien se partage
          depuis « Lien prêt », où il est créé ; la page d'envoi reste dans « Envoyer ». -->
   </div>

@@ -83,6 +83,9 @@ export const GLYPHS = {
   "monitor-x": [{ r: [3, 4, 18, 12.5, 2] }, { d: "M8.5 20.5h7M12 16.5v4M10 8.3l4 4M14 8.3l-4 4" }],
   "search": [{ c: [11, 11, 6.5] }, { d: "M20 20l-4.4-4.4" }],
   "user": [{ c: [12, 8.5, 3.75] }, { d: "M5 20a7 7 0 0 1 14 0" }],
+  // Menu du téléphone (18 novembre) : se déconnecter (porte et flèche), offres (étiquette).
+  "log-out": [{ d: "M10 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H10M15 8l4 4-4 4M19 12H9.5" }],
+  "tag": [{ d: "M3.5 12.2V5.5a2 2 0 0 1 2-2h6.7l8.3 8.3a2 2 0 0 1 0 2.8l-5.9 5.9a2 2 0 0 1-2.8 0z" }, { c: [8.5, 8.5, 1.4], dot: true }],
   "messages-square": [{ d: "M14.5 9.5a2 2 0 0 1-2 2h-6L3.5 14.5v-9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z" }, { d: "M17.5 8.5h1a2 2 0 0 1 2 2v10l-3-3h-6a2 2 0 0 1-2-2v-1" }],
   "chevron-right": [{ d: "M9.5 6l6 6-6 6" }],
   // Menu du téléphone (retours du 15 novembre) : trois traits.

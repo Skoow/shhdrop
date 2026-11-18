@@ -4,7 +4,8 @@
   import { inAppBrowser, isStandalone, isSupported } from "./app/env";
   import { guardFileDrop, reloadIfRestored } from "./app/lifecycle";
   import { scrubAddressBar } from "./app/link";
-  import { href, LINK_ROUTES, moveToLinkPage, PAGE_ROUTES, router } from "./app/router.svelte";
+  import { href, LINK_ROUTES, moveToLinkPage, navigate, PAGE_ROUTES, router } from "./app/router.svelte";
+  import { accountFlag } from "./app/account-flag.svelte";
   import { applySeo } from "./app/seo";
   import { setScreenTitle } from "./app/title";
   import { getLang } from "./i18n/i18n.svelte";
@@ -23,7 +24,7 @@
   // Pages du compte (plan du compte, lot 10) : seulement si __COMPTES__ (drapeau de construction,
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
-  import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, restaurer, supprime } from "./routes/compte/pages";
+  import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, restaurer, seDeconnecter, supprime } from "./routes/compte/pages";
 
   // UI §9 : vérifié une fois, avant toute route. Sans ces capacités, aucune route ne démarre
   // (ni lecture du lien, ni requête).
@@ -108,6 +109,12 @@
   // « Rester connecté » (conception compte §9) : la session gardée sur cet appareil est rouverte
   // au démarrage ; échue ou fermée ailleurs, elle est oubliée. Seulement avec __COMPTES__.
   if (__COMPTES__ && supported) restaurer().catch(() => undefined);
+  // « Se déconnecter » du menu (18 novembre) : la coque n'importe rien du compte ; elle appelle ceci.
+  if (__COMPTES__)
+    accountFlag.logout = async () => {
+      await seDeconnecter();
+      navigate("/compte/connexion");
+    };
 </script>
 
 <svelte:window onhashchange={onHashChange} />

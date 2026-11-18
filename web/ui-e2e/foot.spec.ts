@@ -116,9 +116,9 @@ test.describe("fr-FR", () => {
 
   test("ordinateur : plus de lumière au pointeur (contour lumineux gardé) ; « Créer sur place » en haut ; flèche sous le texte", async ({ page, shh, isMobile }) => {
     test.skip(isMobile, "ordinateur seulement (téléphone : feuille « Ajouter », inchangée)");
-    await page.goto(shh.origin + "/");
-    // Lumière ambiante du contour du réceptacle vide : gardée ; projecteur au pointeur : retiré.
-    await expect(page.locator(".vessel [data-ambient]").first()).toBeAttached();
+    // Le réceptacle n'est plus que sur la page d'envoi (carte de l'accueil, avec sa lumière
+    // ambiante, retirée le 18 novembre) : aucun projecteur au pointeur.
+    await page.goto(shh.origin + "/envoyer");
     await expect(page.locator(".vessel .spot, .vessel .spot-clip")).toHaveCount(0);
     await page.mouse.move(1000, 500);
     await expect(page.locator(".vessel.lit")).toHaveCount(0);

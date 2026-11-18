@@ -9,7 +9,9 @@
   import { accountFlag } from "../app/account-flag.svelte";
   import { presence } from "../history/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
-  import { Menu, X } from "./Icon";
+  import { announce } from "./announce";
+  import { ChevronRight, Download, LogOut, Menu, MessagesSquare, Plus, Share2, ShieldCheck, SlidersHorizontal, Tag, User, X } from "./Icon";
+  import type { Component } from "svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
 
@@ -18,17 +20,35 @@
   let button: HTMLButtonElement | undefined = $state();
   const uid = $props.id();
 
-  type Link = { label: string; path: string; main?: boolean };
+  // Retours du 18 novembre : un menu plus complet et plus soigné. « Nouveau partage » en tête ;
+  // puis les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
+  // « Se connecter » et « Créer un compte », ou, connecté, « Mon compte », « Paramètres » et
+  // « Se déconnecter ». Confidentialité, Conditions, Signaler… restent dans le pied de page.
+  type Link = { label: string; path: string; icon: Component; soon?: boolean };
   const links = $derived<Link[]>([
-    { label: t("send.h1"), path: "/envoyer", main: true },
     // « Mes partages » seulement s'il y a des partages sur cet appareil (17 novembre).
-    ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/" }] : presence.any ? [{ label: t("nav.shares"), path: "/envois" }] : []),
-    ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements" }] : []),
-    { label: t("nav.offers"), path: "/offres" },
-    // Sécurité, Confidentialité, Signaler, Code source : dans le pied de page de chaque écran,
-    // pas répétés ici (décision du propriétaire du 16 novembre : Envoi, Mes partages, Offres).
+    ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
+    ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
+    { label: t("nav.room"), path: "", icon: MessagesSquare, soon: true },
+    { label: t("nav.security"), path: "/securite", icon: ShieldCheck },
+    { label: t("nav.offers"), path: "/offres", icon: Tag },
   ]);
+  const account = $derived<Link[]>(
+    !__COMPTES__
+      ? []
+      : accountFlag.connected
+        ? [
+            { label: t("nav.menu.myAccount"), path: "/compte/profil", icon: User },
+            { label: t("account.settings.title"), path: "/compte", icon: SlidersHorizontal },
+          ]
+        : [],
+  );
   const here = (p: string) => (currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
+
+  async function logout() {
+    close();
+    await accountFlag.logout?.();
+  }
 
   function close(focusBack = false) {
     if (!open) return;
@@ -75,24 +95,100 @@
   >
     {#if open}<X size={24} strokeWidth={2} aria-hidden="true" />{:else}<Menu size={24} strokeWidth={2} aria-hidden="true" />{/if}
   </button>
+  <!-- Voile sous le menu ouvert (18 novembre) : la page s'assombrit ; un appui dessus ferme. -->
+  {#if open}<div class="mm-scrim" aria-hidden="true"></div>{/if}
   <nav class="mm-p" id="{uid}-menu" aria-label={t("nav.label")} hidden={!open} data-menu>
-    <ul>
-      {#each links as l (l.label)}
-        <li>
-          {#if l.path}
+    <a
+      class="mm-cta"
+      href={href("/envoyer")}
+      aria-current={here("/envoyer")}
+      onclick={(e) => {
+        close();
+        followLink(e, "/envoyer");
+      }}
+      style:--i="0"><span class="mm-ci" aria-hidden="true"><Plus size={20} strokeWidth={2.4} /></span>{t("send.h1")}</a
+    >
+    <ul class="mm-list">
+      {#each links as l, i (l.label)}
+        <li style:--i={i + 1}>
+          {#if l.soon}
+            <button type="button" class="mm-l soon" aria-disabled="true" aria-describedby="{uid}-soon" onclick={() => announce(t("tabs.soon.chat"))}>
+              <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
+              <span class="mm-t">{l.label}</span><span class="mm-soon">{t("foot.soon")}</span>
+            </button>
+            <span id="{uid}-soon" class="sr-only">{t("tabs.soon.chat")}</span>
+          {:else}
             <a
-              class={["mm-l", { main: l.main }]}
+              class="mm-l"
               href={href(l.path)}
               aria-current={here(l.path)}
               onclick={(e) => {
                 close();
                 followLink(e, l.path);
-              }}>{l.label}</a
+              }}
             >
+              <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
+              <span class="mm-t">{l.label}</span>
+              <ChevronRight size={18} strokeWidth={1.9} aria-hidden="true" />
+            </a>
           {/if}
         </li>
       {/each}
     </ul>
+    {#if __COMPTES__}
+      <!-- Compte (18 novembre) : seulement si le compte est construit (__COMPTES__). -->
+      <div class="mm-acct" style:--i={links.length + 1}>
+        <p class="mm-h">{t("nav.menu.account")}</p>
+        {#if accountFlag.connected}
+          <ul class="mm-list">
+            {#each account as l (l.label)}
+              <li>
+                <a
+                  class="mm-l"
+                  href={href(l.path)}
+                  aria-current={here(l.path)}
+                  onclick={(e) => {
+                    close();
+                    followLink(e, l.path);
+                  }}
+                >
+                  <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
+                  <span class="mm-t">{l.label}</span>
+                  <ChevronRight size={18} strokeWidth={1.9} aria-hidden="true" />
+                </a>
+              </li>
+            {/each}
+            {#if accountFlag.logout}
+              <li>
+                <button type="button" class="mm-l out" onclick={logout}>
+                  <span class="mm-ic" aria-hidden="true"><LogOut size={20} strokeWidth={1.9} /></span>
+                  <span class="mm-t">{t("account.logout")}</span>
+                </button>
+              </li>
+            {/if}
+          </ul>
+        {:else}
+          <div class="mm-auth">
+            <a
+              class="mm-in"
+              href={href("/compte/connexion")}
+              onclick={(e) => {
+                close();
+                followLink(e, "/compte/connexion");
+              }}>{t("account.login.title")}</a
+            >
+            <a
+              class="mm-up"
+              href={href("/compte/inscription")}
+              onclick={(e) => {
+                close();
+                followLink(e, "/compte/inscription");
+              }}>{t("nav.menu.signup")}</a
+            >
+          </div>
+        {/if}
+      </div>
+    {/if}
   </nav>
 </div>
 
@@ -126,59 +222,201 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  /* Panneau sous l'en-tête, pleine largeur, fond plein : rien ne transparaît dessous. */
+  /* Panneau sous l'en-tête, pleine largeur, fond plein : rien ne transparaît dessous. Ouverture
+     (18 novembre) : le panneau glisse et s'éclaire, les entrées arrivent l'une après l'autre. */
   .mm-p {
     position: absolute;
     inset-inline: 0;
     inset-block-start: 100%;
-    max-height: calc(100dvh - 120px);
+    max-height: calc(100dvh - 72px);
     overflow-y: auto;
-    padding: var(--sp-2) max(var(--sp-4), env(safe-area-inset-left)) var(--sp-4);
-    background: var(--surface-1);
+    padding: var(--sp-3) max(var(--sp-4), env(safe-area-inset-left)) calc(var(--sp-5) + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(120% 60% at 100% 0%, rgb(95 227 181 / 0.08), transparent 60%),
+      linear-gradient(180deg, var(--surface-1), var(--bg));
     border-block-end: 1px solid var(--line-strong);
-    box-shadow: 0 24px 48px rgb(0 0 0 / 0.45);
+    border-radius: 0 0 var(--r-xl) var(--r-xl);
+    box-shadow: 0 28px 60px rgb(0 0 0 / 0.55);
   }
   .mm-p[hidden] {
     display: none;
+  }
+  .mm-scrim {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    height: 100dvh;
+    background: rgb(4 6 10 / 0.62);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .mm-scrim {
+      animation: mm-fade 220ms var(--ease-out) both;
+    }
+  }
+  @keyframes mm-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .mm-p:not([hidden]) {
+      animation: mm-in 260ms var(--ease-out) both;
+    }
+    .mm-p:not([hidden]) :is(.mm-cta, .mm-list > li, .mm-acct) {
+      animation: mm-item 320ms var(--ease-out) both;
+      animation-delay: calc(40ms + var(--i, 0) * 35ms);
+    }
+  }
+  @keyframes mm-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes mm-item {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
   }
   ul {
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  li + li {
-    border-block-start: 1px solid var(--hair);
+  /* « Nouveau partage » : le geste principal, en pastille menthe. */
+  .mm-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-height: 52px;
+    margin-block-end: var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 650;
+    text-decoration: none;
+    box-shadow: 0 10px 28px -10px rgb(95 227 181 / 0.65);
+  }
+  .mm-ci {
+    display: grid;
+    place-items: center;
+  }
+  .mm-list {
+    display: grid;
+    gap: 2px;
   }
   .mm-l {
     display: flex;
     align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
     min-height: 52px;
-    padding-inline: var(--sp-2);
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
     color: var(--text);
+    font: inherit;
     font-size: var(--fs-body);
     font-weight: 560;
+    text-align: start;
     text-decoration: none;
-    border-radius: var(--r-sm);
+    cursor: pointer;
+  }
+  .mm-l:active {
+    background: rgb(255 255 255 / 0.05);
+  }
+  .mm-l :global(svg:last-child) {
+    color: var(--text-3);
+  }
+  .mm-ic {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    background: rgb(255 255 255 / 0.05);
+    box-shadow: inset 0 0 0 1px var(--hair);
+    color: var(--mint);
+  }
+  .mm-t {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .mm-l[aria-current="page"] {
+    background: rgb(95 227 181 / 0.08);
     color: var(--accent);
   }
-  .mm-l.main {
-    justify-content: center;
-    margin-block: var(--sp-2) var(--sp-3);
+  .mm-l.soon {
+    color: var(--text-2);
+    cursor: default;
+  }
+  .mm-l.soon .mm-ic {
+    color: var(--text-3);
+  }
+  .mm-soon {
+    padding: 2px 8px;
     border-radius: var(--r-pill);
+    background: rgb(95 227 181 / 0.12);
+    color: var(--mint);
+    font-size: var(--fs-micro);
+    font-weight: 600;
+  }
+  .mm-l.out {
+    color: var(--text-2);
+  }
+  .mm-acct {
+    margin-block-start: var(--sp-3);
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--hair);
+  }
+  .mm-h {
+    margin: 0 0 var(--sp-2);
+    padding-inline: var(--sp-2);
+    color: var(--text-3);
+    font-size: var(--fs-micro);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .mm-auth {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-2);
+  }
+  .mm-in,
+  .mm-up {
+    display: grid;
+    place-items: center;
+    min-height: 48px;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+  }
+  .mm-in {
     background: var(--text);
     color: var(--bg);
   }
-  .mm-l:focus-visible {
+  .mm-up {
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+    color: var(--text);
+  }
+  :is(.mm-cta, .mm-l, .mm-in, .mm-up):focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   @media (forced-colors: active) {
-    .mm-p {
-      border: 1px solid CanvasText;
-    }
-    .mm-l.main {
+    .mm-p,
+    .mm-cta,
+    .mm-in,
+    .mm-up {
       border: 1px solid CanvasText;
     }
   }

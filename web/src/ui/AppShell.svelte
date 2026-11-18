@@ -593,13 +593,20 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--sp-1) var(--sp-4);
-    padding-block-start: var(--sp-3);
+    /* Ligne au plus près du nom et de la version (propriétaire, 18 novembre). */
+    padding-block-start: var(--sp-2);
     border-block-start: 1px solid var(--hair);
     color: var(--text-3);
     font-size: var(--fs-micro);
   }
   .base p {
     margin: 0;
+  }
+  /* Version : discrète, plus petite que le nom. */
+  .base [data-build] {
+    font-size: 0.625rem;
+    letter-spacing: 0.02em;
+    opacity: 0.8;
   }
   .sig {
     display: inline-flex;

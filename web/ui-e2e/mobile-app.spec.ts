@@ -95,7 +95,9 @@ test.describe("téléphone façon app", () => {
     const menu = page.locator("[data-menu]");
     // Décisions des 16 et 17 novembre : « Nouveau partage », « Mes partages » seulement s'il y a des
     // partages sur l'appareil (aucun ici), « Offres » ; le reste est dans le pied de page.
-    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Offres"]);
+    // Menu du 18 novembre : « Nouveau partage », puis Salon (bientôt, un bouton), Sécurité, Offres.
+    await expect(menu.getByRole("link")).toHaveText(["Nouveau partage", "Sécurité", "Offres"]);
+    await expect(menu.getByRole("button", { name: /^Salon/ })).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByRole("link", { name: /^Téléchargements/ })).toHaveCount(0);
     expect(await smallTargets(page, "header")).toEqual([]);
     await shot(page, "menu-ouvert");
