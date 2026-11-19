@@ -198,7 +198,7 @@ Même format : `P` en base64url, en-tête `X-Shh-Pass`, mêmes routes ; stockage
 
 ## 7. Jetons anonymes (Privacy Pass, RSA aveugle)
 
-**État** : interface serveur prête (`paiement.Droits` : « paiement confirmé → réserve de N jetons » et `Prendre(q, n)`), émission RSA aveugle **à faire** (plan, tâches 6 et 7). Paramètres fixés ici pour que les apps et le salon puissent s'y fier :
+**État** : interface serveur prête (`paiement.Service` : « paiement confirmé → réserve de N jetons » par période, et `Prendre(P, n)` qui la décrémente), émission RSA aveugle **à faire** (plan, tâches 6 et 7). Paramètres fixés ici pour que les apps et le salon puissent s'y fier :
 
 - **Protocole** : Privacy Pass, émission RFC 9578 type **0x0002** (RSA aveugle publiquement vérifiable), **RSABSSA-SHA384-PSS-Deterministic**, module de 2 048 bits (RFC 9474). **Signalement S8 (faible, exactitude)** : §38.4 écrit « Randomized » ; RFC 9578 impose la variante **Deterministic** pour le type 2 (le nonce du jeton tient lieu d'aléa) ; corrigé ici.
 - **Bibliothèques** (décision du propriétaire) : site et apps, moteur Rust `blind-rsa-signatures` **= 0.19.0** (dernière publiée le 19 novembre, à épingler exactement dans `Cargo.lock` après revue, §12) ; serveur, `github.com/cloudflare/circl` **v1.6.5** (`blindsign/blindrsa`). Vecteurs communs : `engine/vectors/privacypass.json` (RFC 9474 annexe A et nos cas : `TokenRequest`, `TokenResponse`, jeton final), rejoués en Rust, en wasm et en Go.
