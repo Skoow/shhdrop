@@ -40,8 +40,11 @@ test("page d'envoi vide : cadre en pointillés, sans phrase de collage ; capture
   await noViewTransition(page);
   const zone = page.locator(".dropzone.empty");
   await expect(zone).toBeVisible();
-  expect(await css(zone, "border-top-style")).toBe("dashed");
-  expect(parseFloat(await css(zone, "border-top-left-radius"))).toBeGreaterThanOrEqual(16);
+  // Cadre en pointillés : porté par son conteneur .dz-box sur ordinateur (le bouton, sans bord,
+  // remplit le cadre), par le bouton lui-même sur téléphone.
+  const frame = (await page.locator(".dz-box").count()) > 0 ? page.locator(".dz-box").first() : zone;
+  expect(await css(frame, "border-top-style")).toBe("dashed");
+  expect(parseFloat(await css(frame, "border-top-left-radius"))).toBeGreaterThanOrEqual(16);
   await expect(page.locator("main")).not.toContainText(/Ctrl|Cmd|collez/i);
   await shot(page, "envoyer-vide", isMobile);
 });

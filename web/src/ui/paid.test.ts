@@ -35,7 +35,10 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
   }
   it("aucune saisie de mot de passe ; plus de mot de passe dans les options (17 novembre : montré sous le lien, sur « Lien prêt »)", () => {
     const { options } = opts();
-    expect(document.querySelectorAll("input[type=text], input:not([type]), input[type=password]")).toHaveLength(0);
+    // Seul champ de texte : le nom du partage (19 novembre), jamais un mot de passe.
+    const fields = [...document.querySelectorAll("input[type=text], input:not([type]), input[type=password]")];
+    expect(fields.filter((f) => !f.closest("[data-share-name]"))).toHaveLength(0);
+    expect(fields.map((f) => f.getAttribute("type"))).not.toContain("password");
     expect(text()).not.toContain("Écrire mon propre");
     expect(text()).not.toContain(options.password);
     const labels = [...document.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent);

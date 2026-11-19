@@ -441,6 +441,15 @@ export async function elementSealer(blob: Blob, first: number, palier: Palier = 
 }
 
 /**
+ * Nom du partage tel que le moteur l'écrit dans le manifeste et le relit (19 novembre) : nettoyé
+ * (blancs regroupés, commandes, inversions de sens et invisibles retirés, NFC), ou undefined s'il
+ * ne reste rien ou s'il dépasse TITLE_MAX points de code.
+ */
+export function cleanTitle(raw: string): Promise<string | undefined> {
+  return run((e) => e.wasm.cleanTitle(raw) ?? undefined);
+}
+
+/**
  * Élément gardé, déjà envoyé sous sa clé (spec §41.14) : `sealer` est le scelleur qui l'a
  * chiffré, dont le moteur reprend la graine k (jamais lue par JavaScript).
  */
@@ -459,7 +468,7 @@ export type FinalEntry =
 export function sealFinal(
   entries: FinalEntry[],
   keys: ContentKeys,
-  opts: { rights?: Rights; keepTtlH?: KeepTtl; palier?: Palier },
+  opts: { rights?: Rights; keepTtlH?: KeepTtl; /** Nom du partage (19 novembre), nettoyé par le moteur ; « titre_trop_long » au-delà de TITLE_MAX. */ title?: string; palier?: Palier },
 ): Promise<{ bucket: number; header: Uint8Array<ArrayBuffer>; tail: Uint8Array<ArrayBuffer> }> {
   return run(async (e) => {
     for (const x of entries) {
@@ -468,7 +477,7 @@ export function sealFinal(
       if (m.size !== x.size || m.first !== x.first) throw new Error("entree_invalide");
     }
     const list = entries.map(({ sealer, ...x }) => ({ ...x, sealer: sealer.id }));
-    const fin = await e.wasm.sealFinal(list, keys, opts.rights, opts.keepTtlH, opts.palier ?? 0);
+    const fin = await e.wasm.sealFinal(list, keys, opts.rights, opts.keepTtlH, opts.title, opts.palier ?? 0);
     return fin as { bucket: number; header: Uint8Array<ArrayBuffer>; tail: Uint8Array<ArrayBuffer> };
   });
 }

@@ -25,6 +25,9 @@ export const PW_TRIES = 5;
 export const STRIP_MAX = 50 * 1048576;
 /** Longueur maximale d'un nom, en points de code (UI §9.2.4, même borne que cleanName). */
 export const NAME_MAX = 120;
+/** Nom du partage (19 novembre) : longueur maximale en points de code après nettoyage, celle du
+ *  moteur (manifest::TITLE_MAX, prouvée par engine/vectors/v2-titre.json). */
+export const TITLE_MAX = 80;
 /** Partages créés par jour et par connexion (spec §24 ; limits.CreatesPer64 du serveur). */
 export const CREATES_PER_DAY = 10;
 /** Envois en préparation (non finalisés) à la fois par connexion (spec §29.5 ; limits.PendingPer64). */

@@ -62,28 +62,6 @@
         return "error" as const;
     }
   });
-  const chip = $derived.by(() => {
-    switch (phase) {
-      case "idle":
-      case "keys":
-        return t("seal.chip.keys");
-      case "captcha":
-      case "fallback":
-        return t("seal.chip.captcha");
-      case "upload":
-        return t("seal.chip.upload");
-      case "paused":
-        return t("seal.chip.paused");
-      case "offline":
-        return t("seal.chip.offline");
-      case "finalize":
-        return t("seal.chip.finalize");
-      case "sealed":
-        return t("seal.chip.sealed");
-      default:
-        return t("seal.chip.stopped");
-    }
-  });
   const title = $derived.by(() => {
     switch (phase) {
       case "idle":
@@ -237,6 +215,11 @@
 
   // ---------- Focus, fermeture du sceau ----------
   let heading: HTMLHeadingElement | undefined = $state();
+  // L'écran remplace le composeur en haut de page : sinon, « Chiffrer et envoyer » appuyé en bas
+  // d'une longue liste laissait la capsule coupée sous l'en-tête (relevé du 19 novembre).
+  $effect(() => {
+    scrollTo({ top: 0, behavior: "instant" });
+  });
   $effect(() => {
     heading?.focus({ preventScroll: true });
   });
@@ -274,7 +257,6 @@
       {progress}
       percent={s.percent}
       {summary}
-      {chip}
       names={shownNames}
       {more}
       sealedLabel={t("seal.phase.sealed")}
@@ -284,7 +266,7 @@
 
   <div class="info">
     <div class="phase">
-      <h1 id="seal-title" class={["title", { pulse: indeterminate }]} tabindex="-1" bind:this={heading}>{title}</h1>
+      <h1 id="seal-title" class="title" tabindex="-1" bind:this={heading}>{title}</h1>
       {#if sub}<p class="sub">{sub}</p>{/if}
     </div>
 
@@ -298,9 +280,12 @@
       aria-valuetext={indeterminate ? title : `${s.percent} %`}
     ></div>
 
-    {#if s.createdOnServer && phase !== "cancelled"}
-      <UploadStats sent={s.sent} total={s.total} rate={s.rate} eta={s.eta} done={s.segments.done} segments={s.segments.total} />
-    {/if}
+    <!-- Place des mesures gardée dès l'ouverture : rien ne saute quand l'envoi commence. -->
+    <div class={["stats-slot", { reserve: phase !== "error" && phase !== "cancelled" }]}>
+      {#if s.createdOnServer && phase !== "cancelled"}
+        <UploadStats sent={s.sent} total={s.total} rate={s.rate} eta={s.eta} done={s.segments.done} segments={s.segments.total} />
+      {/if}
+    </div>
 
     {#if s.steps.length > 0}
       <ul class="steps" aria-label={t("seal.steps.label")}>
@@ -414,6 +399,9 @@
     gap: var(--sp-5);
     min-width: 0;
   }
+  .stats-slot.reserve {
+    min-height: calc(2lh + var(--sp-2));
+  }
   .phase {
     display: grid;
     gap: var(--sp-1);
@@ -431,11 +419,6 @@
   .sub {
     margin: 0;
     color: var(--text-2);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .pulse {
-      animation: seal-label-pulse 1.2s ease-in-out infinite;
-    }
   }
   .steps {
     margin: 0;

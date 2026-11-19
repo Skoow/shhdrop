@@ -10,6 +10,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { handle, type KdfJob, type KdfReply } from "./argon2.worker";
 import { WORKER_TIMEOUT_MS, passwordKey, passwordKeyForCreate } from "./argon2";
 import { openStream } from "./index";
+import { TITLE_MAX } from "../limits";
 import { loadEngine, type Engine, type Wasm } from "./load";
 import type { FinalEntry } from "./pkg/shhdrop_wasm.js";
 import { createProvider, type WebCryptoProvider } from "./provider";
@@ -450,6 +451,33 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
       expect(await manifestOf(t.imports[0]!.raw, fin.bucket, fin.header, fin.tail), c.name).toBe(c.manifest_json);
     }
     expect(refused).toBe(7);
+  });
+
+  // Nom du partage (19 novembre) : engine/vectors/v2-titre.json, produit par le moteur Rust.
+  it("v2-titre.json : nettoyage (cleanTitle) et scellement avec titre (JSON exact, refus)", async () => {
+    const T = JSON.parse(readFileSync(join(here, "../../../engine/vectors/v2-titre.json"), "utf8"));
+    const str = (h: string | null) => (h === null ? undefined : new TextDecoder().decode(unhex(h)));
+    expect(T.constants.TITLE_MAX).toBe(TITLE_MAX);
+    expect(T.clean.length).toBeGreaterThanOrEqual(20);
+    for (const c of T.clean) expect(W.cleanTitle(str(c.in_hex)!) ?? undefined, c.label).toBe(str(c.title_hex));
+    let refused = 0;
+    for (const c of T.seal) {
+      const t = testProvider([c.r]);
+      const keys = await W.contentKeys(W.newSeed(t.p));
+      const entries = await finalEntries(c.entries);
+      const run = () => W.sealFinal(entries, keys, c.rights, undefined, str(c.title_in_hex));
+      if (typeof c.error === "string") {
+        expect(await errorOf(run), c.label).toBe(c.error);
+        refused++;
+        continue;
+      }
+      const fin = await run();
+      expect(fin.bucket, c.label).toBe(c.bucket);
+      expect(hex(fin.header), c.label).toBe(c.header);
+      expect(sha(fin.tail), c.label).toBe(c.tail_sha256);
+      expect(await manifestOf(t.imports[0]!.raw, fin.bucket, fin.header, fin.tail), c.label).toBe(c.manifest_json);
+    }
+    expect(refused).toBe(1);
   });
 
   /** Clair d'un élément de `share` (texte, ou xorshift32 : README, « Gros clairs »). */

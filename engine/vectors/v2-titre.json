@@ -1,0 +1,437 @@
+{
+  "about": "Nom du partage (champ facultatif `title` du manifeste v2, 19 novembre), produit par le moteur Rust (engine/core/tests/titre.rs) ; voir engine/vectors/README.md.",
+  "clean": [
+    {
+      "in_hex": "50686f746f7320646520766163616e636573",
+      "label": "simple",
+      "seal": {
+        "title_hex": "50686f746f7320646520766163616e636573"
+      },
+      "title_hex": "50686f746f7320646520766163616e636573"
+    },
+    {
+      "in_hex": "",
+      "label": "vide",
+      "seal": {
+        "title_hex": null
+      },
+      "title_hex": null
+    },
+    {
+      "in_hex": "2009c2a0e280a8e3808020",
+      "label": "blancs seulement (espace, tabulation, U+00A0, U+2028, U+3000)",
+      "seal": {
+        "title_hex": null
+      },
+      "title_hex": null
+    },
+    {
+      "in_hex": "202050686f746f7320092064650a0a766163616e636573200d0a",
+      "label": "blancs regroupés et rognés",
+      "seal": {
+        "title_hex": "50686f746f7320646520766163616e636573"
+      },
+      "title_hex": "50686f746f7320646520766163616e636573"
+    },
+    {
+      "in_hex": "61c28562",
+      "label": "U+0085 (NEL) est une espace",
+      "seal": {
+        "title_hex": "612062"
+      },
+      "title_hex": "612062"
+    },
+    {
+      "in_hex": "6100627f63c29f641b65",
+      "label": "commandes C0, DEL et C1 retirées",
+      "seal": {
+        "title_hex": "6162636465"
+      },
+      "title_hex": "6162636465"
+    },
+    {
+      "in_hex": "e280ae67706a2e657865",
+      "label": "inversion de sens U+202E retirée",
+      "seal": {
+        "title_hex": "67706a2e657865"
+      },
+      "title_hex": "67706a2e657865"
+    },
+    {
+      "in_hex": "e280aa61e280ab62e280ac63e280ad",
+      "label": "U+202A à U+202D retirés",
+      "seal": {
+        "title_hex": "616263"
+      },
+      "title_hex": "616263"
+    },
+    {
+      "in_hex": "61e281a662e281a763e281a864e281a9",
+      "label": "isolats U+2066 à U+2069 retirés",
+      "seal": {
+        "title_hex": "61626364"
+      },
+      "title_hex": "61626364"
+    },
+    {
+      "in_hex": "61e2808e62e2808f63d89c64",
+      "label": "LRM, RLM, ALM retirés",
+      "seal": {
+        "title_hex": "61626364"
+      },
+      "title_hex": "61626364"
+    },
+    {
+      "in_hex": "61e2808b62efbbbf63c2ad64e281a065",
+      "label": "largeur nulle, BOM, trait d'union conditionnel retirés",
+      "seal": {
+        "title_hex": "6162636465"
+      },
+      "title_hex": "6162636465"
+    },
+    {
+      "in_hex": "61f3a0818162efb88e63",
+      "label": "étiquettes et sélecteur U+FE0E retirés",
+      "seal": {
+        "title_hex": "616263"
+      },
+      "title_hex": "616263"
+    },
+    {
+      "in_hex": "65e2808bcc81",
+      "label": "retrait avant NFC : e + largeur nulle + accent",
+      "seal": {
+        "title_hex": "c3a9"
+      },
+      "title_hex": "c3a9"
+    },
+    {
+      "in_hex": "43616665cc8120c3856e67737472c3b66d",
+      "label": "NFC",
+      "seal": {
+        "title_hex": "436166c3a920c3856e67737472c3b66d"
+      },
+      "title_hex": "436166c3a920c3856e67737472c3b66d"
+    },
+    {
+      "in_hex": "f09f91a8e2808df09f91a9e2808df09f91a720e29da4efb88f",
+      "label": "séquence emoji gardée (U+200D, U+FE0F)",
+      "seal": {
+        "title_hex": "f09f91a8e2808df09f91a9e2808df09f91a720e29da4efb88f"
+      },
+      "title_hex": "f09f91a8e2808df09f91a9e2808df09f91a720e29da4efb88f"
+    },
+    {
+      "in_hex": "3c623e677261733c2f623e202620227822205c202f2027",
+      "label": "texte brut gardé tel quel (balises, guillemets)",
+      "seal": {
+        "title_hex": "3c623e677261733c2f623e202620227822205c202f2027"
+      },
+      "title_hex": "3c623e677261733c2f623e202620227822205c202f2027"
+    },
+    {
+      "in_hex": "d8aad982d8b1d98ad8b120d7a9d79cd795d79d",
+      "label": "arabe et hébreu gardés",
+      "seal": {
+        "title_hex": "d8aad982d8b1d98ad8b120d7a9d79cd795d79d"
+      },
+      "title_hex": "d8aad982d8b1d98ad8b120d7a9d79cd795d79d"
+    },
+    {
+      "in_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "label": "80 points de code",
+      "seal": {
+        "title_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+      },
+      "title_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+    },
+    {
+      "in_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "label": "81 points de code",
+      "seal": {
+        "error": "titre_trop_long"
+      },
+      "title_hex": null
+    },
+    {
+      "in_hex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "label": "80 emoji (320 octets)",
+      "seal": {
+        "title_hex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880"
+      },
+      "title_hex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880"
+    },
+    {
+      "in_hex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "label": "81 emoji",
+      "seal": {
+        "error": "titre_trop_long"
+      },
+      "title_hex": null
+    },
+    {
+      "in_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161e2808b",
+      "label": "81 avant nettoyage, 80 après (largeur nulle)",
+      "seal": {
+        "title_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+      },
+      "title_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+    },
+    {
+      "in_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161612020202020626262626262626262626262626262626262626262626262626262626262626262626262626262",
+      "label": "blancs intérieurs regroupés avant le compte",
+      "seal": {
+        "title_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616120626262626262626262626262626262626262626262626262626262626262626262626262626262"
+      },
+      "title_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616120626262626262626262626262626262626262626262626262626262626262626262626262626262"
+    },
+    {
+      "in_hex": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2dcd84",
+      "label": "compte après NFC : U+0344 devient deux points de code",
+      "seal": {
+        "error": "titre_trop_long"
+      },
+      "title_hex": null
+    }
+  ],
+  "constants": {
+    "TITLE_MAX": 80
+  },
+  "read": [
+    {
+      "label": "absent (ancien manifeste)",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "présent",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"Rapport T4\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": "526170706f7274205434"
+    },
+    {
+      "label": "nombre : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":5,\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "null : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":null,\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "tableau : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":[\"a\"],\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "objet : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":{\"a\":\"b\"},\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "vide : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "blancs seulement : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\" \\t\\n \",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "nettoyé à la lecture (inversion de sens, blancs)",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"  \\u202eabc  d\\u0000 \",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": "6162632064"
+    },
+    {
+      "label": "81 points de code : ignoré",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": null
+    },
+    {
+      "label": "demi-paire isolée : U+FFFD",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"a\\ud800\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": "61efbfbd"
+    },
+    {
+      "label": "clé répétée : la dernière compte",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"un\",\"title\":\"deux\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}]}",
+      "title_hex": "64657578"
+    },
+    {
+      "label": "après items, avec coffre",
+      "manifest_json": "{\"v\":2,\"rights\":\"coffre\",\"keep_ttl_h\":6,\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0}],\"title\":\"x\"}",
+      "title_hex": "78"
+    }
+  ],
+  "seal": [
+    {
+      "bucket": 16,
+      "entries": [
+        {
+          "first": 0,
+          "k": "d14bdcdbd824e668bf188715deaae644f1472fe632b4d93d70ee45ace9f4c0ee",
+          "kind": "file",
+          "mime": "x/y",
+          "name": "a.bin",
+          "size": 3
+        }
+      ],
+      "header": "53484832020000000000000000000000ea591bf1d121b9087b14cdd7af6b59a8388a983f6233cfba5a15e389eaf8983c",
+      "label": "sans titre",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "r": "2d714d02008054f694ec70f3a36b762f5e5e13ca91674eed1cd6fd5c188f6d2e",
+      "rights": "enregistrer",
+      "tail_sha256": "9803f73d3c0531fd5148c2850b1e2e0cc32432337cb703b089baae7978c08184",
+      "title_in_hex": null
+    },
+    {
+      "bucket": 16,
+      "entries": [
+        {
+          "first": 0,
+          "k": "d14bdcdbd824e668bf188715deaae644f1472fe632b4d93d70ee45ace9f4c0ee",
+          "kind": "file",
+          "mime": "x/y",
+          "name": "a.bin",
+          "size": 3
+        }
+      ],
+      "header": "53484832020000000000000000000000e81456769d2da43a799302a81ed26b5647d436a79259604ec4e4905eac8ad224",
+      "label": "avec titre",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"Rapport T4 — équipe\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "r": "d9e7810df6041d7a03e74310564e2bbd9b4e9ab9908604aaa71cbf980d20a2ce",
+      "rights": "enregistrer",
+      "tail_sha256": "da43d225b0c8554f757f986ee831d18d202054ec6f84bb4b9e47f10a59eb5535",
+      "title_in_hex": "526170706f727420543420e2809420c3a97175697065"
+    },
+    {
+      "bucket": 16,
+      "entries": [
+        {
+          "first": 0,
+          "k": "d14bdcdbd824e668bf188715deaae644f1472fe632b4d93d70ee45ace9f4c0ee",
+          "kind": "file",
+          "mime": "x/y",
+          "name": "a.bin",
+          "size": 3
+        }
+      ],
+      "header": "53484832020000000000000000000000623f27d4f63ae23bf1a13861960ec337d15de1a95440fddfacf10f76a522f86d",
+      "label": "titre nettoyé",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"Rapport T4\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "r": "cb4d954f76805e7812551dac9251e3759017981101e66903e4c86905a423f33e",
+      "rights": "enregistrer",
+      "tail_sha256": "f371febb671627c7ac99ab4441ecfa4c4907400b6a6c2f7806b8f513ec6790a8",
+      "title_in_hex": "2020526170706f7274e280ae2020543420"
+    },
+    {
+      "bucket": 16,
+      "entries": [
+        {
+          "first": 0,
+          "k": "d14bdcdbd824e668bf188715deaae644f1472fe632b4d93d70ee45ace9f4c0ee",
+          "kind": "file",
+          "mime": "x/y",
+          "name": "a.bin",
+          "size": 3
+        }
+      ],
+      "header": "5348483202000000000000000000000055378ea012616109b92e5cc245c0c2feb2ed3ab4f7332cc517aa92802e24793f",
+      "label": "titre vide après nettoyage",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "r": "bba6e74a36b8f22c784e5f156990cb8edd36229d6b00aa49f81971ad72ce1630",
+      "rights": "enregistrer",
+      "tail_sha256": "3a33c1bc152dc639290b25a51a12bc8745b7e8cded9a8a44f7a7e4dcd4cd07de",
+      "title_in_hex": "e2808b20e281a6"
+    },
+    {
+      "bucket": 16,
+      "entries": [
+        {
+          "first": 0,
+          "k": "d14bdcdbd824e668bf188715deaae644f1472fe632b4d93d70ee45ace9f4c0ee",
+          "kind": "file",
+          "mime": "x/y",
+          "name": "a.bin",
+          "size": 3
+        }
+      ],
+      "header": "53484832020000000000000000000000ec4a34fb61070f1c9fbe9a5cf87b39192258fc3bc357cd76caaa05a7c20e8f6a",
+      "label": "80 points de code",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "r": "15c59ff4fe5847558c228fdaa17826370dc89b4d2ded47566fc8643af0be02ac",
+      "rights": "enregistrer",
+      "tail_sha256": "7591c6a7e141941ebc6f5042da2c715483406bf650a60f939c636a3510dce298",
+      "title_in_hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9"
+    },
+    {
+      "entries": [
+        {
+          "first": 0,
+          "k": "d14bdcdbd824e668bf188715deaae644f1472fe632b4d93d70ee45ace9f4c0ee",
+          "kind": "file",
+          "mime": "x/y",
+          "name": "a.bin",
+          "size": 3
+        }
+      ],
+      "error": "titre_trop_long",
+      "label": "81 points de code",
+      "r": "dfbacec14f793faafa8ca75a89c75c776d4165a8d0b9f650ccbd6e39d6d98c6a",
+      "rights": "enregistrer",
+      "title_in_hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9"
+    }
+  ],
+  "write": [
+    {
+      "keep_ttl_h": null,
+      "label": "sans titre : inchangé",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "enregistrer",
+      "title_in_hex": null
+    },
+    {
+      "keep_ttl_h": null,
+      "label": "titre après rights",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"Rapport T4\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "enregistrer",
+      "title_in_hex": "526170706f7274205434"
+    },
+    {
+      "keep_ttl_h": 12,
+      "label": "titre après keep_ttl_h",
+      "manifest_json": "{\"v\":2,\"rights\":\"coffre\",\"keep_ttl_h\":12,\"title\":\"Rapport\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "coffre",
+      "title_in_hex": "526170706f7274"
+    },
+    {
+      "keep_ttl_h": null,
+      "label": "voir",
+      "manifest_json": "{\"v\":2,\"rights\":\"voir\",\"title\":\"x\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "voir",
+      "title_in_hex": "78"
+    },
+    {
+      "keep_ttl_h": null,
+      "label": "échappements de JSON.stringify",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"a\\\"b\\\\c/é\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "enregistrer",
+      "title_in_hex": "6122625c632fc3a9"
+    },
+    {
+      "keep_ttl_h": null,
+      "label": "écrit nettoyé",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"title\":\"a b\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "enregistrer",
+      "title_in_hex": "20e280ae61096220"
+    },
+    {
+      "keep_ttl_h": null,
+      "label": "vide après nettoyage : non écrit",
+      "manifest_json": "{\"v\":2,\"rights\":\"enregistrer\",\"items\":[{\"kind\":\"file\",\"name\":\"a.bin\",\"mime\":\"x/y\",\"size\":3,\"offset\":0,\"k\":\"0Uvc29gk5mi_GIcV3qrmRPFHL-YytNk9cO5FrOn0wO4\"}]}",
+      "rights": "enregistrer",
+      "title_in_hex": "20e2808b20"
+    }
+  ]
+}

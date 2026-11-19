@@ -1,7 +1,8 @@
-// Options de l'envoi (UI §9.3, spec §31, §34) : durée, ouvertures, mot de passe, droits du
-// destinataire. En mémoire seulement : le mot de passe n'est jamais rangé ni journalisé.
+// Options de l'envoi (UI §9.3, spec §31, §34) : nom du partage (19 novembre), durée,
+// ouvertures, mot de passe, droits du destinataire. En mémoire seulement : le mot de passe
+// n'est jamais rangé ni journalisé.
 // Le mot de passe est toujours généré (D41-15) : aucune saisie, donc aucun contrôle ici.
-import { OPENS_DEFAULT, TTL_DEFAULT, previewKindOf, type TtlHours } from "../index";
+import { OPENS_DEFAULT, TITLE_MAX, TTL_DEFAULT, previewKindOf, type TtlHours } from "../index";
 import { limitesDe, type Formule } from "../limits";
 
 export type Rights = "voir" | "enregistrer" | "coffre";
@@ -22,6 +23,8 @@ export function createOptions(deps: OptionsDeps) {
   let formules = $state<readonly Formule[]>([]);
   const lim = $derived(limitesDe(formule));
   let generated = $state(deps.generate());
+  // Nom du partage (19 novembre) : texte libre, nettoyé par le moteur au scellement (cleanTitle).
+  let title = $state("");
   // Droits (spec §34, simplifiés par le propriétaire le 5 novembre) : un interrupteur
   // « Autoriser le téléchargement » (activé par défaut) et, seulement s'il est activé et là où
   // le coffre existe, la sous-option « Garder une copie chiffrée dans l'app du destinataire ».
@@ -95,7 +98,32 @@ export function createOptions(deps: OptionsDeps) {
     regenerate() {
       generated = deps.generate();
     },
+    /** Nom du partage tel que saisi (le moteur le nettoie) ; vu par le destinataire. */
+    get title() {
+      return title;
+    },
+    set title(v: string) {
+      title = typeof v === "string" ? v : "";
+    },
+    /**
+     * Nom trop long : NFC de la saisie au-delà de TITLE_MAX points de code. Majorant du nom que le
+     * moteur gardera (son nettoyage ne fait que retirer ou regrouper) : si ce n'est pas trop long
+     * ici, sealFinal ne refusera pas (« titre_trop_long »).
+     */
+    get titleTooLong() {
+      return titleTooLong(title);
+    },
   };
+}
+
+/** Voir `titleTooLong` des options. */
+export function titleTooLong(raw: string): boolean {
+  return [...raw.normalize("NFC")].length > TITLE_MAX;
+}
+
+/** Nom passé au moteur : undefined s'il n'y a que des blancs (rien à écrire). */
+export function sendTitle(o: Pick<Options, "title">): { title?: string } {
+  return o.title.trim() === "" ? {} : { title: o.title };
 }
 export type Options = ReturnType<typeof createOptions>;
 

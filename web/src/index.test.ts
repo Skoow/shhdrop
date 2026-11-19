@@ -13,6 +13,9 @@ describe("interface publique", () => {
         "CATEGORIE_AUTRE",
         // Empreinte SHA-256 d'un fichier, calculée sur l'appareil (16 novembre) : rien de secret n'en sort.
         "fileSha256",
+        // Nom du partage (19 novembre) : nettoyage d'un texte de l'expéditeur, aucun secret.
+        "cleanTitle",
+        "TITLE_MAX",
         "GrantInvalidError",
         "ReopenLimitError",
         "grantTag",

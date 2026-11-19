@@ -4,7 +4,8 @@
 // - Une entrée du coffre est identifiée d'un appareil à l'autre par son lien (gestion, partage,
 //   invitation) ; son `id` est celui de l'appareil qui l'a créée.
 // - Contenu d'une entrée : le lien, les dates, la taille, le nombre d'éléments, la sorte dominante
-//   ou le libellé local ; JAMAIS un mot de passe, un nom ni un contenu (cleanEntry à la relecture).
+//   ou le libellé local (salon) ou le titre du partage (envoi, 19 novembre : `libelle`) ; JAMAIS
+//   un mot de passe, un nom d'élément ni un contenu (cleanEntry à la relecture).
 //   L'état des relectures (ouvertures, « détruit ») n'est pas synchronisé : chaque appareil relit.
 // - Fusion : les entrées de l'appareil absentes du coffre y entrent (toutes après une récupération
 //   par e-mail, sinon seulement celles créées ici) ; celles du coffre absentes de l'appareil y
@@ -24,7 +25,8 @@ export function versCoffre(e: HistoryEntry): { liste: Liste; valeur: EntreePrive
   const base = { id: e.id, cree: e.createdAt, expire: e.expiresAt };
   switch (e.sorte) {
     case "envoi":
-      return { liste: "envois", valeur: { ...base, gestion: e.manage, taille: e.sizeBytes, elements: e.itemsCount, ouvertures_max: e.maxOpens } };
+      // Titre du partage (19 novembre) : seulement s'il y en a un (entrées d'avant : inchangées).
+      return { liste: "envois", valeur: { ...base, gestion: e.manage, taille: e.sizeBytes, elements: e.itemsCount, ouvertures_max: e.maxOpens, ...(e.label !== "" ? { libelle: e.label } : {}) } };
     case "recu":
       return { liste: "recus", valeur: { ...base, lien: e.link, taille: e.sizeBytes, elements: e.itemsCount, format: e.format } };
     default:
@@ -43,7 +45,8 @@ export function deCoffre(liste: Liste, v: EntreePrivee, now: number): HistoryEnt
     origine: "compte",
     manage: sorte === "envoi" ? v.gestion : sorte === "salon_cree" ? (v.gestion ?? "") : "",
     link: sorte === "envoi" ? "" : sorte === "recu" ? v.lien : v.invitation,
-    label: sorte.startsWith("salon") ? v.libelle : "",
+    // Envoi : titre du partage, absent des entrées d'avant le 19 novembre.
+    label: sorte.startsWith("salon") ? v.libelle : sorte === "envoi" ? (v.libelle ?? "") : "",
     format: sorte === "recu" ? v.format : "",
     createdAt: cree,
     sizeBytes: sorte === "envoi" || sorte === "recu" ? v.taille : 0,
@@ -71,6 +74,26 @@ export function ajouterEntree(p: CoffrePrive, e: HistoryEntry): CoffrePrive {
   if (p[liste].some((v) => deCoffre(liste, v, 0) !== null && linkKey(deCoffre(liste, v, 0)!) === k)) return p;
   if (p[liste].some((v) => v.id === e.id)) return p;
   return { ...p, [liste]: [...p[liste], valeur] };
+}
+
+/**
+ * Renommage d'un envoi sur cet appareil (19 novembre) : le titre de l'entrée du même lien prend
+ * celui de `e` ; absente du coffre : ajoutée. Rien d'autre ne change.
+ */
+export function renommerEntree(p: CoffrePrive, e: HistoryEntry): CoffrePrive {
+  const { liste, valeur } = versCoffre(e);
+  const k = linkKey(e);
+  let found = false;
+  const next = p[liste].map((v) => {
+    const x = deCoffre(liste, v, 0);
+    if (x === null || linkKey(x) !== k) return v;
+    found = true;
+    const out: EntreePrivee = { ...v };
+    delete out.libelle;
+    if ("libelle" in valeur) out.libelle = valeur.libelle;
+    return out;
+  });
+  return found ? { ...p, [liste]: next } : ajouterEntree(p, e);
 }
 
 /** Retire du coffre l'entrée du même lien. */

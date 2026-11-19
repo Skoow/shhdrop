@@ -28,7 +28,8 @@
   import { forgetShare, loadHistory, markDestroyed, recordShare, setHistoryEnabled, shares } from "../history/live.svelte";
   import "../ui/seal.css";
 
-  export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string };
+  /** `title` : nom du partage tel que le moteur l'a écrit (nettoyé, 19 novembre) ; absent sans nom. */
+  export type ReadyResult = { link: string; manage: string; expiresInS: number; password: string; title?: string };
   type Props = {
     /** null après Terminé ou Supprimer : plus aucune référence aux secrets. */
     result: ReadyResult | null;
@@ -55,9 +56,9 @@
 
   // ---------- « Garder dans mon historique » (spec §33, §33.1 ; Q-H2 : activé par défaut) ----------
   // Gardé dès l'affichage (fermer l'onglet sans « Terminé » ne le perd pas) : le lien de gestion,
-  // l'heure locale, la taille, le nombre d'éléments, l'échéance et le maximum d'ouvertures ;
-  // jamais le lien de partage ni le mot de passe. Désactiver retire l'entrée et vaut pour les
-  // prochains envois. Opérations à la file : une bascule rapide garde l'ordre.
+  // l'heure locale, la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures et le
+  // nom du partage (19 novembre) ; jamais le lien de partage, le mot de passe ni les noms des
+  // éléments. Désactiver retire l'entrée et vaut pour les prochains envois. Opérations à la file : une bascule rapide garde l'ordre.
   const createdAt = Date.now();
   let keep = $state(true);
   let keepReady = $state(false);
@@ -67,7 +68,8 @@
   async function save() {
     const r = result;
     if (!r || keepId) return;
-    keepId = await recordShare({ manage: r.manage, createdAt, sizeBytes, itemsCount, expiresAt: createdAt + r.expiresInS * 1000, maxOpens });
+    // Nom du partage (19 novembre) : gardé dans l'entrée, chiffrée comme le reste (history/store.ts).
+    keepId = await recordShare({ manage: r.manage, createdAt, sizeBytes, itemsCount, expiresAt: createdAt + r.expiresInS * 1000, maxOpens, ...(r.title ? { label: r.title } : {}) });
   }
   $effect(() => {
     untrack(() =>
@@ -233,6 +235,8 @@
         {/if}
         <div class="cell" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
         <div class="facts" data-ready-facts>
+          <!-- Nom du partage (19 novembre) : texte de l'expéditeur, en texte brut, isolé (bdi). -->
+          {#if result.title}<p class="name" data-ready-name><span class="sr-only">{t("ready.name")} </span><bdi>{result.title}</bdi></p>{/if}
           <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
           <!-- Heure de fin seule (audit M16) : le serveur l'arrondit au quart d'heure supérieur ;
                un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
@@ -325,6 +329,12 @@
 {/if}
 
 <style>
+  .name {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
   /* Échéance en deux lignes (Deadline, retours UI4). */
   .when {
     margin: 0;

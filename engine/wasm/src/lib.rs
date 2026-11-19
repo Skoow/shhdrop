@@ -1312,7 +1312,9 @@ fn final_entry(v: &JsValue) -> core::result::Result<FinalEntry, JsValue> {
 /// Manifeste final : `{ bucket, header, tail }`. Refus de l'ancien moteur (`vide`,
 /// `droits_invalides`, `manifeste_trop_gros`, `texte_trop_long`, `trop_gros`,
 /// `chevauchement`, `cle_deja_utilisee`) ; clés d'ouverture refusées (`cle_deja_utilisee`) ;
-/// note que le lecteur refuserait (`texte_invalide`, `texte_trop_long`, audit M6).
+/// note que le lecteur refuserait (`texte_invalide`, `texte_trop_long`, audit M6). `title` :
+/// nom du partage (19 novembre), nettoyé par le moteur, `titre_trop_long` au-delà de
+/// `TITLE_MAX` points de code.
 #[wasm_bindgen(
     js_name = sealFinal,
     unchecked_return_type = "Promise<{ bucket: number; header: Uint8Array; tail: Uint8Array }>"
@@ -1322,6 +1324,7 @@ pub fn seal_final(
     keys: &JsContentKeys,
     rights: Option<String>,
     keep_ttl_h: Option<f64>,
+    title: Option<String>,
     palier: Option<f64>,
 ) -> Promise {
     let palier = palier_de(palier);
@@ -1333,21 +1336,39 @@ pub fn seal_final(
         if !creatable {
             return Err(js_err(Error::CleDejaUtilisee));
         }
-        let fin = elements::seal_final_palier(
+        let mut title = title;
+        let palier = match palier {
+            Ok(p) => p,
+            Err(e) => {
+                title.zeroize();
+                return Err(e);
+            }
+        };
+        let fin = elements::seal_final_complet(
             &entries,
             &keys,
             rights.as_deref(),
             keep_ttl_h.map(n64),
-            palier?,
+            palier,
+            title.as_deref(),
         )
-        .await
-        .map_err(js_err)?;
+        .await;
+        title.zeroize();
+        let fin = fin.map_err(js_err)?;
         let o = Object::new();
         set(&o, "bucket", &JsValue::from_f64(f64::from(fin.bucket)));
         set(&o, "header", &bytes(&fin.header));
         set(&o, "tail", &bytes(&fin.tail));
         Ok(o.into())
     })
+}
+
+/// Nom du partage tel que le moteur l'écrira et le relira (19 novembre) : nettoyé
+/// (`manifest::clean_title`), ou `undefined` s'il est vide après nettoyage ou dépasse `TITLE_MAX`
+/// points de code. Le site s'en sert pour montrer et garder exactement ce que verra le destinataire.
+#[wasm_bindgen(js_name = cleanTitle)]
+pub fn clean_title(raw: &str) -> Option<String> {
+    manifest::clean_title(raw).map(|t| t.as_str().to_owned())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1404,6 +1425,8 @@ const TS_MANIFEST: &str = r#"
 /** Manifeste authentifié, sans les graines `k` (le lecteur garde les clés) ; une note porte son texte. */
 export type OpenedManifest = {
   v: 2; rights: "voir" | "enregistrer" | "coffre"; keep_ttl_h?: 1 | 6 | 12 | 24;
+  /** Nom du partage (19 novembre), déjà nettoyé par le moteur ; absent : aucun titre. */
+  title?: string;
   items: { kind: "text" | "file"; name: string; mime: string; size: number; offset: number; clean?: string; sha256?: string; text?: string }[];
 };
 "#;
@@ -1414,6 +1437,9 @@ fn manifest_js(m: &Manifest) -> Object {
     set(&o, "rights", &m.rights.name().into());
     if let Some(h) = m.rights.keep_ttl_h() {
         set(&o, "keep_ttl_h", &JsValue::from_f64(f64::from(h)));
+    }
+    if let Some(t) = &m.title {
+        set(&o, "title", &t.as_str().into());
     }
     let items: Array = m
         .items

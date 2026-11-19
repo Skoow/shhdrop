@@ -49,6 +49,7 @@ export {
   PW_TRIES,
   STRIP_MAX,
   TEXT_MAX,
+  TITLE_MAX,
   TTL_DEFAULT,
   TTL_HOURS,
   TTL_MAX_HOURS,
@@ -57,6 +58,8 @@ export {
 export { PASSWORD_ALPHABET, PASSWORD_LEN, generatePassword, isGeneratedPassword, type GeneratedPassword } from "./engine";
 // Empreinte SHA-256 d'un fichier, affichée sur sa ligne avant l'envoi (16 novembre).
 export { fileSha256 } from "./engine";
+// Nom du partage (19 novembre) : nettoyage du moteur, celui que verra le destinataire.
+export { cleanTitle } from "./engine";
 export {
   MANAGE_FRAGMENT,
   SHARE_FRAGMENT,

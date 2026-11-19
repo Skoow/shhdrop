@@ -415,7 +415,7 @@ pub async fn seal_final<P: Platform>(
     rights: Option<&str>,
     keep_ttl_h: Option<u64>,
 ) -> Result<Sealed> {
-    seal_final_palier(entries, keys, rights, keep_ttl_h, Palier::Gratuit).await
+    seal_final_complet(entries, keys, rights, keep_ttl_h, Palier::Gratuit, None).await
 }
 
 /// `seal_final` pour une formule : éléments jusqu'à `data_chunks(palier)`, palier final
@@ -427,10 +427,37 @@ pub async fn seal_final_palier<P: Platform>(
     keep_ttl_h: Option<u64>,
     palier: Palier,
 ) -> Result<Sealed> {
+    seal_final_complet(entries, keys, rights, keep_ttl_h, palier, None).await
+}
+
+/// [`seal_final`] avec le nom du partage (19 novembre) : `title` nettoyé par
+/// [`manifest::title_for_seal`] (vide après nettoyage : aucun titre), refusé au-delà de
+/// `TITLE_MAX` points de code (« titre_trop_long », vérifié après les droits, avant les entrées).
+pub async fn seal_final_titled<P: Platform>(
+    entries: &[FinalEntry],
+    keys: &ContentKeys<P>,
+    rights: Option<&str>,
+    keep_ttl_h: Option<u64>,
+    title: Option<&str>,
+) -> Result<Sealed> {
+    seal_final_complet(entries, keys, rights, keep_ttl_h, Palier::Gratuit, title).await
+}
+
+/// [`seal_final`] complet : formule (`palier`) et nom du partage (`title`) ; les autres en sont
+/// des cas particuliers.
+pub async fn seal_final_complet<P: Platform>(
+    entries: &[FinalEntry],
+    keys: &ContentKeys<P>,
+    rights: Option<&str>,
+    keep_ttl_h: Option<u64>,
+    palier: Palier,
+    title: Option<&str>,
+) -> Result<Sealed> {
     if entries.is_empty() {
         return Err(Error::Vide);
     }
     let rights: Rights = Rights::new(rights.unwrap_or("enregistrer"), keep_ttl_h)?;
+    let title = title.map(manifest::title_for_seal).transpose()?.flatten();
     // Écart assumé : elements.ts ne bornait pas le nombre d'éléments (l'interface le fait), et
     // un manifeste de plus de MAX_ITEMS éléments serait illisible (`parse`).
     if entries.len() > MAX_ITEMS {
@@ -475,7 +502,11 @@ pub async fn seal_final_palier<P: Platform>(
             data_end = data_end.max(offset + e.size);
         }
     }
-    let json = manifest::to_json(&Manifest { rights, items });
+    let json = manifest::to_json(&Manifest {
+        rights,
+        title,
+        items,
+    });
     if json.len() > MANIFEST_MAX {
         return Err(Error::ManifesteTropGros);
     }

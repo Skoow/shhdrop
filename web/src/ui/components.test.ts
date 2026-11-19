@@ -179,7 +179,7 @@ describe("CopyField", () => {
 });
 
 describe("SealCapsule : légende « ce que le serveur reçoit » (scan UX, envoi)", () => {
-  const base = { percent: 0, summary: "2 éléments", chip: "Envoi", names: [{ name: "vacances.jpg", category: "photos" }, { name: "contrat.pdf", category: "documents" }], more: "", sealedLabel: "Scellé", caption: "En image, ce que le serveur reçoit : des données illisibles." };
+  const base = { percent: 0, summary: "2 éléments", names: [{ name: "vacances.jpg", category: "photos" }, { name: "contrat.pdf", category: "documents" }], more: "", sealedLabel: "Scellé", caption: "En image, ce que le serveur reçoit : des données illisibles." };
   it("jamais tant qu'un nom est lisible", () => {
     show(SealCapsule, { ...base, mode: "progress", progress: 0 });
     expect(document.body.textContent).not.toContain("ce que le serveur reçoit");
@@ -189,6 +189,28 @@ describe("SealCapsule : légende « ce que le serveur reçoit » (scan UX, envoi
     const cap = document.querySelector(".veil-cap")!;
     expect(cap.textContent).toBe(base.caption);
     expect(document.querySelector(".names")!.textContent).not.toContain("vacances.jpg");
+  });
+  it("aucun pourcentage avant l'envoi (rien n'est mesuré) ; le chiffre réel ensuite", () => {
+    show(SealCapsule, { ...base, mode: "spin", progress: 0 });
+    expect(document.querySelector(".figure")!.textContent!.trim()).toBe("");
+    void unmount(mounted.pop()!);
+    show(SealCapsule, { ...base, mode: "progress", progress: 0.42, percent: 42 });
+    expect(document.querySelector(".figure")!.textContent!.replace(/\s/g, "")).toBe("42%");
+  });
+  it("« prêt » seulement en mode sealed : ni mot ni classe pendant la finalisation", () => {
+    show(SealCapsule, { ...base, mode: "final", progress: 1, percent: 100 });
+    expect(document.querySelector(".sealed-word")).toBeNull();
+    expect(document.querySelector("[data-capsule]")!.classList.contains("sealed")).toBe(false);
+    void unmount(mounted.pop()!);
+    show(SealCapsule, { ...base, mode: "sealed", progress: 1, percent: 100 });
+    expect(document.querySelector(".sealed-word")!.textContent).toBe("Scellé");
+    expect(document.querySelector("[data-capsule]")!.classList.contains("sealed")).toBe(true);
+  });
+  it("trame décorative : cachée aux lecteurs d'écran, vrais noms en liste masquée", () => {
+    show(SealCapsule, { ...base, mode: "progress", progress: 0.5 });
+    expect(document.querySelector("[data-trame]")!.getAttribute("aria-hidden")).toBe("true");
+    expect(document.querySelector("[data-trame] canvas")).not.toBeNull();
+    expect(document.querySelector(".sr-only")!.textContent).toContain("vacances.jpg");
   });
 });
 

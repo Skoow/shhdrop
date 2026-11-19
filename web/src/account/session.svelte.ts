@@ -29,7 +29,7 @@ import { deriverCompte, motDePasseValide, normaliserAdresse, type Adresse } from
 import { loadSalonEngine, type SalonEngine } from "../salon/engine";
 import { allEntries, dropAccountEntries, dropEntries, importEntries, onLocalChange, setAccountPrefs } from "../history/live.svelte";
 import type { HistoryEntry } from "../history/store";
-import { ajouterEntree, fusionner, retirerEntree } from "./sync";
+import { ajouterEntree, fusionner, renommerEntree, retirerEntree } from "./sync";
 import { partagesConnus, supprimerTout as suppression, type Progres } from "./suppression";
 import { clearDownloads } from "../downloads/live.svelte";
 import { clearHistory } from "../history/live.svelte";
@@ -67,7 +67,7 @@ export type Historique = {
   importer(es: readonly HistoryEntry[]): Promise<void>;
   retirer(ids: readonly string[]): Promise<void>;
   retirerCompte(): Promise<void>;
-  ecouter(f: (c: { kind: "add" | "remove"; entry: HistoryEntry }) => void): () => void;
+  ecouter(f: (c: { kind: "add" | "remove" | "rename"; entry: HistoryEntry }) => void): () => void;
   regler(p: { keepReceived: boolean } | null): void;
 };
 
@@ -201,7 +201,7 @@ async function synchroniser(o: Ouverte, recuperation: boolean): Promise<void> {
   h.regler({ keepReceived: o.profil.valeur.reglages.garderRecus });
   arreterEcoute = h.ecouter((c) => {
     if (ouverte !== o) return;
-    const f = c.kind === "add" ? (p: CoffrePrive) => ajouterEntree(p, c.entry) : (p: CoffrePrive) => retirerEntree(p, c.entry);
+    const f = (p: CoffrePrive) => (c.kind === "add" ? ajouterEntree(p, c.entry) : c.kind === "rename" ? renommerEntree(p, c.entry) : retirerEntree(p, c.entry));
     void ecrirePrive(f, { differe: true }).catch(() => undefined);
   });
   try {

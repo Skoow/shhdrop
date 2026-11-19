@@ -60,17 +60,17 @@ test.describe("français par défaut", () => {
   });
 
   // Pages d'information séparées (16 novembre) : « Sécurité » charge sa page ; la navigation
-  // interne sans rechargement se vérifie donc dans l'application, vers « Mes partages ».
+  // interne sans rechargement se vérifie donc dans l'application, de la page d'envoi vers l'accueil.
   test("navigation interne sans rechargement, focus sur le contenu, retour arrière", async ({ page, shh, isMobile }) => {
-    await page.goto(shh.origin + "/");
+    // De la page d'envoi à l'accueil par le logo (lien de l'application, toujours présent).
+    await page.goto(shh.origin + "/envoyer");
     await page.evaluate(() => ((window as unknown as { __marque: number }).__marque = 1));
-    if (isMobile) await page.locator("[data-menu-button]").click();
-    await page.getByRole(isMobile ? "navigation" : "banner").getByRole("link", { name: "Mes partages", exact: true }).first().click();
-    await expect(page).toHaveURL(shh.origin + "/envois");
+    await page.locator("a.logo").click();
+    await expect(page).toHaveURL(shh.origin + "/");
     // Focus dans le contenu : sur <main>, ou sur le titre de l'écran qui l'a pris (téléphone).
     await expect.poll(() => page.evaluate(() => document.querySelector("main#contenu")?.contains(document.activeElement) ?? false)).toBe(true);
     await page.goBack();
-    await expect(page).toHaveURL(shh.origin + "/");
+    await expect(page).toHaveURL(shh.origin + "/envoyer");
     expect(await page.evaluate(() => (window as unknown as { __marque?: number }).__marque)).toBe(1);
   });
 
