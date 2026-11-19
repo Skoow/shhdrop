@@ -64,7 +64,7 @@ export type Systeme =
   | { k: "sys"; cle: string; quoi: "arrivee" | "depart" | "retour" | "exclusion" | "code" | "createur"; siege: number }
   | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string }
   | { k: "sys"; cle: string; quoi: "regle"; siege: number; regle: Regle }
-  | { k: "sys"; cle: string; quoi: "renouvellement"; siege: number };
+  | { k: "sys"; cle: string; quoi: "renouvellement" | "invitation"; siege: number };
 
 export type Element = Bulle | Systeme;
 type SansCle<T> = T extends unknown ? Omit<T, "cle"> : never;
@@ -395,6 +395,12 @@ export class Conversation {
 
   /** Codes de vérification comparés ici (siège → code vérifié), annulés quand le code change (exigences 9, 29). */
   readonly verifies = new Map<number, string>();
+
+  /** Invitation changée (rotation, exigence 24) : ligne chez tous ; les codes restent (refonder). */
+  invitationChangee(): void {
+    this.#sys({ k: "sys", quoi: "invitation", siege: this.createurSiege });
+    this.#change();
+  }
 
   /** Renouvellement (0x10) : tout ce qui est de rang ≤ départ quitte l'écran ; les codes sont à revérifier. */
   renouveler(depart: number): string[] {

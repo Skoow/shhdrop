@@ -21,6 +21,10 @@ import { solvePow } from "../captcha/pow";
 import { allEntries, recordShare } from "../history/live.svelte";
 import { b64u } from "../engine/pure";
 import { lireFragment } from "./liens";
+import { exclure } from "./exclusion";
+import * as preuve from "./preuve";
+import { cleMembreLocal, indexMembre } from "../engine/index";
+import { KDF_CREATE } from "../engine/pure";
 
 /**
  * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`,
@@ -48,6 +52,8 @@ export const vue = $state({
   createur: false,
   /** Salon prêt (créateur) : lien d'invitation, mot de passe, lien de gestion (affichés, jamais gardés). */
   pret: null as { lien: string; mdp: string; gestion: string } | null,
+  /** Créateur, après une exclusion ou « Nouveau lien d'invitation » : la nouvelle invitation (affichée, jamais gardée en clair). */
+  nouvelleInvitation: null as { lien: string; mdp: string } | null,
   monPseudo: null as string | null,
   connexion: "connexion" as "connexion" | "ouvert" | "coupe",
   dansLeGroupe: false,
@@ -67,9 +73,15 @@ type Session = {
   client?: ClientSalon;
   conv?: Conversation;
   sGestion?: Uint8Array<ArrayBuffer>;
+  /** K_lien de l'invitation d'origine, gardé après une rotation pour la preuve de membre. */
+  lienOrigine?: Uint8Array<ArrayBuffer>;
   couleur?: number;
   /** Notre photo pour ce salon (pièce chiffrée, v3 §7.2), annoncée dans notre profil. */
   avatar?: { r: Uint8Array; piece: Uint8Array; palier: number } | null;
+  /** Preuve de membre (D41-26) : index et clé locale (non extractible), tirés de l'invitation d'origine. */
+  preuve?: { index: Uint8Array<ArrayBuffer>; cle: CryptoKey | null; sel: Uint8Array<ArrayBuffer> | null };
+  /** K_maître_s courante (réécrite à chaque rotation) : seulement pour la preuve de membre. */
+  kMaitre?: Uint8Array<ArrayBuffer>;
   stop: (() => void)[];
 };
 let s: Session | undefined;
@@ -118,6 +130,8 @@ export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<
   try {
     s.meta = await api.meta(net(), acces.k);
     s.sGestion = await gestionGardee(kLien);
+    const index = await indexMembre(kLien);
+    s.preuve = { index, cle: null, sel: await preuve.lireSel(index) };
     vue.finMs = Date.now() + s.meta.expiresInS * 1000;
     vue.etape = "motdepasse";
   } catch (e) {
@@ -151,12 +165,20 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
     x.cles?.free();
     x.cles = x.eng.clesSalon(x.kLien, kMdp);
     const d = deps(x.eng);
+    // Preuve de membre (D41-26) : même place, même pseudonyme, sans `rejoindre`.
+    if (x.preuve?.sel && (await reprendreParLaPreuve(x, mdp, x.preuve.sel))) return true;
+    x.kMaitre = x.eng.cleMaitre(x.kLien, kMdp) as Uint8Array<ArrayBuffer>;
     // Créateur revenu (exigence C-3 32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
     // l'ajoute ; il ne fonde pas de groupe (les membres en ligne l'ajoutent ; sinon, groupe orphelin).
     const o = { kLien: x.kLien, cles: x.cles, sGestion: x.sGestion };
     const entree = await ClientSalon.rejoindre(d, o);
     demarrer(x, ClientSalon.ouvrir(d, o, entree), entree);
     vue.etape = "explication";
+    // Preuve illisible avec le bon mot de passe (paquet abîmé) : effacée ; une neuve est préparée.
+    if (x.preuve) {
+      if (x.preuve.sel) await preuve.effacer(x.preuve.index);
+      void preparerPreuve(x, mdp);
+    }
     return true;
   } catch (e) {
     vue.erreur = erreurEntree(e);
@@ -207,7 +229,8 @@ export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCan
     const gestion = lienSalon(origin, "s", p.sGestion, import.meta.env.BASE_URL);
     if (o.garder)
       await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: Date.now() + r.expiresInS * 1000, maxOpens: 0 });
-    s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, stop: [] };
+    s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, kMaitre: p.kMaitre, preuve: { index: await indexMembre(p.kLien), cle: null, sel: null }, stop: [] };
+    void preparerPreuve(s, mdp);
     const d = deps(eng);
     const entree = await ClientSalon.rejoindre(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion });
     demarrer(s, ClientSalon.ouvrir(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, creerGroupe: true }, entree), entree);
@@ -334,12 +357,17 @@ function surEvenement(x: Session, ev: EvClient): void {
       vue.finMs = Date.now() + ev.secondes * 1000;
       vue.places = ev.places;
       break;
+    case "rotation":
+      conv.invitationChangee();
+      void preuveRotation(x, ev.kMaitre).finally(() => ev.kMaitre.fill(0));
+      break;
     case "renouvellement":
       for (const cle of conv.renouveler(ev.depart)) liberer(cle);
       fichiersOuverts.clear();
       break;
     case "nouvelleEntree":
       conv.moi = ev.siege;
+      ecrirePreuve(x);
       if (vue.monPseudo) envoyerProfil(x);
       break;
     case "fin":
@@ -351,6 +379,9 @@ function surEvenement(x: Session, ev: EvClient): void {
       // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
       // (sauf exclusion : tout disparaît, spec §39.13.1b).
       x.client = undefined;
+      // Place perdue pour de bon (sauf délogé : la place existe encore) : preuve effacée.
+      if (ev.raison !== "remplace" && x.preuve) void preuve.effacer(x.preuve.index);
+      x.kMaitre?.fill(0);
       x.kLien.fill(0);
       x.sGestion?.fill(0);
       if (ev.raison === "exclu") {
@@ -392,6 +423,57 @@ export function verifierPseudo(p: string): { code: "longueur" | "caracteres" | "
 }
 
 /** « Entrer dans le salon » : pseudonyme annoncé (chiffré) aux membres, puis la conversation. */
+/** Clé locale de la preuve (un Argon2id de plus, sel neuf) ; écrite quand le pseudonyme est accepté. */
+async function preparerPreuve(x: Session, mdp: string): Promise<void> {
+  if (!x.preuve) return;
+  const sel = crypto.getRandomValues(new Uint8Array(16));
+  const kArgon = await passwordKey(mdp.normalize("NFC"), sel, KDF_CREATE).catch(() => null);
+  if (!kArgon || s !== x) {
+    kArgon?.fill(0);
+    return;
+  }
+  const cle = await preuve.importerCle(await cleMembreLocal(kArgon, origineLien(x)));
+  kArgon.fill(0);
+  x.preuve.cle = cle;
+  x.preuve.sel = sel;
+  ecrirePreuve(x);
+}
+/** K_lien de l'invitation d'origine (l'index et K_m en viennent, même après une rotation). */
+function origineLien(x: Session): Uint8Array {
+  return x.lienOrigine ?? x.kLien;
+}
+function ecrirePreuve(x: Session): void {
+  const c = x.client;
+  if (!x.preuve?.cle || !x.preuve.sel || !c || !vue.monPseudo || !x.kMaitre) return;
+  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion }, vue.finMs);
+}
+/** Rotation reçue (ou faite) : la preuve garde la NOUVELLE K_maître_s (spec §39.13.3). */
+async function preuveRotation(x: Session, kMaitre: Uint8Array): Promise<void> {
+  x.kMaitre?.fill(0);
+  x.kMaitre = kMaitre.slice();
+  ecrirePreuve(x);
+}
+async function reprendreParLaPreuve(x: Session, mdp: string, sel: Uint8Array<ArrayBuffer>): Promise<boolean> {
+  const kArgon = await passwordKey(mdp.normalize("NFC"), sel, KDF_CREATE);
+  const cle = await preuve.importerCle(await cleMembreLocal(kArgon, x.kLien));
+  kArgon.fill(0);
+  const c = await preuve.ouvrir(x.preuve!.index, cle);
+  if (!c) return false;
+  x.preuve!.cle = cle;
+  x.kMaitre = c.kMaitre as Uint8Array<ArrayBuffer>;
+  x.couleur = c.couleur;
+  if (c.sGestion) x.sGestion = c.sGestion as Uint8Array<ArrayBuffer>;
+  const cles = x.eng.clesDepuisMaitre(c.kMaitre);
+  x.cles?.free();
+  x.cles = cles;
+  const client = ClientSalon.reprendre(deps(x.eng), { kLien: x.kLien, cles, jeton: c.jeton, siege: c.siege, sGestion: x.sGestion });
+  demarrer(x, client, { jeton: c.jeton, siege: c.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: Math.max(0, (vue.finMs - Date.now()) / 1000), maxMembers: vue.places, membersCanDestroy: false, budgetLeft: 0 });
+  vue.monPseudo = c.pseudo;
+  envoyerProfil(x);
+  vue.etape = "conversation";
+  return true;
+}
+
 export function entrer(pseudo: string): boolean {
   const x = s;
   const v = verifierPseudo(pseudo);
@@ -400,6 +482,7 @@ export function entrer(pseudo: string): boolean {
   if (x.conv) x.conv.pseudoRefuse = false;
   envoyerProfil(x);
   vue.etape = "conversation";
+  ecrirePreuve(x);
   return true;
 }
 
@@ -682,6 +765,30 @@ export async function detruire(signaler = false): Promise<boolean> {
 }
 
 /** « Quitter et signaler » (spec §39.5) : le serveur fait partir le membre et compte le signalement. */
+/**
+ * Créateur : exclut `siege` (ou change seulement l'invitation) ; la nouvelle invitation est
+ * affichée et, si le salon est dans l'historique, gardée comme l'ancienne (lien de gestion
+ * inchangé). Rend le code d'erreur, ou null.
+ */
+export async function exclureSiege(siege?: number): Promise<string | null> {
+  const x = s;
+  if (!x?.client || !x.sGestion) return "forbidden";
+  try {
+    const inv = await exclure(net(), x.eng, x.client, siege);
+    const lien = lienSalon(location.origin, "c", inv.kLien, import.meta.env.BASE_URL);
+    vue.nouvelleInvitation = { lien, mdp: inv.mdp };
+    if (await gestionGardee(x.kLien).catch(() => undefined)) {
+      const gestion = lienSalon(location.origin, "s", x.sGestion, import.meta.env.BASE_URL);
+      await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: vue.finMs, maxOpens: 0 });
+    }
+    x.lienOrigine ??= x.kLien;
+    x.kLien = inv.kLien;
+    return null;
+  } catch (e) {
+    return e instanceof api.SalonError ? e.code : "reseau";
+  }
+}
+
 export async function quitterEtSignaler(): Promise<boolean> {
   const x = s;
   if (!x?.client) return false;

@@ -19,6 +19,8 @@ export type Preparation = {
   kLien: Uint8Array<ArrayBuffer>;
   sGestion: Uint8Array<ArrayBuffer>;
   cles: ClesSalon;
+  /** K_maître_s (preuve de membre du créateur, D41-26) : SECRET, effacé par l'appelant. */
+  kMaitre: Uint8Array<ArrayBuffer>;
   /** En-têtes (base64url) : K_accès_s et J_gestion ; aucun secret de plus. */
   entetes: { acces: string; gestion: string };
   corps: Omit<CorpsCreation, "altcha" | "hp" | "shown_at">;
@@ -39,6 +41,7 @@ export async function preparer(eng: SalonEngine, motDePasse: string, o: { ttlHou
   try {
     kMdp = await passwordKeyForCreate(motDePasse, salt);
     const cles = eng.clesSalon(kLien, kMdp);
+    const kMaitre = eng.cleMaitre(kLien, kMdp) as Uint8Array<ArrayBuffer>;
     const acces = eng.cleAcces(kLien);
     const j = eng.jetonGestion(sGestion);
     const entetes = { acces: b64u(acces.k as Uint8Array<ArrayBuffer>), gestion: b64u(j as Uint8Array<ArrayBuffer>) };
@@ -49,6 +52,7 @@ export async function preparer(eng: SalonEngine, motDePasse: string, o: { ttlHou
       kLien,
       sGestion,
       cles,
+      kMaitre,
       entetes,
       corps: {
         ttl_hours: o.ttlHours,
@@ -73,5 +77,6 @@ export async function preparer(eng: SalonEngine, motDePasse: string, o: { ttlHou
 export function oublier(p: Preparation): void {
   p.kLien.fill(0);
   p.sGestion.fill(0);
+  p.kMaitre.fill(0);
   p.cles.free();
 }

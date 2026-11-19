@@ -76,7 +76,7 @@ describe("règles de sources", () => {
     expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, inUiDir)).toEqual([]));
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),
     ).toEqual([]));
   // Spec §33, §33.1 : exception écrite, l'historique local chiffré des envois. Seul
   // history/live.svelte.ts lit `indexedDB` (pour le passer à history/store.ts, qui chiffre) ;
@@ -85,7 +85,7 @@ describe("règles de sources", () => {
     const live = files.find((f) => f.rel === "history/live.svelte.ts");
     expect(live?.text).toMatch(/indexedDB/);
     expect(live?.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
-    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/"))).toEqual([]);
+    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/") && r !== "salon/preuve.ts")).toEqual([]);
   });
   // D42-22 : exception écrite, l'octroi d'ouverture gardé chiffré pour revenir jusqu'à
   // l'échéance (history/returns.ts, voisin de l'historique et même mécanisme : AES-GCM, clé non
@@ -181,7 +181,13 @@ describe("règles de sources", () => {
     expect(offenders(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|EventSource/, (r) => r.startsWith("salon/") && r !== "salon/api.ts" && r !== "salon/source.ts" && r !== "salon/source.verified.ts")).toEqual([]);
     expect(offenders(/\bnew\s+WebSocket\b/, (r) => r !== "salon/salon.svelte.ts")).toEqual([]);
     expect(offenders(/\bWebSocket\b/, (r) => !r.startsWith("salon/"))).toEqual([]);
-    expect(offenders(/localStorage|sessionStorage|indexedDB|document\.cookie/, (r) => r.startsWith("salon/") || r.startsWith("routes/salon/"))).toEqual([]);
+    expect(offenders(/localStorage|sessionStorage|indexedDB|document\.cookie/, (r) => (r.startsWith("salon/") && r !== "salon/preuve.ts") || r.startsWith("routes/salon/"))).toEqual([]);
+    // Preuve de membre (D41-26), exception écrite : base `shhdrop-salon` nommée et lue seulement
+    // par salon/preuve.ts, jamais localStorage, sessionStorage ni cookie ; aucun mot de passe.
+    const pv = files.find((f) => f.rel === "salon/preuve.ts")!;
+    expect(pv.text).toMatch(/indexedDB/);
+    expect(pv.text).not.toMatch(/localStorage|sessionStorage|document\.cookie|\bmdp\b|motDePasse/);
+    expect(offenders(/shhdrop-salon"/, (r) => r !== "salon/preuve.ts")).toEqual([]);
   });
   // Plan C-4, point 1 : la graine R en clair (seedBytes, seedFromBytes) ne sert qu'aux pièces du
   // salon, où elle voyage dans un message MLS ; jamais dans un partage (R y reste dans l'enveloppe).

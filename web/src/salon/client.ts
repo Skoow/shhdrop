@@ -77,6 +77,8 @@ export type EvClient =
   | { k: "nouvelleEntree"; siege: number }
   /** Salon renouvelé (0x10) : tout ce qui est de rang ≤ `depart` est effacé, le groupe est recréé. */
   | { k: "renouvellement"; depart: number }
+  /** Invitation changée : groupe refondé ; `kMaitre` (K_maître_s', SECRET : copie à effacer) pour la preuve de membre. */
+  | { k: "rotation"; kMaitre: Uint8Array }
   | { k: "fin"; raison: Fin };
 
 /** Enveloppe lue (types du moteur). */
@@ -147,6 +149,12 @@ export class ClientSalon {
   #orphelin: (() => void) | undefined;
   #perdues = new Set<number>();
   #fini = false;
+  /** Plus grand numéro `r` d'exclusion ou de rotation vu (0x09). */
+  #dernierR = 0;
+  /** Rotation de l'invitation préparée par le créateur, en attente de son envoi ou de son écho. */
+  #rotation: { r: number; cles: ClesSalon; cle: Uint8Array; kLien: Uint8Array; envoyee: boolean } | undefined;
+  /** Faux après une rotation reçue : l'ancien lien n'ouvre plus le salon (pas de nouvelle entrée par lui). */
+  #lienValide = true;
   #attenteNotee = false;
   #reglages: { depart: number; secondes: number; places: number } | undefined;
 
@@ -180,6 +188,22 @@ export class ClientSalon {
     if ((o.sGestion !== undefined) !== (entree.siege === 0)) throw new Error("reponse_invalide");
     return entree;
   }
+
+  /**
+   * Retour par la preuve de membre (D41-26) : même jeton, même siège, nouvelle identité. Aucun
+   * `rejoindre` (aucun essai de mot de passe compté) : l'accueil demande une reprise (`0x0A`,
+   * nouveau `nonce_arrivée`) ; l'état MLS naît au 0x0D qui suit. Jeton refusé (4004 : place
+   * libérée, serveur redémarré) : nouvelle entrée par `rejoindre`, comme d'habitude.
+   */
+  static reprendre(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; jeton: string; siege: number; sGestion?: Uint8Array }): ClientSalon {
+    const e: api.Entree = { jeton: o.jeton, siege: o.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: 0, maxMembers: 0, membersCanDestroy: false, budgetLeft: 0 };
+    const c = new ClientSalon(deps, o.cles, o.kLien, o.sGestion, e);
+    c.#repriseBase = true;
+    c.#connecter(DEPUIS_REPRISE);
+    return c;
+  }
+  /** Reprise : le 0x10 de l'accueil donne l'état courant (aucun renouvellement à appliquer). */
+  #repriseBase = false;
 
   /** État MLS et WebSocket d'une entrée déjà faite (`rejoindre`). */
   static ouvrir(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; sGestion?: Uint8Array; creerGroupe?: boolean }, entree: api.Entree): ClientSalon {
@@ -231,6 +255,10 @@ export class ClientSalon {
     } catch {
       return null;
     }
+  }
+  /** `nonce_arrivée` courant d'un siège (exclusion : le serveur refuse un siège réattribué). */
+  nonceDe(siege: number): Uint8Array | undefined {
+    return this.#annonces.get(siege)?.slice();
   }
   enLigne(siege: number): boolean {
     return this.#presence.get(siege) === true;
@@ -322,6 +350,8 @@ export class ClientSalon {
 
   /** Jeton refusé (4004 : place libérée, redémarrage du serveur) : nouvelle entrée par `rejoindre`. */
   async #nouvelleEntree(): Promise<void> {
+    // Après une rotation reçue, l'ancien lien n'ouvre plus le salon : seule la nouvelle invitation.
+    if (!this.#lienValide) return this.#terminer("introuvable");
     try {
       const e = await ClientSalon.#rejoindre(this.#deps, this.#kLien, this.#cles, this.#sGestion);
       if (this.#fini) return;
@@ -380,8 +410,10 @@ export class ClientSalon {
           this.#kps.delete(r.siege);
         }
         this.#salon?.marquerExclu(r.siege, r.r);
+        this.#dernierR = Math.max(this.#dernierR, r.r);
         this.#emettre({ k: "exclusion", siege: r.siege, seq: r.seq, r: r.r });
         this.#retirerPartis();
+        this.#essayerRotation();
         return;
       case 0x07:
         this.#presence.set(r.siege, r.enLigne);
@@ -415,7 +447,8 @@ export class ClientSalon {
         this.#reglages = { depart: r.depart, secondes: r.secondes, places: r.places };
         // Renouvellement (spec 2026-11-13, exigence C-3 22) : seulement s'il est postérieur à notre
         // entrée (un 0x10 d'accueil peut redire un renouvellement d'avant notre jeton).
-        const nouveau = r.depart > this.#depart;
+        const nouveau = r.depart > this.#depart && !this.#repriseBase;
+        if (this.#repriseBase) this.#depart = Math.max(this.#depart, r.depart);
         if (nouveau) this.#depart = r.depart;
         this.#emettre({ k: "reglages", depart: r.depart, secondes: r.secondes, places: r.places });
         if (nouveau) this.#recreerLeGroupe(r.depart);
@@ -447,6 +480,7 @@ export class ClientSalon {
 
   #finRattrapage(): void {
     this.#rattrape = true;
+    this.#repriseBase = false;
     // Trame en vol perdue avec l'ancien WebSocket : renvoyée telle quelle (un doublon est sans effet).
     this.#pousser();
     this.#ajouterEnAttente();
@@ -495,7 +529,14 @@ export class ClientSalon {
       case "message": {
         // Rotation de l'invitation : C-5 (le secret n'est jamais gardé ici).
         if (ev.enveloppe.message.k === "rotation") {
-          ev.enveloppe.message.cle.fill(0);
+          // Le moteur ne l'a rendue que du créateur, à l'époque courante, pour le `r` du dernier
+          // 0x09, sans siège exclu dans l'arbre (exigence 24 (f)) : nouvelles clés, groupe refondé.
+          const cle = ev.enveloppe.message.cle;
+          try {
+            this.#adopter(this.#deps.eng.clesDepuisMaitre(cle), cle, null);
+          } finally {
+            cle.fill(0);
+          }
           return;
         }
         this.#emettre({ k: "message", seq, siege: ev.deSiege, recuMs, epoque: ev.epoque, enveloppe: ev.enveloppe });
@@ -547,9 +588,24 @@ export class ClientSalon {
         this.#vider();
         return;
       }
-      case "rotationAcceptee":
+      case "rotationAcceptee": {
+        // Créateur : les membres ont accepté sa rotation ; il refonde à son tour (exigence 24 (f)).
+        const rot = this.#rotation;
+        if (!rot || rot.r !== ev.n) return;
+        this.#rotation = undefined;
+        this.#adopter(rot.cles, rot.cle, rot.kLien);
+        rot.cle.fill(0);
+        return;
+      }
       case "rotationARenvoyer":
-        return; // C-5
+        // Un Commit, un départ ou une reprise est passé entre l'envoi et l'écho : la même clé,
+        // le même numéro, une fois les sièges à retirer retirés (exigence 24 (e)).
+        if (this.#rotation?.r === ev.n) {
+          this.#rotation.envoyee = false;
+          this.#retirerPartis();
+          this.#essayerRotation();
+        }
+        return;
       case "ignore":
         // Trame des règles 1 à 3 sans message lisible pour nous (Commit, écho, rejeu) : lue.
         if (regle !== 0 && siege !== this.siege) this.#envoyerWS(lu(seq));
@@ -671,6 +727,76 @@ export class ClientSalon {
     this.#vider();
   }
 
+  // --- Exclusion et rotation de l'invitation (exigences 24, 25 ; spec §39.13) ---------------------
+
+  /** Plus grand `r` vu : le prochain `POST exclure` prend un numéro plus grand. */
+  get dernierR(): number {
+    return this.#dernierR;
+  }
+
+  /**
+   * Créateur, juste AVANT `POST exclure` : la nouvelle invitation (clés tirées de K_lien' et
+   * K_mdp', K_maître_s' = `cle`, K_lien'). La clé part dans un message `rotation` seulement après
+   * le 0x09 de ce numéro et le retrait de l'exclu (moteur : époque courante, aucun siège à
+   * retirer), jamais le lien ni le mot de passe (exigence 25). `annuler` si la requête échoue.
+   */
+  preparerRotation(r: number, cles: ClesSalon, cle: Uint8Array, kLien: Uint8Array): void {
+    this.annulerRotation();
+    this.#rotation = { r, cles, cle: cle.slice(), kLien: kLien.slice(), envoyee: false };
+  }
+  annulerRotation(): void {
+    const rot = this.#rotation;
+    if (!rot) return;
+    this.#rotation = undefined;
+    rot.cle.fill(0);
+    rot.kLien.fill(0);
+    rot.cles.free();
+  }
+
+  #essayerRotation(): void {
+    const rot = this.#rotation;
+    const s = this.#salon;
+    if (!rot || rot.envoyee || !s || !this.dansLeGroupe() || !this.#rattrape || this.#dernierR < rot.r) return;
+    if (s.aRetirer().length > 0) return this.#retirerPartis();
+    let t: Uint8Array;
+    try {
+      t = s.envoyer(this.#cles, { heureMs: this.#deps.horloge.maintenant(), regle: 0, message: { k: "rotation", n: rot.r, cle: rot.cle } }).trame;
+    } catch {
+      return; // commit_en_cours, retrait_en_attente, rotation_refusee : à l'événement suivant
+    }
+    rot.envoyee = true;
+    this.#mettre(t, { volatile: false });
+  }
+
+  /**
+   * Nouvelles clés du salon (rotation reçue, ou écho accepté chez le créateur) : groupe refondé
+   * sous elles (même identité, mêmes codes), trames suivantes sous la nouvelle K_trame. Nos
+   * messages pas encore acceptés repartent sous le nouveau groupe. `kLien` : celui de la
+   * nouvelle invitation (créateur) ; null chez un membre, qui ne la connaît pas.
+   */
+  #adopter(cles: ClesSalon, kMaitre: Uint8Array, kLien: Uint8Array | null): void {
+    const s = this.#salon;
+    if (!s) return cles.free();
+    this.#arreterVol();
+    this.#reprendreLaFile();
+    this.#kps.clear();
+    this.#regles.clear();
+    this.#salon = s.refonder(cles);
+    this.#cles.free();
+    this.#cles = cles;
+    if (kLien) {
+      this.#kLien.fill(0);
+      this.#kLien = kLien.slice();
+      this.#lienValide = true;
+    } else this.#lienValide = false;
+    this.#emettre({ k: "rotation", kMaitre: kMaitre.slice() });
+    this.#emettre({ k: "groupe", dansLeGroupe: this.dansLeGroupe() });
+    this.#emettre({ k: "membres", ajoutes: [], retires: [], createurRevenu: false, membres: this.membres() });
+    if (!this.dansLeGroupe()) this.#publierKp(true);
+    else this.#ajouterEnAttente();
+    this.#pousser();
+  }
+
   /** Reprise (nouvelle identité au même siège, aucun rattrapage) : retard, attente pleine. */
   #reprendre(): void {
     if (this.#fini) return;
@@ -776,6 +902,7 @@ export class ClientSalon {
 
   /** Chiffre ce que la boîte peut : dans l'ordre, et s'arrête au premier refus du moteur. */
   #vider(): void {
+    this.#essayerRotation();
     const s = this.#salon;
     while (s && this.#boite.length > 0 && this.dansLeGroupe() && this.#rattrape) {
       const m = this.#boite[0]!;
@@ -938,6 +1065,7 @@ export class ClientSalon {
     this.#reconnexion?.();
     this.#orphelin?.();
     this.#accusesTimer?.();
+    this.annulerRotation();
     this.#arreterVol();
     const ws = this.#ws;
     this.#ws = undefined;

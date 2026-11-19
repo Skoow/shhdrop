@@ -274,6 +274,28 @@ export function seedFromBytes(r: Uint8Array): Promise<Seed> {
   return run((e) => e.wasm.seedFromBytes(e.provider, r));
 }
 
+/**
+ * Preuve de membre du salon (spec §39.13.3, D41-26 ; plan C-5) : clé locale K_m =
+ * HKDF(Argon2id(mot de passe, sel_m) ‖ K_lien, « shhdrop/v2/salon/membre-local »), 32 octets, et
+ * index de l'entrée = HKDF(K_lien, « shhdrop/v2/salon/membre-index »), 16 octets (le stockage ne
+ * montre ni le salon ni son lien). HKDF du moteur (RustCrypto) ; copies que l'appelant efface.
+ */
+export function cleMembreLocal(kArgon: Uint8Array, kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => {
+    const ikm = new Uint8Array(kArgon.length + kLien.length);
+    ikm.set(kArgon, 0);
+    ikm.set(kLien, kArgon.length);
+    try {
+      return e.wasm.hkdf(ikm, "shhdrop/v2/salon/membre-local", 32) as Uint8Array<ArrayBuffer>;
+    } finally {
+      ikm.fill(0);
+    }
+  });
+}
+export function indexMembre(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.hkdf(kLien, "shhdrop/v2/salon/membre-index", 16) as Uint8Array<ArrayBuffer>);
+}
+
 /** K_contenu et engagement d'une R neuve, une seule fois par R (cle_deja_utilisee ensuite). */
 export function contentKeys(r: Seed): Promise<ContentKeys> {
   return run((e) => e.wasm.contentKeys(r));
