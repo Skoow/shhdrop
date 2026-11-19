@@ -24,6 +24,7 @@ import { lireFragment } from "./liens";
 import { exclure } from "./exclusion";
 import * as preuve from "./preuve";
 import { finSilence } from "./son";
+import { createZip, zipName, ZIP_BLOB_MAX_SMALL } from "../zip/store-zip";
 import { cleMembreLocal, indexMembre } from "../engine/index";
 import { KDF_CREATE } from "../engine/pure";
 
@@ -781,6 +782,55 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
   } catch (e) {
     pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
   }
+}
+
+/**
+ * « Télécharger (N) » (v3 §14.3) : une seule archive .zip faite sur l'appareil (module zip
+ * existant : stockée, sans compression ni métadonnée, noms nettoyés par le moteur puis par
+ * zipName). 200 Mio au plus (l'archive est assemblée en mémoire). Chaque fichier envoie son
+ * accusé « Téléchargé ». Rend null, ou le code d'erreur.
+ */
+export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "lecture" | "indisponible" | null> {
+  const x = s;
+  if (!x?.client || bs.length === 0) return "lecture";
+  const choisies = bs.filter((b) => b.piece && !b.retire && (b.piece.ref || originaux.has(b.cle)));
+  if (choisies.reduce((n, b) => n + b.piece!.taille, 0) > ZIP_BLOB_MAX_SMALL) return "trop_gros";
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  const z = createZip({
+    write: async (c) => void parts.push(c.slice()),
+    close: async () => undefined,
+    abort: async () => void (parts.length = 0),
+  });
+  const pris = new Set<string>();
+  try {
+    for (const b of choisies) {
+      const p = b.piece!;
+      const blob = originaux.get(b.cle) ?? (await lirePiece(net(), x.client.jeton, p.ref!));
+      const octets = new Uint8Array(await blob.arrayBuffer());
+      let nom = "fichier";
+      try {
+        nom = x.eng.nettoyerNom(p.nom) || nom;
+      } catch {
+        // nom refusé par le moteur : nom neutre
+      }
+      await z.add(zipName(nom, pris), octets.length, (async function* () {
+        yield octets;
+      })());
+    }
+    await z.finish();
+  } catch (e) {
+    await z.abort().catch(() => undefined);
+    return e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+  }
+  const url = URL.createObjectURL(new Blob(parts, { type: "application/zip" }));
+  parts.length = 0;
+  clickDownload(url, "salon.zip");
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+  for (const b of choisies) {
+    fichiersOuverts.add(b.cle);
+    accuserPiece(b, "piece_telechargee");
+  }
+  return null;
 }
 
 /** Notre photo pour ce salon (ré-encodée 256 × 256 par ui/avatar.ts) : envoyée chiffrée, puis annoncée. */

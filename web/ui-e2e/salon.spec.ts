@@ -213,6 +213,17 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await bouton(pageB, "Fichiers").click();
     await expect(pageB.getByRole("dialog").getByText(nomDoc, { exact: true })).toBeVisible();
     await capture(pageB, "salon-fichiers");
+    // Sélection multiple (v3 §14.3) : une archive .zip faite sur l'appareil, sans compression.
+    const dlg = pageB.getByRole("dialog");
+    await dlg.getByRole("button", { name: "Tout sélectionner", exact: true }).click();
+    const zipDl = pageB.waitForEvent("download");
+    await dlg.getByRole("button", { name: "Télécharger (3)", exact: true }).click();
+    const archive = await zipDl;
+    expect(archive.suggestedFilename()).toBe("salon.zip");
+    const octetsZip = readFileSync((await archive.path())!);
+    expect([...octetsZip.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(octetsZip.includes(Buffer.from(contenuDoc))).toBe(true); // stocké : octets tels quels
+    expect(octetsZip.includes(Buffer.from(nomDoc))).toBe(true);
     await pageB.keyboard.press("Escape");
 
     // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
