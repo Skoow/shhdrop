@@ -18,6 +18,7 @@ test-go:
 test-web:
 	cd web && npm test
 	cd web && npm run build && node scripts/check-dist.mjs
+	cd web && SHH_SITE_COMPTES=1 npm run build && node scripts/check-dist.mjs --comptes
 	cd web && npm run build:demo && node scripts/check-dist.mjs --demo
 
 test-e2e:

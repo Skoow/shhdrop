@@ -77,10 +77,10 @@ services:
       # où Caddy écoute. /32 : le serveur ne croit X-Shh-Client-IP de personne d'autre.
       SHH_TRUSTED_PROXY: 172.30.53.1/32
       SHH_STORAGE_MAX: ${SHH_STORAGE_MAX:-214748364800}
-      # Salon (spec §39, plan C-2) : DÉSACTIVÉ, sans variable pour l'ouvrir, tant que le juriste
-      # n'a pas validé l'hébergement des conversations (Q-SAL8, §39.7) : aucune route
-      # /api/salons/*. Pour l'activer plus tard : "1", en changeant ce fichier (relu, commité).
-      SHH_SALONS: "0"
+      # Salon (spec §39, plan C-2) : ACTIVÉ (décision du propriétaire du 19 novembre, avec le
+      # compte, qui l'exige), sans l'avis du juriste sur l'hébergement des conversations
+      # (Q-SAL8, §39.7), risque écrit dans docs/ouverture-comptes.md. Le couper : "0" ici.
+      SHH_SALONS: "1"
       # Origine publique du site, comparée à l'en-tête Origin du WebSocket et copiée dans la CSP.
       # Vérifiée même salon coupé : une valeur refusée (majuscules dans SHH_DOMAIN, par exemple)
       # empêche le serveur de démarrer ET « shhdrop admin » de tourner (deploy/README.md §10).
@@ -96,11 +96,12 @@ services:
       SHH_SEGMENTS_PER_MIN: ${SHH_SEGMENTS_PER_MIN:-}
       # Trames non volatiles rangées au plus par salon (100 000 ≈ 417 Mo de disque).
       SHH_SALON_FRAMES_MAX: ${SHH_SALON_FRAMES_MAX:-}
-      # Compte par e-mail (conception du compte, plan lot 8) : DÉSACTIVÉ, sans variable pour
-      # l'ouvrir, jusqu'à la décision D8 (avis du juriste, test bloquant du lot 16). Pour
-      # l'activer : "1" ici (fichier relu, commité), avec SHH_SALONS: "1" ; deploy.sh démarre
-      # alors le relais SMTP (profil « comptes ») et vérifie les secrets (README §12).
-      SHH_COMPTES: "0"
+      # Compte par e-mail (conception du compte, plan lot 8) : ACTIVÉ (décision D8 du
+      # propriétaire, 19 novembre, sans l'avis du juriste : risque LCEN écrit dans
+      # docs/ouverture-comptes.md). Exige SHH_SALONS: "1" ; deploy.sh démarre le relais SMTP
+      # (profil « comptes ») et refuse d'installer sans les secrets du README §12.2.
+      # Le couper : "0" ici (fichier relu, commité).
+      SHH_COMPTES: "1"
       SHH_COMPTES_MAX: ${SHH_COMPTES_MAX:-}
       SHH_COMPTES_CLE_FILE: /run/secrets/shh_comptes_cle
       # Nom du fournisseur : le serveur le résout par son /etc/hosts (extra_hosts, plus bas)

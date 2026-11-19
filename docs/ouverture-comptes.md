@@ -6,7 +6,7 @@
 - liste des appareils, export, suppression ;
 - pseudo unique, deux coffres chiffrés sur l'appareil.
 
-Il est **désactivé en production** : `SHH_COMPTES: "0"` côté serveur, `SHH_SITE_COMPTES` non posé côté site. Dans la démo GitHub Pages, il est **essayable**, avec un faux serveur dans l'onglet ; aucun e-mail n'y est envoyé.
+Il est **activé en production** (décision D8 du 19 novembre) : `SHH_COMPTES: "1"` dans `deploy/compose.yaml`, site de l'image construit avec `SHH_SITE_COMPTES=1`. Il ne peut pas encore fonctionner en ligne : `deploy.sh` refuse d'installer sans les secrets et le fournisseur d'e-mails (point 4). Dans la démo GitHub Pages, il est **essayable**, avec un faux serveur dans l'onglet ; aucun e-mail n'y est envoyé.
 
 Ce document liste ce qui manque pour l'ouvrir au public. La procédure technique elle-même est dans `deploy/README.md` §12.
 
@@ -14,14 +14,14 @@ Ce document liste ce qui manque pour l'ouvrir au public. La procédure technique
 
 | N° | Décision | État | Ce qu'il faut faire |
 |---|---|---|---|
-| D8 | Ouverture au public | **ouverte, bloquante** | décider après l'avis du juriste (point 2) |
+| D8 | Ouverture au public | **prise le 19 novembre : ouvert** | `SHH_COMPTES: "1"` et `SHH_SALONS: "1"` dans `deploy/compose.yaml`, site de l'image construit avec le compte. **Risque assumé : sans l'avis du juriste (point 2).** |
 | D1 | Fournisseur d'envoi d'e-mails | ouverte | choisir un fournisseur dans l'UE, en SMTP standard (recommandé : Scaleway Transactional Email) |
 | D4 | Un signalement remet l'ancienneté à zéro | ouverte | recommandé : oui, avec « Rendre l'ancienneté » au tableau de bord |
 | D7 | « Rester connecté » | ouverte | recommandé : proposé, décoché par défaut ; session de 30 jours sans usage, 90 jours au plus (c'est ce qui est codé) |
 
 Source : `docs/superpowers/specs/2026-11-14-compte-email-design.md`, §20 et §21.19.
 
-## 2. Avis du juriste (bloquant avant D8)
+## 2. Avis du juriste (recommandé ; D8 prise sans lui, risque assumé)
 
 À lui soumettre, avec la conception du compte (§16, §21.18) :
 - **LCEN art. 6 et décret 2021-1362** : obligation possible de conserver 1 an les données de création de compte (adresse, pseudonyme) et de connexion (adresse IP). Elle contredirait « adresse jamais gardée » et « aucune adresse IP sur disque » (gravité élevée, R17).

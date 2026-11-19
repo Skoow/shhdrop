@@ -16,7 +16,9 @@ out="${1:-$web/SHA256SUMS.repro}"
 # Même identifiant de version dans les deux copies (elles n'ont pas de dossier .git).
 SHH_BUILD_ID="${SHH_BUILD_ID:-$(git -C "$web" rev-parse --short=7 HEAD)}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$web" log -1 --format=%ct)}"
-export SHH_BUILD_ID SOURCE_DATE_EPOCH
+# Site de production avec le compte (décision D8, 19 novembre), comme deploy/Dockerfile.
+SHH_SITE_COMPTES=1
+export SHH_BUILD_ID SOURCE_DATE_EPOCH SHH_SITE_COMPTES
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

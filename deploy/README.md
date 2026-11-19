@@ -256,7 +256,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 
 ## 10. Salon (désactivé)
 
-Le salon (spécification §39 et `docs/superpowers/specs/2026-11-11-salon-v3-design.md`) est livré **désactivé** : `compose.yaml` pose `SHH_SALONS: "0"`, sans variable dans `.env` pour l'ouvrir. Il reste fermé au public tant que le juriste n'a pas validé l'hébergement des conversations chiffrées (Q-SAL8, §39.7). Avec `SHH_SALONS=0`, aucune route `/api/salons/*` n'existe (même réponse 404 qu'une route inconnue).
+Le salon (spécification §39 et `docs/superpowers/specs/2026-11-11-salon-v3-design.md`) est **activé** depuis la décision du propriétaire du 19 novembre (le compte, ouvert le même jour, l'exige) : `compose.yaml` pose `SHH_SALONS: "1"`. **Risque assumé par le propriétaire** : l'avis du juriste sur l'hébergement des conversations chiffrées (Q-SAL8, §39.7) n'a pas été demandé (`docs/ouverture-comptes.md`). Le couper : `SHH_SALONS: "0"` (et `SHH_COMPTES: "0"`, qui l'exige). Avec `SHH_SALONS=0`, aucune route `/api/salons/*` n'existe (même réponse 404 qu'une route inconnue).
 
 Variables :
 
@@ -307,7 +307,7 @@ Aucune limite de capacité n'est fixée en dur (décision du propriétaire du 13
 
 ## 12. Compte par e-mail (désactivé) : sortie SMTP, secrets, sauvegarde
 
-Le compte (conception `docs/superpowers/specs/2026-11-14-compte-email-design.md`) est livré **désactivé** : `compose.yaml` pose `SHH_COMPTES: "0"`, sans variable dans `.env` pour l'ouvrir. Avec `0`, aucune route `/api/compte/*`, aucun fichier lu dans `secrets/`, aucun relais SMTP, aucune connexion sortante. **Conditions bloquantes d'activation** : décision D8 du propriétaire après l'avis du juriste (conservation des données de création de compte, LCEN et décret 2021-1362 ; conception §16, §21.18), test bloquant « le serveur ne voit rien » étendu au compte (plan du compte, lot 16), salon activé (`SHH_SALONS: "1"`), puis tout ce qui suit.
+Le compte (conception `docs/superpowers/specs/2026-11-14-compte-email-design.md`) est **activé** (décision D8 du propriétaire, 19 novembre) : `compose.yaml` pose `SHH_COMPTES: "1"` et le site de l'image est construit avec le compte (`deploy/Dockerfile`, `SHH_SITE_COMPTES=1`, `check-dist.mjs --comptes`). **Risque assumé par le propriétaire** : l'avis du juriste sur la conservation des données de création de compte (LCEN et décret 2021-1362 ; conception §16, §21.18) n'a pas été demandé. `deploy.sh` refuse d'installer tant que les secrets (§12.2) et la configuration SMTP (§12.3) manquent : **ce qui reste à faire avant la mise en ligne est la liste du §12.3** (fournisseur, DNS, secrets, sauvegarde le même jour). Avec `SHH_COMPTES: "0"` : aucune route `/api/compte/*`, aucun fichier lu dans `secrets/`, aucun relais SMTP, aucune connexion sortante.
 
 ### 12.1 Sortie SMTP : le seul relais
 

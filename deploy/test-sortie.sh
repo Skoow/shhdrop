@@ -4,7 +4,7 @@
 # ne joint que SHH_SMTP_HOST:465.
 #
 # 1. Statique (docker compose config, sans démon) : sur la vraie compose.yaml,
-#    - SHH_COMPTES vaut "0" ; le relais et le réseau « sortie » n'existent qu'avec le profil
+#    - SHH_COMPTES vaut "1" (décision D8 du 19 novembre) ; le relais et le réseau « sortie » n'existent qu'avec le profil
 #      « comptes » ; aucun service ne publie de port ;
 #    - le serveur n'est que sur le réseau « interne » (internal: true) ; le relais sur
 #      « interne » et « sortie », écoute 172.30.53.3:465, cible SHH_SMTP_HOST:465 ; le nom du
@@ -82,7 +82,7 @@ cfg comptes >"$work/avec.json" || die "docker compose config (profil comptes) é
 j() { jq -e "$1" "$2" >/dev/null; }
 S=$work/sans.json A=$work/avec.json
 
-check "SHH_COMPTES vaut \"0\" dans compose.yaml" j '.services.shhdrop.environment.SHH_COMPTES == "0"' "$A"
+check "SHH_COMPTES vaut \"1\" dans compose.yaml (décision D8 du 19 novembre)" j '.services.shhdrop.environment.SHH_COMPTES == "1"' "$A"
 check "sans profil : ni relais ni réseau « sortie »" j '(.services | keys) == ["caddy","shhdrop"] and (.networks | keys) == ["interne"]' "$S"
 check "profil « comptes » : relais et réseau « sortie »" j '(.services | keys) == ["caddy","relais-smtp","shhdrop"] and (.networks | keys) == ["interne","sortie"]' "$A"
 check "aucun port publié" j '[.services[] | .ports // [] | length] | add == 0' "$A"

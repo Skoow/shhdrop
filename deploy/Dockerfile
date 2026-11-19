@@ -64,7 +64,9 @@ COPY --from=engine /out/pkg ./src/engine/pkg
 # check-dist.mjs : le build de production est conforme (variantes .br et .gz exactes,
 # aucun code de démo, aucune adresse http(s):// externe dans index.html, le CSS et
 # pdf-frame.html). Un écart arrête le build de l'image.
-RUN SHH_ENGINE_PREBUILT=1 npm run build && node scripts/check-dist.mjs
+# Compte par e-mail construit (décision D8 du propriétaire, 19 novembre) : --comptes exige
+# alors le module de compte. Même valeur que web/scripts/repro.sh (images comparées en CI).
+RUN SHH_SITE_COMPTES=1 SHH_ENGINE_PREBUILT=1 npm run build && node scripts/check-dist.mjs --comptes
 
 # Le site seul, pour la CI (job repro-docker), qui compare chaque fichier aux empreintes de ses
 # propres builds (même SHH_BUILD_ID) ; n'entre pas dans l'image :
