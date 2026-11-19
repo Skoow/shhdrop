@@ -583,6 +583,8 @@ fn env_de(v: &Value) -> Enveloppe {
         "ecrit" => Message::Ecrit,
         "recu" => Message::Recu { ids: ids_de(m) },
         "vu" => Message::Vu { ids: ids_de(m) },
+        "piece_ouverte" => Message::PieceOuverte { ids: ids_de(m) },
+        "piece_telechargee" => Message::PieceTelechargee { ids: ids_de(m) },
         "regle" => Message::Regle {
             regle: regle_de(m["regle"].as_u64().unwrap()),
         },
@@ -637,6 +639,8 @@ fn env_vers(e: &Enveloppe) -> Value {
         Message::Ecrit => json!({ "k": "ecrit" }),
         Message::Recu { ids: i } => json!({ "k": "recu", "ids": ids(i) }),
         Message::Vu { ids: i } => json!({ "k": "vu", "ids": ids(i) }),
+        Message::PieceOuverte { ids: i } => json!({ "k": "piece_ouverte", "ids": ids(i) }),
+        Message::PieceTelechargee { ids: i } => json!({ "k": "piece_telechargee", "ids": ids(i) }),
         Message::Regle { regle } => json!({ "k": "regle", "regle": *regle as u8 }),
         Message::Profil {
             pseudo,
@@ -801,6 +805,27 @@ fn messages() -> Value {
         ("recu_1_id", 0, json!({ "k": "recu", "ids": ids(1) })),
         ("vu_50_ids", 0, json!({ "k": "vu", "ids": ids(50) })),
         ("vu_51_ids", 0, json!({ "k": "vu", "ids": ids(51) })),
+        // Accusés des pièces (salon v3 §14.2, 19 novembre) : mêmes bornes que « vu ».
+        (
+            "piece_ouverte_1_id",
+            0,
+            json!({ "k": "piece_ouverte", "ids": ids(1) }),
+        ),
+        (
+            "piece_telechargee_50_ids",
+            0,
+            json!({ "k": "piece_telechargee", "ids": ids(50) }),
+        ),
+        (
+            "piece_telechargee_51_ids",
+            0,
+            json!({ "k": "piece_telechargee", "ids": ids(51) }),
+        ),
+        (
+            "piece_ouverte_0_id",
+            0,
+            json!({ "k": "piece_ouverte", "ids": Vec::<String>::new() }),
+        ),
         (
             "recu_0_id",
             0,

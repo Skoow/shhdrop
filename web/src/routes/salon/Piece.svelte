@@ -36,10 +36,10 @@
 
 <div class="piece">
   {#if url && p.sorte === "image"}
-    <img src={url} alt={nom} class="img" />
+    <img src={url} alt={nom} class="img" onload={() => S.estVu(b) && S.accuserPiece(b, "piece_ouverte")} />
   {:else if url && p.sorte === "vocal"}
     <div class="vocal">
-      <audio bind:this={audio} src={url} controls preload="metadata"></audio>
+      <audio bind:this={audio} src={url} controls preload="metadata" onplay={() => S.accuserPiece(b, "piece_ouverte")}></audio>
       <div class="vit" role="group" aria-label={t("salon.piece.vitesse")}>
         {#each vitesses as v (v)}
           <button type="button" aria-pressed={vitesse === v} onclick={() => (vitesse = v)}>{v}×</button>
@@ -48,12 +48,19 @@
     </div>
   {:else if url && p.sorte === "video"}
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video src={url} controls preload="metadata" class="img"></video>
+    <video src={url} controls preload="metadata" class="img" onplay={() => S.accuserPiece(b, "piece_ouverte")}></video>
   {/if}
   <p class="fic">
     <bdi class="nom">{nom}</bdi>
     <span class="taille">{formatBytes(p.taille, lang)}{#if p.dureeMs} · {formatDuration(p.dureeMs / 1000, lang, { precise: true })}{/if}</span>
   </p>
+  {#if b.moi && (b.ouverts.length > 0 || b.telecharges.length > 0)}
+    <!-- Accusés de nos pièces (v3 §14.2) : « Ouvert », « Téléchargé » (dans un groupe : par N / M). -->
+    <p class="accuses">
+      {#if b.ouverts.length > 0}<span>{b.attendus.length > 1 ? t("salon.piece.ouvert.par", { n: b.ouverts.length, total: b.attendus.length }) : t("salon.piece.ouvert")}</span>{/if}
+      {#if b.telecharges.length > 0}<span>{b.attendus.length > 1 ? t("salon.piece.telecharge.par", { n: b.telecharges.length, total: b.attendus.length }) : t("salon.piece.telecharge")}</span>{/if}
+    </p>
+  {/if}
   {#if p.progres !== null && b.moi}
     <progress max="1" value={p.progres} aria-label={t("salon.piece.envoi", { nom })}></progress>
   {/if}
@@ -69,6 +76,13 @@
 </div>
 
 <style>
+  .accuses {
+    margin: 0;
+    display: flex;
+    gap: var(--sp-2);
+    color: var(--text-2);
+    font-size: 0.8125rem;
+  }
   .piece {
     display: grid;
     gap: var(--sp-1);

@@ -81,6 +81,8 @@ function envDe(v: Cas): Enveloppe {
     ecrit: () => ({ k: "ecrit" }),
     recu: () => ({ k: "recu", ids: m.ids.map(unhex) }),
     vu: () => ({ k: "vu", ids: m.ids.map(unhex) }),
+    piece_ouverte: () => ({ k: "piece_ouverte", ids: m.ids.map(unhex) }),
+    piece_telechargee: () => ({ k: "piece_telechargee", ids: m.ids.map(unhex) }),
     regle: () => ({ k: "regle", regle: m.regle }),
     profil: () => ({ k: "profil", pseudo: m.pseudo, couleur: m.couleur, avatar: m.avatar && { r: unhex(m.avatar.r), piece: unhex(m.avatar.piece), palier: m.avatar.palier } }),
     depart: () => ({ k: "depart" }),

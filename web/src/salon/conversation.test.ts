@@ -68,6 +68,21 @@ describe("conversation", () => {
     expect(c.coche(b)).toBe("vu");
     expect(b.vus).toEqual([2, 1]);
   });
+  it("accusés de pièce (v3 §14.2) : ouvert et téléchargé, de nos pièces, d'un lecteur attendu ; valent « vu »", () => {
+    const c = conv(0);
+    c.pieceEnvoi(-1, { nom: "a.pdf", mime: "application/pdf", taille: 9, sorte: "fichier", dureeMs: null });
+    c.rattacher(-1, 1);
+    c.chiffre(1, id(7));
+    const b = bulles(c)[0]!;
+    c.message(20, 1, 3, env(30, { k: "piece_ouverte", ids: [id(7)] }));
+    c.message(21, 2, 3, env(31, { k: "piece_telechargee", ids: [id(7)] }));
+    c.message(22, 5, 3, env(32, { k: "piece_telechargee", ids: [id(7)] })); // siège non attendu : ignoré
+    expect([b.ouverts, b.telecharges, b.vus]).toEqual([[1], [2], [1, 2]]);
+    // Un texte (pas une pièce) : ignoré.
+    c.message(23, 1, 3, env(2, { k: "texte", x: "x" }));
+    c.message(24, 0, 3, env(33, { k: "piece_ouverte", ids: [id(2)] }));
+    expect(bulles(c)[1]!.ouverts).toEqual([]);
+  });
   it("réponse : citation par identifiant ; efface (0x0E) retire la bulle", () => {
     const c = conv();
     c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));

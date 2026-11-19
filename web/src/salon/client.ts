@@ -141,6 +141,8 @@ export class ClientSalon {
   #local = 0;
   #recus = new Set<string>();
   #vus = new Set<string>();
+  #ouverts = new Set<string>();
+  #telecharges = new Set<string>();
   #accusesTimer: (() => void) | undefined;
   #envoyees = 0;
   #commitMs: number;
@@ -850,9 +852,9 @@ export class ClientSalon {
     this.#volatil({ k: "ecrit" });
   }
 
-  /** Accusés `recu`/`vu` (identifiants de 16 octets), groupés par périodes de 2,5 s. */
-  accuser(sorte: "recu" | "vu", ids: Uint8Array[]): void {
-    const s = sorte === "recu" ? this.#recus : this.#vus;
+  /** Accusés `recu`/`vu`/`piece_ouverte`/`piece_telechargee` (identifiants de 16 octets), groupés par périodes de 2,5 s. */
+  accuser(sorte: "recu" | "vu" | "piece_ouverte" | "piece_telechargee", ids: Uint8Array[]): void {
+    const s = sorte === "recu" ? this.#recus : sorte === "vu" ? this.#vus : sorte === "piece_ouverte" ? this.#ouverts : this.#telecharges;
     for (const id of ids) s.add(hex(id));
     if (sorte === "vu") for (const id of ids) this.#recus.delete(hex(id));
     if (!this.#accusesTimer) this.#accusesTimer = this.#deps.horloge.plus_tard(ACCUSES_MS, () => this.#accuserMaintenant());
@@ -861,19 +863,24 @@ export class ClientSalon {
   #accuserMaintenant(): void {
     this.#accusesTimer = undefined;
     if (!this.dansLeGroupe() || !this.#rattrape) {
-      if (this.#recus.size + this.#vus.size > 0) this.#accusesTimer = this.#deps.horloge.plus_tard(ACCUSES_MS, () => this.#accuserMaintenant());
+      if (this.#accusesEnAttente() > 0) this.#accusesTimer = this.#deps.horloge.plus_tard(ACCUSES_MS, () => this.#accuserMaintenant());
       return;
     }
     for (const [sorte, set] of [
       ["vu", this.#vus],
       ["recu", this.#recus],
+      ["piece_ouverte", this.#ouverts],
+      ["piece_telechargee", this.#telecharges],
     ] as const) {
       if (set.size === 0) continue;
       // 3 900 octets de JSON au plus (JSON_MAX) : 100 identifiants par trame tiennent largement.
       const ids = [...set].slice(0, 100);
       if (this.#volatil({ k: sorte, ids: ids.map(deHex) })) for (const i of ids) set.delete(i);
     }
-    if (this.#recus.size + this.#vus.size > 0) this.#accusesTimer = this.#deps.horloge.plus_tard(ACCUSES_MS, () => this.#accuserMaintenant());
+    if (this.#accusesEnAttente() > 0) this.#accusesTimer = this.#deps.horloge.plus_tard(ACCUSES_MS, () => this.#accuserMaintenant());
+  }
+  #accusesEnAttente(): number {
+    return this.#recus.size + this.#vus.size + this.#ouverts.size + this.#telecharges.size;
   }
 
   /** Volatile chiffré maintenant ou abandonné : rend vrai s'il part. */

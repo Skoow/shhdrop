@@ -192,6 +192,9 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     const dl = await telechargement;
     expect(dl.suggestedFilename()).toBe(nomDoc);
     expect(readFileSync((await dl.path())!, "utf8")).toBe(contenuDoc);
+    // Accusés de pièce (v3 §14.2) chez l'expéditrice : document « Téléchargé », photo « Ouvert ».
+    await expect(fil(page).locator("li").filter({ hasText: nomDoc }).locator(".accuses")).toHaveText("Téléchargé", { timeout: 30_000 });
+    await expect(fil(page).locator("li").filter({ hasText: `photo-${r}.jpg` }).locator(".accuses")).toHaveText("Ouvert", { timeout: 30_000 });
     // Texte trop long (§39.5) : refusé, proposé en fichier « message.txt », reçu chez A.
     const long = `Très long ${r} `.repeat(150);
     await saisie(pageB).fill(long);

@@ -658,6 +658,7 @@ function liberer(cle: string): void {
 function oublierPieces(): void {
   for (const k of Object.keys(pieces.urls)) liberer(k);
   originaux.clear();
+  accusesPiece.clear();
   pieces.aConfirmer = [];
   pieces.erreurs = {};
 }
@@ -776,6 +777,7 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
     }
     clickDownload(url, nom);
     setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+    accuserPiece(b, "piece_telechargee");
   } catch (e) {
     pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
   }
@@ -811,12 +813,33 @@ export function reagir(b: Bulle, emoji: string): void {
   x.conv.reagirLocal(b.id, emoji);
 }
 
+/** Message déjà vu sur cet appareil (affiché 1 s, page visible). */
+export function estVu(b: Bulle): boolean {
+  return s?.conv?.vuLe.has(b.cle) === true;
+}
+/** Accusés de pièce déjà envoyés (clé de bulle + sorte) : une fois chacun. */
+const accusesPiece = new Set<string>();
+/**
+ * Accusé « Ouvert » ou « Téléchargé » d'une pièce reçue (v3 §14.2). Décision par défaut, à valider :
+ * « Ouvert » = contenu affiché ou lu dans l'application (image affichée dans un message vu, vocal ou
+ * vidéo lancés) ; le site n'a pas de visionneuse de documents (seulement « Enregistrer »).
+ */
+export function accuserPiece(b: Bulle, sorte: "piece_ouverte" | "piece_telechargee"): void {
+  const x = s;
+  if (!x?.client || b.moi || !b.id || !b.piece) return;
+  const k = `${b.cle}:${sorte}`;
+  if (accusesPiece.has(k)) return;
+  accusesPiece.add(k);
+  x.client.accuser(sorte, [hexOctets(b.id)]);
+}
+
 /** Message affiché 1 s, page visible : accusé « vu » (chiffré) et, règles 1 à 3, lecture au serveur. */
 export function vu(b: Bulle): void {
   const x = s;
   if (!x?.client || b.moi || !b.id) return;
   x.conv?.marquerVu(b.cle, Date.now());
   x.client.accuser("vu", [hexOctets(b.id)]);
+  if (b.piece?.sorte === "image" && pieces.urls[b.cle]) accuserPiece(b, "piece_ouverte");
   if (b.regle !== 0 && b.seq !== null) x.client.lu(b.seq);
 }
 

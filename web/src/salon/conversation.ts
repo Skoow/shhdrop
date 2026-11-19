@@ -45,6 +45,9 @@ export type Bulle = {
   attendus: number[];
   recus: number[];
   vus: number[];
+  /** Pièces (v3 §14.2) : sièges qui l'ont ouverte (affichée ou lue) et téléchargée. */
+  ouverts: number[];
+  telecharges: number[];
   /** Réactions : émoji → sièges, dans l'ordre d'arrivée. */
   reactions: { emoji: string; sieges: number[] }[];
   /** Pièce (plan C-4) : fichier, image, vidéo ou vocal ; null pour un texte. */
@@ -259,6 +262,8 @@ export class Conversation {
       attendus: this.membres.filter((s) => s !== this.moi),
       recus: [],
       vus: [],
+      ouverts: [],
+      telecharges: [],
       reactions: [],
       piece: null,
     };
@@ -345,6 +350,8 @@ export class Conversation {
           attendus: this.membres.filter((s) => s !== siege),
           recus: [],
           vus: [],
+          ouverts: [],
+          telecharges: [],
           reactions: [],
           piece: null,
         };
@@ -379,6 +386,21 @@ export class Conversation {
           if (!b || !b.moi || !b.attendus.includes(siege)) continue;
           if (!b.recus.includes(siege)) b.recus.push(siege);
           if (m.k === "vu" && !b.vus.includes(siege)) b.vus.push(siege);
+        }
+        this.#change();
+        return null;
+      }
+      case "piece_ouverte":
+      case "piece_telechargee": {
+        // Accusés d'une pièce (v3 §14.2) : de nos pièces seulement, d'un lecteur attendu. Ouvrir
+        // ou télécharger vaut aussi « reçu » et « vu ».
+        for (const i of m.ids) {
+          const b = this.#parId.get(hex(i));
+          if (!b || !b.moi || !b.piece || !b.attendus.includes(siege)) continue;
+          const l = m.k === "piece_ouverte" ? b.ouverts : b.telecharges;
+          if (!l.includes(siege)) l.push(siege);
+          if (!b.recus.includes(siege)) b.recus.push(siege);
+          if (!b.vus.includes(siege)) b.vus.push(siege);
         }
         this.#change();
         return null;
@@ -486,6 +508,8 @@ export class Conversation {
       attendus: this.membres.filter((s) => s !== siege),
       recus: [],
       vus: [],
+      ouverts: [],
+      telecharges: [],
       reactions: [],
       piece: null,
     };
