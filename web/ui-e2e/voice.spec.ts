@@ -223,7 +223,7 @@ test("ligne vocale : nom générique renommable (Entrée, Échap, vide → gén�
     }
     // Icône, nom et « … » sur la même rangée ; le lecteur dessous, aligné à gauche sur le nom
     // (retours du propriétaire du 12 novembre : il était centré dans la ligne).
-    const [pic, meta, menu, clip, main] = [await box(voice.locator(".pic")), await box(voice.locator(".meta")), await box(voice.locator(act)), await box(voice.locator("[data-voice-clip]")), await box(voice.locator(".main"))];
+    const [pic, meta, menu, clip, main] = [await box(voice.locator(".pic")), await box(voice.locator(".kind")), await box(voice.locator(act)), await box(voice.locator("[data-voice-clip]")), await box(voice.locator(".main"))];
     expect(Math.abs(pic.y + pic.height / 2 - (menu.y + menu.height / 2))).toBeLessThan(2);
     expect(clip.y).toBeGreaterThanOrEqual(meta.y + meta.height);
     expect(clip.y).toBeGreaterThanOrEqual(pic.y + pic.height);
@@ -352,7 +352,13 @@ test("destinataire : un vocal s'écoute, jamais téléchargé ; la note se lit e
   await expect(page.locator("[data-row]").filter({ hasText: "Mémo vocal 1" })).toBeVisible();
   await page.getByRole("button", { name: "Chiffrer et envoyer" }).click();
   await expect(page.getByRole("heading", { name: "Lien prêt" })).toBeVisible({ timeout: 60_000 });
-  const read = async (name: string) => (await page.getByRole("group", { name, exact: true }).locator(".sr-only").first().textContent()) ?? "";
+  const read = async (name: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name, exact: true });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
   const [link, password] = [await read("Lien"), await read("Mot de passe")];
 
   const ctx = await browser.newContext({ locale: "fr-FR" });

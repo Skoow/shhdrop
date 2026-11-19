@@ -74,8 +74,20 @@
         aria-describedby="{uid}-hint"
       />
     {:else}
-      {#if hidden}
-        <span class="val vis whole masked" translate="no" aria-hidden="true" data-masked>{dots}</span>
+      {#if secret}
+        <!-- Œil dans le rectangle de la valeur (propriétaire, 19 novembre). -->
+        <span class="box">
+          {#if hidden}
+            <span class="val vis whole masked" translate="no" aria-hidden="true" data-masked>{dots}</span>
+          {:else}
+            <span class="val vis whole" translate="no" aria-hidden="true">{value}</span>
+          {/if}
+          <span class="eye">
+            <IconButton label={t(shown ? "copy.hide" : "copy.show", { label })} aria-pressed={shown} onpress={() => void (shown = !shown)} data-reveal>
+              {#if shown}<EyeOff size={20} strokeWidth={1.75} />{:else}<Eye size={20} strokeWidth={1.75} />{/if}
+            </IconButton>
+          </span>
+        </span>
       {:else if whole}
         <span class="val vis whole" translate="no" aria-hidden="true">{value}</span>
       {:else}
@@ -83,11 +95,7 @@
       {/if}
       {#if !hidden}<span class="sr-only">{value}</span>{/if}
     {/if}
-    {#if secret && !manual}
-      <IconButton variant="secondary" label={t(shown ? "copy.hide" : "copy.show", { label })} aria-pressed={shown} onpress={() => void (shown = !shown)} data-reveal>
-        {#if shown}<EyeOff size={20} strokeWidth={1.75} />{:else}<Eye size={20} strokeWidth={1.75} />{/if}
-      </IconButton>
-    {/if}
+
     <!-- Nom accessible = texte visible + suffixe masqué (WCAG 2.5.3 : le nom commence par le libellé visible). -->
     <Button variant="secondary" dense onpress={copy}>
       {#snippet icon()}
@@ -148,6 +156,22 @@
     overflow-wrap: anywhere;
     font-size: var(--fs-mono);
     letter-spacing: 0.04em;
+  }
+  .box {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+  }
+  .box .val {
+    padding-inline-end: 52px;
+  }
+  .eye {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 2px;
+    display: flex;
+    align-items: center;
   }
   /* Points du masque : plus serrés, même hauteur de ligne que la valeur. */
   .masked {

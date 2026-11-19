@@ -49,10 +49,10 @@ test("Votre envoi : un seul tableau, sous-en-têtes de catégorie, icône au bor
     const h3 = (await g.locator(":scope > .head h3").boundingBox())!.x;
     for (const fi of await g.locator("[data-row] svg.fi").all()) expect(Math.abs((await fi.boundingBox())!.x - h3)).toBeLessThanOrEqual(1);
   }
-  // 2ᵉ ligne (type, taille) alignée sur le début du nom.
+  // Ligne du type et de la taille (au-dessus du nom depuis le 19 novembre) alignée sur le début du nom.
   for (const r of await page.locator("[data-row]").all()) {
-    const [nm, meta] = [(await r.locator(".nm").boundingBox())!.x, (await r.locator(".meta").boundingBox())!];
-    const first = await r.locator(".meta > *").first().boundingBox();
+    const [nm, meta] = [(await r.locator(".nm").boundingBox())!.x, (await r.locator(".kind").boundingBox())!];
+    const first = await r.locator(".kind > *").first().boundingBox();
     expect(Math.abs((first ?? meta).x - nm)).toBeLessThanOrEqual(1);
   }
   // Bouclier de nettoyage AVANT le nom, emplacement fixe : tous les noms commencent au même x,

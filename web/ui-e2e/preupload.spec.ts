@@ -86,7 +86,13 @@ test.describe("fr-FR", () => {
 
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
-    const read = async (name: string) => (await page.getByRole("group", { name }).locator(".sr-only").first().textContent()) ?? "";
+    const read = async (name: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
     const link = await read("Lien");
     const password = await read("Mot de passe");
     const o = await openShare(link, password, shh.origin);
@@ -125,7 +131,13 @@ test.describe("fr-FR", () => {
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
     expect(erases).toEqual([]);
     expect(finalize?.void).toEqual([[0, 16]]);
-    const read = async (name: string) => (await page.getByRole("group", { name }).locator(".sr-only").first().textContent()) ?? "";
+    const read = async (name: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
     const o = await openShare(await read("Lien"), await read("Mot de passe"), shh.origin);
     const names = o.manifest.items.map((e) => e.name);
     expect(names).toHaveLength(19);

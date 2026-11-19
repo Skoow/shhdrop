@@ -128,7 +128,7 @@ test.describe("fr-FR", () => {
     expect(await page.locator(".group h3").allTextContents()).toEqual(["Texte", "Photos", "Vidéos", "Documents", "Archives"]);
     // Note : son titre et « Texte · taille » seulement, jamais le contenu (D41-37).
     const note = rows(page).filter({ has: page.locator('.nm[title="Code de la porte"]') });
-    await expect(note.locator(".meta")).toContainText("Texte");
+    await expect(note.locator(".kind")).toContainText("Texte");
     await expect(note).not.toContainText("4512B");
     // Archive : catégorie, laissée intacte (D41-27) : rien sur la ligne, « Fichier tel quel » dans la bulle (D41-34).
     await expect(rows(page).filter({ hasText: "archive.zip" }).locator("[data-clean]")).toHaveCount(0);

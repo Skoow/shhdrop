@@ -225,17 +225,21 @@
           <span class="b">{mid.head}</span><span class="e">{mid.tail}{shownExt}</span>
         </bdi>
       </span>
-      <span class="meta">
+      <!-- Ordre affiché (propriétaire, 19 novembre) : le type et la taille, puis le nom, puis
+           l'empreinte ; dans le DOM, le nom reste en premier (lecteurs d'écran : « nom, type »). -->
+      <span class="kind">
         <!-- Une note ne montre que son titre, jamais son contenu (retour propriétaire). -->
         <span class="ty">{t(item.kind === "text" ? "compose.cat.text" : typeKey(format))}</span><span class="sep" aria-hidden="true">·</span>
         <span class="num">{formatBytes(item.size, getLang())}</span>
         {#if duration !== null}<span class="sep" aria-hidden="true">·</span><span class="num">{formatClock(duration)}</span>{/if}
-        {#if item.kind === "file"}
-          <!-- Empreinte SHA-256 (16 novembre) : sur sa propre ligne, sous le type et la taille
-               (19 novembre) ; sélectionnée d'un toucher pour la copier, entière au survol. Elle
-               change si le fichier est nettoyé. -->
-          <HashLine sum={digestOf(item.data)} />
-        {/if}
+      </span>
+      {#if item.kind === "file"}
+        <!-- Empreinte SHA-256 (16 novembre) : sur sa propre ligne, sous le nom (19 novembre) ;
+             sélectionnée d'un toucher pour la copier, entière au survol. Elle change si le
+             fichier est nettoyé. -->
+        <span class="sumline"><HashLine sum={digestOf(item.data)} /></span>
+      {/if}
+      <span class="meta">
         {#if upload}
           <!-- État de l'envoi : barre et Réessayer seulement ; le libellé est dans la bulle du cadenas. -->
           {@const busy = upload.key === "compose.up.envoi" || upload.key === "compose.up.chiffrement"}
@@ -401,6 +405,30 @@
     display: grid;
     gap: 2px;
     min-width: 0;
+  }
+  /* Type et taille au-dessus du nom (ordre visuel seulement). */
+  .kind {
+    order: -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    padding-inline-start: 21px;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+  }
+  .sumline {
+    display: flex;
+    min-width: 0;
+    padding-inline-start: 21px;
+  }
+  /* Le reste de l'ancienne 2ᵉ ligne (envoi, nettoyage, notes) : vide la plupart du temps. */
+  .meta:empty {
+    display: none;
+  }
+  .meta > .sep:first-child {
+    display: none;
   }
   .head {
     display: flex;

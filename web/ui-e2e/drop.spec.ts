@@ -43,7 +43,7 @@ test("note : cadenas vert avant le clic ; modifiée → renvoyée, nouvelle vers
   await expect(row.locator("[data-up]")).toHaveAttribute("data-up", "pret", { timeout: 30_000 });
   await expect(row.locator("[data-lock] button")).toHaveAccessibleName(/Chiffré, prêt à partir/);
   await expect(row).not.toContainText("contenu-secret");
-  await expect(row.locator(".meta")).toContainText("Texte");
+  await expect(row.locator(".kind")).toContainText("Texte");
   expect(puts.length).toBe(1);
 
   await editNote(page, "contenu-secret-v2");
@@ -53,7 +53,13 @@ test("note : cadenas vert avant le clic ; modifiée → renvoyée, nouvelle vers
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   expect(puts.length).toBe(2); // rien de plus au clic : la note était déjà partie
-  const read = async (name: string) => (await page.getByRole("group", { name }).locator(".sr-only").first().textContent()) ?? "";
+  const read = async (name: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
   const link = await read("Lien");
   const password = await read("Mot de passe");
   const o = await openShare(link, password, shh.origin);
@@ -96,7 +102,13 @@ test("ordinateur : filigrane de dépôt dans la liste (texte entier, clic → ch
   // Destinataire : même règle, le contenu se lit avec « Voir ».
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
-  const read = async (name: string) => (await page.getByRole("group", { name }).locator(".sr-only").first().textContent()) ?? "";
+  const read = async (name: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
   const link = await read("Lien");
   const password = await read("Mot de passe");
   const { ctx, page: rp } = await freshPage(browser, { deviceScaleFactor: 2 });

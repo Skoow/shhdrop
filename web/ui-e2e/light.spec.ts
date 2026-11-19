@@ -58,7 +58,13 @@ test("composeur et destinataire allégés ; captures", async ({ page, shh, brows
   await shot(page, "composeur", isMobile);
   await sendButton(page).click();
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
-  const read = async (name: string) => (await page.getByRole("group", { name }).locator(".sr-only").first().textContent()) ?? "";
+  const read = async (name: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
   const [link, password] = [await read("Lien"), await read("Mot de passe")];
   const { ctx, page: rp } = await freshPage(browser, { deviceScaleFactor: 2, viewport: isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 }, isMobile, hasTouch: isMobile });
   await rp.goto(link);

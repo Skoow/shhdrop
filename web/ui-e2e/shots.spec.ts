@@ -110,10 +110,18 @@ test("audit : tous les écrans", async ({ page, shh, browser }) => {
   await page.unroute("**/api/shares/*/**");
   await shot(page, "07-lien-pret");
   await shot(page, "07b-lien-pret-page", true);
-  const read = async (n: string) => (await page.getByRole("group", { name: n }).locator(".sr-only").first().textContent()) ?? "";
+  const read = async (n: string) => {
+    // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche d'abord.
+    const g = page.getByRole("group", { name: n });
+    const eye = g.locator("[data-reveal]");
+    if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+    return (await g.locator(".sr-only").first().textContent()) ?? "";
+  };
   const link = await read("Lien");
   const password = await read("Mot de passe");
-  const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
+  // Lien de gestion : montré seulement sans historique (19 novembre).
+  await page.getByRole("switch", { name: "Garder dans mon historique" }).click();
+  const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
 
   const rc = await browser.newContext(ctxOpts);
   const r = await rc.newPage();
