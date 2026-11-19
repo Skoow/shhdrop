@@ -154,6 +154,16 @@ type Effaceur interface {
 // erreur (ou en panique) est réessayée au tour suivant ; au plus une ligne fixe sur stderr par
 // série d'erreurs, jamais d'identifiant ni de nombre.
 func Comptes(ctx context.Context, eff Effaceur, now func() time.Time, every time.Duration) {
+	quotidien(ctx, eff, now, every, "janitor: erreur d'effacement des comptes")
+}
+
+// Paiements : comme Comptes, pour paiements.db (paiement.Service.Effacer : commandes non payées,
+// commandes et pass échus ; conception du paiement §5.7).
+func Paiements(ctx context.Context, eff Effaceur, now func() time.Time, every time.Duration) {
+	quotidien(ctx, eff, now, every, "janitor: erreur d'effacement des paiements")
+}
+
+func quotidien(ctx context.Context, eff Effaceur, now func() time.Time, every time.Duration, msg string) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	fait, failed := "", false
@@ -163,7 +173,7 @@ func Comptes(ctx context.Context, eff Effaceur, now func() time.Time, every time
 			if err == nil {
 				fait, failed = j, false
 			} else if !failed {
-				fmt.Fprintln(os.Stderr, "janitor: erreur d'effacement des comptes")
+				fmt.Fprintln(os.Stderr, msg)
 				failed = true
 			}
 		}

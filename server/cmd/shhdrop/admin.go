@@ -37,6 +37,7 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 		fmt.Fprintln(stderr, msg)
 		fmt.Fprintln(stderr, "usage: shhdrop admin freeze|unfreeze|destroy - (lien lu sur l'entrée standard)|wipe --yes")
 		fmt.Fprintln(stderr, "       shhdrop admin bannir - [--duree 30|365|1095] [--motif 1..10] (lien de salon ou adresse sur l'entrée standard)")
+		fmt.Fprintln(stderr, "       shhdrop admin paiement revoquer <commande> (32 caractères hexadécimaux, lus chez le prestataire)")
 		fmt.Fprintln(stderr, "       shhdrop admin bannis liste [actifs|suspendus|bientot] | suspendre|reactiver|lever|annuler <B-…> | echeance <B-…> <AAAA-MM-JJ>")
 		return 2
 	}
@@ -49,6 +50,9 @@ func runAdmin(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 	}
 	if args[0] == "bannir" || args[0] == "bannis" {
 		return runBannis(args, cfg, stdin, stdout, stderr, usage, fail)
+	}
+	if args[0] == "paiement" {
+		return runPaiement(args, cfg, stdout, stderr, usage, fail)
 	}
 	switch args[0] {
 	case "freeze", "unfreeze":

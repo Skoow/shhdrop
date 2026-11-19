@@ -1,0 +1,25 @@
+{
+  "description": "Empreinte du pass Q = SHA-256(« shhdrop/v2/pass » ‖ 0x00 ‖ P) (conception du paiement §5.2, DP-6). P en hexadécimal ; l'en-tête X-Shh-Pass porte P en base64url sans bourrage. Calculé par un outil indépendant (hashlib de Python) ; rejoué par server/internal/paiement.",
+  "pass": [
+    {
+      "label": "zeros",
+      "p_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "q_hex": "50211c0b4f43e85732ddfcc9aa6c6a0647f3b5ce8ff142a152d5e79565e91060"
+    },
+    {
+      "label": "seq",
+      "p_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "q_hex": "d9c2ad5718e80408edd8c7f48c85cee1a599dd279c24b2439d070234f13b67ad"
+    },
+    {
+      "label": "ff",
+      "p_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "q_hex": "6db4420217fd8bbaac2ece14bf9e6b8576573580051a1fd985f72e7eecb947db"
+    },
+    {
+      "label": "sha256-label",
+      "p_hex": "235000f439b6d000ce6a23dc131403644a0085e4fad4c380a68ea6351fd9a793",
+      "q_hex": "4e9553057d2612b8c994fec3a6ee13381ad5bde782e432a0dd399f81e1f7dff8"
+    }
+  ]
+}
