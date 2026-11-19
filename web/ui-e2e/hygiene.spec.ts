@@ -384,7 +384,9 @@ test.describe("intégrité des scripts et des styles (spec §28.3)", () => {
       const res = await route.fetch();
       await route.fulfill({ response: res, body: Buffer.concat([await res.body(), Buffer.from("\n;window.__piege=1")]) });
     });
-    await page.goto(shh.origin + "/");
+    // Page de l'application (app.html, sans contenu écrit au build : l'accueil, lui, est prérendu
+    // depuis le 18 novembre et s'affiche sans script) : sans script exécuté, elle reste vide.
+    await page.goto(shh.origin + "/envoyer");
     await page.waitForLoadState("load");
     expect(await page.evaluate(() => (window as unknown as { __piege?: number }).__piege)).toBeUndefined();
     await expect(page.locator("#app > *")).toHaveCount(0);

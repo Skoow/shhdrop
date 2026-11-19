@@ -74,6 +74,9 @@ test.describe("fr-FR", () => {
     expect(pick.width).toBeGreaterThan(frame.width - 40);
     expect(make.y).toBeGreaterThan(pick.y);
     expect(make.y + make.height).toBeLessThanOrEqual(844);
+    // Tout le cadre est visible au premier écran, même sous les barres de Safari (19 novembre, 2) :
+    // 700 px laissent la place de la barre d'adresse et des onglets d'un iPhone.
+    expect(frame.y + frame.height).toBeLessThanOrEqual(700);
     expect(await page.evaluate(() => scrollY)).toBe(0);
     const demo = (await page.locator("[data-demo]").boundingBox())!;
     expect(demo.y).toBeGreaterThan(frame.y + frame.height);
@@ -103,10 +106,12 @@ test.describe("fr-FR", () => {
     // Plus strict que la page : aucune section ne déborde de sa colonne. Dans Chromium, un mot trop
     // long (« s'autodétruit », question de la FAQ) débordait de 14 px dans la marge sans créer de
     // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un (CI b155911).
-    // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi.
+    // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi. Les sections en
+    // bande (.band) débordent exprès par leur décor (couture et halo d'un bord à l'autre de l'écran,
+    // 19 novembre, 2 ; coupés par #app) : leur contenu, lui, est vérifié.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only") && !e.matches(".band, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );
@@ -342,11 +347,15 @@ test.describe("fr-FR", () => {
         }
         return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...new Set(v)].sort().join(",")]));
       });
-    // Haut de page : l'infographie (curseur du journal) tourne ; hors écran, elle s'arrête.
+    // Haut de page : le titre en trame tourne ; l'infographie (dans « Comment ça marche » depuis le
+    // 19 novembre) tourne quand elle est à l'écran et s'arrête hors écran.
+    await expect.poll(async () => (await state()).other).toBe("running");
+    const demo = page.locator("[data-demo]");
+    await demo.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await expect.poll(async () => (await state()).demo).toBe("running");
     await page.locator("footer[data-foot]").evaluate((e) => e.scrollIntoView({ block: "end" }));
     await expect.poll(async () => (await state()).demo).toBe("paused");
-    await page.evaluate(() => scrollTo(0, 0));
+    await demo.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await expect.poll(async () => (await state()).demo).toBe("running");
     const setHidden = (v: boolean) =>
       page.evaluate((hidden) => {

@@ -153,7 +153,7 @@
 >
   <div class="bar">
     <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
-    <h2 class="sr-only" id="{uid}-t">{t("demo.title")}</h2>
+    <h3 class="sr-only" id="{uid}-t">{t("demo.title")}</h3>
     <span class="bar-t" aria-hidden="true">{t("demo.bar")}</span>
   </div>
 

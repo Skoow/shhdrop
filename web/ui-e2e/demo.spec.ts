@@ -107,7 +107,7 @@ test.describe("fr-FR", () => {
   });
 
   // Spec §32 : liens sous la base de la démo, « /shhgone/s#<clé> » et « /shhgone/s#m<clé> »
-  // (s.html, 200) ; ancien lien « /shhgone/#… » : remplacé par « /shhgone/s » (16 novembre).
+  // (s.html, 200) ; ancien lien « /shhgone/#… » : retiré (18 novembre), il mène à l'accueil.
   for (const [what, start, frag] of [
     ["partage", "s", `#${KEY}`],
     ["gestion", "s", `#m${KEY}`],
@@ -119,6 +119,13 @@ test.describe("fr-FR", () => {
       // « /s » n'est plus montré une fois le lien lu (17 novembre).
       await expect.poll(() => page.url()).toBe(demo.url);
       expect(await page.evaluate(() => location.hash)).toBe("");
+      // Ancien lien « /#… » (retiré le 18 novembre) : l'accueil, rien n'est ouvert ni envoyé.
+      if (what === "ancien lien de partage") {
+        await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1, name: "Ce lien n'existe pas ou n'est plus disponible." })).toHaveCount(0);
+        expect(demo.requests.filter((r) => r.url.includes(KEY) || JSON.stringify(r.headers).includes(KEY) || (r.postData ?? "").includes(KEY))).toEqual([]);
+        return;
+      }
       // Route d'ouverture ou de gestion : le faux serveur de cet onglet ne connaît pas ce partage.
       if (what.includes("partage")) {
         await expect(page.getByRole("heading", { level: 1, name: "Ce lien n'existe pas ou n'est plus disponible." })).toBeVisible();

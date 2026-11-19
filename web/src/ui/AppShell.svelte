@@ -78,8 +78,7 @@
   const BACK: ReadonlySet<string> = new Set(["notfound", "manage", "envois", "telechargements"]);
   // Pied de page sur toutes les pages, ordinateur et téléphone, composeur compris (retours du
   // 11 novembre) ; sur ordinateur, le composeur tient dans l'écran et le pied est juste dessous.
-  /** `tiers` : « Plus » et « Pro » du libellé au bleu de leur offre, le reste comme les autres liens. */
-  type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean; tiers?: boolean };
+  type FootLink = { label: string; path?: string; url?: string; soon?: boolean; report?: boolean };
   const footCols = $derived<{ id: string; title: string; links: FootLink[] }[]>([
     // Plus d'« Envoyer », de « Mes partages » ni de « Salon bientôt » (retours du 16 novembre) ;
     // plus d'« Offres » (17 novembre : l'en-tête et le menu y mènent). Colonne « Produit »
@@ -106,8 +105,6 @@
       ],
     },
   ]);
-  // Libellé découpé : les mots « Plus » et « Pro » (noms d'offre, identiques en français et en anglais).
-  const tierParts = (label: string) => label.split(/\b(Plus|Pro)\b/).map((text, i) => ({ text, tier: i % 2 === 1 ? text.toLowerCase() : null }));
   // « Envoyer » (/) n'est la page courante que sur l'accueil : un partage ouvert a aussi « / » pour chemin.
   const pathHere = (p: string) => (router.current.name !== "notfound" && currentPath() === href(p) && (p !== "/" || router.current.name === "home") ? "page" : undefined);
   // « Mes partages » et « Téléchargements » sont des onglets racine quand la barre d'onglets est là : pas de Retour.
@@ -199,10 +196,6 @@
                   <button type="button" class="fl" aria-haspopup="dialog" onclick={() => chrome.report?.()} data-report-share>{t("content.report")}</button>
                 {:else if l.url}
                   <a class="fl" href={l.url} target="_blank" rel="noopener noreferrer">{l.label}<span class="sr-only"> {t("foot.external")}</span></a>
-                {:else if l.path && l.tiers}
-                  <a class="fl tiers" href={href(l.path)} aria-current={pathHere(l.path)} onclick={(e) => followLink(e, l.path!)} data-foot-offers
-                    ><span>{#each tierParts(l.label) as p, i (i)}{#if p.tier}<span class="tier {p.tier}">{p.text}</span>{:else}{p.text}{/if}{/each}</span></a
-                  >
                 {:else if l.path}
                   <a class="fl" href={href(l.path)} aria-current={pathHere(l.path)} onclick={(e) => followLink(e, l.path!)}>{l.label}</a>
                 {/if}
@@ -492,26 +485,6 @@
   .fl[aria-current="page"] {
     color: var(--accent);
   }
-  /* Ligne des offres (retours TABLE, CLEAN2, CLEAN3) : « Offres » et « et » toujours en gris
-     comme le reste du pied, même sur la page des offres ; seuls « Plus » et « Pro » prennent le
-     bleu de leur offre ; jamais le vert d'accent. */
-  .fl.tiers[aria-current="page"] {
-    color: var(--text-2);
-  }
-  .tier.plus {
-    color: var(--plus);
-  }
-  .tier.pro {
-    color: var(--pro);
-  }
-  .fl.tiers[aria-current="page"] {
-    font-weight: 600;
-  }
-  @media (forced-colors: active) {
-    .tier {
-      color: LinkText;
-    }
-  }
   @media (hover: hover) {
     .fl:hover {
       translate: 2px 0;
@@ -552,9 +525,6 @@
   }
   .foot a[aria-disabled="true"] {
     pointer-events: none;
-  }
-  .busy .tier {
-    color: inherit;
   }
   /* Bas du pied (17 novembre) : plus bas, le nom à gauche plus gros que la version, à droite. */
   .base {

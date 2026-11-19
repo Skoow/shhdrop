@@ -13,9 +13,6 @@ import { cleanAll, enterComposer, openFilePicker } from "./send-helpers";
 const SHOTS = fileURLToPath(new URL("../../.superpowers/sdd/2026-11-04-shhdrop-ecrans/shots/task-TABLE/", import.meta.url));
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris", deviceScaleFactor: 2 });
 const w = (m: boolean) => (m ? 390 : 1440);
-const WHITE = "rgb(233, 236, 242)";
-const PLUS = "rgb(62, 193, 245)";
-const PRO = "rgb(92, 128, 255)";
 async function shot(page: Page, name: string, isMobile: boolean, full = false) {
   mkdirSync(SHOTS, { recursive: true });
   await page.evaluate(() => document.fonts.ready);
@@ -79,26 +76,14 @@ test("Votre envoi : un seul tableau, sous-en-têtes de catégorie, icône au bor
   await shot(page, "options", isMobile);
 });
 
-test("pied : « Offres … et » couleur des liens du pied, Plus et Pro en bleu, jamais le vert ; capture", async ({ page, shh, isMobile }) => {
+test("pied : plus de lien « Offres » (17 novembre : l'en-tête et le menu y mènent), jamais le vert hors page courante ; capture", async ({ page, shh, isMobile }) => {
   await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto(shh.origin + "/offres");
-  const link = page.locator("[data-foot-offers]");
-  await expect(link).toHaveText("Offres Plus et Pro");
-  await expect(link).toHaveAttribute("aria-current", "page");
-  const color = (sel: string) => link.locator(sel).evaluate((e) => getComputedStyle(e).color);
-  // Même sur la page des offres (lien courant) : « Offres » et « et » en gris, comme le pied (CLEAN3).
-  expect(await link.evaluate((e) => getComputedStyle(e).color)).not.toBe(WHITE);
-  const grey = await page.locator("footer a.fl").filter({ hasText: "Conditions" }).evaluate((e) => getComputedStyle(e).color);
-  expect(await link.evaluate((e) => getComputedStyle(e).color)).toBe(grey);
-  expect(await color(".tier.plus")).toBe(PLUS);
-  expect(await color(".tier.pro")).toBe(PRO);
-  await link.scrollIntoViewIfNeeded();
+  const foot = page.locator("footer[data-foot]");
+  await expect(foot.locator("a.fl").filter({ hasText: "Conditions" })).toBeVisible();
+  await expect(foot.locator('a[href$="/offres"]')).toHaveCount(0);
+  await foot.scrollIntoViewIfNeeded();
   await settle(page);
   expect(await axe(page)).toEqual([]);
-  await captureOf(page.locator("footer"), { path: `${SHOTS}pied-${w(isMobile)}.png` });
-  await page.goto(shh.origin + "/securite");
-  const other = page.locator("footer a.fl:not([aria-current])").filter({ hasText: "Conditions" });
-  const linkColor = await other.evaluate((e) => getComputedStyle(e).color);
-  expect(await page.locator("[data-foot-offers]").evaluate((e) => getComputedStyle(e).color)).toBe(linkColor);
-  expect(await page.locator("[data-foot-offers] .tier.plus").evaluate((e) => getComputedStyle(e).color)).toBe(PLUS);
+  await captureOf(foot, { path: `${SHOTS}pied-${w(isMobile)}.png` });
 });

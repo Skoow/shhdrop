@@ -117,12 +117,12 @@ test.describe("fr-FR", () => {
     await expect(page.locator(".sealing")).not.toContainText("palier");
     openSegments();
 
-    // Finalisation retardée : « Envoyé » attend le lien (audit M12), « Scellé » aussi ; aucun lien nulle part.
+    // Finalisation retardée : « Envoyé » attend le lien (audit M12), « Prêt » (ancien « Scellé », 18 novembre) aussi ; aucun lien nulle part.
     await expect.poll(() => finalizing, { timeout: 30_000 }).toBe(true);
     await expect(page.getByRole("heading", { name: "Finalisation" })).toBeVisible();
     await expect(stepItem(page, "Chiffré sur cet appareil")).toHaveCount(1);
     await expect(stepItem(page, "Envoyé")).toHaveCount(0);
-    await expect(stepItem(page, "Scellé")).toHaveCount(0);
+    await expect(stepItem(page, "Prêt")).toHaveCount(0);
     await expect(page.getByText("Finalisation : l'envoi ne peut plus être annulé", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Annuler" })).toHaveCount(0);
     expect(await page.evaluate(() => location.hash)).toBe("");
@@ -138,7 +138,7 @@ test.describe("fr-FR", () => {
     await expect(readyHeading(page)).toBeVisible({ timeout: 30_000 });
     expect(await page.locator("[data-capsule]").first().evaluate((e) => getComputedStyle(e).viewTransitionName)).toBe("capsule");
     // Ordre réel des phases affichées (sans en sauter, sans revenir en arrière).
-    const order = ["Préparation des clés", "Vérification anti-robot", "Chiffrement et envoi", "Finalisation", "Scellé"];
+    const order = ["Préparation des clés", "Vérification anti-robot", "Chiffrement et envoi", "Finalisation", "Prêt"];
     const idx = titles.filter((x) => order.includes(x)).map((x) => order.indexOf(x));
     expect(idx).toEqual([...idx].sort((a, b) => a - b));
     expect(idx.at(-1)).toBe(4);

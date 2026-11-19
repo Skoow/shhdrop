@@ -3,120 +3,108 @@
   // abus ; retours UI5) : lecture d'abord, colonne de texte étroite, titres ancrés par id (sans
   // « # » dans l'adresse : le « # » est réservé aux clés). Bandeau « En cours de rédaction »
   // pour les pages juridiques que le propriétaire doit compléter.
-  // Signature des pages annexes (propriétaire, 18 novembre) : un « document » centré dans un
-  // cadre aux coins menthe (les équerres de l'infographie de l'accueil), en-tête avec une
-  // étiquette mono, sommaire (boutons qui font défiler, jamais de « # »), sections numérotées,
-  // puces en petits blocs, détails techniques façon terminal.
+  // Refonte (propriétaire, 19 novembre, 2 : « ancien, trop serré, pavé ») : plus de carte ni de
+  // cadre ; un grand en-tête sur le fond du site, fermé par une couture en demi-teinte ; sur
+  // ordinateur, le sommaire reste à gauche pendant la lecture et suit la section lue ; sur
+  // téléphone, il devient une rangée de pastilles. Sections espacées, texte plus grand.
   import { getLang, t } from "../i18n/i18n.svelte";
   import { infoPage, type InfoName } from "./pages/content";
 
   let { name }: { name: InfoName } = $props();
   const page = $derived(infoPage(name, getLang()));
-  const num = (i: number) => String(i + 1).padStart(2, "0");
+  const idOf = (b: { id?: string }, i: number) => b.id ?? `info-b-${i}`;
+  let current = $state("");
+
   function go(id: string) {
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     el.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+    current = id;
+  }
+
+  // Section lue : la dernière dont le titre a passé le haut de l'écran (sous l'en-tête du site).
+  function follow(node: HTMLElement) {
+    if (typeof IntersectionObserver === "undefined") return;
+    const seen = new Map<string, boolean>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+        const first = [...node.querySelectorAll<HTMLElement>(".blk")].find((s) => seen.get(s.id));
+        if (first) current = first.id;
+      },
+      { rootMargin: "-96px 0px -55% 0px" },
+    );
+    for (const s of node.querySelectorAll<HTMLElement>(".blk")) io.observe(s);
+    return () => io.disconnect();
   }
 </script>
 
 <article class="info" data-info={name} aria-labelledby="info-title">
-  <div class="frame">
-  <div class="doc">
-    <header class="hd">
-      <p class="eyebrow" aria-hidden="true"><span class="dotm"></span>shhgone · {page.title.toLowerCase()}</p>
-      <h1 id="info-title" class="title" tabindex="-1" data-large-title>{page.title}</h1>
-      <p class="lede">{page.lede}</p>
-      {#if page.draft}<p class="draft" role="note" data-draft>{t("info.draft")}</p>{/if}
-    </header>
+  <header class="hd band" style:--tone="92 128 255">
+    <p class="eyebrow" aria-hidden="true"><span class="dotm"></span>shhgone</p>
+    <h1 id="info-title" class="title" tabindex="-1" data-large-title>{page.title}</h1>
+    <p class="lede">{page.lede}</p>
+    {#if page.draft}<p class="draft" role="note" data-draft>{t("info.draft")}</p>{/if}
+  </header>
+
+  <div class={["body", { solo: page.blocks.length <= 2 }]}>
     {#if page.blocks.length > 2}
       <nav class="toc" aria-label={t("info.toc")}>
         <p class="toc-h">{t("info.toc")}</p>
         <ol>
           {#each page.blocks as b, i (i)}
-            <li><button type="button" onclick={() => go(b.id ?? `info-b-${i}`)}><span class="tn num">{num(i)}</span>{b.h}</button></li>
+            <li><button type="button" aria-current={current === idOf(b, i) ? "true" : undefined} onclick={() => go(idOf(b, i))}>{b.h}</button></li>
           {/each}
         </ol>
       </nav>
     {/if}
-    {#each page.blocks as b, i (i)}
-      <section class="blk" id={b.id ?? `info-b-${i}`} aria-labelledby="info-h-{i}">
-        <h2 id="info-h-{i}" tabindex="-1"><span class="hn num" aria-hidden="true">{num(i)}</span>{b.h}</h2>
-        {#each b.p ?? [] as para, j (j)}<p>{para}</p>{/each}
-        {#if b.list}
-          <ul>{#each b.list as li, j (j)}<li>{li}</li>{/each}</ul>
-        {/if}
-      </section>
-    {/each}
-    {#if page.tech}
-      <!-- Détails techniques (retours UI6) : repliés, en bas ; le corps reste sans jargon. -->
-      <details class="tech" id="details-techniques" data-tech>
-        <summary><span class="tp" aria-hidden="true">$</span>{page.tech.h}</summary>
-        <div class="tech-in">
-          {#each page.tech.p ?? [] as para, j (j)}<p>{para}</p>{/each}
-          {#if page.tech.list}<ul>{#each page.tech.list as li, j (j)}<li>{li}</li>{/each}</ul>{/if}
-          <ul class="links">
-            {#each page.tech.links as l (l.url)}<li><a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}<span class="sr-only"> {t("foot.external")}</span></a></li>{/each}
-          </ul>
-        </div>
-      </details>
-    {/if}
-  </div>
+    <div class="text" {@attach follow}>
+      {#each page.blocks as b, i (i)}
+        <section class="blk" id={idOf(b, i)} aria-labelledby="info-h-{i}">
+          <h2 id="info-h-{i}" tabindex="-1">{b.h}</h2>
+          {#each b.p ?? [] as para, j (j)}<p>{para}</p>{/each}
+          {#if b.list}
+            <ul>{#each b.list as li, j (j)}<li>{li}</li>{/each}</ul>
+          {/if}
+        </section>
+      {/each}
+      {#if page.tech}
+        <!-- Détails techniques (retours UI6) : repliés, en bas ; le corps reste sans jargon. -->
+        <details class="tech" id="details-techniques" data-tech>
+          <summary><span class="tp" aria-hidden="true">$</span>{page.tech.h}</summary>
+          <div class="tech-in">
+            {#each page.tech.p ?? [] as para, j (j)}<p>{para}</p>{/each}
+            {#if page.tech.list}<ul>{#each page.tech.list as li, j (j)}<li>{li}</li>{/each}</ul>{/if}
+            <ul class="links">
+              {#each page.tech.links as l (l.url)}<li><a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}<span class="sr-only"> {t("foot.external")}</span></a></li>{/each}
+            </ul>
+          </div>
+        </details>
+      {/if}
+    </div>
   </div>
 </article>
 
 <style>
   .info {
     display: grid;
-    justify-items: center;
-    padding-block: var(--sp-5) var(--sp-7);
-  }
-  /* Le document dans un cadre aux coins menthe (signature du site, comme l'infographie de
-     l'accueil) : les équerres autour, la carte de lecture dedans. */
-  .frame {
-    --k: rgb(95 227 181 / 0.6);
     width: 100%;
-    max-width: 784px;
-    padding: 12px;
-    background:
-      linear-gradient(var(--k), var(--k)) 0 0 / 18px 2px no-repeat,
-      linear-gradient(var(--k), var(--k)) 0 0 / 2px 18px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 0 / 18px 2px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 0 / 2px 18px no-repeat,
-      linear-gradient(var(--k), var(--k)) 0 100% / 18px 2px no-repeat,
-      linear-gradient(var(--k), var(--k)) 0 100% / 2px 18px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 100% / 18px 2px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 100% / 2px 18px no-repeat;
+    max-width: 1120px;
+    margin-inline: auto;
+    padding-block: 0 var(--sp-7);
   }
-  .doc {
-    display: grid;
-    gap: var(--sp-6);
-    width: 100%;
-    padding: clamp(var(--sp-5), 5vw, var(--sp-7)) clamp(var(--sp-4), 6vw, 64px);
-    border: 1px solid var(--hair-2);
-    border-radius: var(--r-2xl);
-    background:
-      radial-gradient(120% 50% at 50% 0%, rgb(92 128 255 / 0.07), transparent 70%),
-      var(--surface-1);
-    box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.7);
-  }
-  @media (max-width: 599px) {
-    .info {
-      padding-block: var(--sp-3) var(--sp-6);
-    }
-    .frame {
-      padding: 6px;
-    }
-    .doc {
-      border-radius: var(--r-xl);
-    }
-  }
+  /* En-tête : grand titre sur le fond du site, halo et couture en demi-teinte de la teinte bleue
+     (classe .band, ui/base.css), sous laquelle commence la lecture. */
   .hd {
     display: grid;
-    gap: var(--sp-3);
-    padding-block-end: var(--sp-5);
-    border-block-end: 1px solid var(--hair);
+    gap: var(--sp-4);
+    justify-items: start;
+    padding-block: clamp(48px, 8vw, 104px) clamp(64px, 9vw, 112px);
+  }
+  .hd::after {
+    inset-block-start: auto;
+    inset-block-end: -44px;
   }
   .eyebrow {
     display: inline-flex;
@@ -137,9 +125,14 @@
   }
   .title {
     margin: 0;
-    font-size: var(--fs-screen);
-    line-height: 1.08;
-    letter-spacing: -0.02em;
+    max-width: 18ch;
+    font-size: clamp(2.25rem, 1.4rem + 3.4vw, 4rem);
+    line-height: 1.02;
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    letter-spacing: -0.035em;
+    overflow-wrap: break-word;
+    min-width: 0;
     text-wrap: balance;
   }
   .title:focus {
@@ -147,29 +140,33 @@
   }
   .lede {
     margin: 0;
-    max-width: 58ch;
-    color: var(--text-2);
-    font-size: 1.125rem;
-    line-height: 1.55;
+    max-width: 56ch;
+    color: #aab6d3;
+    font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+    line-height: 1.6;
+    text-wrap: pretty;
   }
   .draft {
-    justify-self: start;
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pill);
     background: var(--warn-tint);
     color: var(--warn);
     font-size: var(--fs-small);
     font-weight: 600;
   }
-  /* Sommaire : boutons (le « # » est réservé aux clés), numérotés comme les sections. */
+
+  .body {
+    display: grid;
+    gap: var(--sp-6);
+    padding-block-start: 72px;
+  }
+  /* Sommaire : boutons (le « # » est réservé aux clés). Téléphone : une rangée de pastilles qui
+     défile seule, sans faire défiler la page. */
   .toc {
     display: grid;
-    gap: var(--sp-2);
-    padding: var(--sp-4);
-    border-radius: var(--r-lg);
-    background: rgb(255 255 255 / 0.025);
-    box-shadow: inset 0 0 0 1px var(--hair);
+    gap: var(--sp-3);
+    min-width: 0;
   }
   .toc-h {
     margin: 0;
@@ -180,126 +177,165 @@
     text-transform: uppercase;
   }
   .toc ol {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
-    gap: 2px var(--sp-4);
+    display: flex;
+    gap: var(--sp-2);
     margin: 0;
-    padding: 0;
+    padding: 0 0 var(--sp-1);
     list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .toc li {
+    flex: none;
   }
   .toc button {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    width: 100%;
     min-height: 40px;
-    padding: var(--sp-2) 0;
+    padding: var(--sp-2) var(--sp-4);
     border: 0;
-    background: none;
-    color: var(--text);
+    border-radius: var(--r-pill);
+    background: rgb(255 255 255 / 0.04);
+    box-shadow: inset 0 0 0 1px var(--hair-2);
+    color: var(--text-2);
     font: inherit;
     font-size: var(--fs-small);
+    white-space: nowrap;
     text-align: start;
     cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
   .toc button:hover {
+    color: var(--text);
+  }
+  .toc button[aria-current] {
     color: var(--accent);
+    background: rgb(95 227 181 / 0.08);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.35);
   }
   .toc button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-    border-radius: 4px;
   }
-  .tn {
-    flex: none;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: var(--fs-micro);
+  /* Ordinateur : sommaire à gauche, qui reste à l'écran ; un trait signale la section lue. */
+  @media (min-width: 960px) {
+    .body {
+      grid-template-columns: 240px minmax(0, 1fr);
+      column-gap: clamp(48px, 6vw, 96px);
+      align-items: start;
+    }
+    .body.solo {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .toc {
+      position: sticky;
+      top: 96px;
+    }
+    .toc ol {
+      display: grid;
+      gap: 0;
+      overflow: visible;
+      border-inline-start: 1px solid var(--hair-2);
+    }
+    .toc button {
+      position: relative;
+      width: 100%;
+      padding: 10px 0 10px var(--sp-4);
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    .toc button[aria-current] {
+      background: none;
+      box-shadow: none;
+    }
+    .toc button[aria-current]::before {
+      content: "";
+      position: absolute;
+      inset-block: 8px;
+      inset-inline-start: -1px;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgb(95 227 181 / 0.6);
+    }
+  }
+
+  .text {
+    display: grid;
+    gap: clamp(48px, 6vw, 72px);
+    min-width: 0;
+    max-width: 68ch;
   }
   .blk {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
     scroll-margin-top: 96px;
   }
   h2 {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-3);
     margin: 0;
-    font-size: var(--fs-h3);
-    line-height: 1.25;
+    font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     text-wrap: balance;
   }
   h2:focus {
     outline: none;
   }
-  .hn {
-    flex: none;
-    min-width: 2.2em;
-    padding: 2px 6px;
-    border-radius: 6px;
-    background: rgb(95 227 181 / 0.1);
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-align: center;
-  }
   p,
   li {
     margin: 0;
-    color: var(--text-2);
-    line-height: 1.7;
+    color: #b6c0d9;
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    text-wrap: pretty;
   }
-  .blk > p,
-  .blk > ul {
-    max-width: 64ch;
-  }
-  /* Puces : petits blocs menthe, comme les paquets chiffrés de l'infographie. */
   ul {
     display: grid;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     margin: 0;
     padding: 0;
     list-style: none;
   }
+  /* Puces : petits points menthe, comme la trame du site. */
   .blk li,
   .tech-in > ul:not(.links) li {
     position: relative;
-    padding-inline-start: 1.3em;
+    padding-inline-start: 1.4em;
   }
   .blk li::before,
   .tech-in > ul:not(.links) li::before {
     content: "";
     position: absolute;
-    inset-inline-start: 0.15em;
-    inset-block-start: 0.68em;
+    inset-inline-start: 0.2em;
+    inset-block-start: 0.72em;
     width: 6px;
     height: 6px;
-    border-radius: 1.5px;
+    border-radius: 50%;
     background: var(--accent);
-    opacity: 0.8;
+    box-shadow: 0 0 8px rgb(95 227 181 / 0.5);
   }
   /* Détails techniques : un terminal replié. */
   .tech {
-    border: 1px solid rgb(95 227 181 / 0.18);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-xl);
     background:
-      repeating-linear-gradient(180deg, rgb(255 255 255 / 0.02) 0 1px, transparent 1px 3px),
-      rgb(3 9 8 / 0.6);
+      repeating-linear-gradient(180deg, rgb(255 255 255 / 0.018) 0 1px, transparent 1px 3px),
+      rgb(3 9 8 / 0.55);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.18);
   }
   .tech summary {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: 48px;
-    padding: var(--sp-2) var(--sp-4);
+    min-block-size: 56px;
+    padding: var(--sp-3) var(--sp-5);
     color: #9ff5d3;
     font-family: var(--font-mono);
     font-size: var(--fs-small);
     font-weight: 600;
     cursor: pointer;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-xl);
   }
   .tp {
     color: var(--blue, #5596f8);
@@ -311,8 +347,9 @@
   .tech-in {
     display: grid;
     gap: var(--sp-3);
-    padding: 0 var(--sp-4) var(--sp-4);
+    padding: 0 var(--sp-5) var(--sp-5);
   }
+  .tech p,
   .tech li {
     font-size: var(--fs-small);
   }
@@ -328,8 +365,19 @@
     font-size: var(--fs-small);
     font-weight: 560;
   }
+  @media (prefers-reduced-motion: reduce) {
+    .toc button {
+      transition: none;
+    }
+  }
   @media (forced-colors: active) {
-    .doc {
+    .toc button {
+      border: 1px solid ButtonText;
+    }
+    .toc button[aria-current] {
+      border-width: 2px;
+    }
+    .tech {
       border: 1px solid CanvasText;
     }
   }

@@ -25,7 +25,6 @@
   import { Camera, Check, MessagesSquare, Mic, Upload } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
-  import SecureDemo from "../ui/SecureDemo.svelte";
   import Faq from "./home/Faq.svelte";
   import Sections from "./home/Sections.svelte";
 
@@ -77,6 +76,8 @@
         : [],
     }));
   });
+
+  const nLetters = $derived(words.reduce((n, w) => n + w.letters.length, 0));
 
   // Accroche coupée autour des mots mis en avant (sans HTML dans les textes).
   const lede = $derived.by(() => {
@@ -148,9 +149,9 @@
         <h1 id="hero-title" tabindex="-1">
           <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
           <span class="sr-only">{t("hero.title")}</span>
-          <span class="words" aria-hidden="true" data-ambient>
+          <span class="words" aria-hidden="true" data-ambient style:--n={nLetters}>
             {#each words as { w, hl, br, letters }, i (i)}{#if br}<br />{/if}<span class={["w", { hl }]}
-                >{#if hl}{#each letters as { c, k }, j (j)}<span class="l" style:--k={k}>{c}</span>{/each}{:else}{w}{/if}</span
+                >{#if hl}{#each letters as { c, k }, j (j)}<span class="l" data-c={c} style:--k={k}><span class="g">{c}</span></span>{/each}{:else}{w}{/if}</span
               >{" "}{/each}
           </span>
         </h1>
@@ -162,6 +163,9 @@
         <p class="lede" data-lede>
           {#each lede as p, i (i)}{#if "b" in p}<b class="hl">{p.b}</b>{:else}{p.s}{/if}{/each}
         </p>
+      {/if}
+    </div>
+    {#if !compact}
         <!-- Cadre d'envoi (propriétaire, 19 novembre, reprise de la maquette « Le chiffré ») : à
              gauche, la zone de dépôt et « Choisir des fichiers » ; à droite, « Ou créez sur place » :
              Photo ou vidéo, Vocal, Salon. Chaque bouton mène à la page d'envoi avec son geste déjà
@@ -190,14 +194,9 @@
         <ul class="meta" aria-label={t("home.facts.label")} data-meta>
           {#each meta as m, i (i)}<li><span class="ck" aria-hidden="true"><Check size={12} strokeWidth={2.6} /></span>{m}</li>{/each}
         </ul>
-      {:else}
-        <!-- Page d'envoi (retours du propriétaire du 12 novembre) : le titre reste visible, avec
-             trois assurances courtes sous lui ; rien de plus haut que la zone de dépôt. -->
-        <!-- Plus de bouton Salon ici (17 novembre) : il est avec les autres actions du composeur
-             (rangée sur ordinateur, menu « + » sur téléphone). -->
-      {/if}
-    </div>
-    {#if !compact}<div class="demo-slot"><SecureDemo /></div>{/if}
+    {/if}
+    <!-- La démonstration animée est descendue dans « Comment ça marche » (19 novembre, 2) : elle
+         répétait le panneau de cette section ; le cadre d'envoi prend sa place à droite. -->
   </section>
 
   <!-- Plus de bande d'engagements (17 novembre) : la sécurité et la confidentialité sont dites
@@ -251,6 +250,10 @@
       radial-gradient(38% 46% at 74% 42%, rgb(51 102 255 / 0.16), transparent 70%),
       radial-gradient(30% 40% at 62% 62%, rgb(95 227 181 / 0.09), transparent 70%);
   }
+  /* Les points du titre s'envolent vers la droite : jamais de défilement horizontal. */
+  .home:not(.compact) .hero {
+    overflow-x: clip;
+  }
   .pitch {
     display: grid;
     justify-items: start;
@@ -293,20 +296,29 @@
   /* Les deux actions (la tuile se suffit : plus de cadre autour, 16 novembre). */
   /* Cadre d'envoi (19 novembre) : zone de dépôt à gauche, gestes à droite. */
   .box {
+    position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    gap: var(--sp-4) var(--sp-5);
-    align-items: center;
+    gap: var(--sp-4);
+    justify-items: center;
     width: 100%;
-    max-width: 44rem;
-    margin-top: var(--sp-3);
-    padding: var(--sp-5);
+    max-width: 34rem;
+    padding: var(--sp-6) var(--sp-5);
     border-radius: var(--r-2xl);
+    text-align: center;
     background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)), rgb(16 22 38 / 0.82);
     box-shadow:
       inset 0 0 0 1px rgb(150 175 255 / 0.18),
       0 24px 60px -30px rgb(51 102 255 / 0.55);
     transition: box-shadow var(--dur-fast) var(--ease-out);
+  }
+  /* Pointillé intérieur : le cadre est une zone de dépôt (maquette « La trame »). */
+  .box::before {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 2px dotted rgb(150 175 255 / 0.22);
+    border-radius: calc(var(--r-2xl) - 8px);
+    pointer-events: none;
   }
   .box.over {
     box-shadow:
@@ -316,7 +328,9 @@
   .bx-l,
   .bx-r {
     display: grid;
+    justify-items: center;
     gap: var(--sp-3);
+    width: 100%;
     min-width: 0;
   }
   .bx-t {
@@ -341,7 +355,6 @@
     align-items: center;
     justify-content: center;
     gap: var(--sp-2);
-    justify-self: start;
     min-height: 56px;
     padding: 0 var(--sp-5);
     border: 0;
@@ -367,6 +380,7 @@
     outline-offset: 3px;
   }
   .mk3 {
+    width: 100%;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.75em), 1fr));
     gap: var(--sp-2);
@@ -413,18 +427,23 @@
     font-size: 0.6875rem;
     font-weight: 600;
   }
-  /* Téléphone : la zone de dépôt au-dessus, les trois gestes dessous ; bouton pleine largeur. */
+  /* Téléphone (19 novembre, 2) : tout le cadre tient dans le premier écran d'un iPhone ; « Glissez
+     vos fichiers ici » retiré (on ne glisse pas de fichier sur un téléphone), bouton pleine largeur. */
   @media (max-width: 639px) {
     .box {
-      grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-4);
-      text-align: center;
+      gap: var(--sp-3);
+      padding: var(--sp-5) var(--sp-4);
+    }
+    .bx-t {
+      display: none;
     }
     .pick {
       justify-self: stretch;
+      min-height: 52px;
     }
     .mk {
-      min-height: 84px;
+      min-height: 72px;
+      padding-block: var(--sp-2);
     }
   }
   @media (max-width: 767px) {
@@ -468,25 +487,6 @@
     color: var(--accent);
   }
   
-  @media (max-width: 599px) {
-    .ctas{
-      display: grid;
-      width: 100%;
-    }
-    /* Le cadre centré hérite de justify-content: center (tablette) : sa colonne doit s'étirer. */
-    .home:not(.compact) .ctas {
-      grid-template-columns: minmax(0, 1fr);
-      justify-content: stretch;
-    }
-
-    .pick{
-      width: 100%;
-      justify-content: center;
-    }
-  }
-  .demo-slot {
-    min-width: 0;
-  }
   /* Page d'envoi (retours du 12 novembre) : le titre visible, plus petit, à gauche ; trois
      assurances dessous ; le Salon à droite (ordinateur) ou dessous (téléphone). */
   .home.compact .hero {
@@ -620,61 +620,135 @@
   
   
 
-  /* « puis plus rien. » (reprise de « La trame », 19 novembre) : lisible d'abord, puis chaque
-     lettre, l'une après l'autre, se défait en trame de points (masque de points qui rapetissent),
-     s'évapore et revient ; boucle de 12 s, lisible environ les deux tiers du temps. Mouvement
-     réduit : lettres pleines, rien ne bouge. */
+  /* « puis plus rien. » (maquette « La trame », version 1 ; propriétaire, 19 novembre, 2) : en
+     vague depuis la fin de la ligne, chaque lettre se change en trame de points blancs, vire au
+     menthe, puis se défait en points qui s'envolent vers la droite et s'éteignent ; la ligne
+     reste vide un instant puis revient. Les points sont des masques CSS (aucune image) ; les deux
+     copies volantes (::before, ::after) reprennent la lettre (data-c). Boucle de 11 s, lisible
+     plus de la moitié du temps. Mouvement réduit : lettres pleines menthe, rien ne bouge. */
   @property --r {
     syntax: "<length>";
     inherits: false;
     initial-value: 4px;
   }
   .l {
+    position: relative;
     display: inline-block;
   }
   @media (prefers-reduced-motion: no-preference) {
+    .w.hl {
+      color: var(--text);
+    }
     .l {
-      -webkit-mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.6px));
-      mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.6px));
+      --d: calc((var(--n, 15) - var(--k, 0)) * 85ms);
+    }
+    /* La lettre (masquée) et ses points volants (hors du masque, sinon ils seraient coupés). */
+    .g {
+      display: inline-block;
+      -webkit-mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.7px));
+      mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.7px));
       -webkit-mask-size: 5px 5px;
       mask-size: 5px 5px;
-      animation: dissolve 12s var(--ease-in-out) infinite;
-      animation-delay: calc(var(--k, 0) * 90ms);
+      animation: dots 11s linear infinite;
+      animation-delay: var(--d);
     }
-    .still .l {
+    .l::before,
+    .l::after {
+      content: attr(data-c);
+      position: absolute;
+      inset: 0;
+      color: var(--accent);
+      opacity: 0;
+      pointer-events: none;
+      -webkit-mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
+      mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
+      -webkit-mask-size: 8px 7px;
+      mask-size: 8px 7px;
+      animation: fly 11s cubic-bezier(0.3, 0, 0.6, 1) infinite;
+      animation-delay: var(--d);
+    }
+    .l::after {
+      -webkit-mask-size: 11px 9px;
+      mask-size: 11px 9px;
+      -webkit-mask-position: 4px 3px;
+      mask-position: 4px 3px;
+      animation-name: fly2;
+    }
+    .still .g,
+    .still .l::before,
+    .still .l::after {
       animation-play-state: paused;
     }
   }
-  @keyframes dissolve {
+  /* Lettre : pleine → trame blanche → trame menthe → s'efface (ses points s'envolent) → revient. */
+  @keyframes dots {
     0%,
-    50% {
+    40% {
       --r: 4px;
+      color: var(--text);
       opacity: 1;
-      transform: none;
     }
-    64% {
+    47% {
+      --r: 1.9px;
+      color: var(--text);
+      opacity: 1;
+    }
+    53% {
+      --r: 1.9px;
+      color: var(--accent);
+      opacity: 1;
+    }
+    60% {
       --r: 1.2px;
-      opacity: 1;
-      transform: none;
-    }
-    74% {
-      --r: 0.5px;
+      color: var(--accent);
       opacity: 0;
-      transform: translateY(-0.12em);
     }
-    86% {
-      --r: 0.5px;
+    88% {
+      --r: 1.2px;
+      color: var(--text);
       opacity: 0;
-      transform: translateY(0.06em);
     }
+    96%,
     100% {
       --r: 4px;
+      color: var(--text);
       opacity: 1;
-      transform: none;
     }
   }
-  /* Téléphone et tablette (téléphone ajouté le 15 novembre : centrage revu) : texte centré,
-     infographie dessous, à largeur lisible. */
+  /* Points qui s'envolent : deux nuées, l'une plus loin et plus haut que l'autre. */
+  @keyframes fly {
+    0%,
+    54% {
+      opacity: 0;
+      transform: none;
+    }
+    57% {
+      opacity: 0.95;
+      transform: translate(0.06em, 0);
+    }
+    70%,
+    100% {
+      opacity: 0;
+      transform: translate(0.42em, -0.12em);
+    }
+  }
+  @keyframes fly2 {
+    0%,
+    55% {
+      opacity: 0;
+      transform: none;
+    }
+    59% {
+      opacity: 0.8;
+      transform: translate(0.1em, 0.02em);
+    }
+    74%,
+    100% {
+      opacity: 0;
+      transform: translate(1em, 0.14em);
+    }
+  }
+  /* Téléphone et tablette : titre, phrase, cadre puis assurances, centrés. */
   @media (max-width: 1023px) {
     .home:not(.compact) h1 {
       margin-inline: auto;
@@ -683,31 +757,56 @@
       justify-items: center;
       text-align: center;
     }
-    .home:not(.compact) .ctas,
+    .home:not(.compact) .box {
+      justify-self: center;
+    }
     .home:not(.compact) .meta {
       justify-content: center;
     }
-    .demo-slot {
-      width: 100%;
-      max-width: 560px;
-      margin-inline: auto;
+  }
+  @media (max-width: 639px) {
+    /* Bas : la couture de « Comment ça marche » (44 px au-dessus de la section) ne touche pas
+       les assurances. */
+    .home:not(.compact) .hero {
+      gap: var(--sp-4);
+      padding-block: var(--sp-3) 64px;
+    }
+    .home:not(.compact) .pitch {
+      gap: var(--sp-3);
+    }
+    .home:not(.compact) h1 {
+      font-size: clamp(2.125rem, 1.2rem + 4.6vw, 2.75rem);
+    }
+    .lede {
+      font-size: 1rem;
+      line-height: 1.5;
     }
   }
-  /* Ordinateur : texte à gauche, l'écran de démonstration à droite, sur le premier écran. */
+  /* Ordinateur : titre, phrase et assurances à gauche ; le cadre d'envoi à droite (maquette « La
+     trame »), sur le premier écran. */
   @media (min-width: 1024px) {
-    /* Premier écran (propriétaire, 18 novembre) : plus large, l'infographie plus grande, et le
-       héros remplit l'écran avant « Comment ça marche ». */
     .home:not(.compact) .hero {
-      grid-template-columns: minmax(0, 1fr) minmax(480px, 1.15fr);
+      grid-template-columns: minmax(0, 1.15fr) minmax(400px, 0.85fr);
+      grid-template-areas:
+        "pitch box"
+        "meta box";
       align-items: center;
-      column-gap: clamp(48px, 5vw, 88px);
-      min-height: calc(100svh - 76px - var(--banner-h, 0px));
-      padding-block: var(--sp-5) var(--sp-7);
+      column-gap: clamp(48px, 5vw, 96px);
+      row-gap: var(--sp-5);
+      min-height: min(calc(100svh - 76px - var(--banner-h, 0px)), 760px);
+      padding-block: var(--sp-6) var(--sp-7);
     }
-    .home:not(.compact) .demo-slot {
-      max-width: 760px;
+    .home:not(.compact) .pitch {
+      grid-area: pitch;
+      align-self: end;
+    }
+    .home:not(.compact) .box {
+      grid-area: box;
       justify-self: end;
-      width: 100%;
+    }
+    .home:not(.compact) .meta {
+      grid-area: meta;
+      align-self: start;
     }
     .home.compact .hero {
       grid-template-columns: minmax(0, 1fr);
@@ -716,12 +815,6 @@
     .lede {
       font-size: 1.1875rem;
     }
-    
-    
-    /* Carte vide : titre et « Commencer » sur une ligne, gestes dessous. */
-    
-    
-    
   }
 
   @media (prefers-reduced-motion: reduce) {

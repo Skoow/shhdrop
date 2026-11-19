@@ -348,21 +348,17 @@ html.kbd-open .dock {
   mask-image: radial-gradient(60% 100% at 50% 50%, #000 30%, transparent 100%);
 }
 @media (max-width: 599px) {
-  /* Téléphone : dans la colonne (le fondu cache le bord) ; aucun débordement à 320 px. */
-  .band::before,
+  /* Téléphone (19 novembre, 2 ; maquette « La trame », version 2) : la couture va d'un bord à
+     l'autre de l'écran (#app coupe tout débordement horizontal) ; elle ne se fond que sur les
+     bords, sinon le fondu rond l'effaçait presque. Les sections laissent 60 px entre elle et le
+     titre (Sections.svelte). */
   .band::after {
-    left: 0;
-    translate: none;
-  }
-  .band::before {
-    width: 100%;
-  }
-  .band::after {
-    width: 100%;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
   }
   .band::before {
     background:
-      radial-gradient(70% 140px at 50% 0, rgb(var(--tone) / 0.12), transparent 72%),
+      radial-gradient(80% 160px at 50% 0, rgb(var(--tone) / 0.14), transparent 72%),
       radial-gradient(90% 50% at 50% 50%, rgb(var(--tone) / 0.04), transparent 80%);
   }
 }

@@ -9,9 +9,9 @@
   import { limitParams } from "../../i18n/limit-params";
   import { reveal } from "../../ui/attach";
   import AddIcon from "../../ui/AddIcon.svelte";
-  import { scramble } from "../../ui/decor";
-  import { ArrowRight, Broom, EyeOff, Lock, UserX } from "../../ui/Icon";
+  import { ArrowRight, Broom, EyeOff, UserX } from "../../ui/Icon";
   import OffersStrip from "../../ui/OffersStrip.svelte";
+  import SecureDemo from "../../ui/SecureDemo.svelte";
   import TabIcon from "../../ui/TabIcon.svelte";
 
   const how = [
@@ -19,31 +19,6 @@
     { k: "seal", tint: "blue" },
     { k: "go", tint: "cyan" },
   ] as const;
-  // Panneau « en clair | chiffré » (19 novembre) : exemples, jamais des données de la personne.
-  const rows = $derived([
-    { k: "a", a: "vacances.jpg", b: "3,2 Mo", note: false },
-    { k: "b", a: "contrat-signé.pdf", b: "184 Ko", note: false },
-    { k: "c", a: t("home.how.voice"), b: "0:42", note: false },
-    { k: "d", a: t("home.how.note1"), b: "", note: true },
-    { k: "e", a: t("home.how.note2"), b: "", note: true },
-  ]);
-  // Le balayage ne tourne que si le panneau est à l'écran et l'onglet visible (ambiance).
-  let sealOn = $state(false);
-  function watchSeal(node: HTMLElement) {
-    if (typeof IntersectionObserver === "undefined") return;
-    let seen = false;
-    const set = () => (sealOn = seen && !document.hidden);
-    const io = new IntersectionObserver(([e]) => {
-      seen = e!.isIntersecting;
-      set();
-    });
-    io.observe(node);
-    document.addEventListener("visibilitychange", set);
-    return () => {
-      io.disconnect();
-      document.removeEventListener("visibilitychange", set);
-    };
-  }
   const priv = [
     { k: "account", tint: "mint" },
     { k: "server", tint: "blue" },
@@ -57,26 +32,10 @@
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
   </div>
-  <!-- Reprise de « Le chiffré » (propriétaire, 19 novembre), améliorée : un panneau « en clair |
-       chiffré » ; une ligne menthe le balaie et transforme sur son passage les noms de fichiers et la
-       note en texte chiffré, puis revient. Décor seulement (texte brouillé à graine fixe, decor.ts),
-       caché aux lecteurs d'écran ; les trois étapes dessous portent le sens. -->
-  <div class={["seal", "rv", { run: sealOn }]} aria-hidden="true" data-ambient {@attach reveal} {@attach watchSeal}>
-    <div class="sl-head">
-      <span>{t("home.how.clear")}</span>
-      <span class="sl-badge"><Lock size={12} strokeWidth={2.4} />{t("home.how.sealed")}</span>
-      <span>{t("home.how.cipher")}</span>
-    </div>
-    <div class="sl-body">
-      <div class="sl-layer clear">
-        {#each rows as r (r.k)}<p class={["sl-row", { note: r.note }]}><span>{r.a}</span>{#if r.b}<span class="num">{r.b}</span>{/if}</p>{/each}
-      </div>
-      <div class="sl-layer ciph">
-        {#each rows as r, i (r.k)}<p class={["sl-row", { note: r.note }]}><span>{scramble(r.a, 1, 0x51 + i * 7)}</span>{#if r.b}<span class="num">{scramble(r.b, 1, 0x91 + i * 5)}</span>{/if}</p>{/each}
-      </div>
-      <span class="sl-line"></span>
-    </div>
-  </div>
+  <!-- Démonstration animée (propriétaire, 19 novembre) : descendue du premier écran, elle remplace
+       le panneau « en clair | chiffré », qui répétait la même idée. Les trois étapes dessous
+       portent le sens pour les lecteurs d'écran. -->
+  <div class="demo rv" {@attach reveal}><SecureDemo /></div>
   <ol class="steps3">
     {#each how as c, i (c.k)}
       <li class="st rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
@@ -183,116 +142,17 @@
   @media (max-width: 599px) {
     .sec {
       gap: var(--sp-6);
-      padding-block: 72px 16px;
+      padding-block: 104px 24px;
     }
     .card {
       justify-items: center;
       text-align: center;
     }
   }
-  /* « Comment ça marche » (19 novembre) : panneau en clair | chiffré balayé par une ligne. */
-  .seal {
+  .demo {
     width: 100%;
-    max-width: 920px;
-    border-radius: var(--r-xl);
-    background: rgb(8 12 20 / 0.75);
-    box-shadow: inset 0 0 0 1px rgb(150 175 255 / 0.16), 0 30px 80px -40px rgb(0 0 0 / 0.8);
-    overflow: hidden;
-  }
-  .sl-head {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--sp-3) var(--sp-5);
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    font-size: var(--fs-micro);
-    border-block-end: 1px solid rgb(150 175 255 / 0.08);
-  }
-  .sl-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: var(--r-pill);
-    background: var(--accent);
-    color: var(--on-accent);
-    font-family: var(--font-sans);
-    font-weight: 700;
-  }
-  .sl-body {
-    --x: 50%;
-    position: relative;
-    overflow: hidden;
-    display: grid;
-    padding: var(--sp-5) var(--sp-5) var(--sp-6);
-    font-family: var(--font-mono);
-    font-size: clamp(0.8125rem, 0.7rem + 0.4vw, 1.0625rem);
-  }
-  .sl-layer {
-    grid-area: 1 / 1;
-    display: grid;
-    gap: 10px;
-    justify-self: center;
-    width: min(100%, 34em);
-  }
-  .sl-row {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .clear {
-    color: var(--text);
-    clip-path: inset(0 calc(100% - var(--x)) 0 0);
-  }
-  .ciph {
-    color: var(--accent);
-    opacity: 0.85;
-    clip-path: inset(0 0 0 var(--x));
-    text-shadow: 0 0 10px rgb(95 227 181 / 0.35);
-  }
-  .clear .sl-row:nth-child(4) {
-    margin-block-start: var(--sp-3);
-  }
-  .ciph .sl-row:nth-child(4) {
-    margin-block-start: var(--sp-3);
-  }
-  .sl-line {
-    position: absolute;
-    inset-block: 0;
-    left: var(--x);
-    width: 2px;
-    background: var(--accent);
-    box-shadow: 0 0 18px 2px rgb(95 227 181 / 0.55);
-  }
-  @property --x {
-    syntax: "<percentage>";
-    inherits: true;
-    initial-value: 50%;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .sl-body {
-      animation: sweep 7s var(--ease-in-out) infinite alternate;
-      animation-play-state: paused;
-    }
-    .run .sl-body {
-      animation-play-state: running;
-    }
-  }
-  @keyframes sweep {
-    0%,
-    8% {
-      --x: 104%;
-    }
-    92%,
-    100% {
-      --x: -4%;
-    }
+    max-width: 760px;
+    min-width: 0;
   }
   .steps3 {
     display: grid;
@@ -478,12 +338,6 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 6px;
-  }
-  @media (max-width: 599px) {
-    .sec {
-      padding-block-start: 72px;
-      gap: var(--sp-6);
-    }
   }
   @media (prefers-reduced-motion: reduce) {
     .card,

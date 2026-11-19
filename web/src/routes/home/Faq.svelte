@@ -184,7 +184,7 @@
      laissaient un grand vide avant le pied de page. */
   @media (max-width: 599px) {
     .faq {
-      padding-block: 72px 16px;
+      padding-block: 104px 24px;
     }
   }
   @media (forced-colors: active) {

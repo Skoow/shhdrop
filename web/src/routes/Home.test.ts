@@ -58,16 +58,17 @@ describe("Home (UI §9.1)", () => {
     // Sections sous le pli, chacune titrée.
     const h2 = [...document.querySelectorAll("h2")].map((h) => h.textContent!.trim());
     expect(h2).toEqual([
-      "Ce qui se passe quand vous partagez", // titre de l'infographie, pour les lecteurs d'écran
       "Comment ça marche",
       "Pensé pour la confidentialité",
       "Offres",
       "Vos questions",
     ]);
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
-    // « Comment ça marche » (19 novembre, « Le chiffré ») : panneau en clair | chiffré, caché aux
-    // lecteurs d'écran, et trois étapes numérotées.
-    expect(document.querySelector(".seal")!.getAttribute("aria-hidden")).toBe("true");
+    // « Comment ça marche » (19 novembre, 2) : la démonstration animée y est descendue (titrée h3
+    // pour les lecteurs d'écran), au-dessus des trois étapes numérotées.
+    expect(document.querySelector("#comment [data-demo]")).not.toBeNull();
+    expect(document.querySelector(".hero [data-demo]")).toBeNull();
+    expect(document.querySelector("#comment h3.sr-only")!.textContent).toBe("Ce qui se passe quand vous partagez");
     expect([...document.querySelectorAll("ol.steps3 > li[data-how-card] .n")].map((e) => e.textContent)).toEqual(["1", "2", "3"]);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
