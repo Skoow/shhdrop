@@ -149,6 +149,9 @@ func NewService(c Config) (*Service, error) {
 // Jetons : émission et dépense des jetons anonymes (nil sans Emetteur).
 func (s *Service) Jetons() *Jetons { return s.jetons }
 
+// Regime : régime de TVA choisi par l'exploitant (SHH_TVA).
+func (s *Service) Regime() Regime { return s.regime }
+
 // Moyens proposés, dans l'ordre carte, PayPal, crypto.
 func (s *Service) Moyens() []Moyen {
 	var out []Moyen

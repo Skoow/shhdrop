@@ -5,12 +5,13 @@
 // paiement/pass.ts). Le serveur du compte ne voit qu'un coffre chiffré de plus ; rien ne relie le
 // compte au paiement chez nous (le serveur du paiement ne connaît pas le compte).
 import { b64u, unb64u } from "../engine/pure";
-import { garder, lirePasses, type PassGarde } from "../paiement/pass";
+import { garder, lirePasses, paysDe, type PassGarde } from "../paiement/pass";
 import type { CoffrePrive, EntreePrivee } from "./vaults";
 
-/** Entrée du coffre : identifiant de l'enregistrement de l'appareil, pass et formule (aucune date de paiement). */
+/** Entrée du coffre : identifiant de l'enregistrement de l'appareil, pass, formule et pays déclaré (note de vente). */
 export function passEnEntree(g: PassGarde): EntreePrivee {
-  return { id: g.id, p: b64u(g.pass), offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, cree: g.cree };
+  const pays = paysDe(g.pays);
+  return { id: g.id, p: b64u(g.pass), offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, cree: g.cree, ...(pays ? { pays } : {}) };
 }
 
 /** Pass lu dans le coffre ; null s'il est mal formé (ignoré, jamais une erreur de session). */
@@ -28,7 +29,8 @@ export function passDeEntree(e: EntreePrivee): PassGarde | null {
     )
       return null;
     // Rangé depuis le coffre : une commande d'un autre appareil n'attend plus rien ici.
-    return { id: e.id, pass, offre: e.offre, jours: e.jours, renouvelle: e.renouvelle, moyen: e.moyen, enAttente: false, cree: e.cree as number };
+    const pays = paysDe(e.pays);
+    return { id: e.id, pass, offre: e.offre, jours: e.jours, renouvelle: e.renouvelle, moyen: e.moyen, enAttente: false, cree: e.cree as number, ...(pays ? { pays } : {}) };
   } catch {
     return null;
   }

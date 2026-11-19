@@ -151,18 +151,24 @@ func moyenDe(s string) (paiement.Moyen, bool) {
 	return 0, false
 }
 
-// offre : moyens proposés par ce serveur, pays acceptés, droits « bientôt » (aucun secret).
+// offre : moyens proposés par ce serveur, pays acceptés, droits « bientôt », régime de TVA et
+// taux appliqué par pays (aucun secret ; la note de vente est faite sur l'appareil, §9.3).
 func (a paiementAPI) offre(w http.ResponseWriter, _ *http.Request) {
 	var moyens []string
 	for _, m := range a.p.Moyens() {
 		moyens = append(moyens, nomsMoyens[m])
+	}
+	type tva struct {
+		Regime string           `json:"regime"`
+		Taux   map[string]int64 `json:"taux"`
 	}
 	writeJSON(w, http.StatusOK, struct {
 		V       int      `json:"v"`
 		Moyens  []string `json:"moyens"`
 		Pays    []string `json:"pays"`
 		Bientot []string `json:"bientot"`
-	}{1, moyens, paiement.Pays(), paiement.Bientot})
+		TVA     tva      `json:"tva"`
+	}{1, moyens, paiement.Pays(), paiement.Bientot, tva{a.p.Regime().String(), paiement.TauxAppliques(a.p.Regime())}})
 }
 
 // lirePass : X-Shh-Pass présent exactement une fois, 32 octets en base64url.

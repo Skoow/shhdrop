@@ -111,6 +111,25 @@ func TestVentiler(t *testing.T) {
 	if _, err := Ventiler(0, "FR", 700); err == nil {
 		t.Error("régime inconnu accepté")
 	}
+	// Taux publiés pour la note de vente du site : ceux de Ventiler, pour les 27 pays.
+	for _, r := range []Regime{Franchise, France, OSS} {
+		ta := TauxAppliques(r)
+		if len(ta) != 27 {
+			t.Fatalf("%v : %d pays", r, len(ta))
+		}
+		for _, p := range Pays() {
+			v, _ := Ventiler(r, p, 700)
+			if ta[p] != v.Taux {
+				t.Errorf("%v %s : %d, %d attendu", r, p, ta[p], v.Taux)
+			}
+		}
+	}
+	if TauxAppliques(Franchise)["DE"] != 0 || TauxAppliques(France)["DE"] != 2000 || TauxAppliques(OSS)["DE"] != 1900 {
+		t.Error("taux appliqués")
+	}
+	if Franchise.String() != "franchise" || France.String() != "france" || OSS.String() != "oss" || Regime(0).String() != "" {
+		t.Error("noms des régimes")
+	}
 	// Chaque pays, chaque prix : HT + TVA = TTC, TVA ≥ 0, et l'arrondi est le plus proche.
 	for _, p := range Pays() {
 		for _, ttc := range []int64{700, 2000, 7000, 20000} {

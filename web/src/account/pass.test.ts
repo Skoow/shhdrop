@@ -12,6 +12,9 @@ describe("pass dans le coffre privé", () => {
   it("entrée ↔ pass ; entrée mal formée ignorée", () => {
     const a = g();
     expect(passDeEntree(passEnEntree(a))).toEqual(a);
+    const b = g({ pays: "DE" });
+    expect(passDeEntree(passEnEntree(b))).toEqual(b);
+    expect(passDeEntree({ ...passEnEntree(b), pays: "de" })).toEqual({ ...b, pays: undefined });
     expect(passDeEntree({ ...passEnEntree(a), offre: "max" })).toBeNull();
     expect(passDeEntree({ ...passEnEntree(a), p: "court" })).toBeNull();
   });

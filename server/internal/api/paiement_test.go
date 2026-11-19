@@ -78,7 +78,8 @@ func TestPaiementOffre(t *testing.T) {
 	w := e.do(req{method: "GET", path: "/api/paiement"})
 	m := jsonOf(t, w)
 	if w.Code != 200 || m["v"] != 1.0 || len(m["moyens"].([]any)) != 1 || m["moyens"].([]any)[0] != "carte" ||
-		len(m["pays"].([]any)) != 27 || !strings.Contains(w.Body.String(), `"bientot":["appel_audio","appel_video"]`) {
+		len(m["pays"].([]any)) != 27 || !strings.Contains(w.Body.String(), `"bientot":["appel_audio","appel_video"]`) ||
+		!strings.Contains(w.Body.String(), `"tva":{"regime":"oss","taux":{"AT":2000,"BE":2100,`) || !strings.Contains(w.Body.String(), `"DE":1900,`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }

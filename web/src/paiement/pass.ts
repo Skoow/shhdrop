@@ -7,7 +7,9 @@
 //   appareil ; cela ne protège que d'une lecture naïve du stockage.
 // - Sans compte, perdre l'appareil (ou effacer les données du site) perd le pass : dit avant le
 //   paiement. Le rangement dans le coffre privé du compte vient ensuite (plan, tâche 8).
-// - Rien d'autre n'est gardé : ni pays, ni prix, ni adresse de page de paiement.
+// - Gardé aussi, ici seulement : le pays déclaré à la commande, pour la note de vente faite sur
+//   l'appareil (TVA du pays, conception §9.3) ; il n'est jamais renvoyé au serveur. Rien d'autre :
+//   ni prix, ni adresse de page de paiement.
 // Apps (D42-20) : trousseau du système à la place, même contenu.
 import { idbBackend, type Backend } from "../history/store";
 import { b64u, unb64u, utf8 } from "../engine/pure";
@@ -27,7 +29,12 @@ export type PassGarde = {
   enAttente: boolean;
   /** Date de la commande (millisecondes), pour trier ; jamais envoyée. */
   cree: number;
+  /** Pays déclaré à la commande (ISO, deux majuscules), pour la note de vente ; jamais envoyé ensuite. */
+  pays?: string;
 };
+
+/** Pays au bon format, ou undefined. */
+export const paysDe = (v: unknown): string | undefined => (typeof v === "string" && /^[A-Z]{2}$/.test(v) ? v : undefined);
 
 /** IndexedDB du navigateur, ou null (refusé : navigation privée de certains navigateurs, cadres). */
 export function idbDuNavigateur(): IDBFactory | null {
@@ -50,7 +57,7 @@ const nouvelleCle = () => crypto.subtle.generateKey({ name: "AES-GCM", length: 2
 export async function garder(idb: IDBFactory, g: PassGarde): Promise<void> {
   const b = base(idb);
   const key = await b.key(await nouvelleCle());
-  const pt = utf8(JSON.stringify({ p: b64u(g.pass), offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, en_attente: g.enAttente, cree: g.cree }));
+  const pt = utf8(JSON.stringify({ p: b64u(g.pass), offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, en_attente: g.enAttente, cree: g.cree, pays: paysDe(g.pays) }));
   try {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD + g.id) }, key, pt));
@@ -86,7 +93,8 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
           !Number.isSafeInteger(o.cree)
         )
           continue;
-        out.push({ id, pass, offre: o.offre, jours: o.jours, renouvelle: o.renouvelle, moyen: o.moyen, enAttente: o.en_attente, cree: o.cree as number });
+        const pays = paysDe(o.pays);
+        out.push({ id, pass, offre: o.offre, jours: o.jours, renouvelle: o.renouvelle, moyen: o.moyen, enAttente: o.en_attente, cree: o.cree as number, ...(pays ? { pays } : {}) });
       } catch {
         // enregistrement abîmé : ignoré
       }

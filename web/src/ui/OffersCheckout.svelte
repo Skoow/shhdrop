@@ -114,7 +114,7 @@
         return;
       }
       const jours = billing === "month" ? 30 : 365;
-      const g = { id: nouvelId(), pass: tirerPass(), offre: chosen, jours, renouvelle, moyen: API[means], enAttente: true, cree: Date.now() } as const;
+      const g = { id: nouvelId(), pass: tirerPass(), offre: chosen, jours, renouvelle, moyen: API[means], enAttente: true, cree: Date.now(), pays } as const;
       try {
         await garder(idb, g);
       } catch {

@@ -20,7 +20,22 @@ export type Moyen = "carte" | "paypal" | "crypto";
 export const MOYENS: readonly Moyen[] = ["carte", "paypal", "crypto"];
 export type OffrePayante = "plus" | "pro";
 
-export type OffreServeur = { moyens: Moyen[]; pays: string[]; bientot: string[] };
+/** Régime de TVA du vendeur et taux appliqué par pays (points de base : 2000 = 20 %), pour la note de vente. */
+export type Tva = { regime: "franchise" | "france" | "oss"; taux: Readonly<Record<string, number>> };
+export type OffreServeur = { moyens: Moyen[]; pays: string[]; bientot: string[]; tva: Tva | null };
+
+/** Régime et taux lus ; null si absents ou mal formés (la note de vente n'est alors pas proposée). */
+function tvaDe(o: unknown): Tva | null {
+  if (typeof o !== "object" || o === null) return null;
+  const { regime, taux } = o as Record<string, unknown>;
+  if ((regime !== "franchise" && regime !== "france" && regime !== "oss") || typeof taux !== "object" || taux === null) return null;
+  const out: Record<string, number> = {};
+  for (const [p, v] of Object.entries(taux)) {
+    if (!/^[A-Z]{2}$/.test(p) || !Number.isSafeInteger(v) || (v as number) < 0 || (v as number) > 10000) return null;
+    out[p] = v as number;
+  }
+  return { regime, taux: out };
+}
 
 /** Pages hébergées permises (conception §4.4), mêmes débuts d'adresse que le serveur. */
 export const ORIGINES: readonly string[] = [
@@ -70,7 +85,12 @@ export async function lireOffre(n: Net = netParDefaut()): Promise<OffreServeur |
   if (r === null || r.status !== 200) return null;
   const o = await json(r);
   if (o === null || o.v !== 1 || !chaines(o.moyens) || !chaines(o.pays) || !chaines(o.bientot)) return null;
-  return { moyens: o.moyens.filter((m): m is Moyen => (MOYENS as readonly string[]).includes(m)), pays: o.pays.filter((p) => /^[A-Z]{2}$/.test(p)), bientot: o.bientot };
+  return {
+    moyens: o.moyens.filter((m): m is Moyen => (MOYENS as readonly string[]).includes(m)),
+    pays: o.pays.filter((p) => /^[A-Z]{2}$/.test(p)),
+    bientot: o.bientot,
+    tva: tvaDe(o.tva),
+  };
 }
 
 export type Demande = { offre: OffrePayante; jours: 30 | 365; renouvelle: boolean; moyen: Moyen; pays: string; renonciation: boolean };
