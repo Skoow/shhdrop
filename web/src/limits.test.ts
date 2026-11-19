@@ -20,7 +20,10 @@ describe("limites : mêmes valeurs côté serveur (Go)", () => {
     expect(/maxAttempts\s*=\s*(\d+)/.exec(service)?.[1]).toBe(String(PW_TRIES));
   });
   it("ouvertures : 1 à MAX_OPENS", () => {
-    expect(service).toContain("r.MaxOpens < 1 || r.MaxOpens > MaxOpens ||");
+    // Formules payantes (19 novembre) : la borne vient de la formule ; gratuit : MaxOpens.
+    expect(service).toContain("r.MaxOpens < 1 || r.MaxOpens > t.MaxOpensOf() ||");
+    const tier = readFileSync(new URL("../../server/internal/share/tier.go", import.meta.url), "utf8");
+    expect(tier).toMatch(/func \(t Tier\) MaxOpensOf\(\) int \{[\s\S]*?\n\treturn MaxOpens\n\}/);
     expect(/\nconst MaxOpens = (\d+)\n/.exec(service)?.[1]).toBe(String(MAX_OPENS));
   });
   it("durées proposées", () => {

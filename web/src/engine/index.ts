@@ -16,7 +16,7 @@
 import { compteKeys, passwordKey as kdfOpen, passwordKeyForCreate as kdfCreate } from "./argon2";
 import { loadEngine, resetEngine, type Engine } from "./load";
 import type { JsAccessKeys, JsContentKeys, JsElementSealer, JsReader, JsSeed } from "./pkg/shhdrop_wasm.js";
-import { type KAcces, type KdfParams, type KeepTtl, type KLien, type KMdp, type KPreuve, type Manifest, type ManifestClean, type Piece, PREVIEW_MAX, type Rights, type SGestion, utf8 } from "./pure";
+import { type KAcces, type KdfParams, type KeepTtl, type KLien, type KMdp, type KPreuve, type Manifest, type ManifestClean, type Palier, type Piece, PREVIEW_MAX, type Rights, type SGestion, utf8 } from "./pure";
 
 export * from "./pure";
 export { loadEngine } from "./load";
@@ -403,11 +403,11 @@ const sealers = new WeakMap<ElementSealer, { gen: number; size: number; first: n
  * Prépare l'élément `blob` placé au morceau `first` (clé neuve à chaque appel). Le Blob est lu
  * par plages (4 Mio au plus) ; un File modifié depuis l'ajout fait échouer la lecture.
  */
-export async function elementSealer(blob: Blob, first: number): Promise<ElementSealer> {
+export async function elementSealer(blob: Blob, first: number, palier: Palier = 0): Promise<ElementSealer> {
   const size = blob.size;
   const made = await run((e) => {
     const g = gen;
-    return e.wasm.elementSealer(e.provider, size, first).then((el: JsElementSealer) => ({ el, gen: g }));
+    return e.wasm.elementSealer(e.provider, size, first, palier).then((el: JsElementSealer) => ({ el, gen: g }));
   });
   const el = made.el;
   const pieces = el.pieces() as Piece[];
@@ -459,7 +459,7 @@ export type FinalEntry =
 export function sealFinal(
   entries: FinalEntry[],
   keys: ContentKeys,
-  opts: { rights?: Rights; keepTtlH?: KeepTtl },
+  opts: { rights?: Rights; keepTtlH?: KeepTtl; palier?: Palier },
 ): Promise<{ bucket: number; header: Uint8Array<ArrayBuffer>; tail: Uint8Array<ArrayBuffer> }> {
   return run(async (e) => {
     for (const x of entries) {
@@ -468,7 +468,7 @@ export function sealFinal(
       if (m.size !== x.size || m.first !== x.first) throw new Error("entree_invalide");
     }
     const list = entries.map(({ sealer, ...x }) => ({ ...x, sealer: sealer.id }));
-    const fin = await e.wasm.sealFinal(list, keys, opts.rights, opts.keepTtlH);
+    const fin = await e.wasm.sealFinal(list, keys, opts.rights, opts.keepTtlH, opts.palier ?? 0);
     return fin as { bucket: number; header: Uint8Array<ArrayBuffer>; tail: Uint8Array<ArrayBuffer> };
   });
 }

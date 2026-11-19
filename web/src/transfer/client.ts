@@ -257,7 +257,8 @@ export type CreateOpts = api.Net & {
    * import.meta.env.BASE_URL). Le lien vaut `${origin}${base}#<K_lien>` (spec §32).
    */
   base?: string;
-  ttlHours: TtlHours;
+  /** Heures : 1, 6, 12, 24 (gratuit) ; aussi 48, 72 (Plus) et 168 (Pro), vérifiées par le brouillon (limitesDe). */
+  ttlHours: number;
   maxOpens: number;
   /** Mot de passe généré (generatePassword, 11 caractères) ou saisi (checkPassword : 10 au moins). */
   password: GeneratedPassword | string;

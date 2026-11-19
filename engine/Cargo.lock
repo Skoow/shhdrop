@@ -2031,6 +2031,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "shhdrop-jetons-wasm"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "js-sys",
+ "shhdrop-core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "shhdrop-salon"
 version = "0.1.0"
 dependencies = [
@@ -2068,7 +2078,6 @@ dependencies = [
 name = "shhdrop-wasm"
 version = "0.1.0"
 dependencies = [
- "getrandom 0.4.3",
  "js-sys",
  "shhdrop-core",
  "wasm-bindgen",

@@ -7,8 +7,6 @@
 // de segments, et à la fin le sel, Argon2id, V_preuve, E, l'en-tête et le manifeste chiffré.
 import {
   CHUNK_CT,
-  DATA_CHUNKS,
-  DATA_SEGMENTS,
   HEADER,
   KDF_CREATE,
   SEG_CHUNKS,
@@ -18,6 +16,7 @@ import {
   b64u,
   checkOrigin,
   contentKeys,
+  dataSegmentsOf,
   deriveAccess,
   elementSealer,
   fileSha256,
@@ -43,10 +42,11 @@ import {
   type KeepTtl,
   type KLien,
   type KMdp,
+  type Palier,
   type Rights,
   type SGestion,
 } from "../engine";
-import { MAX_OPENS, TTL_HOURS } from "../limits";
+import { limitesDe } from "../limits";
 import * as api from "./api";
 import {
   CAPTCHA_MIN_MS,
@@ -102,6 +102,16 @@ export type DraftOpts = api.Net & {
   onChange?: () => void;
   /** Créer le brouillon dès le premier fichier (faux : seulement au clic, ex. createShare). */
   auto?: boolean;
+  /**
+   * Formule du partage (conception du paiement §11) : 0 gratuit (défaut), 1 Plus, 2 Pro. Fixée
+   * pour toute la vie du brouillon (le serveur la lit dans le jeton dépensé à la création).
+   */
+  palier?: Palier;
+  /**
+   * Jeton anonyme de la formule (base64url), demandé une fois, à la création du brouillon ; il
+   * part dans « Authorization: PrivateToken » et nulle part ailleurs. Obligatoire avec palier > 0.
+   */
+  jeton?: () => Promise<string>;
   keepMs?: number;
 };
 
@@ -141,6 +151,12 @@ const isAbort = (e: unknown) => e instanceof DOMException && e.name === "AbortEr
 
 export function createDraft(origin: string, o: DraftOpts = {}) {
   checkOrigin(origin);
+  const palier: Palier = o.palier ?? 0;
+  if (palier !== 0 && !o.jeton) throw new Error("jeton_absent");
+  const formule = palier === 0 ? "free" : palier === 1 ? "plus" : "pro";
+  /** Segments et morceaux de données au plus de la formule. */
+  const dataSegments = dataSegmentsOf(palier);
+  const dataChunks = dataSegments * SEG_CHUNKS;
   const c = api.ctx(origin, o);
   const els = new Map<string, El>();
   /** Places (segments) de grands éléments retirés, gardées jusqu'à la fin de leur effacement sur le serveur. */
@@ -255,9 +271,11 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       // Réservation : fichiers déjà placés et en attente, au plus CREATE_SEGMENTS segments
       // (D42-6 : le serveur refuse plus) ; la suite vient par grow, au fil de l'envoi.
       const pending = usedSegments() + segmentsNeeded([...els.values()].filter((e) => e.first < 0).map((e) => e.src.size));
-      const bucket = reservationFor(Math.min(CREATE_SEGMENTS, DATA_SEGMENTS, pending));
+      const bucket = reservationFor(Math.min(CREATE_SEGMENTS, dataSegments, pending), palier);
+      // Jeton de la formule : pris ici, juste avant la création (jamais plus tôt).
+      const jeton = palier === 0 ? undefined : await o.jeton!();
       // Jamais interrompue : un brouillon créé resterait inconnu.
-      const r = await api.create(c, acc.kAcces, sGestion, { bucket, hp: "", shown_at: cap.shownAt, ...fields });
+      const r = await api.create(c, acc.kAcces, sGestion, { bucket, hp: "", shown_at: cap.shownAt, ...fields }, jeton);
       return { kLien, sGestion, token: r.uploadToken, bucket };
     } catch (e) {
       kLien.fill(0);
@@ -375,7 +393,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   // retirés exclus.
 
   function takenChunks(): Uint8Array {
-    const t = new Uint8Array(DATA_CHUNKS);
+    const t = new Uint8Array(dataChunks);
     for (const e of els.values()) {
       if (e.first < 0 || e.chunks === 0) continue;
       // En erreur : seule la place déjà partie reste prise (un essai neuf la reprend ailleurs) ;
@@ -402,14 +420,14 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     if (n === 0) return 0;
     const t = takenChunks();
     if (isSmall(size)) {
-      for (let a = 0, run = 0; a < DATA_CHUNKS; a++) {
+      for (let a = 0, run = 0; a < dataChunks; a++) {
         if (a % SEG_CHUNKS === 0) run = 0;
         run = t[a] ? 0 : run + 1;
         if (run === n) return a - n + 1;
       }
     } else {
       const segs = Math.ceil(n / SEG_CHUNKS);
-      for (let g = 0, run = 0; g < DATA_SEGMENTS; g++) {
+      for (let g = 0, run = 0; g < dataSegments; g++) {
         run = t.subarray(g * SEG_CHUNKS, (g + 1) * SEG_CHUNKS).some((x) => x !== 0) ? 0 : run + 1;
         if (run === segs) return (g - segs + 1) * SEG_CHUNKS;
       }
@@ -447,7 +465,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       throwIfAborted(signal);
       e.chunks = footprintFor(e.data.size);
       e.first = place(e.data.size);
-      const sealer = await elementSealer(e.data, e.first);
+      const sealer = await elementSealer(e.data, e.first, palier);
       e.sealer = sealer;
       e.parts = sealer.pieces.length;
       // A13 : PUT_IN_FLIGHT envois au plus en même temps (le serveur accepte 2 segments au-delà du
@@ -471,7 +489,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           // au-delà du dernier reçu, audit H1).
           const n = p.seg;
           if ((n + 1) * SEG_CHUNKS + 1 > cr.bucket) {
-            const need = reservationFor(n + 1);
+            const need = reservationFor(n + 1, palier);
             await withBudget(Date.now() + SERVER_STALL_MS, { signal }, (s) => api.grow(c, cr.token, need, s));
             cr.bucket = need;
           }
@@ -701,8 +719,9 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
   };
 
   async function finalize(list: { id: string; item: Item }[], f: CreateOpts): Promise<{ link: string; manage: string; expiresInS: number }> {
-    if (!(TTL_HOURS as readonly number[]).includes(f.ttlHours)) throw new Error("duree_invalide");
-    if (!Number.isInteger(f.maxOpens) || f.maxOpens < 1 || f.maxOpens > MAX_OPENS) throw new Error("ouvertures_invalides");
+    const lim = limitesDe(formule);
+    if (!lim.ttlHours.includes(f.ttlHours)) throw new Error("duree_invalide");
+    if (!Number.isInteger(f.maxOpens) || f.maxOpens < 1 || f.maxOpens > lim.maxOpens) throw new Error("ouvertures_invalides");
     f.prepared?.proof.catch(() => undefined);
     // Mot de passe de la forme générée (D41-15) : refusé avant toute requête.
     if (!isGeneratedPassword(f.password)) throw new Error("mot_de_passe_non_genere");
@@ -847,7 +866,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           entries.push({ kind: "file", name: item.name, mime: item.mime, size: e.data!.size, first: e.first, sealer: e.sealer!, ...(item.clean ? { clean: item.clean } : {}), ...(sum && /^[0-9a-f]{64}$/.test(sum) ? { sha256: sum } : {}) });
         }
       }
-      const opts = { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined };
+      const opts = { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined, palier };
       // Empreintes en trop (200 fichiers aux noms très longs) : le manifeste déborderait ; il part
       // alors sans empreinte plutôt que d'empêcher l'envoi (le refus de validation n'use pas la
       // clé, moteur). Le composeur borne la taille sans les empreintes.

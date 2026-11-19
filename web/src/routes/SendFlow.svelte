@@ -17,6 +17,9 @@
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { createDraft, destroyShare, type CaptchaCtx, type Draft, type TtlHours } from "../index";
+  import { limitesDe, type Formule } from "../limits";
+  import { formulesDisponibles, prendreJeton } from "../paiement/jetons";
+  import { idbDuNavigateur } from "../paiement/pass";
   import { announce } from "../ui/announce";
   import Banner from "../ui/Banner.svelte";
   import { runTransition } from "../ui/viewTransition";
@@ -53,10 +56,52 @@
   // ajout ; détruit (keepalive) si la liste est vidée, la page quittée ou l'écran démonté.
   let uploadVersion = $state(0);
   let removing = $state(0);
+  // Formule du partage (conception du paiement §11) : Plus ou Pro seulement si un pass payé est
+  // gardé sur cet appareil ; le brouillon la reçoit à sa création (fixée pour sa vie) et dépense
+  // alors un jeton anonyme. Démo : jamais (aucun serveur).
+  let formules = $state<Formule[]>([]);
+  let formule: Formule = "free";
+  $effect(() => {
+    const idb = demo ? null : idbDuNavigateur();
+    if (idb === null) return;
+    let vivant = true;
+    void formulesDisponibles(idb)
+      .then((l) => {
+        if (vivant) formules = l;
+      })
+      .catch(() => undefined);
+    return () => {
+      vivant = false;
+    };
+  });
+  function jetonDe(f: Formule): (() => Promise<string>) | undefined {
+    if (f === "free") return undefined;
+    return () => {
+      const idb = idbDuNavigateur();
+      return idb === null ? Promise.reject(new Error("aucun_jeton")) : prendreJeton(idb, f);
+    };
+  }
+  // Fichiers de la liste (relus pour recommencer l'envoi quand la formule change).
+  let lastList: { id: string; data: Blob }[] = [];
+  function onformule(f: Formule) {
+    if (f === formule) return;
+    formule = f;
+    // Nouvelle formule : nouveau brouillon (l'ancien est abandonné, ses envois effacés) et les
+    // fichiers déjà ajoutés recommencent sous la nouvelle formule.
+    void draft.abandon();
+    draft = newDraft();
+    if (shownPassword !== undefined) draft.password(shownPassword);
+    if (sendPage) draft.warm();
+    if (draftUsed) draft.sync(lastList);
+    removing = 0;
+    uploadVersion++;
+  }
   function newDraft(): Draft {
     const d = createDraft(typeof location === "undefined" ? "http://localhost" : location.origin, {
       solveCaptcha,
       auto: true,
+      palier: limitesDe(formule).palier,
+      jeton: jetonDe(formule),
       // Dernier verrou avant le chiffrement : seul un contenu déclaré prêt par le composeur
       // (nettoyé, ou « Envoyer tel quel » choisi) est chiffré (flows/clean-gate.ts, spec §35.2).
       prepare: gate,
@@ -85,6 +130,7 @@
     draft.password(pw);
   }
   function onitems(list: { id: string; data: Blob }[]) {
+    lastList = list;
     if (list.length === 0 && draftUsed) {
       void draft.abandon();
       draft = newDraft();
@@ -297,6 +343,8 @@
       onsend={start}
       {onitems}
       {onpassword}
+      {onformule}
+      {formules}
       uploadOf={(id) => draft.status(id)}
       {uploadVersion}
       onretry={(id) => draft.retry(id)}

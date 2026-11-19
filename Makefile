@@ -10,6 +10,7 @@ test-engine:
 	cd engine && cargo clippy -p shhdrop-wasm --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 	cd engine && cargo clippy -p shhdrop-salon --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 	cd engine && cargo clippy -p shhdrop-salon-wasm --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
+	cd engine && cargo clippy -p shhdrop-jetons-wasm --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 	cd engine && cargo test --workspace --locked
 
 test-go:

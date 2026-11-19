@@ -68,6 +68,7 @@ export async function lirePasses(idb: IDBFactory): Promise<PassGarde[]> {
     const key = await b.key(await nouvelleCle());
     const out: PassGarde[] = [];
     for (const [id, rec] of await b.all()) {
+      if (id.startsWith("j:")) continue; // jeton (lireJetons)
       try {
         if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) continue;
         const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD + id) }, key, rec.ct));
@@ -103,4 +104,56 @@ export async function oublier(idb: IDBFactory, id: string): Promise<void> {
 /** Identifiant d'enregistrement : 16 caractères base64url aléatoires (aucun lien avec le pass). */
 export function nouvelId(): string {
   return b64u(crypto.getRandomValues(new Uint8Array(12)));
+}
+
+// --- Jetons anonymes gardés (conception du paiement §7) ---------------------------------------
+// Même base, enregistrements « j: » à part, même chiffrement (donnée authentifiée distincte) :
+// un jeton n'est relié à aucun pass dans la base (rien ne dit de quel pass il vient).
+
+const AAD_JETON = "shhdrop-pass/v1/jeton/";
+
+export type JetonGarde = { id: string; jeton: string; offre: OffrePayante; /** jour de sa clé (AAAA-MM-JJ, UTC) */ jour: string };
+
+export async function garderJeton(idb: IDBFactory, j: Omit<JetonGarde, "id">): Promise<void> {
+  const b = base(idb);
+  const key = await b.key(await nouvelleCle());
+  const id = "j:" + nouvelId();
+  const pt = utf8(JSON.stringify({ jeton: j.jeton, offre: j.offre, jour: j.jour }));
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(AAD_JETON + id) }, key, pt));
+    await b.put(id, { iv, ct });
+  } finally {
+    pt.fill(0);
+  }
+}
+
+/** Jetons gardés (illisibles ignorés) ; [] sans base. */
+export async function lireJetons(idb: IDBFactory): Promise<JetonGarde[]> {
+  const b = base(idb);
+  try {
+    if (!(await b.exists())) return [];
+    const key = await b.key(await nouvelleCle());
+    const out: JetonGarde[] = [];
+    for (const [id, rec] of await b.all()) {
+      if (!id.startsWith("j:")) continue;
+      try {
+        if (!(rec?.iv instanceof Uint8Array) || !(rec.ct instanceof Uint8Array)) continue;
+        const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv, additionalData: utf8(AAD_JETON + id) }, key, rec.ct));
+        const o = JSON.parse(new TextDecoder().decode(pt)) as Record<string, unknown>;
+        pt.fill(0);
+        if (typeof o.jeton !== "string" || !/^[A-Za-z0-9_-]{472}$/.test(o.jeton) || (o.offre !== "plus" && o.offre !== "pro") || typeof o.jour !== "string") continue;
+        out.push({ id, jeton: o.jeton, offre: o.offre, jour: o.jour });
+      } catch {
+        // abîmé : ignoré
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export async function retirerJeton(idb: IDBFactory, id: string): Promise<void> {
+  await base(idb).del(id);
 }

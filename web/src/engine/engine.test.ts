@@ -111,7 +111,11 @@ describe("vecteurs v2.json, moteur WebAssembly et fournisseur WebCrypto", () => 
       if (k === "ELEMENT_AD") expect(hex(c[k] as Uint8Array), k).toBe(v);
       else expect(c[k], k).toEqual(v);
     }
-    expect(Object.keys(c).sort()).toEqual(Object.keys(V.constants).filter((k) => k !== "ENVELOPE_AD").sort());
+    // Constantes des formules payantes (19 novembre) : hors de v2.json (figé), vérifiées contre
+    // engine/vectors/v5-paliers.json par paiement.test.ts ; exactement celles-ci en plus.
+    const payantes = ["CONTENT_MAX_PLUS", "CONTENT_MAX_PRO", "PAID_BUCKETS"];
+    expect(payantes.filter((k) => k in c)).toEqual(payantes);
+    expect(Object.keys(c).filter((k) => !payantes.includes(k)).sort()).toEqual(Object.keys(V.constants).filter((k) => k !== "ENVELOPE_AD").sort());
   });
 
   it("encoding", async () => {

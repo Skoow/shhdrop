@@ -303,6 +303,8 @@ export const fr = {
   "options.opens.count.one": "{n}\u202fouverture",
   "options.opens.count.other": "{n}\u202fouvertures",
   "options.ttl.label": "Durée",
+  "options.formule.label": "Formule de ce partage",
+  "options.formule.hint": "Plus et Pro utilisent un jeton anonyme de votre offre. Changer de formule recommence l'envoi des fichiers déjà ajoutés.",
   "options.opens.label": "Ouvertures",
   "options.pw.title": "Mot de passe",
   "options.pw.lead": "Un mot de passe en plus du lien.",

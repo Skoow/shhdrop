@@ -98,6 +98,8 @@ export type ComposeDeps = {
   commit?: (apply: () => void) => void;
   names?: Names;
   online?: () => boolean;
+  /** Données et segments au plus (formule du partage, conception du paiement §11) ; gratuit par défaut. */
+  limites?: () => { contentMax: number; dataSegments: number };
 };
 
 const EXT_MAX = 16;
@@ -191,6 +193,8 @@ function insertSorted(list: ComposeItem[], it: ComposeItem): ComposeItem[] {
 }
 
 export function createComposer(deps: ComposeDeps = {}) {
+  const contentMax = () => deps.limites?.().contentMax ?? CONTENT_MAX;
+  const dataSegments = () => deps.limites?.().dataSegments ?? DATA_SEGMENTS;
   const names = deps.names ?? FR_NAMES;
   // Lecture d'essai : les premiers octets seulement (type par le contenu, sniff.ts).
   const probe = deps.probe ?? (async (f: Blob) => new Uint8Array(await f.slice(0, HEAD_BYTES).arrayBuffer()));
@@ -531,8 +535,8 @@ export function createComposer(deps: ComposeDeps = {}) {
 
   function blockReason(): BlockReason | null {
     if (items.length === 0) return "vide";
-    if (totalBytes > CONTENT_MAX) return "trop_gros";
-    if (segments > DATA_SEGMENTS) return "segments";
+    if (totalBytes > contentMax()) return "trop_gros";
+    if (segments > dataSegments()) return "segments";
     if (items.some((i) => i.kind === "text" && codePoints(i.text ?? "") > TEXT_MAX)) return "texte_trop_long";
     if (manifestBytes > MANIFEST_MAX) return "manifeste";
     if (pending > 0) return "nettoyage";
@@ -553,7 +557,7 @@ export function createComposer(deps: ComposeDeps = {}) {
       if (i.risky) out.add(i.id);
       if (i.kind === "text" && codePoints(i.text ?? "") > TEXT_MAX) out.add(i.id);
     }
-    let over = totalBytes - CONTENT_MAX;
+    let over = totalBytes - contentMax();
     if (over > 0)
       for (const i of [...items].filter((x) => x.kind === "file").sort((a, b) => b.size - a.size)) {
         if (over <= 0) break;

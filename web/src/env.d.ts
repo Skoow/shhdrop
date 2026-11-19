@@ -45,3 +45,10 @@ declare module "virtual:shh-salon" {
   export const integrity: string;
   export const wasm: string;
 }
+
+// Module WebAssembly des jetons anonymes (greffon shh-jetons, vite.config.ts, conception du
+// paiement §7) : adresse et empreinte SRI de assets/jetons-EMPREINTE.wasm (vides dans la démo).
+declare module "virtual:shh-jetons" {
+  export const src: string;
+  export const integrity: string;
+}

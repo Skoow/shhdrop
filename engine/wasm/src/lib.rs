@@ -1133,32 +1133,6 @@ fn palier_de(p: Option<f64>) -> core::result::Result<format::Palier, JsValue> {
     }
 }
 
-/// Jeton anonyme (conception du paiement §7) : demande `TokenRequest` et état secret à garder
-/// jusqu'à la réponse. `palier_invalide` n'existe pas ici : la clé dit la formule.
-#[wasm_bindgen(
-    js_name = jetonPreparer,
-    unchecked_return_type = "{ requete: Uint8Array; etat: Uint8Array }"
-)]
-pub fn jeton_preparer(spki: &[u8], emetteur: &str) -> core::result::Result<JsValue, JsValue> {
-    let d = shhdrop_core::jetons::preparer(spki, emetteur).map_err(js_err)?;
-    let o = Object::new();
-    set(&o, "requete", &bytes(&d.requete));
-    set(&o, "etat", &bytes(&d.etat));
-    Ok(o.into())
-}
-
-/// Jeton final (`Token`, 354 octets) depuis l'état et la réponse du serveur ; vérifié.
-#[wasm_bindgen(js_name = jetonFinaliser, unchecked_return_type = "Uint8Array")]
-pub fn jeton_finaliser(
-    spki: &[u8],
-    emetteur: &str,
-    etat: &[u8],
-    reponse: &[u8],
-) -> core::result::Result<JsValue, JsValue> {
-    let j = shhdrop_core::jetons::finaliser(spki, emetteur, etat, reponse).map_err(js_err)?;
-    Ok(bytes(&j))
-}
-
 #[wasm_bindgen(js_name = segmentsNeeded)]
 pub fn segments_needed(sizes: Vec<f64>) -> core::result::Result<f64, JsValue> {
     let sizes: Vec<u64> = sizes.into_iter().map(n64).collect();

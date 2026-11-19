@@ -302,6 +302,8 @@ export const en = {
   "options.opens.count.one": "{n}\u00a0open",
   "options.opens.count.other": "{n}\u00a0opens",
   "options.ttl.label": "Duration",
+  "options.formule.label": "Plan for this share",
+  "options.formule.hint": "Plus and Pro use an anonymous token from your plan. Changing plan restarts the upload of files already added.",
   "options.opens.label": "Opens",
   "options.pw.title": "Password",
   "options.pw.lead": "A password on top of the link.",
