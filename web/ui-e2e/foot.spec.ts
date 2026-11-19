@@ -99,8 +99,10 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     // Retours du 17 novembre : deux boutons seulement dans le héros (fichiers, créer sur place).
     await expect(page.locator("[data-room]")).toHaveCount(0);
-    await expect(page.locator("[data-ctas] button")).toHaveCount(2);
-    await page.locator("[data-create]").click();
+    // Cadre d'envoi (19 novembre) : Choisir des fichiers, Photo ou vidéo, Vocal, Salon (bientôt).
+    await expect(page.locator("[data-ctas] button")).toHaveCount(4);
+    await expect(page.locator('[data-make="room"]')).toContainText("bientôt");
+    await page.locator('[data-make="room"]').click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
     // Téléphone : la feuille « Ajouter » s'ouvre ; ordinateur : la rangée « Créer sur place ».
     const scope = isMobile ? page.getByRole("dialog", { name: "Ajouter" }) : page.getByRole("group", { name: "Créer sur place" });

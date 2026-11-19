@@ -313,25 +313,39 @@ html.kbd-open .dock {
   translate: -50% 0;
   pointer-events: none;
   background:
-    radial-gradient(5px 5px at 50% 0, rgb(255 255 255 / 0.9), transparent),
-    radial-gradient(18px 10px at 50% 0, rgb(var(--tone) / 0.7), transparent),
     radial-gradient(38% 200px at 50% 0, rgb(var(--tone) / 0.13), transparent 72%),
     radial-gradient(70% 50% at 50% 50%, rgb(var(--tone) / 0.045), transparent 80%),
     linear-gradient(180deg, transparent, rgb(255 255 255 / 0.014) 160px, rgb(255 255 255 / 0.008) 65%, transparent);
   -webkit-mask-image: linear-gradient(180deg, #000, #000 calc(100% - 160px), transparent);
   mask-image: linear-gradient(180deg, #000, #000 calc(100% - 160px), transparent);
 }
+/* Couture en demi-teinte (reprise de « La trame », 19 novembre) : une bande de points qui
+   grossissent vers le milieu puis rapetissent, dans la teinte de la section ; ses bords se fondent
+   dans le noir (masque). Dessinée en CSS : 11 rangées de points, aucune image. */
 .band::after {
   content: "";
   position: absolute;
   z-index: -1;
-  inset-block-start: 0;
+  inset-block-start: -44px;
   left: 50%;
-  width: min(1120px, 88cqw);
-  height: 1px;
+  width: 100cqw;
+  height: 88px;
   translate: -50% 0;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgb(var(--tone) / 0.18) 18%, rgb(var(--tone) / 0.6) 42%, rgb(255 255 255 / 0.75) 50%, rgb(var(--tone) / 0.6) 58%, rgb(var(--tone) / 0.18) 82%, transparent);
+  background:
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.5px, transparent 1.1px) 0 0px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.9px, transparent 1.5px) 0 8px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 1.4px, transparent 2.0px) 0 16px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.0px, transparent 2.6px) 0 24px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.6px, transparent 3.2px) 0 32px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 3.1px, transparent 3.7px) 0 40px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.6px, transparent 3.2px) 0 48px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 2.0px, transparent 2.6px) 0 56px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 1.4px, transparent 2.0px) 0 64px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.9px, transparent 1.5px) 0 72px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--tone) / 0.55) 0.5px, transparent 1.1px) 0 80px / 8px 8px repeat-x;
+  -webkit-mask-image: radial-gradient(60% 100% at 50% 50%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(60% 100% at 50% 50%, #000 30%, transparent 100%);
 }
 @media (max-width: 599px) {
   /* Téléphone : dans la colonne (le fondu cache le bord) ; aucun débordement à 320 px. */
@@ -344,12 +358,10 @@ html.kbd-open .dock {
     width: 100%;
   }
   .band::after {
-    left: 6%;
-    width: 88%;
+    width: 100%;
   }
   .band::before {
     background:
-      radial-gradient(4px 4px at 50% 0, rgb(255 255 255 / 0.8), transparent),
       radial-gradient(70% 140px at 50% 0, rgb(var(--tone) / 0.12), transparent 72%),
       radial-gradient(90% 50% at 50% 50%, rgb(var(--tone) / 0.04), transparent 80%);
   }
@@ -359,7 +371,6 @@ html.kbd-open .dock {
     display: none;
   }
   .band::after {
-    background: CanvasText;
-    opacity: 0.4;
+    display: none;
   }
 }

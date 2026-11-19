@@ -32,12 +32,12 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(h1.classList.contains("compact")).toBe(false);
-    // Plus de sur-titre (retours du 15 novembre). Deux boutons (17 novembre) : « Choisir des
-    // fichiers » et « Créer sur place » (note, vocal, photo, salon) ; plus de bouton Salon à part.
+    // Plus de sur-titre (retours du 15 novembre). Cadre d'envoi (19 novembre, « Le chiffré ») :
+    // « Choisir des fichiers », puis Photo ou vidéo, Vocal, Salon.
     expect(document.querySelector("[data-eyebrow]")).toBeNull();
     expect(document.querySelector("[data-ctas] [data-pick]")).not.toBeNull();
-    expect(document.querySelector("[data-ctas] [data-create]")).not.toBeNull();
-    expect(document.querySelectorAll("[data-ctas] button")).toHaveLength(2);
+    expect([...document.querySelectorAll("[data-ctas] [data-make]")].map((b) => b.getAttribute("data-make"))).toEqual(["media", "vocal", "room"]);
+    expect(document.querySelectorAll("[data-ctas] button")).toHaveLength(4);
     expect(document.querySelector("[data-room]")).toBeNull();
     expect(document.querySelector("[data-more]")).toBeNull();
     // Phrase : les fonctions moins visibles mises en avant.
@@ -45,13 +45,10 @@ describe("Home (UI §9.1)", () => {
     expect(lede.textContent).toMatch(/^Vos fichiers, mais aussi des messages vocaux, des notes et bientôt un salon de discussion\u202f: /);
     expect([...lede.querySelectorAll("b.hl")].map((b) => b.textContent)).toEqual(["messages vocaux", "notes", "salon de discussion"]);
     const pick = document.querySelector<HTMLButtonElement>("[data-pick]")!;
-    expect(pick.querySelector(".pk-t")!.textContent).toBe("Choisir des fichiers");
-    expect(pick.querySelector(".pk-s")!.textContent).toBe("ou glissez-les ici"); // tuile : aussi une zone de dépôt (16 novembre)
-    expect(pick.querySelector(".pk-s")!.getAttribute("aria-hidden")).toBe("true");
+    expect(pick.textContent!.trim()).toBe("Choisir des fichiers");
     expect(pick.querySelector("svg")).not.toBeNull();
-    const make = document.querySelector<HTMLButtonElement>("[data-create]")!;
-    expect(make.textContent).toContain("Créer sur place");
-    expect(make.textContent).toContain("salon bientôt");
+    expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/^200\séléments · 2\sGo au total$/);
+    expect(document.querySelector('[data-make="room"]')!.textContent).toContain("bientôt");
     const meta = [...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim());
     expect(meta).toEqual(["Gratuit jusqu'à 2\u202fGo", "Partage sans compte", "Durée et ouvertures au choix"]);
     expect(document.querySelector("[data-demo]")).not.toBeNull();
@@ -68,13 +65,15 @@ describe("Home (UI §9.1)", () => {
       "Vos questions",
     ]);
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
-    // « Comment ça marche » (A2, 18 novembre) : cartes à grand chiffre en filigrane.
-    expect([...document.querySelectorAll("ol.steps > li[data-how-card] .big")].map((e) => e.textContent)).toEqual(["1", "2", "3"]);
+    // « Comment ça marche » (19 novembre, « Le chiffré ») : panneau en clair | chiffré, caché aux
+    // lecteurs d'écran, et trois étapes numérotées.
+    expect(document.querySelector(".seal")!.getAttribute("aria-hidden")).toBe("true");
+    expect([...document.querySelectorAll("ol.steps3 > li[data-how-card] .n")].map((e) => e.textContent)).toEqual(["1", "2", "3"]);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
-    for (const c of [...document.querySelectorAll("[data-how-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
+
     // Plus de ligne sur la clé après le « # » sur l'accueil (décision du 16 novembre).
     expect(document.querySelector("[data-key-note]")).toBeNull();
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);
@@ -119,14 +118,11 @@ describe("Home (UI §9.1)", () => {
     expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "plus", "rien."]);
     // Titre affiché d'emblée dans son état final (17 novembre) : aucun délai d'entrée par mot.
     expect(words.map((w) => w.style.getPropertyValue("--d"))).toEqual(words.map(() => ""));
-    // « puis plus rien. » effacé lettre à lettre, d'emblée : chaque lettre plus pâle que la
-    // précédente, le point final invisible.
+    // « puis plus rien. » (19 novembre, « La trame ») : chaque lettre a son rang, qui décale son
+    // effacement en trame de points.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
     expect(letters.map((l) => l.textContent).join("")).toBe("puisplusrien.");
-    const o = letters.map((l) => Number(l.style.getPropertyValue("--o")));
-    expect(o[0]).toBe(0.55);
-    expect(o[12]).toBe(0);
-    for (let i = 1; i < o.length; i++) expect(o[i]).toBeLessThan(o[i - 1]!);
+    expect(letters.map((l) => Number(l.style.getPropertyValue("--k")))).toEqual(letters.map((_, i) => i));
   });
 
   it("plus d'entrée animée (18 novembre : accueil écrit au build, affiché avant le script)", () => {
@@ -135,17 +131,17 @@ describe("Home (UI §9.1)", () => {
   });
 
 
-  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; « Créer sur place » appelle oncreate ; plus de carte de dépôt sur l'accueil (18 novembre)", () => {
+  it("« Choisir des fichiers » ouvre le sélecteur du composeur (onpick) ; Photo ou vidéo, Vocal, Salon appellent onmake ; plus de carte de dépôt sur l'accueil (18 novembre)", () => {
     const onfiles = vi.fn();
-    const oncreate = vi.fn();
+    const onmake = vi.fn();
     const onpick = vi.fn();
-    show({ onfiles, oncreate, onpick });
+    show({ onfiles, onmake, onpick });
     // Plus de sélecteur propre à l'accueil : le composeur tient le seul champ fichier.
     expect(document.querySelectorAll('input[type="file"]')).toHaveLength(0);
     (document.querySelector("[data-pick]") as HTMLButtonElement).click();
     expect(onpick).toHaveBeenCalledTimes(1);
-    (document.querySelector("[data-create]") as HTMLButtonElement).click();
-    expect(oncreate).toHaveBeenCalledTimes(1);
+    for (const g of ["media", "vocal", "room"]) (document.querySelector(`[data-make="${g}"]`) as HTMLButtonElement).click();
+    expect(onmake.mock.calls).toEqual([["media"], ["vocal"], ["room"]]);
     // Ni « Commencer », ni carte « Glissez vos fichiers ici » : doublons des deux boutons du héros.
     expect([...document.querySelectorAll("button")].some((b) => b.textContent!.trim().startsWith("Commencer"))).toBe(false);
     expect(document.querySelector('[data-slot="compose"]')).toBeNull();
@@ -188,10 +184,9 @@ describe("Home (UI §9.1)", () => {
     setLang("en");
     show();
     expect(title(document.querySelector("h1")!)).toBe("One link, one password, then nothing.");
-    expect(document.querySelector("[data-create]")!.textContent).toContain("Create here");
+    expect(document.querySelector("#hero-make")!.textContent).toBe("Or create one here");
     expect([...document.querySelectorAll("[data-lede] b.hl")].map((b) => b.textContent)).toEqual(["voice messages", "notes", "chat room"]);
-    expect(document.querySelector("[data-pick] .pk-t")!.textContent).toBe("Choose files");
-    expect(document.querySelector("[data-pick] .pk-s")!.textContent).toBe("or drop them here");
+    expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
     expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Lifetime and opens of your choice"]);
   });
 });

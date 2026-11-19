@@ -169,6 +169,11 @@
         </linearGradient>
       </defs>
 
+      <!-- Balayage de l'étape 2 (reprise de « La trame », 19 novembre) : une ligne menthe descend sur
+           l'écran ; au-dessus d'elle le chiffré, au-dessous la photo encore lisible. -->
+      <clipPath id="{uid}-above"><rect class={["scanr", "up", { go: shown === 2, done: shown > 2 && shown < 7 }]} x="24" y="52" width="84" height="104" /></clipPath>
+      <clipPath id="{uid}-below"><rect class={["scanr", "down", { go: shown === 2, done: shown > 2 && shown < 7 }]} x="24" y="52" width="84" height="104" /></clipPath>
+
       <!-- Liaisons -->
       <path class="wire" d="M108 106H158M242 106H292" stroke="url(#{uid}-wire)" />
 
@@ -179,16 +184,17 @@
         <!-- Écran d'appareil (18 novembre) : encoche en haut, barre du bas. -->
         <rect class="notch" x="56" y="57" width="20" height="3" rx="1.5" />
         <rect class="home-bar" x="54" y="149" width="24" height="2" rx="1" />
-        <g class={["photo", { on: at(shown, 1) }]}>
+        <g class={["photo", { on: at(shown, 1, 2) }]} clip-path="url(#{uid}-below)">
           <rect x="40" y="70" width="52" height="40" rx="6" class="ph-bg" />
           <circle cx="80" cy="80" r="5" class="ph-sun" />
           <path d="M42 108l16-18 10 10 8-7 14 15z" class="ph-hill" />
           <text class="fname" x="66" y="128">photo.jpg</text>
         </g>
-        <g class={["cipher", { on: at(shown, 2, 3, 4, 5, 6) }]}>
+        <g class={["cipher", { on: at(shown, 2, 3, 4, 5, 6) }]} clip-path="url(#{uid}-above)">
           {#each cipher as line, i (i)}<text class="mono" x="66" y={76 + i * 11}>{line}</text>{/each}
           <text class="fname x" x="66" y="138">Xq9#7b.z</text>
         </g>
+        <rect class={["scan", { go: shown === 2 }]} x="26" y="52" width="80" height="2" rx="1" />
         <g class={["sent", { on: at(shown, 7) }]}>
           <circle cx="66" cy="96" r="13" />
           <path d="M60 96.5l4 4 8-8.5" />
@@ -420,6 +426,47 @@
   .leds circle {
     fill: var(--mint);
     opacity: 0.55;
+  }
+  /* Balayage : les deux découpes glissent ensemble, la ligne les suit. */
+  .scanr {
+    transform-box: view-box;
+    transition: transform 1700ms var(--ease-in-out) 250ms;
+  }
+  .scanr.up {
+    transform: translateY(-104px);
+  }
+  .scanr.down {
+    transform: translateY(0);
+  }
+  .scanr.up.go,
+  .scanr.up.done {
+    transform: translateY(0);
+  }
+  .scanr.down.go,
+  .scanr.down.done {
+    transform: translateY(104px);
+  }
+  .scan {
+    fill: var(--mint);
+    opacity: 0;
+    filter: drop-shadow(0 0 4px rgb(95 227 181 / 0.9));
+  }
+  .scan.go {
+    animation: scan 1700ms var(--ease-in-out) 250ms both;
+  }
+  @keyframes scan {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    92% {
+      opacity: 1;
+      transform: translateY(102px);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(102px);
+    }
   }
   .notch,
   .home-bar {

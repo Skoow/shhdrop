@@ -309,8 +309,13 @@
     chrome.spot = "drop";
     navigate("/envoyer");
   }
-  function create() {
-    chrome.spot = "make";
+  // Accueil, « Ou créez sur place » (19 novembre) : la page d'envoi s'ouvre avec ce geste déjà
+  // lancé (caméra, enregistreur) ; Salon (bientôt) : sa tuile est mise en avant, et dit « bientôt ».
+  function make(g: "media" | "vocal" | "room") {
+    if (g === "room") {
+      chrome.spot = "make";
+      say(t("tabs.soon.chat"));
+    } else chrome.pending = g;
     navigate("/envoyer");
   }
   $effect(() => {
@@ -804,7 +809,7 @@
 <input bind:this={videoIn} type="file" accept="video/*" capture="environment" hidden tabindex="-1" onchange={(e) => picked(e.currentTarget, "video")} />
 
 <!-- « Commencer » (accueil) mène à la page d'envoi « /envoyer » (retours DROP). -->
-<Home {active} compact={shown} onpick={pickFromHome} children={shown ? app : undefined} onfiles={(f, s, folders) => void addFiles(f, s, folders)} oncreate={create} />
+<Home {active} compact={shown} onpick={pickFromHome} children={shown ? app : undefined} onfiles={(f, s, folders) => void addFiles(f, s, folders)} onmake={make} />
 
 <Sheet bind:open={editorOpen} title={editorId ? t("text.title.edit") : t("text.title.new")}>
   <div class="editor">

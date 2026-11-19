@@ -9,7 +9,8 @@
   import { limitParams } from "../../i18n/limit-params";
   import { reveal } from "../../ui/attach";
   import AddIcon from "../../ui/AddIcon.svelte";
-  import { ArrowRight, Broom, EyeOff, Link2, Lock, UserX } from "../../ui/Icon";
+  import { scramble } from "../../ui/decor";
+  import { ArrowRight, Broom, EyeOff, Lock, UserX } from "../../ui/Icon";
   import OffersStrip from "../../ui/OffersStrip.svelte";
   import TabIcon from "../../ui/TabIcon.svelte";
 
@@ -18,6 +19,31 @@
     { k: "seal", tint: "blue" },
     { k: "go", tint: "cyan" },
   ] as const;
+  // Panneau « en clair | chiffré » (19 novembre) : exemples, jamais des données de la personne.
+  const rows = $derived([
+    { k: "a", a: "vacances.jpg", b: "3,2 Mo", note: false },
+    { k: "b", a: "contrat-signé.pdf", b: "184 Ko", note: false },
+    { k: "c", a: t("home.how.voice"), b: "0:42", note: false },
+    { k: "d", a: t("home.how.note1"), b: "", note: true },
+    { k: "e", a: t("home.how.note2"), b: "", note: true },
+  ]);
+  // Le balayage ne tourne que si le panneau est à l'écran et l'onglet visible (ambiance).
+  let sealOn = $state(false);
+  function watchSeal(node: HTMLElement) {
+    if (typeof IntersectionObserver === "undefined") return;
+    let seen = false;
+    const set = () => (sealOn = seen && !document.hidden);
+    const io = new IntersectionObserver(([e]) => {
+      seen = e!.isIntersecting;
+      set();
+    });
+    io.observe(node);
+    document.addEventListener("visibilitychange", set);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", set);
+    };
+  }
   const priv = [
     { k: "account", tint: "mint" },
     { k: "server", tint: "blue" },
@@ -31,17 +57,34 @@
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
   </div>
-  <!-- Proposition A2 retenue (propriétaire, 18 novembre) : trois cartes, un grand chiffre en
-       filigrane, l'icône en haut, le texte en bas ; plus de frise. -->
-  <ol class="cards three steps">
+  <!-- Reprise de « Le chiffré » (propriétaire, 19 novembre), améliorée : un panneau « en clair |
+       chiffré » ; une ligne menthe le balaie et transforme sur son passage les noms de fichiers et la
+       note en texte chiffré, puis revient. Décor seulement (texte brouillé à graine fixe, decor.ts),
+       caché aux lecteurs d'écran ; les trois étapes dessous portent le sens. -->
+  <div class={["seal", "rv", { run: sealOn }]} aria-hidden="true" data-ambient {@attach reveal} {@attach watchSeal}>
+    <div class="sl-head">
+      <span>{t("home.how.clear")}</span>
+      <span class="sl-badge"><Lock size={12} strokeWidth={2.4} />{t("home.how.sealed")}</span>
+      <span>{t("home.how.cipher")}</span>
+    </div>
+    <div class="sl-body">
+      <div class="sl-layer clear">
+        {#each rows as r (r.k)}<p class={["sl-row", { note: r.note }]}><span>{r.a}</span>{#if r.b}<span class="num">{r.b}</span>{/if}</p>{/each}
+      </div>
+      <div class="sl-layer ciph">
+        {#each rows as r, i (r.k)}<p class={["sl-row", { note: r.note }]}><span>{scramble(r.a, 1, 0x51 + i * 7)}</span>{#if r.b}<span class="num">{scramble(r.b, 1, 0x91 + i * 5)}</span>{/if}</p>{/each}
+      </div>
+      <span class="sl-line"></span>
+    </div>
+  </div>
+  <ol class="steps3">
     {#each how as c, i (c.k)}
-      <li class="hc rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
-        <span class="big" aria-hidden="true">{i + 1}</span>
-        <span class="tile-ic {c.tint}" aria-hidden="true">
-          {#if c.k === "add"}<AddIcon id="files" size={22} />{:else if c.k === "seal"}<Lock size={22} strokeWidth={1.8} />{:else}<Link2 size={22} strokeWidth={1.8} />{/if}
-        </span>
-        <h3><span class="sr-only">{i + 1}. </span>{t(`home.how.${c.k}.t` as Key)}</h3>
-        <p>{t(`home.how.${c.k}.p` as Key, limitParams(getLang()))}</p>
+      <li class="st rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
+        <span class="n num" aria-hidden="true">{i + 1}</span>
+        <div>
+          <h3><span class="sr-only">{i + 1}. </span>{t(`home.how.${c.k}.t` as Key)}</h3>
+          <p>{t(`home.how.${c.k}.p` as Key, limitParams(getLang()))}</p>
+        </div>
       </li>
     {/each}
   </ol>
@@ -147,61 +190,154 @@
       text-align: center;
     }
   }
-  /* « Comment ça marche » (A2, 18 novembre) : cartes à grand chiffre en filigrane. */
-  .steps {
-    counter-reset: none;
-  }
-  .hc {
-    position: relative;
-    display: grid;
-    align-content: end;
-    gap: var(--sp-2);
-    min-width: 0;
-    min-height: 220px;
-    padding: var(--sp-5);
-    overflow: hidden;
+  /* « Comment ça marche » (19 novembre) : panneau en clair | chiffré balayé par une ligne. */
+  .seal {
+    width: 100%;
+    max-width: 920px;
     border-radius: var(--r-xl);
-    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.012)), rgb(16 22 38 / 0.7);
-    box-shadow: inset 0 0 0 1px rgb(150 175 255 / 0.14);
+    background: rgb(8 12 20 / 0.75);
+    box-shadow: inset 0 0 0 1px rgb(150 175 255 / 0.16), 0 30px 80px -40px rgb(0 0 0 / 0.8);
+    overflow: hidden;
   }
-  .big {
-    position: absolute;
-    inset-block-start: -22px;
-    inset-inline-end: 10px;
-    color: transparent;
-    font-size: 150px;
-    font-weight: 800;
-    line-height: 1;
-    -webkit-text-stroke: 1.5px rgb(95 227 181 / 0.32);
-    pointer-events: none;
-    user-select: none;
+  .sl-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--sp-3) var(--sp-5);
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro);
+    border-block-end: 1px solid rgb(150 175 255 / 0.08);
   }
-  .hc .tile-ic {
-    margin-block-end: var(--sp-2);
+  .sl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-sans);
+    font-weight: 700;
   }
-  .hc p {
+  .sl-body {
+    --x: 50%;
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    padding: var(--sp-5) var(--sp-5) var(--sp-6);
+    font-family: var(--font-mono);
+    font-size: clamp(0.8125rem, 0.7rem + 0.4vw, 1.0625rem);
+  }
+  .sl-layer {
+    grid-area: 1 / 1;
+    display: grid;
+    gap: 10px;
+    justify-self: center;
+    width: min(100%, 34em);
+  }
+  .sl-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-4);
     margin: 0;
-    max-width: 34ch;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .clear {
+    color: var(--text);
+    clip-path: inset(0 calc(100% - var(--x)) 0 0);
+  }
+  .ciph {
+    color: var(--accent);
+    opacity: 0.85;
+    clip-path: inset(0 0 0 var(--x));
+    text-shadow: 0 0 10px rgb(95 227 181 / 0.35);
+  }
+  .clear .sl-row:nth-child(4) {
+    margin-block-start: var(--sp-3);
+  }
+  .ciph .sl-row:nth-child(4) {
+    margin-block-start: var(--sp-3);
+  }
+  .sl-line {
+    position: absolute;
+    inset-block: 0;
+    left: var(--x);
+    width: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 18px 2px rgb(95 227 181 / 0.55);
+  }
+  @property --x {
+    syntax: "<percentage>";
+    inherits: true;
+    initial-value: 50%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sl-body {
+      animation: sweep 7s var(--ease-in-out) infinite alternate;
+      animation-play-state: paused;
+    }
+    .run .sl-body {
+      animation-play-state: running;
+    }
+  }
+  @keyframes sweep {
+    0%,
+    8% {
+      --x: 104%;
+    }
+    92%,
+    100% {
+      --x: -4%;
+    }
+  }
+  .steps3 {
+    display: grid;
+    gap: var(--sp-5);
+    width: 100%;
+    max-width: 920px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .st {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: start;
+  }
+  .st .n {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: rgb(95 227 181 / 0.12);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .st h3 {
+    margin: 0 0 4px;
+  }
+  .st p {
+    margin: 0;
     color: #aab6d3;
     font-size: 0.9375rem;
     line-height: 1.55;
   }
   @media (min-width: 760px) {
-    .three {
+    .steps3 {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+  }
+  @media (min-width: 760px) {
     .four {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-  @media (max-width: 599px) {
-    .hc {
-      min-height: 180px;
-      justify-items: center;
-      text-align: center;
-    }
-    .big {
-      font-size: 120px;
     }
   }
   @media (min-width: 1180px) {

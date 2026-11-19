@@ -19,7 +19,7 @@ test("premier écran : « Choisir des fichiers » et « Créer sur place » visi
   await page.goto(shh.origin + "/");
   await expect(page.getByRole("button", { name: "Choisir des fichiers" })).toBeVisible();
   expect(await inView(page, "[data-pick]")).toBe(true);
-  expect(await inView(page, "[data-create]")).toBe(true);
+  expect(await inView(page, '[data-make="room"]')).toBe(true);
   await expect(page.locator('[data-slot="compose"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

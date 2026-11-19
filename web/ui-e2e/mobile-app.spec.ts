@@ -147,7 +147,7 @@ test.describe("téléphone façon app", () => {
     await page.goto(shh.origin + "/");
     await shot(page, "accueil-ajouter");
     // « Créer sur place » → page d'envoi, feuille « Ajouter » déjà ouverte (17 novembre) : liste groupée, avec poignée.
-    await page.locator("[data-create]").click();
+    await page.locator('[data-make="room"]').click();
     await expect(page).toHaveURL(/\/envoyer$/);
     const add = page.getByRole("dialog", { name: "Ajouter" });
     await expect(add).toBeVisible();
@@ -277,7 +277,7 @@ test.describe("ordinateur : rien ne change", () => {
     const banner = page.getByRole("banner");
     await expect(banner.getByRole("button", { name: /Réglages|Settings|Langue|Language|Français|English/ })).toHaveCount(0);
     expect(await banner.getByRole("button").allTextContents()).toEqual(["Envoyer", "Salonbientôt", "Sécurité"]);
-    await expect(foot(page).getByText("À propos", { exact: true })).toBeAttached();
+    await expect(foot(page).getByText("À propos", { exact: true })).toHaveCount(0); // pied B2 (18 novembre)
     for (const n of ["Langue", "Fichiers"]) await expect(foot(page).getByText(n, { exact: true })).toHaveCount(0); // retirés le 12 novembre
     await expect(footLink(page, "Sécurité")).toBeVisible();
     await expect(footLink(page, "Confidentialité")).toBeVisible();

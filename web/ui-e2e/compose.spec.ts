@@ -30,7 +30,7 @@ const MIXED = [...PHOTOS, f("anniversaire-lou.webm"), f("contrat.pdf"), f("archi
 async function open(page: Page, origin: string) {
   await page.goto(origin + "/");
   // Accueil : « Commencer » (mène à la page d'envoi, D41-37).
-  await expect(page.getByRole("button", { name: /^(Commencer|Créer sur place)/ }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.locator('[data-make="room"]').filter({ visible: true }).first()).toBeVisible();
 }
 /** Choisit des fichiers par la feuille d'ajout (« Commencer » ou « Ajouter ») ou la zone de dépôt (composeur). */
 async function browse(page: Page, files: string[] | { name: string; mimeType: string; buffer: Buffer }[], wait = true) {
@@ -667,7 +667,7 @@ test.describe("en-US", () => {
     if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(shh.origin + "/");
     // « Get started » mène à la page d'envoi (D41-37) ; puis « Add » (téléphone) ou la zone de dépôt.
-    await page.getByRole("button", { name: /^(Get started|Create here)/ }).filter({ visible: true }).first().click();
+    await page.locator('[data-make="room"]').click();
     await expect(page).toHaveURL(/\/envoyer$/);
     await closeAddSheet(page);
     const chooser = page.waitForEvent("filechooser");

@@ -18,18 +18,16 @@ export async function noViewTransition(page: Page) {
 }
 
 /**
- * Accueil : « Créer sur place » (17 novembre ; sur téléphone, il ouvre aussi la feuille « Ajouter »,
- * refermée ici pour partir du composeur vide) ou « Commencer » (carte de dépôt), retours du
- * 15 novembre : la carte de dépôt n'est plus sur l'accueil du téléphone) mène à la page d'envoi
- * « /envoyer » (retours DROP) ; ailleurs (déjà dans le composeur), rien à faire.
+ * Accueil (19 novembre) : le bouton « Salon » du cadre d'envoi mène à la page d'envoi « /envoyer »
+ * sans rien lancer (salon : bientôt ; sur téléphone, il ouvre la feuille « Ajouter », refermée ici
+ * pour partir du composeur vide) ; ailleurs (déjà dans le composeur), rien à faire.
  */
-const START = /^(Commencer|Get started|Créer sur place|Create here)/;
 export async function enterComposer(page: Page) {
   await noViewTransition(page);
   // L'écran doit être monté avant de choisir le geste (accueil ou composeur, téléphone ou ordinateur).
-  const any = page.getByRole("button", { name: /^(Ajouter|Add|Commencer|Get started|Créer sur place|Create here)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first();
+  const any = page.locator('[data-make="room"]').or(page.getByRole("button", { name: /^(Ajouter|Add)$/ })).or(page.locator(".dropzone")).filter({ visible: true }).first();
   await expect(any).toBeVisible();
-  const start = page.getByRole("button", { name: START }).filter({ visible: true }).first();
+  const start = page.locator('[data-make="room"]').filter({ visible: true }).first();
   if (!(await start.isVisible().catch(() => false))) return;
   await start.click();
   await expect(page).toHaveURL(/\/envoyer$/);

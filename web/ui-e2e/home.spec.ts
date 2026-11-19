@@ -34,9 +34,9 @@ test.describe("fr-FR", () => {
     await expect(page.locator("[data-lede]")).toHaveText(/^Vos fichiers, mais aussi des messages vocaux, des notes et bientôt un salon de discussion/);
     const certs = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
     await expect(certs).toHaveCount(3);
-    // Deux boutons (17 novembre) : « Choisir des fichiers » et « Créer sur place ». Plus de « Parcourir ».
+    // Cadre d'envoi (19 novembre) : « Choisir des fichiers », puis Photo ou vidéo, Vocal, Salon. Plus de « Parcourir ».
     await expect(page.getByRole("button", { name: /^Choisir des fichiers/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Créer sur place/ })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button")).toHaveText([/Photo ou vidéo/, /Vocal/, /Salon/]);
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
     // Limites gratuites (spec §41.2), lues des constantes.
     for (const h of ["Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
@@ -67,7 +67,7 @@ test.describe("fr-FR", () => {
     await expect(page.locator('[data-slot="compose"]')).toBeHidden();
     const frame = (await page.locator("[data-ctas]").boundingBox())!;
     const pick = (await page.locator("[data-pick]").boundingBox())!;
-    const make = (await page.locator("[data-create]").boundingBox())!;
+    const make = (await page.locator('[data-make="room"]').boundingBox())!;
     expect(pick.height).toBeGreaterThanOrEqual(48);
     expect(make.height).toBeGreaterThanOrEqual(48);
     // Les boutons occupent la largeur du cadre ; ordre : fichiers, puis « Créer sur place ».
@@ -78,7 +78,7 @@ test.describe("fr-FR", () => {
     const demo = (await page.locator("[data-demo]").boundingBox())!;
     expect(demo.y).toBeGreaterThan(frame.y + frame.height);
     // « Créer sur place » : page d'envoi, feuille « Ajouter » ouverte.
-    await page.locator("[data-create]").click();
+    await page.locator('[data-make="room"]').click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
     await expect(page.getByRole("dialog", { name: "Ajouter" })).toBeVisible();
   });
@@ -146,7 +146,7 @@ test.describe("fr-FR", () => {
   test("rien n'attend : à 100 ms, « Créer sur place » mène à la page d'envoi vide (grand cadre de dépôt), puis le sélecteur multiple", async ({ page, shh, isMobile }) => {
     test.skip(isMobile, "téléphone : page d'envoi vide, « Ajouter » (drop.spec.ts)");
     await page.goto(shh.origin + "/", { waitUntil: "domcontentloaded" });
-    const start = page.locator("[data-create]");
+    const start = page.locator('[data-make="room"]');
     await expect(start).toBeAttached();
     await page.waitForTimeout(100);
     await start.click({ force: true });
@@ -237,7 +237,7 @@ test.describe("fr-FR", () => {
     await expect(overlay).toBeHidden();
     await drag(page, "dragenter", ["a.txt"]);
     await expect(overlay).toBeVisible();
-    await expect(page.locator("[data-pick].over")).toHaveCount(1); // la tuile de dépôt s'allume
+    await expect(page.locator("[data-ctas].over")).toHaveCount(1); // le cadre d'envoi s'allume
     await page.waitForTimeout(600);
     await capture(page, "home-drop");
     await page.keyboard.press("Escape");
@@ -255,7 +255,7 @@ test.describe("fr-FR", () => {
 
   test("« Créer sur place » mène à la page d'envoi ; retour : l'accueil ; Sécurité › Comment ça marche descend à sa section", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/");
-    const cta = page.locator("[data-create]");
+    const cta = page.locator('[data-make="room"]');
     await cta.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await cta.click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
@@ -414,11 +414,12 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { level: 1, name: TITLE_FR })).toBeVisible();
     for (const sel of [".aurora", ".grain"])
       expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).display), sel).toBe("none");
-    for (const name of isMobile ? ["Choisir des fichiers", "Créer sur place"] : ["Choisir des fichiers", "Créer sur place"]) {
+    for (const name of ["Choisir des fichiers", "Vocal"]) {
       const b = page.getByRole("button", { name: new RegExp(`^${name}`) }).filter({ visible: true }).first();
-      // La tuile « Choisir des fichiers » est une zone de dépôt : pointillé (16 novembre).
-      expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe(name === "Choisir des fichiers" ? "dashed" : "solid");
+      expect(await b.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("solid");
     }
+    // Le cadre d'envoi est la zone de dépôt : pointillé (19 novembre).
+    expect(await page.locator("[data-ctas]").evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe("dashed");
     await page.waitForTimeout(900);
     await capture(page, "home-v3-forced");
     await page.locator("section.priv").evaluate((e) => e.scrollIntoView());
@@ -451,7 +452,7 @@ test.describe("en-US", () => {
     await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then nothing." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^(Get started|Create here)/ }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("group", { name: "Or create one here" })).toBeVisible();
     for (const h of ["How it works", "Built for privacy", "Plans", "Your questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     expect(await noHScroll(page)).toBe(true);
