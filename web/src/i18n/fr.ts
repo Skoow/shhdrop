@@ -905,6 +905,7 @@ export const fr = {
   "tabs.shares": "Mes partages",
   "tabs.chat": "Salon",
   "tabs.soon": "Bientôt",
+  "nav.login.soon": "Bientôt\u202f: un compte facultatif. Partager restera possible sans compte.",
   "tabs.soon.chat": "Bientôt\u202f: un salon de discussion chiffré et éphémère.",
   "clean.done.image": "Nettoyé\u202f: position, appareil et dates retirés, vignette d'aperçu gardée",
   "clean.done.video": "Nettoyé\u202f: position, appareil et dates retirés",

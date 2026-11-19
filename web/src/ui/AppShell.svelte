@@ -363,13 +363,10 @@
      grain de l'aurore passe dessous), marque à gauche au même bord intérieur que l'en-tête,
      colonnes hiérarchisées, liens JAMAIS soulignés (retours UI8) : survol et focus par la couleur,
      anneau de focus au clavier. */
-  /* Pied de page (19 novembre, 4) : un panneau aux coins hauts arrondis, un peu plus clair que la
-     page, comme le panneau crème de l'accueil ; fin filet menthe en haut. */
+  /* Pied de page : bord droit, sans filet (propriétaire, 19 novembre, 4 : ni coins arrondis ni
+     filet menthe). */
   .foot {
     position: relative;
-    border-start-start-radius: clamp(28px, 4vw, 56px);
-    border-start-end-radius: clamp(28px, 4vw, 56px);
-    overflow: hidden;
     /* Son propre fond seulement (décision du propriétaire du 16 novembre) : le fond de la page
        (aurore, trame) ne se mélange plus à son papier peint ; la lueur et les pictos restent. */
     z-index: 1;
@@ -381,14 +378,6 @@
       radial-gradient(50% 90% at 88% 100%, rgb(95 227 181 / 0.04), transparent 70%),
       linear-gradient(to bottom, rgb(255 255 255 / 0.025), rgb(7 8 12 / 0.55))
       var(--bg);
-  }
-  .foot::before {
-    content: "";
-    position: absolute;
-    inset-inline: 0;
-    inset-block-start: 0;
-    block-size: 1px;
-    background: linear-gradient(90deg, transparent, rgb(95 227 181 / 0.45) 22%, rgb(233 236 242 / 0.16) 60%, transparent);
   }
   /* Papier peint maison (retours UI7) : petits pictos Shhgone répétés (cadenas, clé, fichier,
      onde, points de la Trame), fichier statique mis en cache (CSP : ni data: ni style inline),
@@ -632,7 +621,6 @@
       background: none;
       border-block-start: 1px solid var(--line-strong);
     }
-    .foot::before,
     .foot::after {
       display: none;
     }

@@ -276,7 +276,8 @@ test.describe("ordinateur : rien ne change", () => {
     // boutons sont ceux des menus de la barre du haut (refonte du 12 novembre).
     const banner = page.getByRole("banner");
     await expect(banner.getByRole("button", { name: /Réglages|Settings|Langue|Language|Français|English/ })).toHaveCount(0);
-    expect(await banner.getByRole("button").allTextContents()).toEqual(["Envoyer", "Salonbientôt", "Sécurité"]);
+    // « Se connecter · bientôt » tant que le compte n'est pas ouvert (19 novembre, 4).
+    expect(await banner.getByRole("button").allTextContents()).toEqual(["Envoyer", "Salonbientôt", "Sécurité", "Se connecterbientôt"]);
     await expect(foot(page).getByText("À propos", { exact: true })).toHaveCount(0); // pied B2 (18 novembre)
     for (const n of ["Langue", "Fichiers"]) await expect(foot(page).getByText(n, { exact: true })).toHaveCount(0); // retirés le 12 novembre
     await expect(footLink(page, "Sécurité")).toBeVisible();

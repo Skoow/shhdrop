@@ -901,6 +901,7 @@ export const en = {
   "tabs.shares": "My shares",
   "tabs.chat": "Room",
   "tabs.soon": "Soon",
+  "nav.login.soon": "Soon: an optional account. Sharing will stay possible without one.",
   "tabs.soon.chat": "Soon: an encrypted, ephemeral chat room.",
   "clean.done.image": "Cleaned: location, device and dates removed, preview thumbnail kept",
   "clean.done.video": "Cleaned: location, device and dates removed",

@@ -24,14 +24,16 @@
   // puis les écrans du site, chacun avec son icône ; puis le compte (seulement avec __COMPTES__) :
   // « Se connecter » et « Créer un compte », ou, connecté, « Mon compte », « Paramètres » et
   // « Se déconnecter ». Confidentialité, Conditions, Signaler… restent dans le pied de page.
-  type Link = { label: string; path: string; icon: Component; soon?: boolean };
+  type Link = { label: string; path: string; icon: Component; soon?: string };
   const links = $derived<Link[]>([
     // « Mes partages » seulement s'il y a des partages sur cet appareil (17 novembre).
     ...(accountFlag.connected ? [{ label: t("nav.home"), path: "/", icon: Share2 }] : presence.any ? [{ label: t("nav.shares"), path: "/envois", icon: Share2 }] : []),
     ...(accountFlag.connected ? [{ label: t("foot.downloads"), path: "/telechargements", icon: Download }] : []),
-    { label: t("nav.room"), path: "", icon: MessagesSquare, soon: true },
+    { label: t("nav.room"), path: "", icon: MessagesSquare, soon: t("tabs.soon.chat") },
     { label: t("nav.security"), path: "/securite", icon: ShieldCheck },
     { label: t("nav.offers"), path: "/offres", icon: Tag },
+    // Compte pas encore ouvert (D8) : « Se connecter » visible, bientôt (19 novembre, 4).
+    ...(__COMPTES__ ? [] : [{ label: t("account.login.title"), path: "", icon: User, soon: t("nav.login.soon") }]),
   ]);
   const account = $derived<Link[]>(
     !__COMPTES__
@@ -112,11 +114,11 @@
       {#each links as l, i (l.label)}
         <li style:--i={i + 1}>
           {#if l.soon}
-            <button type="button" class="mm-l soon" aria-disabled="true" aria-describedby="{uid}-soon" onclick={() => announce(t("tabs.soon.chat"))}>
+            <button type="button" class="mm-l soon" aria-disabled="true" aria-describedby="{uid}-soon-{i}" onclick={() => announce(l.soon!)}>
               <span class="mm-ic" aria-hidden="true"><l.icon size={20} strokeWidth={1.9} /></span>
               <span class="mm-t">{l.label}</span><span class="mm-soon">{t("foot.soon")}</span>
             </button>
-            <span id="{uid}-soon" class="sr-only">{t("tabs.soon.chat")}</span>
+            <span id="{uid}-soon-{i}" class="sr-only">{l.soon}</span>
           {:else}
             <a
               class="mm-l"

@@ -213,6 +213,13 @@
       {:else}
         <a class="btn ghost" href={href("/compte/connexion")} aria-current={here("/compte/connexion")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/compte/connexion"))} {...off}>{t("account.login.title")}</a>
       {/if}
+    {:else}
+      <!-- Compte pas encore ouvert (décision D8) : « Se connecter » visible, bientôt, comme le Salon
+           (propriétaire, 19 novembre, 4) ; un clic l'annonce, rien ne s'ouvre. -->
+      <button type="button" class="btn ghost login-soon" aria-disabled="true" aria-describedby="{uid}-login" data-login-soon onclick={() => announce(t("nav.login.soon"))}>
+        {t("account.login.title")}<span class="soon">{t("foot.soon")}</span>
+      </button>
+      <span id="{uid}-login" class="sr-only">{t("nav.login.soon")}</span>
     {/if}
     <!-- Plus de bouton « Partager » (décision du propriétaire du 17 novembre) : le lien se partage
          depuis « Lien prêt », où il est créé ; la page d'envoi reste dans « Envoyer ». -->
@@ -286,6 +293,17 @@
   .room {
     cursor: not-allowed;
     color: var(--text-3);
+  }
+  .login-soon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: not-allowed;
+  }
+  /* Le clic annonce « bientôt » (les autres boutons désactivés ne réagissent pas). */
+  .btn.login-soon[aria-disabled="true"] {
+    pointer-events: auto;
+    color: var(--text-2);
   }
   .soon {
     padding: 1px 7px;
