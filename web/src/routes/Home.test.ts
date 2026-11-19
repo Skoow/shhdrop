@@ -50,7 +50,7 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/^200\séléments · 2\sGo au total$/);
     expect(document.querySelector('[data-make="room"]')!.textContent).toContain("bientôt");
     const meta = [...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim());
-    expect(meta).toEqual(["Gratuit jusqu'à 2\u202fGo", "Partage sans compte", "Durée et ouvertures au choix"]);
+    expect(meta).toEqual(["Gratuit", "Partage sans compte", "Durée et ouvertures au choix"]);
     expect(document.querySelector("[data-demo]")).not.toBeNull();
     const a = [...document.querySelectorAll("a")].find((x) => x.textContent?.trim() === "Tous les détails de sécurité")!;
     expect(a.getAttribute("href")).toBe("/securite");
@@ -59,24 +59,28 @@ describe("Home (UI §9.1)", () => {
     const h2 = [...document.querySelectorAll("h2")].map((h) => h.textContent!.trim());
     expect(h2).toEqual([
       "Comment ça marche",
+      "Ce qui se passe quand vous partagez", // section de l'infographie (19 novembre, 3)
       "Pensé pour la confidentialité",
       "Offres",
       "Vos questions",
     ]);
     expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
-    // « Comment ça marche » (19 novembre, 2) : la démonstration animée y est descendue (titrée h3
-    // pour les lecteurs d'écran), au-dessus des trois étapes numérotées.
-    expect(document.querySelector("#comment [data-demo]")).not.toBeNull();
+    // « Comment ça marche » (19 novembre, 3, maquette « La trame ») : trois illustrations fixes,
+    // cachées aux lecteurs d'écran, et trois étapes numérotées ; l'infographie a sa section, titrée
+    // par son h2 visible, avec ses sept étapes à droite.
     expect(document.querySelector(".hero [data-demo]")).toBeNull();
-    expect(document.querySelector("#comment h3.sr-only")!.textContent).toBe("Ce qui se passe quand vous partagez");
+    expect(document.querySelector("#comment [data-demo]")).toBeNull();
+    expect(document.querySelector(".demo-sec [data-demo]")!.getAttribute("aria-labelledby")).toBe("demo-title");
+    expect([...document.querySelectorAll("#comment svg.ill")].map((s) => s.getAttribute("aria-hidden"))).toEqual(["true", "true", "true"]);
     expect([...document.querySelectorAll("ol.steps3 > li[data-how-card] .n")].map((e) => e.textContent)).toEqual(["1", "2", "3"]);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);
     for (const c of [...document.querySelectorAll("[data-priv-card]")]) expect(c.querySelector(".tile-ic svg")).not.toBeNull();
 
-    // Plus de ligne sur la clé après le « # » sur l'accueil (décision du 16 novembre).
-    expect(document.querySelector("[data-key-note]")).toBeNull();
+    // Le lien en deux (19 novembre, 3, remplace la décision du 16 novembre) : l'adresse au serveur,
+    // la clé après le « # » dans le navigateur ; un exemple, jamais une vraie clé.
+    expect(document.querySelector("[data-key-note] figcaption")!.textContent).toMatch(/^La clé du lien est après le «\s#\s»/);
     expect([...document.querySelectorAll("[data-offer]")].map((o) => o.getAttribute("data-offer"))).toEqual(["free", "plus", "pro"]);
     // Retours du 15 novembre : prix prévu et sens de chaque chiffre dans les cartes (lus dans PAID).
     const card = (x: string) => document.querySelector(`[data-offer="${x}"]`)!;
@@ -119,10 +123,10 @@ describe("Home (UI §9.1)", () => {
     expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "plus", "rien."]);
     // Titre affiché d'emblée dans son état final (17 novembre) : aucun délai d'entrée par mot.
     expect(words.map((w) => w.style.getPropertyValue("--d"))).toEqual(words.map(() => ""));
-    // « puis plus rien. » (19 novembre, « La trame ») : chaque lettre a son rang, qui décale son
+    // « plus rien. » (19 novembre, « La trame » ; « puis » reste plein) : chaque lettre a son rang, qui décale son
     // effacement en trame de points.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
-    expect(letters.map((l) => l.textContent).join("")).toBe("puisplusrien.");
+    expect(letters.map((l) => l.textContent).join("")).toBe("plusrien.");
     expect(letters.map((l) => Number(l.style.getPropertyValue("--k")))).toEqual(letters.map((_, i) => i));
   });
 
@@ -188,6 +192,6 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector("#hero-make")!.textContent).toBe("Or create one here");
     expect([...document.querySelectorAll("[data-lede] b.hl")].map((b) => b.textContent)).toEqual(["voice messages", "notes", "chat room"]);
     expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
-    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free up to 2\u00a0GB", "Share without an account", "Lifetime and opens of your choice"]);
+    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free", "Share without an account", "Lifetime and opens of your choice"]);
   });
 });

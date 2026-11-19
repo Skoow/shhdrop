@@ -170,6 +170,8 @@
 </main>
 
 <footer class={["foot", { busy }]} data-foot>
+  <!-- Couture en points vers le pied (19 novembre, 3), comme entre les sections de l'accueil. -->
+  <div class="seam" aria-hidden="true"></div>
   <div class="wrap foot-in">
     {#if busy}
       <!-- Envoi en cours : raison lisible des liens et réglages désactivés. -->
@@ -364,6 +366,7 @@
      colonnes hiérarchisées, liens JAMAIS soulignés (retours UI8) : survol et focus par la couleur,
      anneau de focus au clavier. */
   .foot {
+    --sb: 11 13 18;
     position: relative;
     /* Son propre fond seulement (décision du propriétaire du 16 novembre) : le fond de la page
        (aurore, trame) ne se mélange plus à son papier peint ; la lueur et les pictos restent. */

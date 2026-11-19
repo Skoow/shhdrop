@@ -61,7 +61,8 @@
     list.forEach((w, i) => {
       if (w.endsWith(",") && i < list.length - 1) breath = i;
     });
-    const hl = (i: number) => breath >= 0 && i > breath;
+    // « puis » reste plein, seuls « plus rien. » se défont (maquette « La trame », 19 novembre, 3).
+    const hl = (i: number) => breath >= 0 && i > breath + 1;
     let seen = 0;
     // Seconde ligne colorée (référence du propriétaire, 12 novembre) : « puis plus rien. ».
     return list.map((w, i) => ({
@@ -88,7 +89,8 @@
   });
 
   // Ligne de méta : la limite gratuite vient de limits.ts (jamais écrite dans les textes).
-  const meta = $derived([t("hero.meta.free", { size: formatBytes(CONTENT_MAX, getLang()) }), t("home.fact.account"), t("hero.meta.erase")]);
+  // « 2 Go » n'est écrit qu'une fois, sous le bouton du cadre (propriétaire, 19 novembre, 3).
+  const meta = $derived([t("hero.meta.free"), t("home.fact.account"), t("hero.meta.erase")]);
 
   function give(list: File[], source: Source, folders: string[] = []) {
     if (list.length > 0 || folders.length > 0) onfiles?.(list, source, folders);
@@ -137,66 +139,60 @@
 
 <div class={["home", { compact, still: tabHidden }]}>
   <section class="hero" aria-labelledby="hero-title">
-    <div class="pitch">
-      <!-- Plus de sur-titre « Chiffré de bout en bout » (retours du 15 novembre) : le titre, la
-           phrase et les cases cochées le disent déjà. -->
-      {#if compact}
-        <!-- Page d'envoi (retours du propriétaire du 17 novembre) : un titre pour les lecteurs
-             d'écran (« Votre envoi » est le titre visible) ; les trois assurances sont dans le cadre
-             de dépôt du composeur (ui/Assurances.svelte). -->
-        <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
-      {:else}
-        <h1 id="hero-title" tabindex="-1">
-          <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
-          <span class="sr-only">{t("hero.title")}</span>
-          <span class="words" aria-hidden="true" data-ambient style:--n={nLetters}>
-            {#each words as { w, hl, br, letters }, i (i)}{#if br}<br />{/if}<span class={["w", { hl }]}
-                >{#if hl}{#each letters as { c, k }, j (j)}<span class="l" data-c={c} style:--k={k}><span class="g">{c}</span></span>{/each}{:else}{w}{/if}</span
-              >{" "}{/each}
-          </span>
-        </h1>
-      {/if}
-
-      {#if !compact}
-        <!-- Accroche (17 novembre) : « fichiers » en général, et ce qu'on ne devine pas sans bouton
-             exprès mis en avant : vocaux, notes, salon de discussion. -->
-        <p class="lede" data-lede>
-          {#each lede as p, i (i)}{#if "b" in p}<b class="hl">{p.b}</b>{:else}{p.s}{/if}{/each}
-        </p>
-      {/if}
-    </div>
-    {#if !compact}
-        <!-- Cadre d'envoi (propriétaire, 19 novembre, reprise de la maquette « Le chiffré ») : à
-             gauche, la zone de dépôt et « Choisir des fichiers » ; à droite, « Ou créez sur place » :
-             Photo ou vidéo, Vocal, Salon. Chaque bouton mène à la page d'envoi avec son geste déjà
-             choisi (Salon : bientôt, mis en avant là-bas). -->
-        <div class={["ctas", "box", { over }]} data-ctas>
-          <div class="bx-l">
-            <p class="bx-t" aria-hidden="true">{t("hero.box.title")}</p>
-            <button type="button" class="pick" data-pick onclick={() => onpick?.()}>
-              <Upload size={20} strokeWidth={2.2} aria-hidden="true" />
-              <span>{t("hero.pick")}</span>
-            </button>
-            <p class="bx-s num">{t("hero.box.limits", { n: MAX_ITEMS, size: formatBytes(CONTENT_MAX, getLang()) })}</p>
-          </div>
-          <div class="bx-r" role="group" aria-labelledby="hero-make">
-            <p class="bx-h" id="hero-make">{t("hero.make")}</p>
-            <div class="mk3">
-              <button type="button" class="mk" data-make="media" onclick={() => onmake?.("media")}><Camera size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.media.t")}</span></button>
-              <button type="button" class="mk" data-make="vocal" onclick={() => onmake?.("vocal")}><Mic size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.vocal.t")}</span></button>
-              <button type="button" class="mk soon" data-make="room" aria-describedby="hero-room-soon" onclick={() => onmake?.("room")}
-                ><MessagesSquare size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.room")}</span><span class="pill">{t("foot.soon")}</span></button
-              >
-              <span id="hero-room-soon" class="sr-only">{t("tabs.soon.chat")}</span>
-            </div>
+    {#if compact}
+      <!-- Page d'envoi (retours du propriétaire du 17 novembre) : un titre pour les lecteurs
+           d'écran (« Votre envoi » est le titre visible) ; les trois assurances sont dans le cadre
+           de dépôt du composeur (ui/Assurances.svelte). -->
+      <h1 id="hero-title" tabindex="-1" class="sr-only">{t("send.h1")}</h1>
+    {:else}
+        <div class="pitch">
+          <h1 id="hero-title" tabindex="-1">
+            <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
+            <span class="sr-only">{t("hero.title")}</span>
+            <span class="words" aria-hidden="true" data-ambient style:--n={nLetters}>
+              {#each words as { w, hl, br, letters }, i (i)}{#if br}<br />{/if}<span class={["w", { hl }]}
+                  >{#if letters.length}{#each letters as { c, k }, j (j)}<span class="l" data-c={c} style:--k={k}><span class="g">{c}</span></span>{/each}{:else}{w}{/if}</span
+                >{" "}{/each}
+            </span>
+          </h1>
+          <!-- Accroche (17 novembre) : « fichiers » en général, et ce qu'on ne devine pas sans bouton
+               exprès mis en avant : vocaux, notes, salon de discussion. -->
+          <p class="lede" data-lede>
+            {#each lede as p, i (i)}{#if "b" in p}<b class="hl">{p.b}</b>{:else}{p.s}{/if}{/each}
+          </p>
+        </div>
+        <!-- Cadre d'envoi (19 novembre) : la zone de dépôt (titre, « Choisir des fichiers ») puis
+             « Ou créez sur place » : Photo ou vidéo, Vocal, Salon, sur une ligne. Chaque bouton mène à
+             la page d'envoi avec son geste déjà choisi (Salon : bientôt, mis en avant là-bas). -->
+      <div class={["ctas", "box", { over }]} data-ctas>
+        <!-- Zone de dépôt (19 novembre, 3) : pointillé menthe autour du titre et du bouton. -->
+        <div class="drop">
+          <span class="up" aria-hidden="true"><Upload size={22} strokeWidth={2.2} /></span>
+          <p class="bx-t" aria-hidden="true">{t("hero.box.title")}</p>
+          <button type="button" class="pick" data-pick onclick={() => onpick?.()}>
+            <Upload size={20} strokeWidth={2.2} aria-hidden="true" />
+            <span>{t("hero.pick")}</span>
+          </button>
+          <p class="bx-s num">{t("hero.box.limits", { n: MAX_ITEMS, size: formatBytes(CONTENT_MAX, getLang()) })}</p>
+        </div>
+        <div class="bx-r" role="group" aria-labelledby="hero-make">
+          <p class="bx-h" id="hero-make">{t("hero.make")}</p>
+          <div class="mk3">
+            <button type="button" class="mk" data-make="media" onclick={() => onmake?.("media")}><Camera size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.media.t")}</span></button>
+            <button type="button" class="mk" data-make="vocal" onclick={() => onmake?.("vocal")}><Mic size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.vocal.t")}</span></button>
+            <button type="button" class="mk soon" data-make="room" aria-describedby="hero-room-soon" onclick={() => onmake?.("room")}
+              ><MessagesSquare size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.room")}</span><span class="pill">{t("foot.soon")}</span></button
+            >
+            <span id="hero-room-soon" class="sr-only">{t("tabs.soon.chat")}</span>
           </div>
         </div>
+      </div>
         <ul class="meta" aria-label={t("home.facts.label")} data-meta>
           {#each meta as m, i (i)}<li><span class="ck" aria-hidden="true"><Check size={12} strokeWidth={2.6} /></span>{m}</li>{/each}
         </ul>
+      <!-- L'infographie animée a sa propre section, avec ses étapes (19 novembre, 3) ; le cadre
+           d'envoi est à droite du titre (maquette « La trame »). -->
     {/if}
-    <!-- La démonstration animée est descendue dans « Comment ça marche » (19 novembre, 2) : elle
-         répétait le panneau de cette section ; le cadre d'envoi prend sa place à droite. -->
   </section>
 
   <!-- Plus de bande d'engagements (17 novembre) : la sécurité et la confidentialité sont dites
@@ -257,7 +253,6 @@
   .pitch {
     display: grid;
     justify-items: start;
-    align-content: center;
     gap: var(--sp-4);
     min-width: 0;
   }
@@ -266,8 +261,8 @@
   }
   h1 {
     margin: 0;
-    font-size: clamp(2.5rem, 1.1rem + 4.4vw, 4.75rem);
-    line-height: 1;
+    font-size: clamp(2.5rem, 0.8rem + 3.7vw, 5.5rem);
+    line-height: 0.98;
     font-weight: 700;
     font-stretch: var(--wd-display);
     letter-spacing: -0.04em;
@@ -286,56 +281,61 @@
   }
   .lede {
     margin: 0;
-    max-width: 44ch;
+    max-width: 48ch;
     overflow-wrap: break-word;
     color: #aab6d3;
     font-size: 1.0625rem;
     line-height: 1.55;
     text-wrap: pretty;
   }
-  /* Les deux actions (la tuile se suffit : plus de cadre autour, 16 novembre). */
-  /* Cadre d'envoi (19 novembre) : zone de dépôt à gauche, gestes à droite. */
+  /* Cadre d'envoi (19 novembre, 3) : la zone de dépôt, en pointillé menthe, entoure le titre et le
+     bouton ; les trois gestes « Ou créez sur place » sur une ligne dessous. */
   .box {
-    position: relative;
     display: grid;
-    gap: var(--sp-4);
-    justify-items: center;
+    gap: var(--sp-3);
     width: 100%;
-    max-width: 34rem;
-    padding: var(--sp-6) var(--sp-5);
+    max-width: 44rem;
+    padding: var(--sp-3);
     border-radius: var(--r-2xl);
-    text-align: center;
-    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)), rgb(16 22 38 / 0.82);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)), rgb(16 22 38 / 0.86);
     box-shadow:
       inset 0 0 0 1px rgb(150 175 255 / 0.18),
       0 24px 60px -30px rgb(51 102 255 / 0.55);
-    transition: box-shadow var(--dur-fast) var(--ease-out);
   }
-  /* Pointillé intérieur : le cadre est une zone de dépôt (maquette « La trame »). */
-  .box::before {
-    content: "";
-    position: absolute;
-    inset: 10px;
-    border: 2px dotted rgb(150 175 255 / 0.22);
-    border-radius: calc(var(--r-2xl) - 8px);
-    pointer-events: none;
+  .drop {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
+    border: 2px dashed rgb(95 227 181 / 0.45);
+    border-radius: var(--r-xl);
+    background: radial-gradient(80% 90% at 50% 0%, rgb(95 227 181 / 0.09), transparent 75%), rgb(95 227 181 / 0.025);
+    text-align: center;
+    transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
   }
-  .box.over {
-    box-shadow:
-      inset 0 0 0 2px var(--accent),
-      0 24px 60px -30px rgb(95 227 181 / 0.6);
+  .box.over .drop {
+    border-color: var(--accent);
+    background-color: rgb(95 227 181 / 0.1);
   }
-  .bx-l,
+  .up {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 0 28px -4px rgb(95 227 181 / 0.6);
+  }
   .bx-r {
     display: grid;
     justify-items: center;
     gap: var(--sp-3);
-    width: 100%;
     min-width: 0;
   }
   .bx-t {
     margin: 0;
-    font-size: clamp(1.25rem, 1.05rem + 0.6vw, 1.5rem);
+    font-size: clamp(1.25rem, 1.05rem + 0.6vw, 1.625rem);
     font-weight: 700;
     letter-spacing: -0.02em;
   }
@@ -356,7 +356,7 @@
     justify-content: center;
     gap: var(--sp-2);
     min-height: 56px;
-    padding: 0 var(--sp-5);
+    padding: 0 var(--sp-6);
     border: 0;
     border-radius: var(--r-lg);
     background: var(--sig-blue);
@@ -379,11 +379,12 @@
     outline: 2px solid var(--accent);
     outline-offset: 3px;
   }
+  /* Toujours trois colonnes : Photo ou vidéo, Vocal, Salon côte à côte (19 novembre, 3). */
   .mk3 {
-    width: 100%;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.75em), 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--sp-2);
+    width: 100%;
   }
   .mk {
     position: relative;
@@ -391,7 +392,7 @@
     justify-items: center;
     align-content: center;
     gap: 6px;
-    min-height: 92px;
+    min-height: 80px;
     padding: var(--sp-3) var(--sp-2);
     border: 0;
     border-radius: var(--r-lg);
@@ -427,18 +428,23 @@
     font-size: 0.6875rem;
     font-weight: 600;
   }
-  /* Téléphone (19 novembre, 2) : tout le cadre tient dans le premier écran d'un iPhone ; « Glissez
-     vos fichiers ici » retiré (on ne glisse pas de fichier sur un téléphone), bouton pleine largeur. */
+  /* Téléphone : tout le cadre tient dans le premier écran d'un iPhone ; ni pastille ni « Glissez vos
+     fichiers ici » (on ne glisse pas de fichier sur un téléphone) ; bouton pleine largeur. */
   @media (max-width: 639px) {
     .box {
       gap: var(--sp-3);
-      padding: var(--sp-5) var(--sp-4);
+      padding: var(--sp-3);
     }
+    .drop {
+      padding: var(--sp-3);
+      gap: var(--sp-2);
+    }
+    .up,
     .bx-t {
       display: none;
     }
     .pick {
-      justify-self: stretch;
+      width: 100%;
       min-height: 52px;
     }
     .mk {
@@ -447,9 +453,6 @@
     }
   }
   @media (max-width: 767px) {
-    
-    
-    
     /* Le bloc « Que voulez-vous envoyer ? » ne reste que sur la page d'envoi. */
     .home:not(.compact) .compose {
       display: none;
@@ -494,36 +497,13 @@
     padding-bottom: var(--sp-2);
     gap: var(--sp-3);
   }
-  /* Une rangée sur ordinateur (titre à gauche, assurances à droite) ; les assurances passent
-     sous le titre quand la place manque (téléphone). */
-  .home.compact .pitch {
-    order: 1;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2) var(--sp-5);
-  }
   .home.compact .compose {
     order: 2;
   }
   /* Salon (bientôt) : à part des actions d'envoi, désactivé mais lisible. */
-  
-  
-  
-  
-  
-  
 
-  
-  
-  
-  
 
   /* « Commencer » (page d'envoi) : bouton contour ; le blanc plein reste au héros (refonte du 12 novembre). */
-  
-  
-  
-  
 
   
 
@@ -553,23 +533,6 @@
   .home.compact .compose :global(.vessel:not(.drop) .track) {
     stroke-dasharray: none;
   }
-  
-  
-  
-  /* Reflet sous le pointeur (magnet). */
-  
-  
-  
-  
-  
-  /* Petits gestes propres à chaque tuile, au survol seulement : déclencheur, voyant, niveaux, curseur. */
-  
-  
-  
-  
-  
-  
-  
   @keyframes flash {
     30% {
       opacity: 0.9;
@@ -617,8 +580,6 @@
     max-width: 880px;
     margin-inline: auto;
   }
-  
-  
 
   /* « puis plus rien. » (maquette « La trame », version 1 ; propriétaire, 19 novembre, 2) : en
      vague depuis la fin de la ligne, chaque lettre se change en trame de points blancs, vire au
@@ -640,7 +601,7 @@
       color: var(--text);
     }
     .l {
-      --d: calc((var(--n, 15) - var(--k, 0)) * 85ms);
+      --d: calc((var(--n, 15) - var(--k, 0)) * 170ms);
     }
     /* La lettre (masquée) et ses points volants (hors du masque, sinon ils seraient coupés). */
     .g {
@@ -757,19 +718,17 @@
       justify-items: center;
       text-align: center;
     }
-    .home:not(.compact) .box {
-      justify-self: center;
-    }
     .home:not(.compact) .meta {
       justify-content: center;
     }
+    .home:not(.compact) .box {
+      justify-self: center;
+    }
   }
   @media (max-width: 639px) {
-    /* Bas : la couture de « Comment ça marche » (44 px au-dessus de la section) ne touche pas
-       les assurances. */
     .home:not(.compact) .hero {
       gap: var(--sp-4);
-      padding-block: var(--sp-3) 64px;
+      padding-block: var(--sp-3) var(--sp-6);
     }
     .home:not(.compact) .pitch {
       gap: var(--sp-3);
@@ -783,18 +742,18 @@
     }
   }
   /* Ordinateur : titre, phrase et assurances à gauche ; le cadre d'envoi à droite (maquette « La
-     trame »), sur le premier écran. */
+     trame ») ; toute la largeur utile (19 novembre, 3 : « trop compressé »). */
   @media (min-width: 1024px) {
     .home:not(.compact) .hero {
-      grid-template-columns: minmax(0, 1.15fr) minmax(400px, 0.85fr);
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
       grid-template-areas:
         "pitch box"
         "meta box";
       align-items: center;
-      column-gap: clamp(48px, 5vw, 96px);
+      column-gap: clamp(40px, 5vw, 96px);
       row-gap: var(--sp-5);
-      min-height: min(calc(100svh - 76px - var(--banner-h, 0px)), 760px);
-      padding-block: var(--sp-6) var(--sp-7);
+      min-height: min(calc(100svh - 76px - var(--banner-h, 0px)), 820px);
+      padding-block: var(--sp-5) var(--sp-7);
     }
     .home:not(.compact) .pitch {
       grid-area: pitch;

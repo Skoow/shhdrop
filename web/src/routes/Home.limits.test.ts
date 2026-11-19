@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-// Ligne de méta de l'accueil : la limite gratuite vient de limits.ts, jamais écrite en dur.
+// Cadre d'envoi de l'accueil : la limite gratuite vient de limits.ts, jamais écrite en dur (écrite
+// une seule fois, sous « Choisir des fichiers », depuis le 19 novembre, 3).
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -13,9 +14,9 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-it("« Gratuit jusqu'à … » suit CONTENT_MAX", () => {
+it("« … au total » sous le bouton suit CONTENT_MAX", () => {
   setLang("fr");
   c = mount(Home as never, { target: document.body, props: {} }) as Record<string, unknown>;
   flushSync();
-  expect(document.querySelector("[data-meta] li")!.textContent!.trim()).toBe("Gratuit jusqu'à 5 Go");
+  expect(document.querySelector("[data-ctas] .bx-s")!.textContent!.trim()).toMatch(/^200\séléments · 5\sGo au total$/);
 });

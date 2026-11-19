@@ -70,8 +70,9 @@ test.describe("fr-FR", () => {
     const make = (await page.locator('[data-make="room"]').boundingBox())!;
     expect(pick.height).toBeGreaterThanOrEqual(48);
     expect(make.height).toBeGreaterThanOrEqual(48);
-    // Les boutons occupent la largeur du cadre ; ordre : fichiers, puis « Créer sur place ».
-    expect(pick.width).toBeGreaterThan(frame.width - 40);
+    // Le bouton occupe la largeur de la zone de dépôt ; ordre : fichiers, puis « Créer sur place ».
+    const drop = (await page.locator("[data-ctas] .drop").boundingBox())!;
+    expect(pick.width).toBeGreaterThan(drop.width - 40);
     expect(make.y).toBeGreaterThan(pick.y);
     expect(make.y + make.height).toBeLessThanOrEqual(844);
     // Tout le cadre est visible au premier écran, même sous les barres de Safari (19 novembre, 2) :
@@ -107,11 +108,12 @@ test.describe("fr-FR", () => {
     // long (« s'autodétruit », question de la FAQ) débordait de 14 px dans la marge sans créer de
     // défilement ; dans WebKit, aux métriques un peu plus larges, il en créait un (CI b155911).
     // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi. Les sections en
-    // bande (.band) débordent exprès par leur décor (couture et halo d'un bord à l'autre de l'écran,
-    // 19 novembre, 2 ; coupés par #app) : leur contenu, lui, est vérifié.
+    // bande (.band, .sect) débordent exprès par leur décor (couture et halo d'un bord à l'autre de l'écran,
+    // 19 novembre, 2 ; coupés par #app) : leur contenu, lui, est vérifié. Les dessins SVG (mis à
+    // l'échelle, sans texte de page) n'entrent pas dans cette mesure.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only") && !e.matches(".band, .home"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg") && !e.matches(".band, .sect, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );

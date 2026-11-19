@@ -71,14 +71,15 @@ test("destinataire : bouclier juste avant le nom ; capture", async ({ page, shh,
   await page.screenshot({ path: `${SHOTS}destinataire-${w(isMobile)}.png` });
 });
 
-async function sides(page: Page) {
-  return page.locator("[data-sides]").evaluate((e) => {
-    const c = getComputedStyle(e);
-    return { img: c.backgroundImage, o: parseFloat(c.opacity), d: c.display, pos: c.position, mask: c.maskImage || c.webkitMaskImage };
+/** Pictos du pied (::after) : seul endroit du papier peint depuis le 19 novembre (3). */
+async function footPictos(page: Page) {
+  return page.locator("footer[data-foot]").evaluate((e) => {
+    const c = getComputedStyle(e, "::after");
+    return { img: c.backgroundImage, d: c.display };
   });
 }
 
-test("pied : « Shhgone © 2026 » en bas à gauche, plus de « publicité » ; côtés en pictos, retirés en contraste renforcé ; captures", async ({ page, shh, isMobile }) => {
+test("pied : « Shhgone © 2026 » en bas à gauche, plus de « publicité » ; pictos au pied seulement, retirés en contraste renforcé ; captures", async ({ page, shh, isMobile }) => {
   await page.setViewportSize({ width: w(isMobile), height: isMobile ? 844 : 1000 });
   await page.goto(shh.origin + "/");
   await settle(page);
@@ -89,17 +90,15 @@ test("pied : « Shhgone © 2026 » en bas à gauche, plus de « publicité » ; 
   const sig = foot.locator(".base .sig");
   await expect(sig).toHaveText(/^Shhgone\s*©\s2026$/);
   const [sb, base] = [await sig.boundingBox(), await foot.locator(".base").boundingBox()];
-  // Téléphone (< 900 px, retours du 15 novembre) : signature centrée ; ordinateur : à gauche.
-  if (w(isMobile) < 900) expect(Math.abs(sb!.x + sb!.width / 2 - (base!.x + base!.width / 2))).toBeLessThanOrEqual(1);
-  else expect(Math.abs(sb!.x - base!.x)).toBeLessThanOrEqual(1);
-  // Côtés : fichier statique (pas de data:), fixe, très discret, colonne centrale masquée.
-  const st = await sides(page);
+  // Nom à gauche, version à droite, sur téléphone comme sur ordinateur (pied de page du 17 novembre ;
+  // remplace la signature centrée sur téléphone du 15 novembre).
+  expect(Math.abs(sb!.x - base!.x)).toBeLessThanOrEqual(1);
+  // Papier peint : au pied seulement (plus sur les côtés de la page, 19 novembre, 3) ; fichier
+  // statique (pas de data:), nom à empreinte (A7, cache d'un an).
+  await expect(page.locator("[data-sides]")).toHaveCount(0);
+  const st = await footPictos(page);
   expect(st.img).toMatch(/assets\/motif-[A-Za-z0-9_-]{8,}\.svg/);
   expect(st.img).not.toContain("data:");
-  expect(st.pos).toBe("fixed");
-  expect(st.o).toBeLessThanOrEqual(isMobile ? 0.015 : 0.025);
-  expect(st.mask).toMatch(/transparent|rgba\(0, 0, 0, 0\)/);
-  // Nom à empreinte (A7, cache d'un an) : adresse lue dans le style.
   const res = await page.request.get(new URL(/url\("?([^")]+)"?\)/.exec(st.img)![1]!, shh.origin).href);
   expect((await res.body()).length).toBeLessThan(4096);
   await settle(page);
@@ -107,7 +106,7 @@ test("pied : « Shhgone © 2026 » en bas à gauche, plus de « publicité » ; 
   await page.evaluate(() => scrollTo(0, 0));
   expect(await axe(page)).toEqual([]);
   await page.emulateMedia({ contrast: "more" } as Parameters<Page["emulateMedia"]>[0]);
-  expect((await sides(page)).d).toBe("none");
+  expect((await footPictos(page)).d).toBe("none");
   await page.emulateMedia({ contrast: "no-preference", forcedColors: "active" } as Parameters<Page["emulateMedia"]>[0]);
-  expect((await sides(page)).d).toBe("none");
+  expect((await footPictos(page)).d).toBe("none");
 });

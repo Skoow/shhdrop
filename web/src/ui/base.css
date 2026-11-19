@@ -370,3 +370,53 @@ html.kbd-open .dock {
     display: none;
   }
 }
+
+/* Sections de l'accueil (propriétaire, 19 novembre, 3 ; maquette « La trame ») : chaque section a
+   son propre fond, d'un bord à l'autre de l'écran (#app coupe le débordement), et le texte n'est
+   jamais posé sur le papier peint (les pictos restent au pied de page). Couture : au-dessus de la
+   section, des rangées de points de SA couleur grossissent jusqu'à devenir son fond plein, sur le
+   fond de la section précédente. `--sb` : couleur du fond (r g b). Dessiné en CSS, aucune image. */
+.sect {
+  --sb: 11 13 16;
+  position: relative;
+  isolation: isolate;
+}
+.sect::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  left: 50%;
+  width: 100cqw;
+  translate: -50% 0;
+  background: rgb(var(--sb));
+  pointer-events: none;
+}
+.sect::after,
+.seam {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block-end: 100%;
+  left: 50%;
+  width: 100cqw;
+  height: 72px;
+  translate: -50% 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, rgb(var(--sb)) 0.5px, transparent 1.1px) 0px 0px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 0.9px, transparent 1.5px) 4px 8px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 1.4px, transparent 2.0px) 0px 16px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 1.9px, transparent 2.5px) 4px 24px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 2.5px, transparent 3.1px) 0px 32px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 3.1px, transparent 3.7px) 4px 40px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 3.7px, transparent 4.3px) 0px 48px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 4.4px, transparent 5.0px) 4px 56px / 8px 8px repeat-x,
+    radial-gradient(circle, rgb(var(--sb)) 5.1px, transparent 5.7px) 0px 64px / 8px 8px repeat-x;
+}
+@media (forced-colors: active) {
+  .sect::after,
+  .seam {
+    display: none;
+  }
+}

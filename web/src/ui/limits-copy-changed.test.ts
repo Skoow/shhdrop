@@ -24,7 +24,7 @@ describe("MAX_ITEMS à 7", () => {
     setLang("fr");
     c = mount(Home as never, { target: document.body, props: {} }) as Record<string, unknown>;
     flushSync();
-    expect(document.querySelector("[data-meta] li")!.textContent).toMatch(/Gratuit jusqu'à 2\sGo/);
+    expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/^7\séléments · 2\sGo au total$/);
     void unmount(c);
     document.body.innerHTML = "";
     c = mount(CapacityGauge as never, { target: document.body, props: { bytes: 1, count: 2 } }) as Record<string, unknown>;

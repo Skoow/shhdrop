@@ -36,10 +36,10 @@ describe("limites : 200 éléments (toutes formules), 2 Go gratuits", () => {
   it("accueil : ligne de preuves, en français et en anglais", () => {
     show(Home);
     // Ligne du héros (la carte de dépôt « Jusqu'à 2 Go au total » est retirée, 18 novembre).
-    expect(document.querySelector("[data-meta] li")!.textContent).toMatch(/Gratuit jusqu'à 2\sGo/);
+    expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/2\sGo au total/);
     setLang("en");
     flushSync();
-    expect(document.querySelector("[data-meta] li")!.textContent).toMatch(/Free up to 2\sGB/);
+    expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/2\sGB in all/);
   });
 
   it("jauge : « 340 Mo / 2 Go » et « 3 / 200 », barre du nombre (plus de crans)", () => {

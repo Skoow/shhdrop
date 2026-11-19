@@ -7,11 +7,13 @@
   // nom, le mot de passe ni l'adresse IP ; tout est effacé après ouverture ou à l'échéance.
   // Le brouillé est décoratif (decor.ts : générateur à graine fixe, jamais de crypto).
   import { t, type Key } from "../i18n/i18n.svelte";
-  import { Lock, Pause, Play } from "./Icon";
+  import { Check, FileText, Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
   import { PAUSE, STEP_MS, STEPS, TYPE_MS } from "./demo-steps";
 
   const uid = $props.id();
+  // Section de l'accueil qui porte le titre visible (19 novembre, 3) : sinon, titre caché propre.
+  let { labelledby }: { labelledby?: string } = $props();
 
   // Mouvement réduit, relu si la préférence change pendant la visite.
   const mq = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
@@ -115,7 +117,8 @@
       at += text.length + st.length;
       return row;
     });
-    return all.slice(-4);
+    // Deux lignes au plus (19 novembre, 3) : la scène prend la place ; les étapes sont à droite.
+    return all.slice(-2);
   });
   /** Fin de la frappe de l'étape (en lettres) : le minuteur s'arrête là. */
   const total = $derived(rows.reduce((m, r) => (r.full ? m : Math.max(m, r.start + r.text.length + r.st.length)), 0));
@@ -137,24 +140,30 @@
 
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
 
-<!-- Cadre « figure » : coins marqués, légende Fig. 01 dessous. -->
+<!-- Disposition du 19 novembre (3) : la scène et le journal à gauche ; la liste des étapes, cochées
+     au fil de l'animation, à droite (dessous sur téléphone) ; « étape n sur 7 » et la pause en haut. -->
 <figure class="fig">
-<div class="frame">
 <div
   bind:this={root}
-  class={["demo", { board: reduced, paused: !playing && !reduced }]}
+  class={["dw", { board: reduced, paused: !playing && !reduced }]}
   data-demo
   data-ambient
   data-step={shown}
   role="group"
-  aria-labelledby="{uid}-t"
+  aria-labelledby={labelledby ?? `${uid}-t`}
   onfocusin={() => (focused = true)}
   onfocusout={focusOut}
 >
+<div class="demo">
   <div class="bar">
-    <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
-    <h3 class="sr-only" id="{uid}-t">{t("demo.title")}</h3>
-    <span class="bar-t" aria-hidden="true">{t("demo.bar")}</span>
+    {#if !labelledby}<h2 class="sr-only" id="{uid}-t">{t("demo.title")}</h2>{/if}
+    <span class="bar-t" aria-hidden="true"><FileText size={14} strokeWidth={2} />{t("demo.bar")}</span>
+    {#if !reduced}
+      <span class="bar-s num" aria-hidden="true">{t("demo.stepof", { n: shown, total: STEPS.length })}</span>
+      <button type="button" class="toggle" data-demo-toggle aria-label={playing ? t("demo.pause") : t("demo.play")} onclick={toggle}>
+        {#if !playing}<Play size={14} strokeWidth={2.2} aria-hidden="true" />{:else}<Pause size={14} strokeWidth={2.2} aria-hidden="true" />{/if}
+      </button>
+    {/if}
   </div>
 
   <!-- Survol de la scène ou du journal : arrêt ; la barre du bas (pause, lecture) n'arrête rien. -->
@@ -307,23 +316,18 @@
     </ol>
   {/if}
   </div>
-  <div class="info">
-    <span class="info-t" aria-hidden="true"><Lock size={12} strokeWidth={2.2} />{t("demo.info")}</span>
-    {#if !reduced}
-      <button type="button" class="toggle" data-demo-toggle aria-label={playing ? t("demo.pause") : t("demo.play")} onclick={toggle}>
-        {#if !playing}<Play size={14} strokeWidth={2.2} aria-hidden="true" />{:else}<Pause size={14} strokeWidth={2.2} aria-hidden="true" />{/if}
-      </button>
-    {/if}
-  </div>
-  <ol class={["steps", { "sr-only": !reduced }]} data-demo-steps>
+</div>
+  <ol class="steps" data-demo-steps>
     {#each STEPS as n (n)}
-      <li><span class="st">{t(`demo.s${n}.t` as "demo.s1.t")}</span> <span class="sd">{t(`demo.s${n}.d` as "demo.s1.d")}</span></li>
+      {@const done = !reduced && n < shown}
+      <li class={{ done, now: !reduced && n === shown }} aria-current={!reduced && n === shown ? "step" : undefined}>
+        <span class="ck" aria-hidden="true">{#if done}<Check size={13} strokeWidth={3} />{/if}</span>
+        <span class="st">{t(`demo.s${n}.t` as "demo.s1.t")}</span> <span class="sd">{t(`demo.s${n}.d` as "demo.s1.d")}</span>
+      </li>
     {/each}
   </ol>
 </div>
-</div>
 
-<!-- Plus de légende « Fig. 01 » (17 novembre). -->
 </figure>
 
 
@@ -363,26 +367,21 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    min-height: 48px;
+    padding: 2px 4px 2px 16px;
     border-bottom: 1px solid rgb(150 175 255 / 0.1);
     background: rgb(255 255 255 / 0.02);
   }
-  .lights {
-    display: inline-flex;
-    gap: 6px;
-  }
-  .lights i {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: rgb(233 236 242 / 0.16);
-  }
-  .lights i:first-child {
-    background: var(--mint);
-    opacity: 0.8;
-  }
   .bar-t {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
     margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--text-2);
     font-family: var(--font-mono);
     font-size: 0.75rem;
@@ -767,7 +766,7 @@
     flex-direction: column;
     justify-content: flex-end;
     gap: 6px;
-    height: 116px;
+    height: 64px;
     margin: 0;
     padding: 10px 16px 12px;
     overflow: hidden;
@@ -844,28 +843,15 @@
       opacity: 0;
     }
   }
-  .info {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 44px;
-    padding: 4px 6px 4px 16px;
-    border-top: 1px solid rgb(150 175 255 / 0.1);
-    color: var(--text-2);
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    letter-spacing: 0.02em;
-  }
-  .info-t {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-  }
-  .info-t :global(svg) {
+  .bar-t :global(svg) {
     flex: none;
-    color: var(--mint);
+    color: var(--text-2);
+  }
+  .bar-s {
+    flex: none;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
   }
   .toggle {
     flex: none;
@@ -887,70 +873,77 @@
     outline: 2px solid var(--accent);
     outline-offset: -2px;
   }
-  /* Figure : coins marqués (équerres menthe), légende mono dessous. */
-  .fig {
-    min-width: 0;
-    margin: 0;
-  }
-  .frame {
-    padding: 10px;
-    --k: rgb(95 227 181 / 0.55);
-    background:
-      linear-gradient(var(--k), var(--k)) 0 0 / 14px 1.5px no-repeat,
-      linear-gradient(var(--k), var(--k)) 0 0 / 1.5px 14px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 0 / 14px 1.5px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 0 / 1.5px 14px no-repeat,
-      linear-gradient(var(--k), var(--k)) 0 100% / 14px 1.5px no-repeat,
-      linear-gradient(var(--k), var(--k)) 0 100% / 1.5px 14px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 100% / 14px 1.5px no-repeat,
-      linear-gradient(var(--k), var(--k)) 100% 100% / 1.5px 14px no-repeat;
-  }
-  
-  
   /* Pause : la seule boucle (le curseur) s'arrête ; les animations finies vont à leur terme. */
   .paused .cur.idle {
     animation-play-state: paused;
   }
 
-  /* Mouvement réduit : storyboard, sans aucun mouvement. */
+  .fig {
+    min-width: 0;
+    margin: 0;
+  }
+  /* La scène à gauche, les étapes à droite (ordinateur) ; les étapes dessous (téléphone). */
+  .dw {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  @media (min-width: 1024px) {
+    .dw {
+      grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
+      gap: 32px;
+    }
+  }
+  /* Étapes : cochées au fil de l'animation, l'étape en cours surlignée. */
   .steps {
+    display: grid;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  .board .steps {
-    padding: 16px;
-    grid-column: 1 / -1;
+  .steps li {
     display: grid;
-    gap: 8px;
-    counter-reset: st;
+    grid-template-columns: 20px minmax(0, 1fr);
+    column-gap: 14px;
+    padding: 12px 14px;
+    border-block-end: 1px solid rgb(150 175 255 / 0.1);
+    border-radius: 10px;
+    transition: background-color var(--dur-base) var(--ease-out);
   }
-  .board .steps li {
-    display: grid;
-    grid-template-columns: 22px minmax(0, 1fr);
-    column-gap: 10px;
-    counter-increment: st;
-    font-size: var(--fs-small);
-    line-height: var(--lh-small);
+  .steps li:last-child {
+    border-block-end: 0;
   }
-  .board .steps li::before {
-    content: counter(st);
+  .steps li.now {
+    background: rgb(150 175 255 / 0.07);
+  }
+  .ck {
     grid-row: 1 / span 2;
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: rgb(95 227 181 / 0.14);
-    color: var(--mint);
-    font-size: 0.75rem;
-    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    margin-block-start: 1px;
+    border-radius: 5px;
+    box-shadow: inset 0 0 0 1.5px rgb(233 236 242 / 0.45);
+    color: var(--on-accent);
+    transition: background-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
   }
-  .board .st {
+  .now .ck {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+  .done .ck {
+    background: var(--accent);
+    box-shadow: none;
+  }
+  .st {
     font-weight: 650;
+    font-size: 0.9375rem;
   }
-  .board .sd {
+  .sd {
     color: var(--text-2);
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
   }
   .board :global(*) {
     animation: none !important;

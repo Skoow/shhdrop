@@ -3,18 +3,20 @@
   // réponse ouverte), réponses tirées de la spécification (§2, §9, §18). La réponse entre en
   // fondu et montée de 6 px ; aucune hauteur animée (§20.6 point 1).
   import { t, type Key } from "../../i18n/i18n.svelte";
-  import { magnet, reveal } from "../../ui/attach";
+  import { reveal } from "../../ui/attach";
   import { ChevronDown } from "../../ui/Icon";
 
   const qs = ["server", "lost", "back", "scan", "copy"] as const;
 </script>
 
-<section class="faq band" style:--tone="150 140 255" aria-labelledby="faq-title">
+<!-- Fond bleu nuit et trame à gauche (maquette « La trame », 19 novembre, 3) ; titre à gauche,
+     questions à droite sur ordinateur. -->
+<section class="faq sect" style:--sb="16 26 64" aria-labelledby="faq-title">
   <h2 id="faq-title" class="rv" {@attach reveal}>{t("home.faq.title")}</h2>
   <div class="qa">
     {#each qs as k (k)}
       <!-- « Ce que voit le serveur » (menu Sécurité de la barre du haut) ouvre la première question. -->
-      <details name="faq" id="faq-{k}" class="rv" {@attach reveal} {@attach magnet}>
+      <details name="faq" id="faq-{k}" class="rv" {@attach reveal}>
         <summary><span>{t(`home.faq.${k}.q` as Key)}</span><ChevronDown size={22} strokeWidth={1.75} aria-hidden="true" /></summary>
         <div class="a"><p>{t(`home.faq.${k}.a` as Key)}</p></div>
       </details>
@@ -24,69 +26,57 @@
 
 <style>
   .faq {
-    position: relative;
-    isolation: isolate;
-    padding-block-end: 120px;
-    grid-template-columns: minmax(0, 1fr);
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-6);
-    width: 100%;
-    max-width: 52rem;
-    margin-inline: auto;
-    padding-block-start: 120px;
+    padding-block: 112px 120px;
+  }
+  /* Trame de points ; le fond descend sous l'écart avant le pied de page (caché par le pied, qui a
+     son propre fond), pour que la couture du pied se pose sur ce bleu et non sur le fond de page. */
+  .faq::before {
+    inset-block-end: -160px;
+    background:
+      radial-gradient(circle, rgb(150 175 255 / 0.12) 1.4px, transparent 2px) 0 0 / 9px 9px,
+      rgb(var(--sb));
   }
   details {
     scroll-margin-top: 96px;
   }
+  @media (min-width: 1024px) {
+    .faq {
+      grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+      column-gap: clamp(48px, 6vw, 120px);
+      align-items: start;
+      padding-block: 136px 144px;
+    }
+  }
   h2 {
-    text-align: center;
+    margin: 0;
     text-wrap: balance;
     min-width: 0;
     overflow-wrap: break-word;
-    font-size: clamp(2rem, 1.4rem + 2vw, 3rem);
-    line-height: 1.05;
+    font-size: clamp(2.25rem, 1.4rem + 2.8vw, 4rem);
+    line-height: 1.02;
     font-weight: 700;
     font-stretch: 112%;
     letter-spacing: -0.035em;
   }
+  /* Questions : une liste à filets (plus de cartes) ; barre menthe à gauche de la question ouverte. */
   .qa {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-2);
+    border-block-start: 1px solid rgb(150 175 255 / 0.16);
   }
-  /* Question : relief léger, reflet sous le pointeur, barre menthe qui se lève à l'ouverture. */
   details {
     position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    border: 1px solid transparent;
-    border-radius: 18px;
-    background:
-      linear-gradient(180deg, rgb(15 22 42 / 0.92), rgb(10 15 30 / 0.92)) padding-box,
-      linear-gradient(180deg, rgb(150 175 255 / 0.18), rgb(150 175 255 / 0.04)) border-box;
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
-  }
-  details::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    left: 0;
-    top: 0;
-    width: 320px;
-    height: 320px;
-    margin: -160px 0 0 -160px;
-    border-radius: 50%;
-    background: radial-gradient(closest-side, rgb(95 227 181 / 0.08), transparent);
-    opacity: 0;
-    transform: translate(var(--lx, 50%), var(--ly, 50%));
-    transition: opacity var(--dur-base) var(--ease-out);
+    border-block-end: 1px solid rgb(150 175 255 / 0.16);
   }
   details::after {
     content: "";
     position: absolute;
     left: 0;
-    top: 14px;
-    bottom: 14px;
+    top: 18px;
+    height: 28px;
     width: 3px;
     border-radius: 0 3px 3px 0;
     background: var(--accent);
@@ -96,11 +86,6 @@
   details[open]::after {
     transform: scaleY(1);
   }
-  @media (hover: hover) {
-    details:hover::before {
-      opacity: 1;
-    }
-  }
   summary {
     list-style: none;
     display: flex;
@@ -108,18 +93,19 @@
     justify-content: space-between;
     gap: var(--sp-4);
     min-height: 64px;
-    padding: var(--sp-4) 22px;
-    border-radius: 18px;
+    padding: var(--sp-4) var(--sp-2) var(--sp-4) var(--sp-4);
     cursor: pointer;
     font-size: 1.125rem;
     font-weight: 580;
     -webkit-tap-highlight-color: transparent;
   }
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: 8px;
+  }
   summary > span {
     min-width: 0;
-    overflow-wrap: break-word;
-  }
-  .a {
     overflow-wrap: break-word;
   }
   summary::-webkit-details-marker {
@@ -142,62 +128,30 @@
     }
   }
   .a {
-    padding: 0 22px 20px;
+    padding: 0 var(--sp-4) 22px;
+    overflow-wrap: break-word;
   }
   .a p {
     margin: 0;
-    color: var(--text-2);
+    color: #aab6d3;
     max-width: 62ch;
+    line-height: 1.6;
   }
   @media (prefers-reduced-motion: no-preference) {
     details[open] .a {
       animation: answer 480ms var(--ease-settle) both;
     }
-    details[open] summary > span {
-      animation: nudge 480ms var(--ease-settle) both;
-    }
   }
   @keyframes answer {
     from {
       opacity: 0;
-      transform: translateY(-10px);
-      filter: blur(3px);
-    }
-  }
-  @keyframes nudge {
-    from {
-      transform: translateX(-4px);
+      transform: translateY(-8px);
     }
   }
   @media (prefers-reduced-motion: reduce) {
     details::after,
     summary :global(svg) {
       transition: none;
-    }
-  }
-  @media (min-width: 1024px) {
-    .faq {
-      padding-block: 140px 140px;
-    }
-  }
-  /* Téléphone (retours du 15 novembre) : 120 px sous la dernière question, plus la marge du pied,
-     laissaient un grand vide avant le pied de page. */
-  @media (max-width: 599px) {
-    .faq {
-      padding-block: 104px 24px;
-    }
-  }
-  @media (forced-colors: active) {
-    details {
-      border: 1px solid CanvasText;
-      box-shadow: none;
-      background: Canvas;
-    }
-    details::before {
-      display: none;
-    }
-    details::after {
-      background: Highlight;
     }
   }
 </style>

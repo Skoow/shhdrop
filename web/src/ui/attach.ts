@@ -87,24 +87,6 @@ function follow(node: HTMLElement, write: (x: number, y: number, w: number, h: n
   };
 }
 
-/** Tuile magnétique : `--tx`/`--ty` (±3 px vers le pointeur), `--lx`/`--ly` (reflet sous le pointeur). */
-export function magnet(node: HTMLElement): (() => void) | void {
-  const set = (k: string, v: string) => node.style.setProperty(k, v);
-  return follow(
-    node,
-    (x, y, w, h) => {
-      set("--lx", `${Math.round(x)}px`);
-      set("--ly", `${Math.round(y)}px`);
-      set("--tx", `${((x / w - 0.5) * 6).toFixed(2)}px`);
-      set("--ty", `${((y / h - 0.5) * 6).toFixed(2)}px`);
-    },
-    () => {
-      set("--tx", "0px");
-      set("--ty", "0px");
-    },
-  );
-}
-
 /** Inclinaison du réceptacle vers le pointeur : `--rx`/`--ry` en degrés (±2 et ±2,5). */
 export function tilt(node: HTMLElement): (() => void) | void {
   const set = (k: string, v: string) => node.style.setProperty(k, v);
