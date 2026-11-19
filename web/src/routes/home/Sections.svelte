@@ -26,7 +26,7 @@
   ] as const;
 </script>
 
-<section class="sec how" id="comment" aria-labelledby="how-title">
+<section class="sec how band" style:--tone="95 227 181" id="comment" aria-labelledby="how-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
@@ -47,7 +47,7 @@
   </ol>
 </section>
 
-<section class="sec priv" aria-labelledby="priv-title">
+<section class="sec priv band" style:--tone="92 128 255" aria-labelledby="priv-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="priv-title" tabindex="-1">{t("home.priv.title")}</h2>
     <p>{t("home.priv.lede")}</p>
@@ -68,7 +68,7 @@
   <a class="more" href={href("/securite")} onclick={(e) => followLink(e, "/securite")}>{t("home.why.more")}<ArrowRight size={18} strokeWidth={1.9} aria-hidden="true" /></a>
 </section>
 
-<section class="sec offers" aria-labelledby="offers-title">
+<section class="sec offers band" style:--tone="70 205 235" aria-labelledby="offers-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="offers-title">{t("home.offers.title")}</h2>
     <p>{t("home.offers.lede")}</p>
@@ -86,29 +86,10 @@
     padding-block: 96px 24px;
     scroll-margin-top: 72px;
   }
-  /* Ordinateur (propriétaire, 18 novembre) : chaque section est une bande à part, sur toute la
-     largeur (100cqw du conteneur #app) : un filet en haut, une lueur douce, et une bande sur
-     deux légèrement plus claire. */
+  /* Bandes (18 novembre) : voir .band dans ui/base.css ; chaque section a sa teinte. */
   @media (min-width: 1024px) {
     .sec {
-      padding-block: 112px 104px;
-    }
-    .sec::before {
-      content: "";
-      position: absolute;
-      z-index: -1;
-      inset-block: 0;
-      left: 50%;
-      width: 100cqw;
-      transform: translateX(-50%);
-      border-block-start: 1px solid rgb(150 175 255 / 0.1);
-      background: radial-gradient(60% 120px at 50% 0%, rgb(95 227 181 / 0.06), transparent 100%);
-      pointer-events: none;
-    }
-    .sec.priv::before {
-      background:
-        radial-gradient(60% 120px at 50% 0%, rgb(92 128 255 / 0.08), transparent 100%),
-        rgb(255 255 255 / 0.018);
+      padding-block: 120px 112px;
     }
   }
   .head > * {

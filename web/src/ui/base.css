@@ -293,3 +293,73 @@ html.kbd-open .dock {
     transform: translateY(28px);
   }
 }
+
+/* Bandes des sections de l'accueil (propriétaire, 18 novembre) : chaque section se fond dans la
+   suivante (aucun bord net), un filet de lumière qui s'éclaire vers le centre avec un point
+   lumineux, un arc de lueur dessous et une brume légère dans la teinte de la section (--tone,
+   en « r g b »). Pleine largeur (100cqw du conteneur #app) ; rien ne bouge. */
+.band {
+  --tone: 95 227 181;
+  position: relative;
+  isolation: isolate;
+}
+.band::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  left: 50%;
+  width: 100cqw;
+  translate: -50% 0;
+  pointer-events: none;
+  background:
+    radial-gradient(5px 5px at 50% 0, rgb(255 255 255 / 0.9), transparent),
+    radial-gradient(18px 10px at 50% 0, rgb(var(--tone) / 0.7), transparent),
+    radial-gradient(38% 200px at 50% 0, rgb(var(--tone) / 0.13), transparent 72%),
+    radial-gradient(70% 50% at 50% 50%, rgb(var(--tone) / 0.045), transparent 80%),
+    linear-gradient(180deg, transparent, rgb(255 255 255 / 0.014) 160px, rgb(255 255 255 / 0.008) 65%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000, #000 calc(100% - 160px), transparent);
+  mask-image: linear-gradient(180deg, #000, #000 calc(100% - 160px), transparent);
+}
+.band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block-start: 0;
+  left: 50%;
+  width: min(1120px, 88cqw);
+  height: 1px;
+  translate: -50% 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(var(--tone) / 0.18) 18%, rgb(var(--tone) / 0.6) 42%, rgb(255 255 255 / 0.75) 50%, rgb(var(--tone) / 0.6) 58%, rgb(var(--tone) / 0.18) 82%, transparent);
+}
+@media (max-width: 599px) {
+  /* Téléphone : dans la colonne (le fondu cache le bord) ; aucun débordement à 320 px. */
+  .band::before,
+  .band::after {
+    left: 0;
+    translate: none;
+  }
+  .band::before {
+    width: 100%;
+  }
+  .band::after {
+    left: 6%;
+    width: 88%;
+  }
+  .band::before {
+    background:
+      radial-gradient(4px 4px at 50% 0, rgb(255 255 255 / 0.8), transparent),
+      radial-gradient(70% 140px at 50% 0, rgb(var(--tone) / 0.12), transparent 72%),
+      radial-gradient(90% 50% at 50% 50%, rgb(var(--tone) / 0.04), transparent 80%);
+  }
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+  .band::before {
+    display: none;
+  }
+  .band::after {
+    background: CanvasText;
+    opacity: 0.4;
+  }
+}
