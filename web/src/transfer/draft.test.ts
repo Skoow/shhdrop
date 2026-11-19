@@ -75,6 +75,29 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
     expect(fake.inspect()[0]).toMatchObject({ bucket: 160 });
   });
 
+  it("formule payante (conception du paiement §11) : jeton pris une fois, à la création, en PrivateToken ; jamais ailleurs", async () => {
+    expect(() => createDraft(ORIGIN, { palier: 1 })).toThrow("jeton_absent");
+    const { seen, net } = setup();
+    let pris = 0;
+    const jeton = "J".repeat(472);
+    const d = createDraft(ORIGIN, { ...net, solveCaptcha, auto: true, palier: 1, jeton: async () => (pris++, jeton) });
+    const f = file(70_000, 3);
+    d.sync([{ id: "a", data: f }]);
+    await until(() => d.status("a")?.phase === "pret");
+    const r = await d.finalize([{ id: "a", item: fileItem("a.bin", f) }], { ttlHours: 1, maxOpens: 1, password: PW, solveCaptcha });
+    expect(r.link).toContain("#");
+    expect(pris).toBe(1);
+    const avec = seen.filter((x) => x.headers.includes("PrivateToken"));
+    expect(avec.map((x) => `${x.method} ${x.path}`)).toEqual(["POST /api/shares"]);
+    expect(avec[0]!.headers).toContain(`PrivateToken token=${jeton}`);
+    // Limites de la formule au clic : 3 jours et 10 ouvertures permis en Plus, pas 7 jours.
+    const d2 = createDraft(ORIGIN, { ...net, palier: 1, jeton: async () => jeton });
+    await expect(d2.finalize([{ id: "x", item: fileItem("x", f) }], { ttlHours: 168, maxOpens: 1, password: PW, solveCaptcha })).rejects.toThrow("duree_invalide");
+    await expect(d2.finalize([{ id: "x", item: fileItem("x", f) }], { ttlHours: 72, maxOpens: 11, password: PW, solveCaptcha })).rejects.toThrow("ouvertures_invalides");
+    const d3 = createDraft(ORIGIN, { ...net });
+    await expect(d3.finalize([{ id: "x", item: fileItem("x", f) }], { ttlHours: 48, maxOpens: 1, password: PW, solveCaptcha })).rejects.toThrow("duree_invalide");
+  });
+
   it("ordre et éléments du manifeste = ceux du clic ; note non remise : envoyée au clic ; le serveur ne voit rien", async () => {
     const { seen, net } = setup();
     const MARK = "MOT-REPERE-brouillon";

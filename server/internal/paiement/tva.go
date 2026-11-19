@@ -27,6 +27,31 @@ func RegimeDe(s string) (Regime, bool) {
 	return 0, false
 }
 
+// String : « franchise », « france » ou « oss » ; "" pour un régime inconnu.
+func (r Regime) String() string {
+	switch r {
+	case Franchise:
+		return "franchise"
+	case France:
+		return "france"
+	case OSS:
+		return "oss"
+	}
+	return ""
+}
+
+// TauxAppliques : taux appliqué sous ce régime pour chaque pays de l'UE (points de base), le même
+// que Ventiler. Public (aucun secret) : la note de vente du site le recopie (conception §9.3).
+func TauxAppliques(r Regime) map[string]int64 {
+	out := make(map[string]int64, len(tauxUE))
+	for _, t := range tauxUE {
+		if v, err := Ventiler(r, t.pays, 10000); err == nil {
+			out[t.pays] = v.Taux
+		}
+	}
+	return out
+}
+
 // tauxUE : taux normaux de TVA des 27 États membres, en points de base (2000 = 20 %), au
 // 19 novembre 2026, à vérifier par le comptable dans la base TEDB de la Commission avant la
 // première vente et à chaque changement (conception §9.1). Liste triée par code ISO 3166-1.

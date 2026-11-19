@@ -42,6 +42,8 @@ var allowedMaps = map[string]string{
 	"limits/limits.go:join48":           "§9.5 entrées de l'heure (§39.3.6)",
 	"limits/limits.go:frame64":          "§9.5 trames de la minute (§39.3.6)",
 	"limits/limits.go:frame48":          "§9.5 trames de la minute (§39.3.6)",
+	"limits/limits.go:paid64":           "§9.5 octets utiles du jour des partages payants par connexion (spec §38.6, conception du paiement §11)",
+	"limits/limits.go:paid48":           "§9.5 octets utiles du jour des partages payants par /48 (spec §38.6)",
 	"limits/limits.go:paie64":           "§9.5 commandes de paiement de l'heure par connexion (conception du paiement §8)",
 	"limits/limits.go:paie48":           "§9.5 commandes de paiement de l'heure par /48 (conception du paiement §8)",
 	"limits/slots.go:c64":               "§9.5 transferts simultanés",

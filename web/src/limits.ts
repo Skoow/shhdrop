@@ -1,7 +1,7 @@
 // Constantes uniques des chiffres affichés par les écrans (benchmark M5) : les textes (fr.ts,
 // en.ts) n'écrivent jamais ces nombres en dur, ils les reçoivent d'ici. Les mêmes valeurs
 // sont imposées par le serveur ; limits.test.ts les compare au code Go.
-import { CONTENT_MAX, MAX_ITEMS, PREVIEW_MAX, TEXT_MAX } from "./engine/pure";
+import { CONTENT_MAX, MAX_ITEMS, PREVIEW_MAX, TEXT_MAX, contentMaxOf, type Palier } from "./engine/pure";
 
 /** CONTENT_MAX : exactement 2 Gio de données (spec §29.3) ; TEXT_MAX en points de code. */
 export { CONTENT_MAX, MAX_ITEMS, PREVIEW_MAX, TEXT_MAX };
@@ -47,6 +47,18 @@ export const PAID: Readonly<Record<PaidTier, { bytes: number; opens: number; ttl
   plus: { bytes: 10 * 1024 ** 3, opens: 10, ttlDays: [2, 3], month: 7, year: 70 },
   pro: { bytes: 30 * 1024 ** 3, opens: 20, ttlDays: [2, 3, 7], month: 20, year: 200 },
 };
+
+/**
+ * Limites d'un partage selon sa formule (conception du paiement §11) : données au plus, durées
+ * proposées (heures) et ouvertures au plus. Mêmes valeurs que le serveur (share.Tier : MaxBucket,
+ * TTLAllowed, MaxOpensOf ; limits.test.ts les compare au code Go).
+ */
+export type Formule = "free" | PaidTier;
+export function limitesDe(f: Formule): { contentMax: number; ttlHours: readonly number[]; maxOpens: number; palier: Palier } {
+  if (f === "free") return { contentMax: CONTENT_MAX, ttlHours: TTL_HOURS, maxOpens: MAX_OPENS, palier: 0 };
+  const palier: Palier = f === "plus" ? 1 : 2;
+  return { contentMax: contentMaxOf(palier), ttlHours: [...TTL_HOURS, ...PAID[f].ttlDays.map((d) => d * 24)], maxOpens: PAID[f].opens, palier };
+}
 
 /**
  * Durées maximales de capture dans l'interface (caméra et micro maison), en secondes, par

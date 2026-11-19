@@ -504,6 +504,17 @@ pub fn constants() -> Object {
         .map(|&b| JsValue::from_f64(f64::from(b)))
         .collect();
     set(&o, "BUCKETS", &buckets);
+    // Paliers payants et données au plus de chaque formule (conception du paiement §11).
+    let paid: Array = format::PAID_BUCKETS
+        .iter()
+        .map(|&b| JsValue::from_f64(f64::from(b)))
+        .collect();
+    set(&o, "PAID_BUCKETS", &paid);
+    n(
+        "CONTENT_MAX_PLUS",
+        format::Palier::Plus.content_max() as f64,
+    );
+    n("CONTENT_MAX_PRO", format::Palier::Pro.content_max() as f64);
     for (name, p) in [
         ("KDF_MIN", KDF_MIN),
         ("KDF_MAX", KDF_MAX),
@@ -1048,8 +1059,8 @@ pub fn nonce(index: f64, last: bool) -> core::result::Result<Uint8Array, JsValue
 
 /// Palier canonique pour une fin des données ; `taille_invalide`, `trop_gros`.
 #[wasm_bindgen(js_name = bucketFor)]
-pub fn bucket_for(data_end: f64) -> core::result::Result<u32, JsValue> {
-    format::bucket_for(n64(data_end)).map_err(js_err)
+pub fn bucket_for(data_end: f64, palier: Option<f64>) -> core::result::Result<u32, JsValue> {
+    format::bucket_for_palier(n64(data_end), palier_de(palier)?).map_err(js_err)
 }
 
 fn bucket32(b: f64) -> core::result::Result<u32, JsValue> {
@@ -1107,8 +1118,19 @@ pub fn is_small(size: f64) -> bool {
 }
 
 #[wasm_bindgen(js_name = reservationFor)]
-pub fn reservation_for(used: f64) -> core::result::Result<u32, JsValue> {
-    elements::reservation_for(n64(used)).map_err(js_err)
+pub fn reservation_for(used: f64, palier: Option<f64>) -> core::result::Result<u32, JsValue> {
+    elements::reservation_for_palier(n64(used), palier_de(palier)?).map_err(js_err)
+}
+
+/// Formule d'un partage : absente (gratuit), 0, 1 (Plus) ou 2 (Pro) ; sinon `palier_invalide`.
+fn palier_de(p: Option<f64>) -> core::result::Result<format::Palier, JsValue> {
+    match p {
+        None => Ok(format::Palier::Gratuit),
+        Some(x) if x == 0.0 || x == 1.0 || x == 2.0 => {
+            Ok(format::Palier::de(x as u8).unwrap_or(format::Palier::Gratuit))
+        }
+        Some(_) => Err(js_msg("palier_invalide")),
+    }
 }
 
 #[wasm_bindgen(js_name = segmentsNeeded)]
@@ -1204,11 +1226,16 @@ impl JsElementSealer {
     js_name = elementSealer,
     unchecked_return_type = "Promise<JsElementSealer>"
 )]
-pub fn element_sealer(provider: &Provider, size: f64, first: f64) -> Promise {
+pub fn element_sealer(provider: &Provider, size: f64, first: f64, palier: Option<f64>) -> Promise {
     let p = Rc::new(Web(provider.clone()));
     let (size, first) = (n64(size), n64(first));
+    let palier = palier_de(palier);
     future_to_promise(async move {
-        let el = Rc::new(ElementSealer::new(&p, size, first).await.map_err(js_err)?);
+        let el = Rc::new(
+            ElementSealer::new_palier(&p, size, first, palier?)
+                .await
+                .map_err(js_err)?,
+        );
         let id = NEXT_SEALER.with(|n| {
             let id = n.get();
             n.set(id.wrapping_add(1).max(1));
@@ -1298,7 +1325,9 @@ pub fn seal_final(
     rights: Option<String>,
     keep_ttl_h: Option<f64>,
     title: Option<String>,
+    palier: Option<f64>,
 ) -> Promise {
+    let palier = palier_de(palier);
     let entries: core::result::Result<Vec<FinalEntry>, JsValue> =
         entries.iter().map(|e| final_entry(&e)).collect();
     let (keys, creatable) = (Rc::clone(&keys.keys), keys.creatable);
@@ -1308,11 +1337,19 @@ pub fn seal_final(
             return Err(js_err(Error::CleDejaUtilisee));
         }
         let mut title = title;
-        let fin = elements::seal_final_titled(
+        let palier = match palier {
+            Ok(p) => p,
+            Err(e) => {
+                title.zeroize();
+                return Err(e);
+            }
+        };
+        let fin = elements::seal_final_complet(
             &entries,
             &keys,
             rights.as_deref(),
             keep_ttl_h.map(n64),
+            palier,
             title.as_deref(),
         )
         .await;

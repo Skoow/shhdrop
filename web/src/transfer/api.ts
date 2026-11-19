@@ -251,9 +251,15 @@ export async function create(
   kAcces: KAcces,
   sGestion: SGestion,
   b: CreateBody,
+  jeton?: string,
 ): Promise<{ uploadToken: string; segments: number }> {
   const q: Req = { method: "POST", path: "/api/shares", ...json(b) };
   q.headers = { ...q.headers, "X-Shh-Access": b64u(kAcces), "X-Shh-Manage": b64u(sGestion) };
+  // Partage payant (conception du paiement §7) : le jeton anonyme, et rien qui désigne le pass.
+  if (jeton !== undefined) {
+    if (!/^[A-Za-z0-9_-]{472}$/.test(jeton)) throw new Error("jeton_invalide");
+    q.headers = { ...q.headers, Authorization: `PrivateToken token=${jeton}` };
+  }
   const o = await send(c, q, readJSON);
   return { uploadToken: str(o, "upload_token"), segments: num(o, "segments") };
 }

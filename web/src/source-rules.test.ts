@@ -136,7 +136,10 @@ describe("règles de sources", () => {
   it("paiement : X-Shh-Pass seulement dans paiement/api.ts, base shhdrop-pass seulement dans paiement/pass.ts", () => {
     expect(offenders(/X-Shh-Pass/i, (r) => r !== "paiement/api.ts")).toEqual([]);
     expect(files.find((f) => f.rel === "paiement/api.ts")?.text).toMatch(/X-Shh-Pass/);
-    expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("paiement/") && r !== "paiement/api.ts")).toEqual([]);
+    // Exception : lecture du module WebAssembly des jetons (source*.ts, avec son empreinte en
+    // production, comme le salon), jamais une requête au serveur.
+    expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("paiement/") && r !== "paiement/api.ts" && !/^paiement\/source(\.verified)?\.ts$/.test(r))).toEqual([]);
+    expect(offenders(/\/api\//, (r) => /^paiement\/source/.test(r))).toEqual([]);
     expect(offenders(/shhdrop-pass/, (r) => r !== "paiement/pass.ts")).toEqual([]);
     expect(files.find((f) => f.rel === "paiement/pass.ts")?.text).toMatch(/indexedDB/);
     expect(offenders(/localStorage|sessionStorage|document\.cookie/, (r) => r.startsWith("paiement/"))).toEqual([]);

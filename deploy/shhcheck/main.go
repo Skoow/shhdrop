@@ -1,4 +1,4 @@
-// Commande shhcheck : contrôles pour l'exploitation et relais SMTP, bibliothèque standard seulement.
+// Commande shhcheck : contrôles pour l'exploitation et relais de sortie, bibliothèque standard seulement.
 //
 //	shhcheck health [hôte:port]
 //	    Santé du serveur Go, de l'intérieur du conteneur (l'image n'a ni shell ni curl) :
@@ -11,9 +11,10 @@
 //	    TLS 1.3, doit réussir la poignée de main avec un certificat valide pour ce nom.
 //	    Autorités : celles du système, ou le fichier désigné par SSL_CERT_FILE.
 //
-//	shhcheck relais <écoute IP:port> <cible hôte:port>
-//	    Relais SMTP, seule sortie du serveur Go vers Internet (plan du compte, lot 8) : recopie
-//	    chaque connexion reçue vers la seule cible fixée ici (relais.go). Ne rend la main
+//	shhcheck relais <écoute IP:port> <cible hôte:port> [connexions]
+//	    Relais de sortie, seules sorties du serveur Go vers Internet (SMTP du compte, API des
+//	    prestataires de paiement) : recopie chaque connexion reçue vers la seule cible fixée ici
+//	    (relais.go), au plus [connexions] à la fois (1 à 64, 4 par défaut). Ne rend la main
 //	    qu'en cas d'erreur.
 //
 //	shhcheck smtp <hôte:port>
@@ -47,13 +48,15 @@ func main() {
 		case os.Args[1] == "tls" && len(os.Args) == 4:
 			exit(tlsHybrid(os.Args[2], os.Args[3]))
 		case os.Args[1] == "relais" && len(os.Args) == 4:
-			exit(relaisMain(os.Args[2], os.Args[3]))
+			exit(relaisMain(os.Args[2], os.Args[3], ""))
+		case os.Args[1] == "relais" && len(os.Args) == 5:
+			exit(relaisMain(os.Args[2], os.Args[3], os.Args[4]))
 		case os.Args[1] == "smtp" && len(os.Args) == 3:
 			exit(smtpMain(os.Args[2]))
 		}
 	}
 	fmt.Fprintln(os.Stderr, "usage: shhcheck health [hôte:port] | shhcheck tls <hôte:port> <nom du site>\n"+
-		"       shhcheck relais <écoute IP:port> <cible hôte:port> | shhcheck smtp <hôte:port>")
+		"       shhcheck relais <écoute IP:port> <cible hôte:port> [connexions] | shhcheck smtp <hôte:port>")
 	os.Exit(2)
 }
 

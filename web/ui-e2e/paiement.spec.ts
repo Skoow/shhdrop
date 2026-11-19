@@ -130,6 +130,18 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
   await expect(page.locator('[data-return="payee"]')).toContainText("Les partages Plus et Pro ne sont pas encore ouverts");
   expect(etats.every((x) => PASS.test(x))).toBe(true);
   expect(new Set(etats).size).toBe(1);
+  // Note de vente, faite sur l'appareil (S4) : seul GET /api/paiement (régime de TVA du vrai
+  // serveur, oss) est lu ; aucune requête n'emporte le pays, le montant ou une identité.
+  const lus: string[] = [];
+  page.on("request", (r) => lus.push(`${r.method()} ${new URL(r.url()).pathname}`));
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.locator("[data-note]").click()]);
+  expect(dl.suggestedFilename()).toMatch(/^note-de-vente-shhgone-\d{4}-\d{2}-\d{2}\.html$/);
+  const { readFile } = await import("node:fs/promises");
+  const note = await readFile((await dl.path())!, "utf8");
+  for (const x of ["Note de vente", "Shhgone Plus, 30 jours, renouvelé chaque mois", "TVA (20 %)", "5,83 €", "1,17 €", "7,00 €", "FR", "[À COMPLÉTER : SIREN]", "guichet unique OSS"])
+    expect(note).toContain(x);
+  expect(note).not.toMatch(/<script|src=|href=/i);
+  expect(lus.filter((x) => x.includes("/api/"))).toEqual(["GET /api/paiement"]);
   await page.route("**/api/paiement/resilier", (route) => route.fulfill({ status: 204 }));
   await page.locator("[data-stop]").click();
   await expect(page.locator("[data-stopped]")).toContainText("Renouvellement arrêté");
@@ -140,7 +152,7 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
 
 test("Le vrai serveur : GET /api/paiement, état d'un pass inconnu, webhook Stripe mal signé refusé", async ({ shh, request }) => {
   const o = await (await request.get(shh.origin + "/api/paiement")).json();
-  expect(o).toEqual({ v: 1, moyens: ["carte", "crypto"], pays: expect.arrayContaining(["DE", "FR"]), bientot: ["appel_audio", "appel_video"] });
+  expect(o).toEqual({ v: 1, moyens: ["carte", "crypto"], pays: expect.arrayContaining(["DE", "FR"]), bientot: ["appel_audio", "appel_video"], tva: { regime: "oss", taux: expect.objectContaining({ DE: 1900, FR: 2000 }) } });
   const pass = Buffer.alloc(32, 5).toString("base64url");
   const e = await request.post(shh.origin + "/api/paiement/etat", { headers: { "X-Shh-Pass": pass } });
   expect(await e.json()).toEqual({ v: 1, etat: "inconnue", offre: null, fin: null, renouvelle: false, droits: [] });

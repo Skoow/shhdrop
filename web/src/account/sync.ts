@@ -16,7 +16,7 @@
 import { HISTORY_KEEP_GONE_MS, cleanEntry, endOf, linkKey, type HistoryEntry, type Sorte } from "../history/store";
 import type { CoffrePrive, EntreePrivee } from "./vaults";
 
-export type Liste = keyof CoffrePrive;
+export type Liste = Exclude<keyof CoffrePrive, "pass">;
 const LISTE: Record<Sorte, Liste> = { envoi: "envois", recu: "recus", salon_cree: "salons", salon_rejoint: "rejoints" };
 const SORTE: Record<Liste, Sorte> = { envois: "envoi", recus: "recu", salons: "salon_cree", rejoints: "salon_rejoint" };
 const LISTES = Object.keys(SORTE) as Liste[];
@@ -112,7 +112,8 @@ export function fusionner(
   o: { now: number; recuperation: boolean },
 ): { coffre: CoffrePrive | null; importer: HistoryEntry[]; retirer: string[] } {
   let change = false;
-  const garde: CoffrePrive = { salons: [], recus: [], rejoints: [], envois: [] };
+  // Les pass des offres payantes (pass.ts) ne sont pas de l'historique : gardés tels quels.
+  const garde: CoffrePrive = { salons: [], recus: [], rejoints: [], envois: [], ...(coffre.pass !== undefined ? { pass: coffre.pass } : {}) };
   const duCoffre: HistoryEntry[] = [];
   for (const l of LISTES)
     for (const v of coffre[l]) {

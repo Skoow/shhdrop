@@ -6,7 +6,8 @@
   // de la personne ne prouve rien.
   import { href } from "../app/router.svelte";
   import { getLang, t } from "../i18n/i18n.svelte";
-  import { lireEtat, resilier, type EtatPaiement } from "../paiement/api";
+  import { lireEtat, lireOffre, resilier, type EtatPaiement } from "../paiement/api";
+  import { telechargerNote } from "../paiement/note";
   import { garder, idbDuNavigateur, lirePasses, oublier, type PassGarde } from "../paiement/pass";
 
   let { rapide = 3000, lent = 30000 }: { rapide?: number; lent?: number } = $props();
@@ -59,6 +60,19 @@
     if (r !== "erreur" && e) e = { ...e, renouvelle: false };
   }
 
+  // Note de vente (conception §9.3, S4) : assemblée ici ; seul GET /api/paiement est lu (régime
+  // de TVA, public), rien n'est envoyé.
+  let noteErr = $state(false);
+  async function noteDeVente(): Promise<void> {
+    noteErr = false;
+    const o = await lireOffre();
+    if (!g || !e?.fin || !o?.tva) {
+      noteErr = true;
+      return;
+    }
+    telechargerNote({ id: g.id, offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, pays: g.pays, cree: g.cree, fin: e.fin, tva: o.tva, maintenant: Date.now() });
+  }
+
   async function oublierCommande(): Promise<void> {
     const idb = idbDuNavigateur();
     if (g && idb) await oublier(idb, g.id).catch(() => {});
@@ -86,6 +100,11 @@
     {/if}
     {#if arret === "ok"}<p class="body" data-stopped>{t("offers.ret.stopped")}</p>{/if}
     {#if arret === "erreur"}<p class="err" role="alert">{t("offers.ret.stop.err")}</p>{/if}
+    {#if g && e.fin}
+      <button type="button" class="act" onclick={noteDeVente} data-note>{t("offers.ret.note")}</button>
+      <p class="body">{t("offers.ret.note.hint")}</p>
+      {#if noteErr}<p class="err" role="alert">{t("offers.ret.note.err")}</p>{/if}
+    {/if}
   {:else if vue === "attente"}
     <h2>{t("offers.ret.wait")}</h2>
     <p class="body">{t("offers.ret.wait.body")}</p>

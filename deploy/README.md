@@ -11,9 +11,10 @@ Caddy (TLS) devant le serveur Go, dans Docker. Références : spécification §8
 | `shhcheck/` | petit programme Go : santé du conteneur, test TLS hybride, relais SMTP et contrôle SMTP du compte (§12) ; `salonws_test.go` et `compte_test.go` : essais de banc (tests seulement, hors du binaire) |
 | `test-proxy.sh` | test du proxy : le Caddyfile devant le vrai serveur (salon activé), sur la boucle locale |
 | `test-sortie.sh` | test de la sortie SMTP : configuration résolue de `compose.yaml`, puis réseau réel avec Docker (§12.1) |
-| `sauvegarder.sh`, `systemd/` | sauvegarde quotidienne chiffrée (age) de `comptes.db` seule, et son minuteur (§12.4) |
+| `compose.yaml` : `relais-stripe`, `relais-paypal`, `relais-nowpayments` | seules sorties du paiement, une par prestataire, paiement activé (§13) |
+| `sauvegarder.sh`, `systemd/` | sauvegarde quotidienne chiffrée (age) de `comptes.db` et de `paiements.db`, et son minuteur (§12.4) |
 | `restaurer.sh` | vérification mensuelle et restauration d'une sauvegarde (§12.5) |
-| `test-restauration.sh` | sauvegarde, effacement, restauration et reconnexion d'un compte de test, en mémoire (§12.5) |
+| `test-restauration.sh` | sauvegarde, effacement, restauration et reconnexion d'un compte de test, puis de `paiements.db` avec un pass factice, en mémoire (§12.5) |
 | `env.example` | modèle de `deploy/.env` |
 
 Ce kit réduit les risques ; il ne rend pas le service invulnérable. Les limites sont listées en fin de page.
@@ -246,7 +247,7 @@ Un job rouge = une faille connue : GitHub envoie un e-mail d'échec au propriét
 - **Surveillance (§15.2)** : ni sonde externe (site injoignable, **date de fin du certificat** : Caddy ne journalise rien, un renouvellement raté ne se voit pas autrement), ni script horaire d'alerte (disque à 80 %, signalements). Pour ce script : `df` pour le disque ; `docker exec shhdrop-shhdrop-1 /shhcheck health` affiche `reports_alert`.
 - **Déverrouillage (§22)** : pas de `deploy/unlock.sh` ; les trois commandes du §5 en tiennent lieu. Pas d'alerte « redémarrage nécessaire ».
 - **Dates et tailles des fichiers** (audit adverse du 13 novembre, stockage, F4). Les dates de contenu et d'accès sont au 1er janvier 1970 ; la date de changement d'inode (`ctime`) de tous les fichiers est ramenée, une fois par minute, à l'heure de ce passage. Restent lisibles par qui lit le disque déverrouillé : la **date de création** (`btime`, sur ext4) de chaque fichier de partage, de pièce et de conversation, qu'aucun appel système ne permet de changer, donc l'heure de création de chaque partage vivant et du premier message de chaque salon ; pendant une minute au plus, le `ctime` d'un fichier qui vient d'être écrit ; la taille d'une conversation, par paliers de 64 messages (plus le nombre exact) ; l'ordre de création (numéros d'inode). Le dossier de données lui-même, `frozen`, `kill/`, `kill.key`, `shares.db`, `shares.db-wal` et `shares.db-shm` ont, depuis la 3ᵉ campagne de l'audit adverse (stockage, F5), leurs dates de contenu et d'accès remises à l'epoch à chaque passage du janitor (une fois par minute) et leur `ctime` ramené à l'heure de ce passage : l'heure du dernier gel, dégel, destruction par l'administrateur ou écriture en base ne se lit plus qu'à la minute près ; un gel et un dégel remettent aussi les dates aussitôt. Restent : la **date de création de `frozen`**, qui donne l'heure du gel en cours tant qu'il dure, et celle de `kill/`, créé au premier passage du serveur (heure du démarrage, sans rapport avec une destruction). Seuls le volume chiffré et l'absence d'instantanés les protègent.
-- **Sauvegardes** : aucune pour les partages et les salons, et c'est voulu. La spécification les interdit pour les données (§9.2 : « aucune sauvegarde de ce dossier ») : des partages chiffrés qui vivent 24 h n'ont rien à restaurer, et une sauvegarde garderait ce qui doit disparaître. **Seule exception, compte activé : `comptes.db`**, et elle seule, chiffrée chaque jour (§12.4 ; conception du compte §21.13, décision du propriétaire du 14 novembre). À sauvegarder ailleurs que sur le serveur : `deploy/.env` et la phrase du volume, plus, compte activé, la **clé du serveur** (§12.2), chacun à part. `deploy/.env` ne contient aucun secret qui ouvre quoi que ce soit : avec le tableau de bord, seulement l'**empreinte** du jeton (§4), qui ne permet pas de le retrouver ; le jeton lui-même se garde dans le gestionnaire de mots de passe de l'exploitant, jamais avec cette sauvegarde. Un `SHH_ADMIN_TOKEN` en clair n'y a pas sa place (le serveur refuse de démarrer avec lui, §4). Le dossier `caddy/` se recrée seul (nouveau certificat).
+- **Sauvegardes** : aucune pour les partages et les salons, et c'est voulu. La spécification les interdit pour les données (§9.2 : « aucune sauvegarde de ce dossier ») : des partages chiffrés qui vivent 24 h n'ont rien à restaurer, et une sauvegarde garderait ce qui doit disparaître. **Seules exceptions : `comptes.db` (compte activé) et `paiements.db` (paiement activé)**, chiffrées chaque jour (§12.4 ; conception du compte §21.13, décision du propriétaire du 14 novembre ; conception du paiement §5.1, S11 : perdre `paiements.db` rendrait inutilisables les pass payés). À sauvegarder ailleurs que sur le serveur : `deploy/.env` et la phrase du volume, plus, compte activé, la **clé du serveur** (§12.2), chacun à part. `deploy/.env` ne contient aucun secret qui ouvre quoi que ce soit : avec le tableau de bord, seulement l'**empreinte** du jeton (§4), qui ne permet pas de le retrouver ; le jeton lui-même se garde dans le gestionnaire de mots de passe de l'exploitant, jamais avec cette sauvegarde. Un `SHH_ADMIN_TOKEN` en clair n'y a pas sa place (le serveur refuse de démarrer avec lui, §4). Le dossier `caddy/` se recrée seul (nouveau certificat).
 - **Durcissement de la machine** : les réglages du §1 (journald, pare-feu, SSH, mises à jour) sont à faire à la main ; aucun script ne les pose ni ne les vérifie, sauf `noatime` et la mémoire d'échange, contrôlés par `deploy.sh`.
 - **Hébergeur** : il voit les adresses IP et peut lire la mémoire de la machine. Hors de portée (§18.3).
 - **Caddy tourne en root dans son conteneur** (audit du 13 novembre, D9 ; non corrigé, décision à prendre). Il n'a aucune capacité sauf `NET_BIND_SERVICE` (écouter sur 80 et 443), sous `no-new-privileges`, avec un système de fichiers en lecture seule. Le passer en `user: "65532:65532"` ne marche pas avec l'image officielle épinglée : son binaire porte la capacité de fichier `cap_net_bind_service=+p` (lu dans la couche `sha256:5000c332…` de `caddy:2.11.9` : attribut `security.capability`, bit « effectif » absent), et `no-new-privileges` fait de toute façon ignorer les capacités de fichier. Un Caddy non root ne pourrait donc pas écouter sur 443. Deux voies, à choisir : (a) `sysctl net.ipv4.ip_unprivileged_port_start=80` sur la machine (réglage global : tout processus de la machine pourrait alors prendre 80 ou 443 pendant un redémarrage de Caddy ; `network_mode: host` interdit de le poser pour le seul conteneur), puis `user: "65532:65532"` et le dossier `caddy/` donné à 65532 ; (b) garder root, comme aujourd'hui.
@@ -364,9 +365,9 @@ Le mot de passe SMTP, lui, se remplace (nouveau mot de passe chez le fournisseur
 
 Désactiver : `SHH_COMPTES: "0"`, `deploy.sh` (le relais est arrêté). `comptes.db` reste sur le volume, intacte.
 
-### 12.4 Sauvegarde quotidienne chiffrée de `comptes.db`
+### 12.4 Sauvegarde quotidienne chiffrée de `comptes.db` et de `paiements.db`
 
-Ce qui est sauvegardé : **`comptes.db` seule** (comptes, sessions, bannis). Jamais `shares.db`, les fichiers des partages, les salons, les conversations, ni la clé du serveur. Comment (`sauvegarder.sh`, minuteur `systemd/shhdrop-sauvegarde.timer`, chaque jour vers 03:17 UTC) : copie cohérente par `sqlite3 .backup`, serveur en marche (sous le compte 65532, dans `/srv/shhdrop/sauvegarde/` : le clair ne quitte jamais le volume chiffré, refus sinon) ; `PRAGMA integrity_check` ; chiffrement par **age** (`age-encryption.org/v1`, X25519) vers la clé **publique** de l'exploitant ; clair effacé aussitôt ; envoi du seul chiffré, nommé `comptes-AAAA-MM-JJTHHMMSSZ.db.age`. Aucune crypto maison, rien dans le serveur Go. La lecture de la base dure environ une seconde ; si une suppression de compte tombe pendant ce temps, son vidage du journal (`comptes.db-wal`) attend le suivant (au plus la passe quotidienne).
+Ce qui est sauvegardé : **`comptes.db`** (comptes, sessions, bannis) et **`paiements.db`** (empreintes des pass, commandes en attente, références des prestataires, jetons dépensés des deux derniers jours ; aucune identité, aucun montant, aucun pays ; les **clés privées d'émission des jetons sont retirées de la copie** avant le chiffrement, `VACUUM` compris), chacune dans son propre fichier ; une base absente (compte ou paiement désactivé) est sautée. Jamais `shares.db`, les fichiers des partages, les salons, les conversations, ni la clé du serveur. Comment (`sauvegarder.sh`, minuteur `systemd/shhdrop-sauvegarde.timer`, chaque jour vers 03:17 UTC) : copie cohérente par `sqlite3 .backup`, serveur en marche (sous le compte 65532, dans `/srv/shhdrop/sauvegarde/` : le clair ne quitte jamais le volume chiffré, refus sinon) ; `PRAGMA integrity_check` ; chiffrement par **age** (`age-encryption.org/v1`, X25519) vers la clé **publique** de l'exploitant ; clair effacé aussitôt ; envoi du seul chiffré, nommé `comptes-AAAA-MM-JJTHHMMSSZ.db.age` et `paiements-AAAA-MM-JJTHHMMSSZ.db.age`, sous le même `SHH_SAUVEGARDE_URL`. Aucune crypto maison, rien dans le serveur Go. La lecture de la base dure environ une seconde ; si une suppression de compte tombe pendant ce temps, son vidage du journal (`comptes.db-wal`) attend le suivant (au plus la passe quotidienne).
 
 Mise en place, une fois :
 
@@ -403,9 +404,10 @@ Mise en place, une fois :
 
 ```sh
 deploy/restaurer.sh verifier comptes-<date>.db.age sauvegarde.cle   # « intégrité : ok ; schéma 2 ; N comptes »
+deploy/restaurer.sh verifier paiements-<date>.db.age sauvegarde.cle # « intégrité : ok ; base des paiements ; schéma 2 ; N pass »
 ```
 
-(déchiffrée en mémoire, `/dev/shm`, puis effacée ; rien n'est installé). À chaque changement du schéma de `comptes.db`, et à chaque changement des scripts : `sudo make test-restauration` (compte de test créé par le vrai serveur, sauvegarde serveur en marche, effacement, restauration, reconnexion réussie ; avec une autre clé du serveur, connexion refusée).
+(déchiffrée en mémoire, `/dev/shm`, puis effacée ; rien n'est installé). À chaque changement du schéma de `comptes.db`, et à chaque changement des scripts : `sudo make test-restauration` (compte de test créé par le vrai serveur, sauvegarde serveur en marche, effacement, restauration, reconnexion réussie ; avec une autre clé du serveur, connexion refusée ; puis `paiements.db` créée par le serveur avec le paiement en bac à sable, un pass factice sauvegardé sans son empreinte en clair ni clé de jetons, restauré).
 
 **Restauration réelle** (base perdue ou abîmée, nouvelle machine) :
 
@@ -419,7 +421,7 @@ deploy/restaurer.sh verifier comptes-<date>.db.age sauvegarde.cle   # « intégr
    deploy/deploy.sh "$(cat deploy/.release)"
    ```
 
-   Le clair est déchiffré dans le dossier de données lui-même (volume chiffré), vérifié (`integrity_check`, tables), installé (compte 65532, 0600). `--remplacer` garde l'ancienne base à côté (`comptes.db.avant-restauration`, avec son `-wal`) : l'effacer une fois un compte de contrôle reconnecté.
+   La même commande restaure `paiements-<date>.db.age` (la base est reconnue à ses tables et installée sous `paiements.db`). Le clair est déchiffré dans le dossier de données lui-même (volume chiffré), vérifié (`integrity_check`, tables), installé (compte 65532, 0600). `--remplacer` garde l'ancienne base à côté (`comptes.db.avant-restauration`, avec son `-wal`) : l'effacer une fois un compte de contrôle reconnecté.
 4. Se connecter avec un compte de contrôle.
 
 Règles et effets :
@@ -427,4 +429,44 @@ Règles et effets :
 - **toujours la plus récente** : les suppressions de comptes antérieures y sont appliquées ; une copie plus ancienne ferait revenir des comptes supprimés (interdit par la procédure, conception §21.13) ;
 - **toutes les sessions sont effacées** à la restauration : chacun se reconnecte (une session fermée depuis la sauvegarde, après un vol par exemple, ne revient pas) ;
 - **ce qui a changé depuis la sauvegarde est perdu** (24 h au plus) : un mot de passe changé **revient à l'ancien**, une adresse changée aussi, un compte créé disparaît, **un compte supprimé depuis revient**, un bannissement posé depuis disparaît ; aucun e-mail ne peut prévenir les personnes (le serveur ne garde pas les adresses). À noter dans le registre de l'incident ; un bannissement se repose depuis le tableau de bord ;
-- partages et salons d'avant la perte sont perdus (éphémères, jamais sauvegardés), le lien compte ↔ salon aussi.
+- partages et salons d'avant la perte sont perdus (éphémères, jamais sauvegardés), le lien compte ↔ salon aussi ;
+- **paiements** : la copie n'a **aucune clé de jetons** (retirées à la sauvegarde, et encore à la restauration ; de nouvelles sont tirées à la première demande) : tout jeton émis avant ne passe plus (un jeton dépensé depuis la sauvegarde ne peut donc pas resservir) ; chacun en reprend sans rien faire, dans la limite du jour. **Un pass payé depuis la sauvegarde est inconnu de la copie** (24 h au plus) : sa commande aussi, et un webhook rejoué ensuite ne le recrée pas. La personne le signale au contact avec la date, le montant et le moyen de paiement ; l'exploitant retrouve le paiement dans le tableau de bord du prestataire (qui, lui, connaît l'acheteur) et le rembourse : rien chez nous ne relie un pass à une personne. Une révocation posée à la main depuis la sauvegarde (`shhdrop admin paiement revoquer`) disparaît : la reposer.
+
+## 13. Paiement des offres Plus et Pro (désactivé) : relais de sortie, secrets, sauvegarde
+
+Conception : `docs/superpowers/specs/2026-11-19-paiement-design.md`. **Désactivé** : `compose.yaml` pose `SHH_PAIEMENT: "0"` ; ce qui manque avant de l'activer est la liste du §13 de la conception (comptes chez les prestataires, régime de TVA, mentions légales des notes de vente, contrat et CGV). Avec `"0"` : aucune route `/api/paiement/*`, aucun fichier de `secrets/` lu pour le paiement, aucun relais de paiement, aucune connexion sortante de plus.
+
+### 13.1 Sorties : un relais par prestataire
+
+Même modèle que le relais SMTP (§12.1), pour la même raison (échec fermé) : le serveur reste sur `interne` (`internal: true`), **sans route vers Internet, même paiement activé**. Pour chaque prestataire configuré, `deploy.sh` démarre son relais (même image, `/shhcheck relais`, 16 connexions à la fois, 60 s chacune au plus, compte 65532, lecture seule, sans capacité, aucun journal) :
+
+| Relais (profil) | Adresse interne | Seule cible (production ; bac à sable avec `SHH_PAIEMENT_ESSAI: "1"`) |
+| --- | --- | --- |
+| `relais-stripe` (`paiement-stripe`) | 172.30.53.4:443 | `api.stripe.com:443` (le même en essai) |
+| `relais-paypal` (`paiement-paypal`) | 172.30.53.5:443 | `api-m.paypal.com:443` (`api-m.sandbox.paypal.com:443`) |
+| `relais-nowpayments` (`paiement-nowpayments`) | 172.30.53.6:443 | `api.nowpayments.io:443` (`api-sandbox.nowpayments.io:443`) |
+
+Dans le conteneur du serveur, `extra_hosts` fait pointer chacun de ces noms vers son relais ; le serveur vérifie le certificat TLS pour ce nom (TLS de bout en bout : le relais ne voit que des octets chiffrés, leur taille et l'heure). Le client HTTP du paiement ouvre une connexion par appel (aucune connexion gardée que le relais couperait au milieu d'un paiement) et ne lit aucune variable de proxy. Les hôtes sont fixés par `deploy.sh` d'après `SHH_PAIEMENT_ESSAI` (dans `compose.yaml`), jamais par `deploy/.env`. Les webhooks des prestataires **entrent** par Caddy, comme le reste du site : rien à ouvrir pour eux. Défense de plus, facultative (comme §12.1) : n'autoriser depuis 172.30.53.8/29 que TCP 465 et 443 et la résolution DNS par la machine. **Limite** : un relais joint toute adresse que le DNS donne pour son hôte ; il ne choisit pas l'hôte.
+
+Tests : `make test-sortie` (configuration résolue : relais, adresses, cibles, profils, aucun port publié, serveur sur `interne` seul ; avec un démon Docker : chaque API jointe à travers son relais en TLS vérifié, injoignable relais arrêté), `make lint-deploy` (tests du relais, dont son plafond de connexions).
+
+### 13.2 Secrets et réglages
+
+Fichiers de `<SHH_DATA_ROOT>/secrets` (compte 65532, droits 0400, comme §12.2), jamais des variables ; un prestataire est **configuré quand ses fichiers sont là** :
+
+| Prestataire | Fichiers | Dans `deploy/.env` |
+| --- | --- | --- |
+| Stripe (carte) | `shh_stripe_cle` (clé secrète restreinte `rk_…`/`sk_…`), `shh_stripe_webhook` (`whsec_…`) | `SHH_STRIPE_TAXE=1` si Stripe Tax calcule la TVA |
+| PayPal | `shh_paypal_secret` | `SHH_PAYPAL_CLIENT_ID`, `SHH_PAYPAL_WEBHOOK_ID`, `SHH_PAYPAL_PLANS` |
+| NOWPayments (crypto) | `shh_nowpayments_cle`, `shh_nowpayments_ipn` | rien |
+
+et, pour tous, `SHH_TVA` (`franchise`, `france` ou `oss` : régime choisi par le propriétaire avec son comptable). Paiement activé, `deploy.sh` refuse d'installer sans `SHH_TVA`, sans aucun prestataire, ou si un fichier attendu manque, est un lien ou n'a pas le bon propriétaire et les bons droits. Le serveur, lui, refuse de démarrer avec une clé Stripe de production en essai ou l’inverse, ou un prestataire à moitié configuré (message sans valeur).
+
+```sh
+(umask 077 && cat > /srv/shhdrop/secrets/shh_stripe_cle)   # coller la clé, Entrée, Ctrl-D
+chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop/secrets/shh_stripe_cle
+```
+
+### 13.3 Sauvegarde et restauration
+
+`paiements.db` (empreintes des pass, commandes en attente, références des prestataires ; aucune identité, aucun montant, aucun pays ; jamais les clés privées des jetons) est sauvegardée **avec `comptes.db`**, chaque jour, dans son propre fichier chiffré (§12.4), et se restaure de la même façon (§12.5 : clés de jetons effacées ; un pass payé depuis la sauvegarde est à rembourser depuis le tableau de bord du prestataire). La sauvegarde doit être en place **le jour de l'activation** : perdre `paiements.db` rendrait inutilisables tous les pass payés.

@@ -44,6 +44,9 @@ const out = join(web, "src", "engine", "pkg");
 const MODULES = [
   { crate: "shhdrop-wasm", profile: "release", name: "shhdrop_wasm", out, extra: ["--experimental-reset-state-function"] },
   { crate: "shhdrop-salon-wasm", profile: "wasm-salon", name: "shhdrop_salon_wasm", out: join(web, "src", "salon", "pkg"), extra: ["--experimental-reset-state-function"] },
+  // Jetons anonymes des offres payantes (conception du paiement §7) : module à part, lu seulement
+  // pour obtenir des jetons (web/src/paiement/moteur.ts) ; sans état, aucune remise à zéro utile.
+  { crate: "shhdrop-jetons-wasm", profile: "wasm-salon", name: "shhdrop_jetons_wasm", out: join(web, "src", "paiement", "pkg"), extra: [] },
 ];
 
 function run(cmd, args, cwd, env = process.env) {

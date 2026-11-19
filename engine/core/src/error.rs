@@ -31,6 +31,9 @@ pub enum Error {
     /// Erreur unique de toute ouverture (taille, tag, autre id, autre en-tête, autre clé,
     /// engagement faux) : aucun oracle sur la cause.
     PaquetCorrompu,
+    /// Jeton anonyme (Privacy Pass) : clé, réponse ou jeton mal formés, ou signature fausse
+    /// (conception du paiement §7).
+    JetonInvalide,
     /// Graine de contenu R qui ne fait pas 32 octets (`checkSeed`).
     GraineInvalide,
     /// Le fournisseur n'a pas pu importer une clé ou chiffrer (lot mal formé, poignée inconnue,
@@ -104,6 +107,7 @@ impl Error {
             Error::Argon2Echec => "argon2_echec",
             Error::AleatoireIndisponible => "aleatoire_indisponible",
             Error::PaquetCorrompu => "paquet_corrompu",
+            Error::JetonInvalide => "jeton_invalide",
             Error::GraineInvalide => "graine invalide",
             Error::ChiffrementEchec => "chiffrement_echec",
             Error::TailleNonSure => "taille_invalide",

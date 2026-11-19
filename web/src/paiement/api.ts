@@ -7,7 +7,7 @@
 //   le serveur) ;
 // - l'adresse de la page hébergée rendue par le serveur est revérifiée ici contre la liste fermée
 //   des prestataires (adresseSure) avant toute redirection.
-import { b64u } from "../engine/pure";
+import { b64u, unb64u } from "../engine/pure";
 
 export type Net = { origin: string; fetch: typeof fetch };
 
@@ -20,7 +20,22 @@ export type Moyen = "carte" | "paypal" | "crypto";
 export const MOYENS: readonly Moyen[] = ["carte", "paypal", "crypto"];
 export type OffrePayante = "plus" | "pro";
 
-export type OffreServeur = { moyens: Moyen[]; pays: string[]; bientot: string[] };
+/** Régime de TVA du vendeur et taux appliqué par pays (points de base : 2000 = 20 %), pour la note de vente. */
+export type Tva = { regime: "franchise" | "france" | "oss"; taux: Readonly<Record<string, number>> };
+export type OffreServeur = { moyens: Moyen[]; pays: string[]; bientot: string[]; tva: Tva | null };
+
+/** Régime et taux lus ; null si absents ou mal formés (la note de vente n'est alors pas proposée). */
+function tvaDe(o: unknown): Tva | null {
+  if (typeof o !== "object" || o === null) return null;
+  const { regime, taux } = o as Record<string, unknown>;
+  if ((regime !== "franchise" && regime !== "france" && regime !== "oss") || typeof taux !== "object" || taux === null) return null;
+  const out: Record<string, number> = {};
+  for (const [p, v] of Object.entries(taux)) {
+    if (!/^[A-Z]{2}$/.test(p) || !Number.isSafeInteger(v) || (v as number) < 0 || (v as number) > 10000) return null;
+    out[p] = v as number;
+  }
+  return { regime, taux: out };
+}
 
 /** Pages hébergées permises (conception §4.4), mêmes débuts d'adresse que le serveur. */
 export const ORIGINES: readonly string[] = [
@@ -70,7 +85,12 @@ export async function lireOffre(n: Net = netParDefaut()): Promise<OffreServeur |
   if (r === null || r.status !== 200) return null;
   const o = await json(r);
   if (o === null || o.v !== 1 || !chaines(o.moyens) || !chaines(o.pays) || !chaines(o.bientot)) return null;
-  return { moyens: o.moyens.filter((m): m is Moyen => (MOYENS as readonly string[]).includes(m)), pays: o.pays.filter((p) => /^[A-Z]{2}$/.test(p)), bientot: o.bientot };
+  return {
+    moyens: o.moyens.filter((m): m is Moyen => (MOYENS as readonly string[]).includes(m)),
+    pays: o.pays.filter((p) => /^[A-Z]{2}$/.test(p)),
+    bientot: o.bientot,
+    tva: tvaDe(o.tva),
+  };
 }
 
 export type Demande = { offre: OffrePayante; jours: 30 | 365; renouvelle: boolean; moyen: Moyen; pays: string; renonciation: boolean };
@@ -142,4 +162,50 @@ export async function resilier(pass: Uint8Array<ArrayBuffer>, n: Net = netParDef
   if (r?.status === 204) return "ok";
   if (r?.status === 409) return "aucun";
   return "erreur";
+}
+
+// --- Jetons anonymes (conception du paiement §7) ---------------------------------------------
+
+export type CleJetons = { jour: string; offre: OffrePayante; spki: Uint8Array<ArrayBuffer> };
+
+/** Clés publiques d'aujourd'hui et de demain (les mêmes pour tous) ; null si indisponibles. */
+export async function lireCles(n: Net = netParDefaut()): Promise<{ emetteur: string; cles: CleJetons[] } | null> {
+  const r = await appel(n, "/jetons/cles", { method: "GET" });
+  if (r === null || r.status !== 200) return null;
+  const o = await json(r);
+  if (o === null || o.v !== 1 || typeof o.emetteur !== "string" || !Array.isArray(o.cles)) return null;
+  const cles: CleJetons[] = [];
+  for (const c of o.cles as unknown[]) {
+    if (!estObj(c) || typeof c.jour !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(c.jour) || (c.offre !== "plus" && c.offre !== "pro") || typeof c.spki !== "string") return null;
+    let spki: Uint8Array<ArrayBuffer>;
+    try {
+      spki = unb64u(c.spki);
+    } catch {
+      return null;
+    }
+    if (spki.length !== 342) return null;
+    cles.push({ jour: c.jour, offre: c.offre, spki });
+  }
+  return { emetteur: o.emetteur, cles };
+}
+
+/**
+ * Émission : réponses (signatures aveugles) aux demandes, dans l'ordre ; « aucun » : pass sans
+ * jetons disponibles (révoqué, échu, réserve du mois ou du jour épuisée) ; null : autre échec.
+ */
+export async function emettre(pass: Uint8Array<ArrayBuffer>, requetes: Uint8Array<ArrayBuffer>[], n: Net = netParDefaut()): Promise<{ offre: OffrePayante; reponses: Uint8Array<ArrayBuffer>[] } | "aucun" | null> {
+  const r = await appel(n, "/jetons", {
+    method: "POST",
+    headers: { ...entetePass(pass), "Content-Type": "application/json" },
+    body: JSON.stringify({ requetes: requetes.map((x) => b64u(x)) }),
+  });
+  if (r?.status === 409) return "aucun";
+  if (r === null || r.status !== 200) return null;
+  const o = await json(r);
+  if (o === null || (o.offre !== "plus" && o.offre !== "pro") || !chaines(o.reponses) || o.reponses.length !== requetes.length) return null;
+  try {
+    return { offre: o.offre, reponses: o.reponses.map((x) => unb64u(x)) };
+  } catch {
+    return null;
+  }
 }

@@ -10,6 +10,7 @@ test-engine:
 	cd engine && cargo clippy -p shhdrop-wasm --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 	cd engine && cargo clippy -p shhdrop-salon --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 	cd engine && cargo clippy -p shhdrop-salon-wasm --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
+	cd engine && cargo clippy -p shhdrop-jetons-wasm --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
 	cd engine && cargo test --workspace --locked
 
 test-go:
@@ -46,13 +47,13 @@ test-proxy:
 	cd web && npm run build
 	deploy/test-proxy.sh
 
-# Sortie SMTP (deploy/test-sortie.sh) : configuration résolue de compose.yaml (docker compose
+# Sorties SMTP et paiement (deploy/test-sortie.sh) : configuration résolue de compose.yaml (docker compose
 # config) ; puis, avec un démon Docker et SHH_IMAGE (image de cet arbre), le réseau réel. Code 3 :
 # partie réseau non faite (aucun démon).
 test-sortie:
 	deploy/test-sortie.sh
 
-# Sauvegarde et restauration de comptes.db (deploy/test-restauration.sh) : en root (montage
+# Sauvegarde et restauration de comptes.db et paiements.db (deploy/test-restauration.sh) : en root (montage
 # tmpfs, serveur sous le compte 65532), age, sqlite3, Go. Aussi à chaque changement de schéma
 # de comptes.db (conception du compte §21.13).
 test-restauration:

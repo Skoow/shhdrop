@@ -39,7 +39,7 @@ export { MANIFEST_MAX, PREVIEW_MAX, type KeepTtl, type Rights } from "./engine";
 // Géométrie publique du paquet (aucune clé) : budget de lecture estimé par la page (flows/read-meter.ts).
 export { CHUNK, SEG_CHUNKS, bucketFor, segmentCount, segmentSize } from "./engine";
 // Place d'un fichier dans un envoi dès l'ajout (segments entiers, spec §41.14) : géométrie seulement.
-export { DATA_SEGMENTS, segmentsFor, segmentsNeeded } from "./engine";
+export { DATA_SEGMENTS, contentMaxOf, dataSegmentsOf, segmentsFor, segmentsNeeded, type Palier } from "./engine";
 export {
   CONTENT_MAX,
   MAX_ITEMS,

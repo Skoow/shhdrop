@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test de la sauvegarde et de la restauration de comptes.db (conception du compte §21.13 ;
-# plan, lot 8), sur des données factices, en mémoire (/dev/shm), avec le vrai serveur Go.
+# plan, lot 8) et de paiements.db (conception du paiement §5.1, S11), sur des données factices,
+# en mémoire (/dev/shm), avec le vrai serveur Go.
 #
 # Ce qui est prouvé :
 #   1. un compte de test est créé par le vrai parcours (ALTCHA, code reçu par un faux SMTP sur
@@ -18,7 +19,10 @@
 #   5. serveur relancé sur la base restaurée et la même clé : connexion du compte de test
 #      réussie, mêmes h, enveloppe, séquestre et coffre de profil ; avec une autre clé du
 #      serveur : connexion refusée (les deux copies hors ligne sont nécessaires) ;
-#   6. l'adresse n'est nulle part dans la base restaurée ni dans les sorties du serveur.
+#   6. l'adresse n'est nulle part dans la base restaurée ni dans les sorties du serveur ;
+#   7. paiements.db (créée par le vrai serveur, SHH_PAIEMENT=1 en bac à sable, un pass factice) :
+#      sauvegardée dans son propre fichier chiffré, sans l'empreinte du pass en clair ;
+#      restaurée (65532, 0600), pass gardé, clés de jetons effacées.
 #
 # Ce qui n'est PAS prouvé ici : l'envoi https vers un vrai stockage objet (curl --aws-sigv4,
 # droits en écriture seule, règle de cycle de vie : README §12), le minuteur systemd, le
@@ -264,6 +268,50 @@ arreter
 demarrer "$work/autre-cle"
 check "avec une autre clé du serveur : connexion refusée" compte refuser
 arreter
+
+# --- 7. paiements.db ---------------------------------------------------------------------------------
+printf 'sk_test_restauration' >"$racine/secrets/stripe_cle"
+printf 'whsec_restauration' >"$racine/secrets/stripe_webhook"
+chown 65532:65532 "$racine/secrets/stripe_cle" "$racine/secrets/stripe_webhook"
+chmod 0400 "$racine/secrets/stripe_cle" "$racine/secrets/stripe_webhook"
+: >"$work/srv.stdout"
+env -i PATH="$PATH" SHH_DATA_DIR="$racine/data" SHH_LISTEN="127.0.0.1:$p_srv" SHH_STORAGE_MAX=1048576 \
+	SHH_ORIGIN="http://127.0.0.1:$p_srv" SHH_PAIEMENT=1 SHH_PAIEMENT_ESSAI=1 SHH_TVA=oss \
+	SHH_STRIPE_CLE_FILE="$racine/secrets/stripe_cle" SHH_STRIPE_WEBHOOK_FILE="$racine/secrets/stripe_webhook" \
+	setpriv --reuid=65532 --regid=65532 --clear-groups -- "$shhdrop" serve \
+	>>"$work/srv.stdout" 2>>"$work/srv.stderr" &
+pid_srv=$!
+for _ in $(seq 1 100); do
+	grep -q '^SHH_LISTENING ' "$work/srv.stdout" && break
+	sleep 0.1
+done
+arreter
+pdb=$racine/data/paiements.db
+check "paiements.db créée par le serveur (65532, 0600)" test "$(stat -c %u:%a "$pdb" 2>/dev/null)" = 65532:600
+q_hex=5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
+setpriv --reuid=65532 --regid=65532 --clear-groups -- sqlite3 "$pdb" \
+	"INSERT INTO passes(q, offre, debut_jour, fin_jour, jetons, recharge_jour, revoque) VALUES(x'$q_hex', 2, 86400, 864000, 100, 172800, 0);
+	 INSERT INTO cles_jetons(jour, offre, sk) VALUES(86400, 2, x'$(printf 'c3%.0s' $(seq 1 1190))');"
+rm -f -- "$depot"/*
+check "sauvegarde des deux bases" sauvegarder "$work/env"
+pcopie=$(find "$depot" -type f -name 'paiements-*.db.age' | head -n 1)
+check "deux fichiers envoyés, dont paiements-….db.age" test "$(find "$depot" -type f | wc -l):${pcopie:+1}" = 2:1
+check "paiements : le fichier commence par age-encryption.org/v1" test "$(head -c 22 "$pcopie")" = "age-encryption.org/v1"
+refuse "paiements : pas l'empreinte du pass en clair" contient "$q_hex" "$pcopie"
+refuse "paiements : pas d'en-tête SQLite en clair" grep -qaF -- "SQLite format 3" "$pcopie"
+"$here/restaurer.sh" verifier "$pcopie" "$work/identite.txt" >"$work/verifier-p.txt" 2>&1 || true
+age -d -i "$work/identite.txt" -o "$work/pclair.db" "$pcopie"
+check "paiements : la copie n'a aucune clé de jetons (retirées avant le chiffrement)" test "$(sqlite3 "$work/pclair.db" 'SELECT count(*) FROM cles_jetons;')" = 0
+refuse "paiements : aucun octet d'une clé de jetons dans la copie déchiffrée" grep -qaF -- "$(printf '\303%.0s' $(seq 1 64))" "$work/pclair.db"
+check "paiements : la copie déchiffrée garde le pass" test "$(sqlite3 "$work/pclair.db" "SELECT count(*) FROM passes WHERE q=x'$q_hex';")" = 1
+rm -f -- "$work/pclair.db"
+check "paiements : verifier compte un pass" grep -q '^intégrité : ok ; base des paiements ; schéma [0-9]* ; 1 pass$' "$work/verifier-p.txt"
+rm -f -- "$pdb" "$pdb-wal" "$pdb-shm"
+check "paiements : installer" "$here/restaurer.sh" installer "$pcopie" "$work/identite.txt" "$racine/data"
+check "paiements restaurée : 65532, 0600" test "$(stat -c %u:%a "$pdb")" = 65532:600
+check "paiements restaurée : le pass y est" test "$(sqlite3 "$pdb" "SELECT count(*) FROM passes WHERE q=x'$q_hex';")" = 1
+check "paiements restaurée : clés de jetons effacées (jetons d'avant refusés)" test "$(sqlite3 "$pdb" 'SELECT count(*) FROM cles_jetons;')" = 0
+check "comptes.db intacte à côté" test -f "$racine/data/comptes.db"
 
 # --- 6. Adresse absente des sorties ---------------------------------------------------------------
 for f in "$work/srv.stdout" "$work/srv.stderr"; do

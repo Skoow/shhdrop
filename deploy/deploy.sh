@@ -17,7 +17,8 @@
 # fichiers de <SHH_DATA_ROOT>/secrets (README §12), jamais des variables. Tout deploy/.env est
 # exporté aux commandes de ce script (set -a). Compte activé (SHH_COMPTES: "1" dans
 # compose.yaml) : relais SMTP démarré, secrets vérifiés avant l'installation, fournisseur
-# d'envoi contrôlé après (avertissement seulement).
+# d'envoi contrôlé après (avertissement seulement). Paiement activé (SHH_PAIEMENT: "1") : un
+# relais par prestataire dont les secrets sont dans <SHH_DATA_ROOT>/secrets (README §13).
 # État : deploy/.release (empreinte en service) et deploy/.release.prev (la précédente).
 #
 # Limites, dites aussi dans le README :
@@ -71,13 +72,62 @@ profils=
 if [ "$comptes" = 1 ]; then profils=comptes; fi
 secrets=$SHH_DATA_ROOT/secrets
 
+# Paiement (README §13 ; conception du paiement §10, S1) : interrupteurs dans compose.yaml
+# seulement. Un prestataire est configuré quand ses fichiers de secrets sont là ; ce script pose
+# alors ses chemins (…_FILE) et démarre son relais, vers l'hôte de son API (production ou bac à
+# sable). Tout ce qui vient de deploy/.env pour ces chemins et ces hôtes est remplacé ici.
+une_ligne() { # une_ligne <variable> : valeur "0" ou "1" de l'unique ligne de compose.yaml
+	[ "$(grep -cE "^ +$1:" compose.yaml)" = 1 ] || die "compose.yaml : une seule ligne $1 attendue"
+	local v
+	v=$(sed -nE "s/^ +$1: \"([01])\"\$/\\1/p" compose.yaml)
+	[ "$v" = 0 ] || [ "$v" = 1 ] || die "compose.yaml : $1 doit valoir \"0\" ou \"1\""
+	printf '%s' "$v"
+}
+paiement=$(une_ligne SHH_PAIEMENT)
+essai=$(une_ligne SHH_PAIEMENT_ESSAI)
+SHH_HOTE_STRIPE=api.stripe.com
+SHH_HOTE_PAYPAL=api-m.paypal.com
+SHH_HOTE_NOWPAYMENTS=api.nowpayments.io
+if [ "$essai" = 1 ]; then
+	SHH_HOTE_PAYPAL=api-m.sandbox.paypal.com
+	SHH_HOTE_NOWPAYMENTS=api-sandbox.nowpayments.io
+fi
+export SHH_HOTE_STRIPE SHH_HOTE_PAYPAL SHH_HOTE_NOWPAYMENTS
+# present <fichier de secrets/> : là (lien symbolique compris : refusé ensuite par preflight).
+present() { [ -e "$secrets/$1" ] || [ -L "$secrets/$1" ]; }
+avec_stripe=0 avec_paypal=0 avec_nowpayments=0
+if [ "$paiement" = 1 ]; then
+	if present shh_stripe_cle || present shh_stripe_webhook; then avec_stripe=1; fi
+	if present shh_paypal_secret; then avec_paypal=1; fi
+	if present shh_nowpayments_cle || present shh_nowpayments_ipn; then avec_nowpayments=1; fi
+fi
+SHH_STRIPE_CLE_FILE="" SHH_STRIPE_WEBHOOK_FILE="" SHH_PAYPAL_SECRET_FILE="" SHH_NOWPAYMENTS_CLE_FILE="" SHH_NOWPAYMENTS_IPN_FILE=""
+if [ "$avec_stripe" = 1 ]; then
+	profils=${profils:+$profils,}paiement-stripe
+	SHH_STRIPE_CLE_FILE=/run/secrets/shh_stripe_cle SHH_STRIPE_WEBHOOK_FILE=/run/secrets/shh_stripe_webhook
+fi
+if [ "$avec_paypal" = 1 ]; then
+	profils=${profils:+$profils,}paiement-paypal
+	SHH_PAYPAL_SECRET_FILE=/run/secrets/shh_paypal_secret
+else
+	# Sans son secret, PayPal n'est pas configuré : ses réglages de deploy/.env sont ignorés
+	# (sinon le serveur refuserait de démarrer : « vont ensemble »).
+	SHH_PAYPAL_CLIENT_ID="" SHH_PAYPAL_WEBHOOK_ID="" SHH_PAYPAL_PLANS=""
+fi
+if [ "$avec_nowpayments" = 1 ]; then
+	profils=${profils:+$profils,}paiement-nowpayments
+	SHH_NOWPAYMENTS_CLE_FILE=/run/secrets/shh_nowpayments_cle SHH_NOWPAYMENTS_IPN_FILE=/run/secrets/shh_nowpayments_ipn
+fi
+export SHH_STRIPE_CLE_FILE SHH_STRIPE_WEBHOOK_FILE SHH_PAYPAL_SECRET_FILE SHH_NOWPAYMENTS_CLE_FILE SHH_NOWPAYMENTS_IPN_FILE
+export SHH_PAYPAL_CLIENT_ID SHH_PAYPAL_WEBHOOK_ID SHH_PAYPAL_PLANS
+
 # dc <empreinte> <arguments de docker compose…>
 # « -f compose.yaml » explicite : sans lui, docker compose fusionne de lui-même un
 # compose.override.yaml posé à côté et suit COMPOSE_FILE (deploy/.env), qui pourraient changer
 # l'environnement du serveur sans rien dire (audit adverse du 13 novembre, stockage, H1). Un
 # seul fichier fait foi : celui de la copie du dépôt.
 # Même raison pour COMPOSE_PROFILES : posé ici, d'après compose.yaml seulement (une valeur venue
-# de deploy/.env démarrerait le relais SMTP compte désactivé).
+# de deploy/.env démarrerait un relais, compte ou paiement désactivé).
 dc() {
 	local digest=$1
 	shift
@@ -113,6 +163,23 @@ preflight() {
 		done
 		[ "$(stat -c %s "$secrets/shh_comptes_cle")" = 32 ] ||
 			die "$secrets/shh_comptes_cle : 32 octets attendus (README §12)"
+	fi
+	if [ "$paiement" = 1 ]; then
+		[ -n "${SHH_TVA:-}" ] || die "paiement activé : SHH_TVA manque dans deploy/.env (franchise, france ou oss, README §13)"
+		[ $((avec_stripe + avec_paypal + avec_nowpayments)) -ge 1 ] ||
+			die "paiement activé : aucun prestataire (fichiers shh_stripe_…, shh_paypal_secret ou shh_nowpayments_… dans $secrets, README §13)"
+		local attendus=()
+		if [ "$avec_stripe" = 1 ]; then attendus+=(shh_stripe_cle shh_stripe_webhook); fi
+		if [ "$avec_paypal" = 1 ]; then
+			attendus+=(shh_paypal_secret)
+			[ -n "${SHH_PAYPAL_CLIENT_ID:-}" ] && [ -n "${SHH_PAYPAL_WEBHOOK_ID:-}" ] && [ -n "${SHH_PAYPAL_PLANS:-}" ] ||
+				die "PayPal : SHH_PAYPAL_CLIENT_ID, SHH_PAYPAL_WEBHOOK_ID et SHH_PAYPAL_PLANS manquent dans deploy/.env (README §13)"
+		fi
+		if [ "$avec_nowpayments" = 1 ]; then attendus+=(shh_nowpayments_cle shh_nowpayments_ipn); fi
+		for f in "${attendus[@]}"; do
+			[ -f "$secrets/$f" ] && [ ! -L "$secrets/$f" ] && [ "$(stat -c '%u %a' "$secrets/$f")" = "65532 400" ] ||
+				die "$secrets/$f absent ou mal réglé : fichier du compte 65532, droits 0400 (README §13)"
+		done
 	fi
 	# Simple avertissement : la détection ne connaît que dm-crypt (LUKS), pas d'autre montage.
 	src=$(findmnt -no SOURCE -T "$SHH_DATA_ROOT")
@@ -182,6 +249,10 @@ install_version() {
 	# Compte désactivé : le relais SMTP d'une activation précédente ne doit pas rester (un
 	# service hors profil n'est pas un « orphelin » pour --remove-orphans).
 	if [ "$comptes" = 0 ]; then dc "$new" rm -sf relais-smtp >/dev/null 2>&1 || true; fi
+	# Même chose pour les relais des prestataires absents ou paiement désactivé.
+	if [ "$avec_stripe" = 0 ]; then dc "$new" rm -sf relais-stripe >/dev/null 2>&1 || true; fi
+	if [ "$avec_paypal" = 0 ]; then dc "$new" rm -sf relais-paypal >/dev/null 2>&1 || true; fi
+	if [ "$avec_nowpayments" = 0 ]; then dc "$new" rm -sf relais-nowpayments >/dev/null 2>&1 || true; fi
 	if check "$new"; then
 		if [ "$new" != "$cur" ]; then
 			if valid "$cur"; then printf '%s\n' "$cur" >.release.prev; fi

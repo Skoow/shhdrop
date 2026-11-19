@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/skoow/shhdrop/server/internal/config"
 	"github.com/skoow/shhdrop/server/internal/paiement"
@@ -78,7 +80,13 @@ func setupPaiement(cfg config.Config) (*paiements, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := paiement.NewService(paiement.Config{DB: db, Now: cfg.Now, Origine: cfg.Origin, Regime: regime, Prestataires: prest})
+	// Émetteur des jetons anonymes : l'hôte public du site (SHH_ORIGIN sans schéma ni port).
+	emetteur := strings.TrimPrefix(strings.TrimPrefix(cfg.Origin, "https://"), "http://")
+	if h, _, err := net.SplitHostPort(emetteur); err == nil {
+		emetteur = h
+	}
+	svc, err := paiement.NewService(paiement.Config{DB: db, Now: cfg.Now, Origine: cfg.Origin, Regime: regime, Prestataires: prest,
+		Emetteur: emetteur})
 	if err != nil {
 		db.Close()
 		return nil, err

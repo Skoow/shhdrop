@@ -6,7 +6,7 @@
   // `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
   // Choix payants : plus aucun ici (décision du propriétaire du 11 novembre, audit M17) ; une
   // seule ligne discrète dans l'en-tête du composeur ouvre la feuille d'information.
-  import { MAX_OPENS, PW_TRIES, TITLE_MAX, TTL_HOURS } from "../index";
+  import { PW_TRIES, TITLE_MAX } from "../index";
   import type { Options } from "../flows/options.svelte";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -31,12 +31,17 @@
 
   const lang = $derived(getLang());
   const ttlLabel = (h: number) => formatDuration(h * 3600, lang);
-  const ttlOptions = $derived(TTL_HOURS.map((h) => ({ value: h, label: ttlLabel(h) })));
+  const ttlOptions = $derived(options.limites.ttlHours.map((h) => ({ value: h, label: ttlLabel(h) })));
   // Ouvertures (retours du propriétaire du 17 novembre) : des cases tant qu'il y en a peu
   // (gratuit : 1 à 5) ; au-delà de 6 (offres Plus et Pro, jusqu'à 10 et 20), un compteur
   // « − n + » plutôt qu'une grille de 10 ou 20 cases. `opensMax` suivra l'offre quand elle existera.
-  const opensMax = MAX_OPENS;
-  const opensOptions = Array.from({ length: opensMax }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+  const opensMax = $derived(options.limites.maxOpens);
+  const opensOptions = $derived(Array.from({ length: opensMax }, (_, i) => ({ value: i + 1, label: String(i + 1) })));
+  // Formule de ce partage (conception du paiement §11) : seulement si un pass payé est gardé sur
+  // cet appareil ; Plus et Pro dépensent un jeton anonyme à la création.
+  const formuleOptions = $derived(
+    (["free", ...options.formules] as const).map((f) => ({ value: f, label: f === "free" ? t("offers.free") : t(`paid.badge.${f}`) })),
+  );
   // Une seule durée quand les deux s'arrondissent pareil (« environ 1 s », pas « 1 s à 1 s »).
   const opensText = $derived(t("options.opens.count", { n: options.maxOpens }));
 
@@ -87,6 +92,13 @@
 
   <div class="block">
     {#if part === "all"}{@render summary()}{/if}
+    {#if options.formules.length > 0}
+      <div class="ctl" data-formule>
+        <span class="cl" aria-hidden="true">{t("options.formule.label")}</span>
+        <Segmented label={t("options.formule.label")} options={formuleOptions} bind:value={() => options.formule, (v) => (options.formule = v)} />
+        <p class="hint">{t("options.formule.hint")}</p>
+      </div>
+    {/if}
     <div class="ctl">
       <span class="cl" aria-hidden="true">{t("options.ttl.label")}</span>
       <Segmented label={t("options.ttl.label")} options={ttlOptions} bind:value={() => options.ttlHours, (v) => (options.ttlHours = v)} />

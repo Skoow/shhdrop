@@ -188,6 +188,44 @@ export function salonWasm(base: string, demo: boolean): Plugin {
 }
 
 /**
+ * Module WebAssembly des jetons anonymes (conception du paiement §7, crate shhdrop-jetons-wasm) :
+ * comme le salon, lu seulement au besoin (obtenir des jetons pour un partage payant), jamais par
+ * les pages de partage. Production : assets/jetons-EMPREINTE.wasm, adresse et empreinte SHA-384
+ * dans le script (src/paiement/source.verified.ts). Démo : aucun paiement, aucun module
+ * (source.demo.ts refuse). La colle de wasm-bindgen ne lit jamais le .wasm voisin.
+ */
+export function jetonsWasm(base: string, demo: boolean): Plugin {
+  const VIRTUAL = "virtual:shh-jetons";
+  const DEFAULT = "new URL('shhdrop_jetons_wasm_bg.wasm', import.meta.url)";
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  return {
+    name: "shh-jetons",
+    apply: "build",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (source === VIRTUAL) return "\0" + VIRTUAL;
+      const from = importer?.replace(/\\/g, "/") ?? "";
+      if (/^\.\/source(?:\.ts)?$/.test(source) && from.includes("/src/paiement/")) return join(here, demo ? "src/paiement/source.demo.ts" : "src/paiement/source.verified.ts");
+      return null;
+    },
+    load(id) {
+      if (id.replace(/\\/g, "/").endsWith("/src/paiement/source.ts")) this.error("shh-jetons : src/paiement/source.ts (lecture sans empreinte) n'entre jamais dans un build");
+      if (id !== "\0" + VIRTUAL) return null;
+      if (demo) return "export const src = \"\"; export const integrity = \"\";";
+      const wasm = readFileSync(join(here, "src/paiement/pkg/shhdrop_jetons_wasm_bg.wasm"));
+      const fileName = `assets/jetons-${createHash("sha256").update(wasm).digest("base64url").slice(0, 8)}.wasm`;
+      this.emitFile({ type: "asset", fileName, source: wasm });
+      return `export const src = ${JSON.stringify(base + fileName)}; export const integrity = ${JSON.stringify(sha384(wasm))};`;
+    },
+    transform(code, id) {
+      if (!id.replace(/\\/g, "/").endsWith("/src/paiement/pkg/shhdrop_jetons_wasm.js")) return null;
+      if (code.split(DEFAULT).length !== 2) this.error("shh-jetons : colle de wasm-bindgen inattendue (chemin par défaut du .wasm)");
+      return { code: code.replace(DEFAULT, '(() => { throw new Error("jetons_sans_source"); })()'), map: null };
+    },
+  };
+}
+
+/**
  * Une seule langue au démarrage (rapport de performance, D4) : ./en-source, importé par
  * src/i18n/, est remplacé par en-source.verified.ts (production) ou en-source.demo.ts (démo, dont
  * la CSP interdit fetch : dictionnaire intégré). Production : le dictionnaire anglais est écrit en
@@ -474,7 +512,7 @@ export function salonPages(actifs: boolean): Plugin {
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
-    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
+    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), jetonsWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
     define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)), __SALONS__: JSON.stringify(salonsActifs(demo)) },
     build: {

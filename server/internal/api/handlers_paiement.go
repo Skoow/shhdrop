@@ -4,9 +4,11 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/paiement"
+	"github.com/skoow/shhdrop/server/internal/share"
 )
 
 // Routes du paiement (conception du paiement §2, §4, §5.6), enregistrées seulement avec
@@ -29,6 +31,113 @@ func (a paiementAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/paiement/etat", a.etat)
 	mux.HandleFunc("POST /api/paiement/resilier", a.resilier)
 	mux.HandleFunc("POST /api/paiement/webhook/{nom}", a.webhook)
+	if a.p.Jetons() != nil {
+		mux.HandleFunc("GET /api/paiement/jetons/cles", a.cles)
+		mux.HandleFunc("POST /api/paiement/jetons", a.emettre)
+	}
+}
+
+// cles : clés publiques des jetons d'aujourd'hui et de demain (conception du paiement §7) ; les
+// mêmes pour tous, sans aucun en-tête lu.
+func (a paiementAPI) cles(w http.ResponseWriter, _ *http.Request) {
+	cl, err := a.p.Jetons().Cles()
+	if err != nil {
+		failPaiement(w, errInterne)
+		return
+	}
+	type cle struct {
+		Jour  string `json:"jour"`
+		Offre string `json:"offre"`
+		SPKI  string `json:"spki"`
+	}
+	out := make([]cle, len(cl))
+	for i, c := range cl {
+		out[i] = cle{time.Unix(c.Jour, 0).UTC().Format("2006-01-02"), c.Offre.String(), b64.EncodeToString(c.SPKI)}
+	}
+	writeJSON(w, http.StatusOK, struct {
+		V        int    `json:"v"`
+		Emetteur string `json:"emetteur"`
+		Cles     []cle  `json:"cles"`
+	}{1, a.p.Jetons().Emetteur(), out})
+}
+
+// emettre : jusqu'à 5 demandes de jetons (TokenRequest, base64url) signées en aveugle avec la clé
+// du jour de la formule du pass ; réserve du pass décomptée. 409 aucun_jeton : pass inconnu,
+// révoqué, échu ou réserve épuisée (du mois ou du jour).
+func (a paiementAPI) emettre(w http.ResponseWriter, r *http.Request) {
+	p, err := lirePass(r)
+	if err != nil {
+		failPaiement(w, err)
+		return
+	}
+	var b struct {
+		Requetes []string `json:"requetes"`
+	}
+	if err := readJSON(w, r, &b); err != nil || len(b.Requetes) == 0 || len(b.Requetes) > 5 {
+		failPaiement(w, errBadRequest)
+		return
+	}
+	reqs := make([][]byte, len(b.Requetes))
+	for i, x := range b.Requetes {
+		if reqs[i], err = b64.DecodeString(x); err != nil {
+			failPaiement(w, errBadRequest)
+			return
+		}
+	}
+	sigs, offre, err := a.p.Jetons().Emettre(a.p, p, reqs)
+	switch {
+	case errors.Is(err, paiement.ErrPasDeJetons):
+		writeErr(w, http.StatusConflict, "aucun_jeton")
+		return
+	case errors.Is(err, paiement.ErrJeton):
+		failPaiement(w, errBadRequest)
+		return
+	case err != nil:
+		failPaiement(w, errInterne)
+		return
+	}
+	reps := make([]string, len(sigs))
+	for i, s := range sigs {
+		reps[i] = b64.EncodeToString(s)
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Offre    string   `json:"offre"`
+		Reponses []string `json:"reponses"`
+	}{offre.String(), reps})
+}
+
+// jetonDeCreation : « Authorization: PrivateToken token=<base64url> » (RFC 9577) sur
+// POST /api/shares : formule du partage (jeton vérifié puis dépensé). Sans en-tête : gratuit.
+// Paiement désactivé, jeton invalide ou déjà dépensé : erreur (400 uniforme).
+func (s *server) jetonDeCreation(r *http.Request) (share.Tier, []byte, error) {
+	v := r.Header.Values("Authorization")
+	if len(v) == 0 {
+		return share.Gratuit, nil, nil
+	}
+	if len(v) != 1 || s.jetons == nil {
+		return 0, nil, errBadRequest
+	}
+	t, ok := strings.CutPrefix(v[0], "PrivateToken token=")
+	if !ok {
+		return 0, nil, errBadRequest
+	}
+	t = strings.TrimSuffix(strings.TrimPrefix(t, `"`), `"`)
+	jeton, err := b64.DecodeString(t)
+	if err != nil {
+		return 0, nil, errBadRequest
+	}
+	o, err := s.jetons.Depenser(jeton)
+	if err != nil {
+		return 0, nil, errBadRequest
+	}
+	return share.Tier(o), jeton, nil
+}
+
+// rendreJeton : création refusée après la dépense (quota, place, conflit) : le jeton resert.
+func (s *server) rendreJeton(jeton []byte) {
+	if jeton != nil && s.jetons != nil {
+		s.jetons.Rendre(jeton)
+	}
 }
 
 var nomsMoyens = [...]string{"", "carte", "paypal", "crypto"}
@@ -42,18 +151,24 @@ func moyenDe(s string) (paiement.Moyen, bool) {
 	return 0, false
 }
 
-// offre : moyens proposés par ce serveur, pays acceptés, droits « bientôt » (aucun secret).
+// offre : moyens proposés par ce serveur, pays acceptés, droits « bientôt », régime de TVA et
+// taux appliqué par pays (aucun secret ; la note de vente est faite sur l'appareil, §9.3).
 func (a paiementAPI) offre(w http.ResponseWriter, _ *http.Request) {
 	var moyens []string
 	for _, m := range a.p.Moyens() {
 		moyens = append(moyens, nomsMoyens[m])
+	}
+	type tva struct {
+		Regime string           `json:"regime"`
+		Taux   map[string]int64 `json:"taux"`
 	}
 	writeJSON(w, http.StatusOK, struct {
 		V       int      `json:"v"`
 		Moyens  []string `json:"moyens"`
 		Pays    []string `json:"pays"`
 		Bientot []string `json:"bientot"`
-	}{1, moyens, paiement.Pays(), paiement.Bientot})
+		TVA     tva      `json:"tva"`
+	}{1, moyens, paiement.Pays(), paiement.Bientot, tva{a.p.Regime().String(), paiement.TauxAppliques(a.p.Regime())}})
 }
 
 // lirePass : X-Shh-Pass présent exactement une fois, 32 octets en base64url.

@@ -57,4 +57,12 @@ func VerifierStripe(cle, webhook string, essai bool) error {
 }
 
 // Effacer : passe quotidienne (janitor.Quotidien).
-func (s *Service) Effacer(time.Time) (int, error) { return 0, s.Purger() }
+func (s *Service) Effacer(time.Time) (int, error) {
+	if err := s.Purger(); err != nil {
+		return 0, err
+	}
+	if s.jetons != nil {
+		return 0, s.jetons.Purger()
+	}
+	return 0, nil
+}

@@ -15,8 +15,8 @@
 use crate::envelope::ContentKeys;
 use crate::error::{Error, Result};
 use crate::format::{
-    BUCKETS, CHUNK, CHUNK_CT, HEADER, MANIFEST_MAX, MAX_ITEMS, MAX_SAFE, SEG_CHUNKS,
-    TEXT_BYTES_MAX, TEXT_MAX, bucket_for, header, nonce,
+    BUCKETS, CHUNK, CHUNK_CT, HEADER, MANIFEST_MAX, MAX_ITEMS, MAX_SAFE, Palier, SEG_CHUNKS,
+    TEXT_BYTES_MAX, TEXT_MAX, all_buckets, bucket_for_palier, header, nonce,
 };
 use crate::kdf::hkdf;
 use crate::manifest::{self, Clean, Entry, Kind, Manifest, Rights};
@@ -37,6 +37,16 @@ pub const DATA_SEGMENTS: u32 = (BUCKETS[BUCKETS.len() - 1] - 1) / SEG_CHUNKS;
 /// Morceaux de données au plus (2 Gio).
 pub const DATA_CHUNKS: u64 = DATA_SEGMENTS as u64 * SEG;
 
+/// Segments de données au plus d'une formule (512, 2 560 ou 7 680).
+pub const fn data_segments(p: Palier) -> u32 {
+    (p.max_bucket() - 1) / SEG_CHUNKS
+}
+
+/// Morceaux de données au plus d'une formule.
+pub const fn data_chunks(p: Palier) -> u64 {
+    data_segments(p) as u64 * SEG
+}
+
 /// `Number.isSafeInteger(size) && size >= 0`, sinon `taille_invalide`.
 fn safe(size: u64) -> Result<u64> {
     if size > MAX_SAFE {
@@ -53,11 +63,16 @@ pub fn segments_for(size: u64) -> Result<u64> {
 /// Plus petit palier qui contient `used` segments de données pleins suivis du morceau du
 /// manifeste : réservation d'un brouillon.
 pub fn reservation_for(used: u64) -> Result<u32> {
-    if used > u64::from(DATA_SEGMENTS) {
+    reservation_for_palier(used, Palier::Gratuit)
+}
+
+/// `reservation_for` d'une formule : paliers connus jusqu'au plus grand qu'elle permet.
+pub fn reservation_for_palier(used: u64, p: Palier) -> Result<u32> {
+    if used > u64::from(data_segments(p)) {
         return Err(Error::TropGros);
     }
-    BUCKETS
-        .into_iter()
+    all_buckets()
+        .filter(|&b| b <= p.max_bucket())
         .find(|&b| u64::from(b) > used * SEG)
         .ok_or(Error::TropGros)
 }
@@ -134,10 +149,15 @@ impl<P: Platform> ElementSealer<P> {
     /// avant tout tirage ; graine neuve à chaque appel : un nouvel essai ou une nouvelle place
     /// ne réutilise jamais un nonce sous une clé.
     pub async fn new(p: &Rc<P>, size: u64, first: u64) -> Result<Self> {
+        Self::new_palier(p, size, first, Palier::Gratuit).await
+    }
+
+    /// `new` pour une formule : places jusqu'à `data_chunks(palier)`.
+    pub async fn new_palier(p: &Rc<P>, size: u64, first: u64, palier: Palier) -> Result<Self> {
         let n = footprint_for(size)?;
         let end = first
             .checked_add(n)
-            .filter(|&e| e <= DATA_CHUNKS)
+            .filter(|&e| e <= data_chunks(palier))
             .ok_or(Error::TropGros)?;
         let placed = if is_small(size) {
             first / SEG == (end - 1) / SEG
@@ -147,7 +167,7 @@ impl<P: Platform> ElementSealer<P> {
         if !placed {
             return Err(Error::PlaceInvalide);
         }
-        // Bornes : end ≤ DATA_CHUNKS = 32 768, donc segments et morceaux tiennent en u32.
+        // Bornes : end ≤ data_chunks(Pro) = 491 520, donc segments et morceaux tiennent en u32.
         let mut pieces = Vec::new();
         let mut a = first;
         while a < end {
@@ -367,8 +387,8 @@ pub struct Sealed {
     pub tail: Vec<u8>,
 }
 
-/// Morceaux déjà pris par les éléments gardés (2 Gio = 32 768 bits).
-struct Taken([u64; DATA_CHUNKS as usize / 64]);
+/// Morceaux déjà pris par les éléments gardés (un bit par morceau de données de la formule).
+struct Taken(Vec<u64>);
 
 impl Taken {
     /// Marque `c` ; faux s'il l'était déjà.
@@ -395,7 +415,19 @@ pub async fn seal_final<P: Platform>(
     rights: Option<&str>,
     keep_ttl_h: Option<u64>,
 ) -> Result<Sealed> {
-    seal_final_titled(entries, keys, rights, keep_ttl_h, None).await
+    seal_final_complet(entries, keys, rights, keep_ttl_h, Palier::Gratuit, None).await
+}
+
+/// `seal_final` pour une formule : éléments jusqu'à `data_chunks(palier)`, palier final
+/// `bucket_for_palier` (le même que le lecteur recalcule).
+pub async fn seal_final_palier<P: Platform>(
+    entries: &[FinalEntry],
+    keys: &ContentKeys<P>,
+    rights: Option<&str>,
+    keep_ttl_h: Option<u64>,
+    palier: Palier,
+) -> Result<Sealed> {
+    seal_final_complet(entries, keys, rights, keep_ttl_h, palier, None).await
 }
 
 /// [`seal_final`] avec le nom du partage (19 novembre) : `title` nettoyé par
@@ -408,6 +440,19 @@ pub async fn seal_final_titled<P: Platform>(
     keep_ttl_h: Option<u64>,
     title: Option<&str>,
 ) -> Result<Sealed> {
+    seal_final_complet(entries, keys, rights, keep_ttl_h, Palier::Gratuit, title).await
+}
+
+/// [`seal_final`] complet : formule (`palier`) et nom du partage (`title`) ; les autres en sont
+/// des cas particuliers.
+pub async fn seal_final_complet<P: Platform>(
+    entries: &[FinalEntry],
+    keys: &ContentKeys<P>,
+    rights: Option<&str>,
+    keep_ttl_h: Option<u64>,
+    palier: Palier,
+    title: Option<&str>,
+) -> Result<Sealed> {
     if entries.is_empty() {
         return Err(Error::Vide);
     }
@@ -418,7 +463,7 @@ pub async fn seal_final_titled<P: Platform>(
     if entries.len() > MAX_ITEMS {
         return Err(Error::ManifesteTropGros);
     }
-    let mut taken = Taken([0; DATA_CHUNKS as usize / 64]);
+    let mut taken = Taken(vec![0; data_chunks(palier) as usize / 64]);
     let mut items = Vec::with_capacity(entries.len());
     let mut data_end = 0u64;
     for e in entries {
@@ -429,14 +474,14 @@ pub async fn seal_final_titled<P: Platform>(
         let end = e
             .first
             .checked_add(n)
-            .filter(|&z| z <= DATA_CHUNKS)
+            .filter(|&z| z <= data_chunks(palier))
             .ok_or(Error::TropGros)?;
         for c in e.first..end {
             if !taken.take(c) {
                 return Err(Error::Chevauchement);
             }
         }
-        // end ≤ 2^15 morceaux : offset + taille ≤ 2^31, aucun débordement.
+        // end ≤ 491 520 morceaux : offset + taille < 2^35, aucun débordement.
         let offset = if e.size == 0 { 0 } else { e.first * CHUNK64 };
         let (kind, clean) = match e.kind {
             FinalKind::Text => (Kind::Text, None),
@@ -465,7 +510,7 @@ pub async fn seal_final_titled<P: Platform>(
     if json.len() > MANIFEST_MAX {
         return Err(Error::ManifesteTropGros);
     }
-    let bucket = bucket_for(data_end)?;
+    let bucket = bucket_for_palier(data_end, palier)?;
     let mut plain = Zeroizing::new(vec![0u8; CHUNK]);
     plain[CHUNK - 4 - json.len()..CHUNK - 4].copy_from_slice(&json);
     // json.len() ≤ MANIFEST_MAX < 2^32.

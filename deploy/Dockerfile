@@ -46,6 +46,12 @@ RUN CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$CARGO_HOME=/cargo" \
     cargo build --profile wasm-salon --target wasm32-unknown-unknown -p shhdrop-salon-wasm --locked \
  && wasm-bindgen --target web --remove-name-section --remove-producers-section --experimental-reset-state-function \
     --out-dir /out/salon/pkg --out-name shhdrop_salon_wasm target/wasm32-unknown-unknown/wasm-salon/shhdrop_salon_wasm.wasm
+# Jetons anonymes des offres payantes (crate shhdrop-jetons-wasm, profil wasm-salon ; conception du
+# paiement §7) : module à part, lu seulement pour obtenir des jetons.
+RUN CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$CARGO_HOME=/cargo" \
+    cargo build --profile wasm-salon --target wasm32-unknown-unknown -p shhdrop-jetons-wasm --locked \
+ && wasm-bindgen --target web --remove-name-section --remove-producers-section \
+    --out-dir /out/paiement/pkg --out-name shhdrop_jetons_wasm target/wasm32-unknown-unknown/wasm-salon/shhdrop_jetons_wasm.wasm
 
 # Le pkg seul, pour la CI (job repro-docker de .github/workflows/ci.yml), qui le compare à celui
 # de ses propres builds ; n'entre pas dans l'image :
@@ -53,6 +59,7 @@ RUN CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$CARGO_HOME=/cargo" \
 FROM scratch AS engine-pkg
 COPY --from=engine /out/pkg /pkg
 COPY --from=engine /out/salon/pkg /salon/pkg
+COPY --from=engine /out/paiement/pkg /paiement/pkg
 
 # --- Site -------------------------------------------------------------------------------
 FROM node:26.13.0-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS web
@@ -70,6 +77,7 @@ COPY web/ ./
 # Moteurs construits à l'étape précédente ; build:engine vérifie seulement leur présence.
 COPY --from=engine /out/pkg ./src/engine/pkg
 COPY --from=engine /out/salon/pkg ./src/salon/pkg
+COPY --from=engine /out/paiement/pkg ./src/paiement/pkg
 # check-dist.mjs : le build de production est conforme (variantes .br et .gz exactes,
 # aucun code de démo, aucune adresse http(s):// externe dans index.html, le CSS et
 # pdf-frame.html). Un écart arrête le build de l'image.

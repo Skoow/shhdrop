@@ -141,14 +141,17 @@ const growMargin = 2
 // growMargin segments pleins, plus le morceau du manifeste. Un segment reçu puis effacé
 // (élément retiré) compte encore : effacer ne fait rien gagner à qui garde ses segments, et le
 // client peut placer l'élément suivant juste après un élément en cours d'effacement.
-func growLimit(top int) int {
+func growLimit(top int, t Tier) int {
 	need := (top+growMargin)*SegChunks + 1
-	for _, b := range Buckets {
+	for _, b := range allBuckets() {
+		if b > t.MaxBucket() {
+			break
+		}
 		if b >= need {
 			return b
 		}
 	}
-	return Buckets[len(Buckets)-1]
+	return t.MaxBucket()
 }
 
 // Grow : GrowCharged sans débit de quota.
@@ -179,7 +182,8 @@ func (s *Service) GrowCharged(id string, bucket int, charge func(bucket int) err
 		return err
 	}
 	_, top := s.received(id)
-	if !validBucket(bucket) || bucket <= old || bucket > growLimit(top) {
+	t := s.tierOf(id)
+	if !bucketAllowed(bucket, t) || bucket <= old || bucket > growLimit(top, t) {
 		return ErrBadRequest
 	}
 	if charge != nil {
@@ -302,7 +306,7 @@ func (s *Service) finalizeDraft(id string, reserved int, r FinalizeReq) (time.Du
 	// cela, un brouillon réservé à 2 Gio et finalisé vide ferait écrire 2 Gio d'aléa.
 	// Le client finalise au plus petit palier qui contient son dernier morceau envoyé
 	// (bucketFor), toujours sous cette borne.
-	if b > growLimit(top) {
+	if b > growLimit(top, s.tierOf(id)) {
 		return 0, ErrBadRequest
 	}
 	segs := SegmentCount(b)

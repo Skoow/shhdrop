@@ -3,9 +3,11 @@
 # shhdrop-wasm : liaison WebAssembly du site (wasm-bindgen), avec le fournisseur WebCrypto
 # de web/src/engine/provider.ts. shhdrop-salon : moteur du salon (MLS, trames, messages) ;
 # shhdrop-salon-wasm : sa liaison WebAssembly, module à part (web/src/salon/), chargé seulement
-# par le salon.
+# par le salon. shhdrop-jetons-wasm : jetons anonymes des offres payantes (Privacy Pass, conception
+# du paiement §7), module à part (web/src/paiement/), chargé seulement pour obtenir des jetons :
+# le moteur des partages, lu par toutes les pages de partage, n'en porte pas le poids (RSA).
 [workspace]
-members = ["core", "salon", "salon-wasm", "wasm"]
+members = ["core", "jetons-wasm", "salon", "salon-wasm", "wasm"]
 resolver = "2"
 
 [workspace.package]

@@ -52,7 +52,7 @@ func newEnvPaiement(t *testing.T) envPaiement {
 	}
 	t.Cleanup(func() { db.Close() })
 	p := &prestTest{url: "https://checkout.stripe.com/c/pay/cs_test_1"}
-	s, err := paiement.NewService(paiement.Config{DB: db, Now: e.clk.Now, Origine: "https://shhgone.test", Regime: paiement.OSS,
+	s, err := paiement.NewService(paiement.Config{DB: db, Now: e.clk.Now, Origine: "https://shhgone.test", Regime: paiement.OSS, Emetteur: "shhgone.test",
 		Prestataires: []paiement.Prestataire{p}})
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,8 @@ func TestPaiementOffre(t *testing.T) {
 	w := e.do(req{method: "GET", path: "/api/paiement"})
 	m := jsonOf(t, w)
 	if w.Code != 200 || m["v"] != 1.0 || len(m["moyens"].([]any)) != 1 || m["moyens"].([]any)[0] != "carte" ||
-		len(m["pays"].([]any)) != 27 || !strings.Contains(w.Body.String(), `"bientot":["appel_audio","appel_video"]`) {
+		len(m["pays"].([]any)) != 27 || !strings.Contains(w.Body.String(), `"bientot":["appel_audio","appel_video"]`) ||
+		!strings.Contains(w.Body.String(), `"tva":{"regime":"oss","taux":{"AT":2000,"BE":2100,`) || !strings.Contains(w.Body.String(), `"DE":1900,`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }

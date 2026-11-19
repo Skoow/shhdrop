@@ -45,7 +45,11 @@ describe("adresses de redirection", () => {
 describe("couche HTTP du paiement", () => {
   it("offre : moyens et pays du serveur ; 404 ou réponse invalide : null", async () => {
     const { n, seen } = net(() => rep({ v: 1, moyens: ["carte", "crypto", "inconnu"], pays: ["DE", "FR", "fr"], bientot: ["appel_audio"] }));
-    expect(await A.lireOffre(n)).toEqual({ moyens: ["carte", "crypto"], pays: ["DE", "FR"], bientot: ["appel_audio"] });
+    expect(await A.lireOffre(n)).toEqual({ moyens: ["carte", "crypto"], pays: ["DE", "FR"], bientot: ["appel_audio"], tva: null });
+    const avec = { v: 1, moyens: ["carte"], pays: ["DE"], bientot: [], tva: { regime: "oss", taux: { DE: 1900, FR: 2000 } } };
+    expect((await A.lireOffre(net(() => rep(avec)).n))?.tva).toEqual({ regime: "oss", taux: { DE: 1900, FR: 2000 } });
+    for (const tva of [{ regime: "autre", taux: {} }, { regime: "oss", taux: { DE: 19.5 } }, { regime: "oss", taux: { de: 1900 } }, { regime: "oss", taux: { DE: 20000 } }, "oss"])
+      expect((await A.lireOffre(net(() => rep({ ...avec, tva })).n))?.tva).toBeNull();
     expect(seen[0]!.url).toBe("https://shh.test/api/paiement");
     expect(seen[0]!.init.credentials).toBe("omit");
     expect(seen[0]!.init.redirect).toBe("error");
@@ -98,13 +102,14 @@ describe("pass gardés sur l'appareil", () => {
   it("garder, lire (récent d'abord), oublier ; base shhdrop-pass ; aucun pass en clair", async () => {
     const idb = fakeIndexedDB();
     const a = g({ cree: 1000 });
-    const b = g({ cree: 2000, offre: "pro", jours: 365, renouvelle: false, moyen: "crypto", enAttente: false });
+    const b = g({ cree: 2000, offre: "pro", jours: 365, renouvelle: false, moyen: "crypto", enAttente: false, pays: "DE" });
     await garder(idb, a);
     await garder(idb, b);
     expect([...idb.raw().keys()]).toEqual([PASS_DB]);
     const lus = await lirePasses(idb);
     expect(lus.map((x) => x.id)).toEqual([b.id, a.id]);
     expect(lus[0]).toEqual(b);
+    expect(lus[1]!.pays).toBeUndefined();
     // Rien du pass sur « disque » : ni ses octets, ni son base64url.
     let tout = "";
     const octets: Uint8Array[] = [];
@@ -116,6 +121,7 @@ describe("pass gardés sur l'appareil", () => {
     for (const [, stores] of idb.raw()) for (const [, m] of stores) for (const [k, v] of m) (walk(k), walk(v));
     for (const x of [a, b]) {
       expect(tout).not.toContain(b64u(x.pass));
+      expect(tout).not.toContain('"DE"'); // pays chiffré avec le pass
       expect(octets.some((o) => Buffer.from(o).includes(Buffer.from(x.pass)))).toBe(false);
     }
     await oublier(idb, a.id);

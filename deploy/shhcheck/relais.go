@@ -1,7 +1,8 @@
 package main
 
-// Relais SMTP (plan du compte, lot 8 ; conception du compte §3.2) : la seule sortie du serveur
-// Go vers Internet. Le serveur reste sur le réseau Docker interne (aucune route vers Internet) ;
+// Relais de sortie (plan du compte, lot 8 ; conception du compte §3.2 ; conception du paiement
+// §4, S1) : les seules sorties du serveur Go vers Internet, une par cible (SMTP du compte, API
+// des trois prestataires de paiement). Le serveur reste sur le réseau Docker interne (aucune route vers Internet) ;
 // son /etc/hosts fait pointer SHH_SMTP_HOST vers ce relais, qui recopie les octets, dans les
 // deux sens, vers une seule cible fixée au démarrage (hôte:port du fournisseur d'envoi). Le
 // client ne choisit rien : quoi qu'il envoie, la connexion part vers cette cible. TLS est de
@@ -127,13 +128,28 @@ func (r *relais) relayer(c net.Conn) {
 	wg.Wait()
 }
 
-func relaisMain(ecoute, cible string) error {
+// maxDe : plafond de connexions simultanées donné en argument (1 à 64) ; "" : 4, celui du SMTP.
+func maxDe(v string) (int, error) {
+	if v == "" {
+		return 4, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 || n > 64 || strconv.Itoa(n) != v {
+		return 0, fmt.Errorf("plafond de connexions invalide (1 à 64) : %q", v)
+	}
+	return n, nil
+}
+
+func relaisMain(ecoute, cible, max string) error {
 	e, err := ecouteValide(ecoute)
 	if err != nil {
 		return err
 	}
 	r, err := nouveauRelais(cible)
 	if err != nil {
+		return err
+	}
+	if r.max, err = maxDe(max); err != nil {
 		return err
 	}
 	ln, err := net.Listen("tcp", e)

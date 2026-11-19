@@ -39,6 +39,8 @@ build() { # $1 : dossier absolu de la copie (même disposition que le dépôt : 
   # (le .wasm émis dans dist/assets est déjà compté ci-dessus) ; comparée à celle de l'image par
   # le job repro-docker de la CI.
   (cd "$1/web/src" && find salon/pkg -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
+  # Module des jetons anonymes (web/src/paiement/pkg), même règle (conception du paiement §7).
+  (cd "$1/web/src" && find paiement/pkg -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
 }
 
 build "$tmp/a" >"$tmp/a.sums"

@@ -7,7 +7,8 @@
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
   import Assurances from "../ui/Assurances.svelte";
-  import { CONTENT_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, TITLE_MAX, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
+  import { MAX_ITEMS, NAME_MAX, TEXT_MAX, TITLE_MAX, dataSegmentsOf, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
+  import type { Formule } from "../limits";
   import { blockKey, canClean, createComposer, type AddReport, type ComposeItem, type Source } from "../flows/compose.svelte";
   import { rowStatus, toDraftList } from "../flows/preupload";
   import { addActions, desktopActions, type AddId } from "../flows/add-actions";
@@ -63,8 +64,14 @@
     sendPage?: boolean;
     /** Mot de passe généré, à chaque changement : K_mdp calculé pendant la composition (spec §29.4.4). */
     onpassword?: (password: string) => void;
+    /**
+     * Formule de ce partage (conception du paiement §11), à chaque changement ; `formules` :
+     * formules payantes utilisables sur cet appareil (posées par le parcours d'envoi).
+     */
+    onformule?: (f: Formule) => void;
+    formules?: readonly Formule[];
   };
-  let { onsend, active = true, onitems, uploadOf, uploadVersion = 0, onretry, removing = 0, sendPage = false, onpassword }: Props = $props();
+  let { onsend, active = true, onitems, uploadOf, uploadVersion = 0, onretry, removing = 0, sendPage = false, onpassword, onformule, formules = [] }: Props = $props();
 
   let online = $state(typeof navigator === "undefined" || navigator.onLine !== false);
 
@@ -79,6 +86,7 @@
       voice: (n) => t("compose.name.voice", { n }),
     },
     online: () => online,
+    limites: () => ({ contentMax: options.limites.contentMax, dataSegments: dataSegmentsOf(options.limites.palier) }),
   });
   // Téléphone (< 760 px) : une vraie app (lignes compactes, menu « … », barre collée, options
   // en feuille). Ordinateur : deux colonnes. Coffre chez le destinataire (spec §27) : retiré de
@@ -87,6 +95,10 @@
   const narrow = $derived(narrowMq.current);
   const options = createOptions({ generate: generatePassword });
   $effect(() => onpassword?.(options.password));
+  $effect(() => {
+    options.formules = formules;
+  });
+  $effect(() => onformule?.(options.formule));
 
   const filled = $derived(composer.count > 0);
   // Composeur à l'écran : dès le premier élément, ou d'emblée sur la page d'envoi (même vide).
@@ -433,7 +445,7 @@
   // Nom du partage trop long (19 novembre) : bloqué ici, avant le moteur (« titre_trop_long »).
   const reasonText = $derived(
     composerBlock
-      ? t(blockKey(composerBlock), { max: composerBlock === "trop_gros" ? formatBytes(CONTENT_MAX, lang) : num(TEXT_MAX) })
+      ? t(blockKey(composerBlock), { max: composerBlock === "trop_gros" ? formatBytes(options.limites.contentMax, lang) : num(TEXT_MAX) })
       : options.titleTooLong
         ? t("options.name.tooLong", { max: num(TITLE_MAX) })
         : "",
@@ -685,7 +697,7 @@
           </div>
         {/if}
         <div class="cap">
-          <div class="capg"><CapacityGauge bytes={composer.totalBytes + removing} count={composer.count} head /></div>
+          <div class="capg"><CapacityGauge bytes={composer.totalBytes + removing} count={composer.count} head limite={options.limites.contentMax} /></div>
         </div>
         {#if removing > 0}<p class="removing" role="status">{t("compose.up.removing")}</p>{/if}
       </div>

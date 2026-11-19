@@ -2,7 +2,8 @@
 // ouvertures, mot de passe, droits du destinataire. En mémoire seulement : le mot de passe
 // n'est jamais rangé ni journalisé.
 // Le mot de passe est toujours généré (D41-15) : aucune saisie, donc aucun contrôle ici.
-import { MAX_OPENS, OPENS_DEFAULT, TITLE_MAX, TTL_DEFAULT, TTL_HOURS, previewKindOf, type TtlHours } from "../index";
+import { OPENS_DEFAULT, TITLE_MAX, TTL_DEFAULT, previewKindOf, type TtlHours } from "../index";
+import { limitesDe, type Formule } from "../limits";
 
 export type Rights = "voir" | "enregistrer" | "coffre";
 
@@ -14,8 +15,13 @@ export type OptionsDeps = {
 };
 
 export function createOptions(deps: OptionsDeps) {
-  let ttl = $state<TtlHours>(TTL_DEFAULT);
+  let ttl = $state<number>(TTL_DEFAULT);
   let opens = $state(OPENS_DEFAULT);
+  // Formule du partage (conception du paiement §11) : gratuit par défaut ; Plus ou Pro seulement
+  // si un pass payé est gardé sur cet appareil (formules, posé par l'écran).
+  let formule = $state<Formule>("free");
+  let formules = $state<readonly Formule[]>([]);
+  const lim = $derived(limitesDe(formule));
   let generated = $state(deps.generate());
   // Nom du partage (19 novembre) : texte libre, nettoyé par le moteur au scellement (cleanTitle).
   let title = $state("");
@@ -28,17 +34,40 @@ export function createOptions(deps: OptionsDeps) {
   const rights = $derived<Rights>(!download ? "voir" : vault && vaultOk() ? "coffre" : "enregistrer");
 
   return {
-    get ttlHours(): TtlHours {
+    get ttlHours(): number {
       return ttl;
     },
-    set ttlHours(v: TtlHours) {
-      if ((TTL_HOURS as readonly number[]).includes(v)) ttl = v;
+    set ttlHours(v: number) {
+      if (lim.ttlHours.includes(v)) ttl = v;
     },
     get maxOpens() {
       return opens;
     },
     set maxOpens(v: number) {
-      opens = Math.min(MAX_OPENS, Math.max(1, Number.isFinite(v) ? Math.trunc(v) : 1));
+      opens = Math.min(lim.maxOpens, Math.max(1, Number.isFinite(v) ? Math.trunc(v) : 1));
+    },
+    /** Formule de ce partage ; en changer ramène durée et ouvertures dans ses limites. */
+    get formule(): Formule {
+      return formule;
+    },
+    set formule(f: Formule) {
+      if (f !== "free" && !formules.includes(f)) return;
+      formule = f;
+      const l = limitesDe(f);
+      if (!l.ttlHours.includes(ttl)) ttl = TTL_DEFAULT;
+      opens = Math.min(opens, l.maxOpens);
+    },
+    /** Formules payantes utilisables ici (pass payé gardé sur l'appareil). */
+    get formules(): readonly Formule[] {
+      return formules;
+    },
+    set formules(l: readonly Formule[]) {
+      formules = l.filter((x) => x !== "free");
+      if (formule !== "free" && !formules.includes(formule)) this.formule = "free";
+    },
+    /** Limites de la formule choisie. */
+    get limites() {
+      return lim;
     },
     /** Mot de passe qui sera utilisé : toujours le dernier généré. */
     get password() {
@@ -103,7 +132,8 @@ export type Options = ReturnType<typeof createOptions>;
  * `keep_ttl_h` = durée du partage. Sans elle, createShare refuse « coffre » (S5).
  */
 export function sendRights(o: Pick<Options, "rights" | "ttlHours">): { rights: Rights; keepTtlH?: TtlHours } {
-  return o.rights === "coffre" ? { rights: "coffre", keepTtlH: o.ttlHours } : { rights: o.rights };
+  // Partage payant de 2 à 7 jours : le coffre garde au plus 24 h (spec §27.4 : 1, 6, 12 ou 24 h).
+  return o.rights === "coffre" ? { rights: "coffre", keepTtlH: Math.min(o.ttlHours, 24) as TtlHours } : { rights: o.rights };
 }
 
 

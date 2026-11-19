@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS passes(
   fin_jour INTEGER NOT NULL CHECK(typeof(fin_jour)='integer' AND fin_jour >= 0 AND fin_jour % 86400 = 0),
   jetons INTEGER NOT NULL CHECK(typeof(jetons)='integer' AND jetons >= 0),
   recharge_jour INTEGER NOT NULL CHECK(typeof(recharge_jour)='integer' AND recharge_jour >= 0 AND recharge_jour % 86400 = 0),
-  revoque INTEGER NOT NULL CHECK(revoque IN (0,1))) WITHOUT ROWID;
+  revoque INTEGER NOT NULL CHECK(revoque IN (0,1)),
+  emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0),
+  emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS commandes(
   id BLOB PRIMARY KEY CHECK(typeof(id)='blob' AND length(id)=16),
   q BLOB NOT NULL CHECK(typeof(q)='blob' AND length(q)=32),
@@ -46,10 +48,20 @@ CREATE TABLE IF NOT EXISTS refs(
   r BLOB PRIMARY KEY CHECK(typeof(r)='blob' AND length(r)=32),
   commande BLOB NOT NULL REFERENCES commandes(id) ON DELETE CASCADE,
   jour INTEGER NOT NULL CHECK(typeof(jour)='integer' AND jour >= 0 AND jour % 86400 = 0)) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS refs_commande ON refs(commande)`
+CREATE INDEX IF NOT EXISTS refs_commande ON refs(commande);
+CREATE TABLE IF NOT EXISTS cles_jetons(
+  jour INTEGER NOT NULL CHECK(typeof(jour)='integer' AND jour >= 0 AND jour % 86400 = 0),
+  offre INTEGER NOT NULL CHECK(offre IN (1,2)),
+  sk BLOB NOT NULL CHECK(typeof(sk)='blob' AND length(sk) BETWEEN 1100 AND 1300),
+  PRIMARY KEY(jour, offre)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS depenses(
+  h BLOB PRIMARY KEY CHECK(typeof(h)='blob' AND length(h)=32),
+  jour INTEGER NOT NULL CHECK(typeof(jour)='integer' AND jour >= 0 AND jour % 86400 = 0)) WITHOUT ROWID`
 
-// VersionBase : version du schéma de paiements.db (PRAGMA user_version).
-const VersionBase = 1
+// VersionBase : version du schéma de paiements.db (PRAGMA user_version). 2 : jetons anonymes
+// (clés d'émission du jour, jetons dépensés, émissions du jour par pass) ; une base de la
+// version 1 est migrée à l'ouverture.
+const VersionBase = 2
 
 // ErrBasePlusRecente : paiements.db écrite par une version plus récente ; message fixe.
 var ErrBasePlusRecente = errors.New("paiements.db créée par une version plus récente de Shhgone : refus d'ouvrir " +
@@ -80,6 +92,14 @@ func OuvrirBase(chemin string) (*sql.DB, error) {
 	if v > VersionBase {
 		db.Close()
 		return nil, ErrBasePlusRecente
+	}
+	if v == 1 {
+		// Version 1 → 2 : colonnes d'émission des jetons (valeur 0 : rien émis).
+		if _, err := db.Exec(`ALTER TABLE passes ADD COLUMN emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0);
+ALTER TABLE passes ADD COLUMN emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)`); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("migration de paiements.db : %w", err)
+		}
 	}
 	if _, err := db.Exec(schemaPaiements); err != nil {
 		db.Close()

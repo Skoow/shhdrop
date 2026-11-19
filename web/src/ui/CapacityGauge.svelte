@@ -9,13 +9,14 @@
 
   /** `mini` : une ligne, pour la barre d'envoi du téléphone ; `head` : en-tête de la liste. */
   /** Les espaces Plus et Pro sont des pastilles à côté de la jauge (Compose, retours OPT). */
-  type Props = { bytes: number; count: number; mini?: boolean; head?: boolean };
-  let { bytes, count, mini = false, head = false }: Props = $props();
+  /** `limite` : données au plus de la formule du partage (Plus et Pro, conception du paiement §11). */
+  type Props = { bytes: number; count: number; mini?: boolean; head?: boolean; limite?: number };
+  let { bytes, count, mini = false, head = false, limite = CONTENT_MAX }: Props = $props();
 
   const lang = $derived(getLang());
-  const max = $derived(formatBytes(CONTENT_MAX, lang));
-  const ratio = $derived(bytes / CONTENT_MAX);
-  const level = $derived(bytes > CONTENT_MAX ? "over" : ratio >= 0.9 ? "near" : "ok");
+  const max = $derived(formatBytes(limite, lang));
+  const ratio = $derived(bytes / limite);
+  const level = $derived(bytes > limite ? "over" : ratio >= 0.9 ? "near" : "ok");
   const sizeText = $derived(t("compose.gauge.size", { size: formatBytes(bytes, lang), max }));
   const countText = $derived(t("compose.gauge.count", { n: count, max: MAX_ITEMS }));
   const uid = $props.id();
@@ -26,7 +27,7 @@
   // seul l'excédent est donné (« 4 octets de trop, limite : 2 Go »).
   const overText = $derived.by(() => {
     const size = formatBytes(bytes, lang);
-    const excess = formatBytes(bytes - CONTENT_MAX, lang);
+    const excess = formatBytes(bytes - limite, lang);
     return size === max ? t("compose.tooBig.excess", { excess, max }) : t("compose.tooBig", { size, max, excess });
   });
 
@@ -52,7 +53,7 @@
           ><b>{count}</b>{t("compose.capacity.count", { n: "", max: MAX_ITEMS })}</span
         ><span class="dot" aria-hidden="true">{" · "}</span>{/if}<span aria-hidden="true"><b>{formatBytes(bytes, lang)}</b> / {max}</span>
     </p>
-    <div class="bar" role="meter" aria-labelledby="{uid}-s" aria-valuemin="0" aria-valuemax={CONTENT_MAX} aria-valuenow={Math.min(bytes, CONTENT_MAX)} aria-valuetext={sizeText}>
+    <div class="bar" role="meter" aria-labelledby="{uid}-s" aria-valuemin="0" aria-valuemax={limite} aria-valuenow={Math.min(bytes, limite)} aria-valuetext={sizeText}>
       <span class="fill" style:--r={Math.min(1, ratio)}></span>
     </div>
     {#if level === "near"}<span class="near">{t("compose.gauge.near")}</span>{/if}
@@ -77,8 +78,8 @@
         role="meter"
         aria-labelledby="{uid}-s"
         aria-valuemin="0"
-        aria-valuemax={CONTENT_MAX}
-        aria-valuenow={Math.min(bytes, CONTENT_MAX)}
+        aria-valuemax={limite}
+        aria-valuenow={Math.min(bytes, limite)}
         aria-valuetext={sizeText}
       >
         <span class="fill" style:--r={Math.min(1, ratio)}></span>

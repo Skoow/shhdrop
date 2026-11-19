@@ -18,6 +18,7 @@
 //   démarrage sans session gardée : les entrées venues du compte sont retirées de l'appareil,
 //   celles de l'appareil restent (§37.11 A-G8).
 import * as api from "./api";
+import { synchroniserPass } from "./pass";
 import { netParDefaut, type Net, type Preuve } from "./api";
 import { aleatoire32, clesDeKCompte, clesDuCompte, ouvrirEnveloppe, scellerEnveloppe, type ClesCompte } from "./keys";
 import { creerCoffre, ouvrir, priveDeJson, priveEnJson, priveVide, profilDeJson, profilEnJson, sceller, type Coffre, type CoffrePrive, type Profil, type Sorte } from "./vaults";
@@ -214,6 +215,16 @@ async function synchroniser(o: Ouverte, recuperation: boolean): Promise<void> {
     }
   } catch {
     // Historique illisible ou coffre refusé : la session reste ouverte ; la prochaine connexion refusionne.
+  }
+  // Pass des offres payantes (conception du paiement §6.2) : appareil ↔ coffre privé.
+  try {
+    const idb = deps.idb();
+    if (idb && ouverte === o) {
+      const patch = await synchroniserPass(idb, o.prive.valeur);
+      if (patch && ouverte === o) await ecrireTout(o, [patch]);
+    }
+  } catch {
+    // Au mieux, comme l'historique : la prochaine connexion recommence.
   }
 }
 
@@ -812,7 +823,7 @@ export async function exporterDonnees(): Promise<string> {
   const x = await garde(() => api.exporter(deps.net, o.jeton));
   const p = o.profil.valeur;
   const prive = o.prive.valeur;
-  const sans = (l: CoffrePrive[keyof CoffrePrive], garder: readonly string[]) => l.map((v) => Object.fromEntries(garder.filter((k) => k in v).map((k) => [k, v[k]])));
+  const sans = (l: CoffrePrive["envois"], garder: readonly string[]) => l.map((v) => Object.fromEntries(garder.filter((k) => k in v).map((k) => [k, v[k]])));
   return JSON.stringify(
     {
       format: "shhgone-export-compte",

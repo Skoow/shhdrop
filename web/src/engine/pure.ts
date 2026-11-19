@@ -169,10 +169,31 @@ export type ManifestV2 = {
 };
 export type Manifest = ManifestV2;
 
-/** Palier canonique v2 : le plus petit palier de capacité ≥ fin des données + 4 + MANIFEST_MAX. */
-export function bucketFor(dataEnd: number): number {
+/**
+ * Formule d'un partage (conception du paiement §11) : 0 gratuit, 1 Plus, 2 Pro. Elle ne change que
+ * le plus grand palier (et, côté serveur, les durées et ouvertures) ; même format, même chiffrement.
+ */
+export type Palier = 0 | 1 | 2;
+/** Paliers payants (5, 10, 20, 30 Gio de données plus le morceau du manifeste), comme le moteur. */
+export const PAID_BUCKETS = [81921, 163841, 327681, 491521] as const;
+const MAX_BUCKET: Readonly<Record<Palier, number>> = { 0: 32769, 1: 163841, 2: 491521 };
+const ALL_BUCKETS: readonly number[] = [...BUCKETS, ...PAID_BUCKETS];
+/** Octets de données au plus d'une formule : 2, 10 ou 30 Gio exactement. */
+export function contentMaxOf(p: Palier): number {
+  return MAX_BUCKET[p] * CHUNK - TAIL;
+}
+/** Segments de données au plus d'une formule (512, 2 560 ou 7 680). */
+export function dataSegmentsOf(p: Palier): number {
+  return Math.floor((MAX_BUCKET[p] - 1) / SEG_CHUNKS);
+}
+
+/**
+ * Palier canonique : le plus petit palier connu de capacité ≥ fin des données + 4 + MANIFEST_MAX,
+ * au plus le plus grand de la formule (gratuit par défaut : inchangé depuis la v2).
+ */
+export function bucketFor(dataEnd: number, palier: Palier = 0): number {
   if (!Number.isSafeInteger(dataEnd) || dataEnd < 0) throw new Error("taille_invalide");
-  for (const b of BUCKETS) if (dataEnd + TAIL <= b * CHUNK) return b;
+  for (const b of ALL_BUCKETS) if (b <= MAX_BUCKET[palier] && dataEnd + TAIL <= b * CHUNK) return b;
   throw new Error("trop_gros");
 }
 
@@ -211,9 +232,9 @@ export function segmentsFor(size: number): number {
  * Plus petit palier qui contient `used` segments de données pleins suivis du morceau du
  * manifeste : réservation d'un brouillon (segments 0 à used − 1 tous pleins).
  */
-export function reservationFor(used: number): number {
-  if (!Number.isSafeInteger(used) || used < 0 || used > DATA_SEGMENTS) throw new Error("trop_gros");
-  for (const b of BUCKETS) if (b >= used * SEG_CHUNKS + 1) return b;
+export function reservationFor(used: number, palier: Palier = 0): number {
+  if (!Number.isSafeInteger(used) || used < 0 || used > dataSegmentsOf(palier)) throw new Error("trop_gros");
+  for (const b of ALL_BUCKETS) if (b <= MAX_BUCKET[palier] && b >= used * SEG_CHUNKS + 1) return b;
   throw new Error("trop_gros");
 }
 

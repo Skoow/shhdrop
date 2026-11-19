@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Test de la sortie SMTP (plan du compte, lot 8 ; conception du compte §3.2) : le serveur Go
-# n'a aucune route vers Internet, même compte activé ; sa seule sortie est le relais SMTP, qui
-# ne joint que SHH_SMTP_HOST:465.
+# Test des sorties (plan du compte, lot 8 ; conception du compte §3.2 ; conception du paiement
+# §4, S1) : le serveur Go n'a aucune route vers Internet, même compte ou paiement activé ; ses
+# seules sorties sont le relais SMTP, qui ne joint que SHH_SMTP_HOST:465, et les relais des
+# prestataires de paiement, qui ne joignent chacun que l'hôte de son API, sur 443.
 #
 # 1. Statique (docker compose config, sans démon) : sur la vraie compose.yaml,
 #    - SHH_COMPTES vaut "1" (décision D8 du 19 novembre) ; le relais et le réseau « sortie » n'existent qu'avec le profil
@@ -11,14 +12,20 @@
 #      fournisseur désigne le relais dans /etc/hosts du serveur ;
 #    - secrets : /run/secrets en lecture seule, hors de /data, chemins seulement dans
 #      l'environnement (aucune valeur de clé ni de mot de passe) ;
-#    - relais : compte 65532, lecture seule, sans capacité, no-new-privileges, sans journal.
+#    - relais : compte 65532, lecture seule, sans capacité, no-new-privileges, sans journal ;
+#    - paiement : SHH_PAIEMENT et SHH_PAIEMENT_ESSAI valent "0" ou "1" ; un relais par
+#      prestataire (profils « paiement-stripe », « -paypal », « -nowpayments »), 172.30.53.4 à .6,
+#      cible api.stripe.com, api-m.paypal.com, api.nowpayments.io sur 443 ; leurs noms désignent
+#      les relais dans /etc/hosts du serveur ; mêmes règles que le relais SMTP.
 # 2. Avec un démon Docker et l'image construite (SHH_IMAGE, binaires de cet arbre) : pile de
 #    test (projet à part, mêmes réseaux que la production : à ne PAS lancer sur la machine de
 #    production), faux fournisseur SMTP en TLS sur la machine ;
 #    - depuis un conteneur du service shhdrop : accueil SMTP en TLS vérifié pour le nom du
 #      fournisseur, à travers le relais ; une adresse d'Internet (TCP 443, 465, 25), un nom à
 #      résoudre et le faux fournisseur joint directement : injoignables ;
-#    - relais arrêté (compte désactivé) : le fournisseur n'est plus joignable du tout.
+#    - relais arrêté (compte désactivé) : le fournisseur n'est plus joignable du tout ;
+#    - paiement : chaque API (faux prestataires en TLS sur la machine, certificat pour le vrai
+#      nom) joignable à travers son relais, TLS vérifié ; relais arrêté : injoignable.
 #
 # Usage : deploy/test-sortie.sh            (statique, puis dynamique si un démon répond)
 #         deploy/test-sortie.sh --statique (statique seulement)
@@ -64,7 +71,7 @@ pid_faux=
 dyn=0
 cleanup() {
 	if [ "$dyn" = 1 ]; then
-		COMPOSE_PROFILES=comptes "${dcp[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+		COMPOSE_PROFILES=$tous "${dcp[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 	fi
 	if [ -n "$pid_faux" ]; then kill "$pid_faux" 2>/dev/null || true; fi
 	rm -rf -- "$work"
@@ -79,8 +86,10 @@ cfg() { # cfg <profils> : configuration résolue, en JSON
 }
 cfg "" >"$work/sans.json" || die "docker compose config (sans profil) échoue"
 cfg comptes >"$work/avec.json" || die "docker compose config (profil comptes) échoue"
+tous=comptes,paiement-stripe,paiement-paypal,paiement-nowpayments
+cfg "$tous" >"$work/tous.json" || die "docker compose config (tous les profils) échoue"
 j() { jq -e "$1" "$2" >/dev/null; }
-S=$work/sans.json A=$work/avec.json
+S=$work/sans.json A=$work/avec.json T=$work/tous.json
 
 check "SHH_COMPTES vaut \"1\" dans compose.yaml (décision D8 du 19 novembre)" j '.services.shhdrop.environment.SHH_COMPTES == "1"' "$A"
 check "sans profil : ni relais ni réseau « sortie »" j '(.services | keys) == ["caddy","shhdrop"] and (.networks | keys) == ["interne"]' "$S"
@@ -95,8 +104,8 @@ check "relais : interne 172.30.53.3 et sortie" \
 check "relais : cible SHH_SMTP_HOST:465, écoute 172.30.53.3:465" \
 	j '.services["relais-smtp"].entrypoint == ["/shhcheck"] and .services["relais-smtp"].command == ["relais","172.30.53.3:465","'$smtp':465"]' "$A"
 check "relais : même image que le serveur" j '.services["relais-smtp"].image == .services.shhdrop.image' "$A"
-check "serveur : le nom du fournisseur désigne le relais" \
-	j '.services.shhdrop.extra_hosts == ["'$smtp'=172.30.53.3"] or .services.shhdrop.extra_hosts == ["'$smtp':172.30.53.3"]' "$A"
+check "serveur : chaque nom de fournisseur désigne son relais (SMTP, Stripe, PayPal, NOWPayments)" \
+	j '(.services.shhdrop.extra_hosts | map(sub("=";":")) | sort) == (["'$smtp':172.30.53.3","api.stripe.com:172.30.53.4","api-m.paypal.com:172.30.53.5","api.nowpayments.io:172.30.53.6"] | sort)' "$A"
 check "serveur : SMTP sur 465 seulement" j '.services.shhdrop.environment.SHH_SMTP_PORT == "465"' "$A"
 check "secrets : /run/secrets en lecture seule, hors de /data, jamais créé par Docker" \
 	j '[.services.shhdrop.volumes[] | select(.target == "/run/secrets")] | length == 1 and .[0].read_only == true and .[0].bind.create_host_path == false and (.[0].source | endswith("/secrets"))' "$A"
@@ -108,6 +117,31 @@ check "relais : 65532, lecture seule, sans capacité, no-new-privileges, sans jo
 	j '.services["relais-smtp"] | .user == "65532:65532" and .read_only == true and .cap_drop == ["ALL"] and .security_opt == ["no-new-privileges:true"] and .logging.driver == "none"' "$A"
 check "relais : relancé s'il tombe, mémoire et processus bornés" \
 	j '.services["relais-smtp"] | .restart == "unless-stopped" and .pids_limit == 64 and .mem_limit != null' "$A"
+
+# Paiement : interrupteurs dans compose.yaml seulement, un relais par prestataire.
+check "SHH_PAIEMENT et SHH_PAIEMENT_ESSAI valent \"0\" ou \"1\" (fichier commité)" \
+	j '.services.shhdrop.environment | (.SHH_PAIEMENT == "0" or .SHH_PAIEMENT == "1") and (.SHH_PAIEMENT_ESSAI == "0" or .SHH_PAIEMENT_ESSAI == "1")' "$T"
+check "sans profil de paiement : aucun relais de paiement" j '[.services | keys[] | select(startswith("relais-") and . != "relais-smtp")] == []' "$A"
+check "tous les profils : les quatre relais" \
+	j '(.services | keys) == ["caddy","relais-nowpayments","relais-paypal","relais-smtp","relais-stripe","shhdrop"] and (.networks | keys) == ["interne","sortie"]' "$T"
+check "tous les profils : serveur sur le réseau interne seul" j '(.services.shhdrop.networks | keys) == ["interne"] and .networks.interne.internal == true' "$T"
+check "tous les profils : seuls les relais sont sur « sortie »" \
+	j '[.services | to_entries[] | select(.value.networks.sortie != null) | .key] == ["relais-nowpayments","relais-paypal","relais-smtp","relais-stripe"]' "$T"
+check "tous les profils : aucun port publié" j '[.services[] | .ports // [] | length] | add == 0' "$T"
+check "tous les profils : aucune variable de secret en valeur" \
+	j '[.services[] | .environment // {} | keys[] | select(test("PASSWORD|MDP|SECRET|TOKEN|CLE|KEY|IPN|WEBHOOK_FILE") and (endswith("_FILE") | not))] == []' "$T"
+# jr <filtre> : filtre jq sur la configuration de tous les profils, avec $n (relais), $ip et $h.
+jr() { jq -e --arg n "$n" --arg ip "$ip" --arg h "$h" "$1" "$T" >/dev/null; }
+# shellcheck disable=SC2016 # variables de jq, pas du shell
+for r in stripe:4:api.stripe.com paypal:5:api-m.paypal.com nowpayments:6:api.nowpayments.io; do
+	n=${r%%:*} ip=172.30.53.$(cut -d: -f2 <<<"$r") h=${r##*:}
+	check "relais-$n : profil « paiement-$n », interne $ip et sortie" \
+		jr '.services["relais-" + $n] | .profiles == ["paiement-" + $n] and (.networks | keys) == ["interne","sortie"] and .networks.interne.ipv4_address == $ip'
+	check "relais-$n : écoute $ip:443, cible $h:443, 16 connexions" \
+		jr '.services["relais-" + $n] | .entrypoint == ["/shhcheck"] and .command == ["relais", $ip + ":443", $h + ":443", "16"]'
+	check "relais-$n : même image, 65532, lecture seule, sans capacité, no-new-privileges, sans journal, bornes" \
+		jr '.services as $s | $s["relais-" + $n] | .image == $s.shhdrop.image and .user == "65532:65532" and .read_only == true and .cap_drop == ["ALL"] and .security_opt == ["no-new-privileges:true"] and .logging.driver == "none" and .restart == "unless-stopped" and .pids_limit == 64 and .mem_limit != null'
+done
 
 if [ "$statique" = 1 ]; then
 	[ "$fails" -eq 0 ] || {
@@ -130,8 +164,11 @@ port=${PORT_FAUX:-18465}
 
 # Faux fournisseur : TLS (certificat pour $smtp, autorité de test), accueil « 220 », sur toutes
 # les interfaces de la machine : le relais le joint par host-gateway ; le serveur ne doit pas.
+# Le même certificat sert aussi aux faux prestataires de paiement (leurs vrais noms : ils ne sont
+# résolus que par les /etc/hosts des conteneurs de test).
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 1 -subj "/CN=$smtp" \
-	-addext "subjectAltName=DNS:$smtp" -keyout "$work/faux.key" -out "$work/faux.pem" >/dev/null 2>&1
+	-addext "subjectAltName=DNS:$smtp,DNS:api.stripe.com,DNS:api-m.paypal.com,DNS:api.nowpayments.io" \
+	-keyout "$work/faux.key" -out "$work/faux.pem" >/dev/null 2>&1
 chmod 0644 "$work/faux.pem"
 cat >"$work/faux.py" <<'EOF'
 import socket, ssl, sys, threading
@@ -158,15 +195,25 @@ services:
   relais-smtp:
     command: ["relais", "172.30.53.3:465", "$smtp:$port"]
     extra_hosts: ["$smtp:host-gateway"]
+  relais-stripe:
+    command: ["relais", "172.30.53.4:443", "api.stripe.com:$port", "16"]
+    extra_hosts: ["api.stripe.com:host-gateway"]
+  relais-paypal:
+    command: ["relais", "172.30.53.5:443", "api-m.paypal.com:$port", "16"]
+    extra_hosts: ["api-m.paypal.com:host-gateway"]
+  relais-nowpayments:
+    command: ["relais", "172.30.53.6:443", "api.nowpayments.io:$port", "16"]
+    extra_hosts: ["api.nowpayments.io:host-gateway"]
 EOF
 dcp=(env SHH_IMAGE="$SHH_IMAGE" SHH_DOMAIN=shhdrop.test SHH_DATA_ROOT="$work/racine" SHH_SMTP_HOST="$smtp"
 	docker compose -p "$proj" -f "$here/compose.yaml" -f "$work/override.yaml")
 dyn=1
-COMPOSE_PROFILES=comptes "${dcp[@]}" up -d --wait relais-smtp >/dev/null 2>&1 || die "relais de test non démarré"
+COMPOSE_PROFILES=$tous "${dcp[@]}" up -d --wait relais-smtp relais-stripe relais-paypal relais-nowpayments >/dev/null 2>&1 ||
+	die "relais de test non démarrés"
 # sonde <hôte:port> : shhcheck smtp dans un conteneur du service shhdrop (mêmes réseaux,
 # /etc/hosts, lecture seule), autorité du faux fournisseur acceptée.
 sonde() {
-	COMPOSE_PROFILES=comptes "${dcp[@]}" run --rm --no-deps -T -v "$work/faux.pem:/ca.pem:ro" -e SSL_CERT_FILE=/ca.pem \
+	COMPOSE_PROFILES=$tous "${dcp[@]}" run --rm --no-deps -T -v "$work/faux.pem:/ca.pem:ro" -e SSL_CERT_FILE=/ca.pem \
 		--entrypoint /shhcheck shhdrop smtp "$1"
 }
 check "serveur → fournisseur, à travers le relais, TLS vérifié" sonde "$smtp:465"
@@ -179,6 +226,16 @@ refuse "serveur → faux fournisseur joint directement ($gw) : injoignable" sond
 check "aucun port publié (docker port)" test -z "$(COMPOSE_PROFILES=comptes "${dcp[@]}" port relais-smtp 465 2>/dev/null)"
 COMPOSE_PROFILES=comptes "${dcp[@]}" rm -sf relais-smtp >/dev/null 2>&1
 refuse "relais arrêté (compte désactivé) : fournisseur injoignable" sonde "$smtp:465"
+# Paiement : le faux prestataire répond « 220 » lui aussi (même faux serveur) ; seul compte ici
+# le TLS vérifié pour le vrai nom de l'API, à travers son relais.
+for h in api.stripe.com api-m.paypal.com api.nowpayments.io; do
+	check "serveur → $h:443, à travers son relais, TLS vérifié" sonde "$h:443"
+done
+refuse "serveur → api.stripe.com sur un autre port (8443) : injoignable" sonde api.stripe.com:8443
+COMPOSE_PROFILES=$tous "${dcp[@]}" rm -sf relais-stripe relais-paypal relais-nowpayments >/dev/null 2>&1
+for h in api.stripe.com api-m.paypal.com api.nowpayments.io; do
+	refuse "relais arrêté (paiement désactivé) : $h injoignable" sonde "$h:443"
+done
 
 if [ "$fails" -ne 0 ]; then
 	echo "$fails échec(s)"

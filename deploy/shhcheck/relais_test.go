@@ -142,6 +142,16 @@ func TestRelaisConfiguration(t *testing.T) {
 	if _, err := ecouteValide("172.30.53.3:465"); err != nil {
 		t.Error(err)
 	}
+	for v, n := range map[string]int{"": 4, "1": 1, "16": 16, "64": 64} {
+		if got, err := maxDe(v); err != nil || got != n {
+			t.Errorf("plafond %q : %d, %v (%d attendu)", v, got, err, n)
+		}
+	}
+	for _, v := range []string{"0", "65", "-1", "016", "x", " 4", "4 "} {
+		if _, err := maxDe(v); err == nil {
+			t.Errorf("plafond %q accepté", v)
+		}
+	}
 }
 
 // Au-delà du plafond de connexions simultanées, la connexion est fermée tout de suite, sans
