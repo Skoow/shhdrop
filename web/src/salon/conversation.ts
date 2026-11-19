@@ -79,6 +79,8 @@ export type Presence = { enLigne: boolean; derniereMin: number };
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 const COULEURS = 10;
+/** Exigence 27 : « quelques secondes » d'écart toléré (un Commit de retrait est en route). */
+export const ECART_MS = 8000;
 
 export class Conversation {
   readonly elements: Element[] = [];
@@ -131,7 +133,22 @@ export class Conversation {
   couleurDe(e: Element): number {
     return e.fige?.couleur ?? this.couleur(e.siege);
   }
+  // Écart entre le groupe et le serveur (v3 exigence 27) : un siège encore dans le groupe chiffré
+  // (`membres`) mais absent de la liste du serveur depuis plus de ECART_MS. Le nom gardé est celui
+  // de l'ancien occupant (son profil est oublié à son départ).
+  readonly #ecart = new Map<number, { depuis: number; pseudo: string | null }>();
+  #suivreEcart(): void {
+    for (const s of [...this.#ecart.keys()]) if (!this.membres.includes(s) || this.presents.has(s)) this.#ecart.delete(s);
+    for (const s of this.membres) if (s !== this.moi && !this.presents.has(s) && !this.#ecart.has(s)) this.#ecart.set(s, { depuis: this.maintenant(), pseudo: this.profils.get(s)?.pseudo ?? null });
+  }
+  /** Sièges à signaler « encore dans le groupe chiffré » (plus de ECART_MS d'écart). */
+  encoreDansLeGroupe(): { siege: number; pseudo: string | null; numero: number }[] {
+    const t = this.maintenant();
+    return [...this.#ecart].filter(([, e]) => t - e.depuis > ECART_MS).map(([siege, e]) => ({ siege, pseudo: e.pseudo, numero: siege + 1 }));
+  }
   #liberer(siege: number): void {
+    // Écart noté AVANT d'oublier le profil : l'alerte garde le nom de l'ancien occupant.
+    this.#suivreEcart();
     const f: Fige = { pseudo: this.profils.get(siege)?.pseudo ?? null, couleur: this.couleur(siege) };
     for (const e of this.elements) if (e.siege === siege && !e.fige) e.fige = f;
     this.profils.delete(siege);
@@ -171,10 +188,12 @@ export class Conversation {
   liste(sieges: number[], createur: number): void {
     this.presents = new Set(sieges);
     this.createurSiege = createur;
+    this.#suivreEcart();
     this.#change();
   }
   arrivee(siege: number): void {
     this.presents.add(siege);
+    this.#suivreEcart();
     this.#change();
   }
   depart(siege: number, exclusion = false): void {
@@ -191,6 +210,7 @@ export class Conversation {
   /** Commit fusionné : arrivées, départs, reprises (exigence 9), créateur revenu (34). */
   groupe(e: { ajoutes: number[]; retires: number[]; createurRevenu: boolean; membres: number[] }): void {
     this.membres = e.membres;
+    this.#suivreEcart();
     if (e.createurRevenu) this.#sys({ k: "sys", quoi: "createur", siege: this.createurSiege });
     for (const s of e.ajoutes) {
       if (s === this.moi) continue;

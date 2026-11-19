@@ -20,6 +20,7 @@
   import Fichiers from "./Fichiers.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
   import { Mic, Paperclip } from "../../ui/Icon";
+  import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -87,6 +88,7 @@
     document.getElementById(`m-${cle}`)?.scrollIntoView({ block: "center" });
   }
   function echec(code: string): string {
+    if (code === "trop_grand") return t("salon.room.toolong.json");
     if (code.startsWith("limite:")) return t("salon.piece.err.limite", { duree: formatDuration(Number(code.slice(7)), lang) });
     if (code === "budget") return t("salon.piece.err.budget");
     if (code === "vocal_trop_long" || code === "trop_gros") return t(`salon.piece.err.${code}`);
@@ -101,8 +103,23 @@
 
   // --- Envoi -----------------------------------------------------------------------------------
 
+  /** Texte refusé car trop long : proposé en fichier « message.txt » (§39.5, v3 §4.1). */
+  let tropLong = $state<string | null>(null);
+  function enFichier(x: string): void {
+    tropLong = null;
+    erreur = "";
+    texte = "";
+    void S.envoyerFichiers([new File([x], "message.txt", { type: "text/plain" })]);
+  }
+  /** Silencieux (v3 §14.4) : choix ouvert (toujours, 1 h, 8 h). */
+  let choixSilence = $state(false);
+  const silencieux = $derived(vue.silence === SILENCE_TOUJOURS || vue.silence > maintenant);
+  // Écart groupe / serveur (exigence 27).
+  const fantomes = $derived((void vue.rev, void maintenant, conv.encoreDansLeGroupe()));
+
   function envoyer(): void {
     erreur = "";
+    tropLong = null;
     const brut = texte;
     if (brut.trim() === "") return;
     try {
@@ -111,6 +128,7 @@
     } catch (e) {
       const m = (e as Error).message;
       erreur = m === "texte_trop_long" ? t("salon.room.toolong") : t("salon.room.invalid");
+      tropLong = m === "texte_trop_long" && !edition ? brut : null;
       return;
     }
     texte = "";
@@ -227,6 +245,10 @@
   }
   let vusAnnonce = untrack(() => conv.elements.length);
   let rafale: { n: number; t: number } = { n: 0, t: 0 };
+  /** Dernier son joué (ms) : au plus un toutes les 2 s (v3 §14.4). */
+  let dernierSon = 0;
+  /** Séparateur « Nouveaux messages » (v3 §14 point 6) : avant le premier message non lu. */
+  let separateur = $state<string | null>(null);
   $effect(() => {
     const n = elements.length;
     untrack(() => {
@@ -241,7 +263,15 @@
       rafale.n += nouveaux.length;
       if (rafale.n > 3) announce(t("salon.room.announce.many", { n: rafale.n }));
       else for (const b of nouveaux) announce(t("salon.room.announce", { nom: nom(b.siege), texte: b.texte }));
-      if (!enBas || document.visibilityState !== "visible") nonLus += nouveaux.length;
+      const visible = document.visibilityState === "visible";
+      if (!enBas || !visible) {
+        if (nonLus === 0) separateur = nouveaux[0]!.cle;
+        nonLus += nouveaux.length;
+      }
+      if (doitSonner({ n: nouveaux.length, silence: vue.silence, maintenant: tps, dernier: dernierSon, visible, enBas })) {
+        dernierSon = tps;
+        jouer();
+      }
       void tick().then(() => aller());
     });
   });
@@ -289,6 +319,13 @@
       </p>
     </div>
     <div class="boutons">
+      {#if silencieux}
+        <Button variant="secondary" dense onpress={() => S.silencieux(null)}>{t("salon.son.reactiver")}</Button>
+      {:else}
+        <Button variant="secondary" dense aria-expanded={choixSilence} onpress={() => {
+            choixSilence = !choixSilence;
+          }}>{t("salon.son.silence")}</Button>
+      {/if}
       <Button variant="secondary" dense onpress={() => {
           fichiers = true;
         }}>{t("salon.files.title")}</Button>
@@ -302,9 +339,21 @@
     <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
       {#if vue.connexion === "coupe"}<p class="bandeau" role="status">{t("salon.room.reconnect")}</p>{/if}
       {#if !vue.dansLeGroupe}<p class="bandeau" role="status">{t("salon.room.waitgroup")}</p>{/if}
+      {#if choixSilence && !silencieux}
+        <div class="silence" role="group" aria-label={t("salon.son.silence")}>
+          {#each [["toujours", "salon.son.toujours"], [1, "salon.son.1h"], [8, "salon.son.8h"]] as const as [c, cle] (c)}
+            <Button variant="secondary" dense onpress={() => {
+                S.silencieux(c);
+                choixSilence = false;
+              }}>{t(cle)}</Button>
+          {/each}
+        </div>
+      {/if}
+      {#each fantomes as f (f.siege)}<p class="bandeau alerte" role="alert">{t("salon.room.fantome", { nom: f.pseudo ?? t("salon.room.participant", { n: f.numero }) })}</p>{/each}
       <div role="log" aria-live="off" bind:this={fil}>
       <ol class="fil">
         {#each elements as e (e.cle)}
+          {#if e.cle === separateur}<li class="sys nouveaux">{t("salon.room.nouveaux")}</li>{/if}
           {#if e.k === "sys"}
             <li class="sys">{ligne(e)}</li>
           {:else}
@@ -324,7 +373,8 @@
                       ></p>
                   {/if}
                 {/if}
-                {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>{/if}
+                {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>
+                  {#if e.echec === "trop_grand" && !e.piece && e.texte}<Button variant="secondary" dense onpress={() => enFichier(e.texte)}>{t("salon.room.toolong.txt")}</Button>{/if}{/if}
                 <p class="meta">
                   <time>{formatClock(e.heureMs, lang)}</time>
                   {#if e.modifie && !e.retire}<span>· {t("salon.room.edited")}</span>{/if}
@@ -381,6 +431,9 @@
           </div>
         {/if}
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
+        {#if tropLong}<Button variant="secondary" dense onpress={() => {
+            if (tropLong) enFichier(tropLong);
+          }}>{t("salon.room.toolong.txt")}</Button>{/if}
         {#if reponse}
           <div class="contexte">
             <span>{t("salon.room.reply.to", { nom: nomDe(reponse) })}</span>
@@ -526,6 +579,20 @@
     display: grid;
     gap: var(--sp-2);
     min-height: 40vh;
+  }
+  .silence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .alerte {
+    color: var(--warn, var(--text));
+  }
+  .nouveaux {
+    justify-self: stretch;
+    border-top: 1px solid var(--line-strong);
+    padding-top: var(--sp-1);
+    color: var(--accent);
   }
   .sys {
     justify-self: center;

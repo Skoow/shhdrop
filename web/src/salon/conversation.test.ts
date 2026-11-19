@@ -129,6 +129,19 @@ describe("conversation", () => {
     // Aucun « Hugo s'appelle maintenant Inès ».
     expect(sys.some((e) => e.quoi === "pseudo")).toBe(false);
   });
+  it("écart groupe / serveur (exigence 27) : signalé après quelques secondes, avec le nom de l'ancien occupant", () => {
+    const t = { v: 1000 };
+    const c = conv(0, t);
+    c.message(5, 2, 3, env(1, { k: "profil", pseudo: "Zoé", couleur: 2, avatar: null }));
+    c.depart(2);
+    // Le serveur dit le siège 2 parti, le groupe le contient encore.
+    expect(c.encoreDansLeGroupe()).toEqual([]);
+    t.v += 8001;
+    expect(c.encoreDansLeGroupe()).toEqual([{ siege: 2, pseudo: "Zoé", numero: 3 }]);
+    // Le Commit de retrait arrive : plus d'alerte.
+    c.groupe({ ajoutes: [], retires: [2], createurRevenu: false, membres: [0, 1] });
+    expect(c.encoreDansLeGroupe()).toEqual([]);
+  });
   it("règle d'effacement (C-5) : défaut 5 min, la plus récente en ordre seq gagne, ligne affichée", () => {
     const c = conv(0);
     expect(c.regle).toBe(2);

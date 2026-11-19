@@ -192,7 +192,21 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     const dl = await telechargement;
     expect(dl.suggestedFilename()).toBe(nomDoc);
     expect(readFileSync((await dl.path())!, "utf8")).toBe(contenuDoc);
-    // Écran « Fichiers » : les deux pièces, du plus récent au plus ancien.
+    // Texte trop long (§39.5) : refusé, proposé en fichier « message.txt », reçu chez A.
+    const long = `Très long ${r} `.repeat(150);
+    await saisie(pageB).fill(long);
+    await zone(pageB).getByRole("button", { name: "Envoyer", exact: true }).click();
+    await expect(pageB.getByText("Ce texte est trop long pour un message", { exact: false })).toBeVisible();
+    await bouton(pageB, "Envoyer en fichier .txt").click();
+    await expect(fil(page).getByText("message.txt", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(saisie(pageB)).toHaveValue("");
+    // Silencieux (v3 §14.4) : 1 h, puis son réactivé.
+    await bouton(page, "Mettre en silencieux").click();
+    await bouton(page, "Pendant 1\u202fh").click();
+    await expect(bouton(page, "Réactiver le son")).toBeVisible();
+    await bouton(page, "Réactiver le son").click();
+    await expect(bouton(page, "Mettre en silencieux")).toBeVisible();
+    // Écran « Fichiers » : les pièces, du plus récent au plus ancien.
     await bouton(pageB, "Fichiers").click();
     await expect(pageB.getByRole("dialog").getByText(nomDoc, { exact: true })).toBeVisible();
     await capture(pageB, "salon-fichiers");
@@ -296,6 +310,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       needle("nouvelle clé du lien (octets)", new Uint8Array(Buffer.from(cle(lien2), "base64url"))),
       needle("texte après rechargement", t4),
       needle("texte après exclusion", t5),
+      needle("texte long envoyé en .txt", long.slice(0, 60)),
       needle("clé du lien (base64url)", cle(lien)),
       needle("lien de gestion (base64url)", cle(gestion)),
       needle("clé du lien (octets)", new Uint8Array(Buffer.from(cle(lien), "base64url"))),
@@ -303,10 +318,23 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     ];
     const dir = shh.server.dataDir;
     expect(scanDir(dir, reperes)).toEqual([]);
-    // Destruction par la créatrice : écran de fin chez l'invitée C, puis plus rien sur le disque.
-    if (!(await page.getByRole("button", { name: "Détruire le salon" }).first().isVisible())) await bouton(page, "Participants").click();
-    await page.getByRole("button", { name: "Détruire le salon" }).first().click();
-    await page.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
+    // Destruction par le lien de gestion ouvert SEUL (exigence C-3 32), dans un autre navigateur :
+    // il ne fait entrer personne, dit l'état du salon, détruit. Fin chez A et C, plus rien sur le disque.
+    const ctxD: BrowserContext = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
+    try {
+      const pageD = await ctxD.newPage();
+      await pageD.goto(gestion);
+      await expect(titre(pageD, "Lien de gestion")).toBeVisible({ timeout: 30_000 });
+      expect(pageD.url()).toBe(shh.origin + "/salon");
+      await expect(pageD.getByText("Personnes dans le salon\u202f: 2", { exact: false })).toBeVisible();
+      await expect(fil(pageD)).toHaveCount(0);
+      expect(await axe(pageD)).toEqual([]);
+      await bouton(pageD, "Détruire le salon").first().click();
+      await pageD.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
+      await expect(titre(pageD, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    } finally {
+      await ctxD.close();
+    }
     await expect(titre(pageC, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     await expect(pageC.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible();
     await capture(pageC, "salon-fin");

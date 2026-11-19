@@ -10,7 +10,7 @@
 //   format local à l'appareil, aucun échange avec le serveur ni avec les apps.
 // - Index de l'entrée : HKDF(K_lien, « shhdrop/v2/salon/membre-index »), 16 octets.
 // - Contenu (JSON) : jeton de membre, siège, pseudonyme, couleur, K_maître_s COURANTE (réécrite à
-//   chaque rotation), et S_gestion pour le créateur. Jamais un message, une clé MLS ni le mot de
+//   chaque rotation), S_gestion pour le créateur, et le réglage « silencieux » (v3 §14.4). Jamais un message, une clé MLS ni le mot de
 //   passe. `purge_apres` en clair : fin du salon arrondie à l'heure, pour effacer sans mot de
 //   passe les entrées de salons finis.
 // - Effacée à « Quitter », à l'exclusion, à la fin du salon et quand le serveur refuse le jeton.
@@ -22,7 +22,7 @@ const BASE = "shhdrop-salon";
 const MAGASIN = "preuves";
 const AD = "shhdrop/v2/salon/membre";
 
-export type Contenu = { jeton: string; siege: number; pseudo: string; couleur: number; kMaitre: Uint8Array; sGestion?: Uint8Array };
+export type Contenu = { jeton: string; siege: number; pseudo: string; couleur: number; kMaitre: Uint8Array; sGestion?: Uint8Array; silence?: number };
 type Rec = { sel: Uint8Array; iv: Uint8Array; paquet: Uint8Array; purge_apres: number };
 
 function idb(): IDBFactory | null {
@@ -86,7 +86,7 @@ const ad = (index: Uint8Array) => {
 
 /** Écrit (ou réécrit) la preuve ; échec silencieux si le stockage est refusé (rien ne casse). */
 export async function ecrire(index: Uint8Array, cle: CryptoKey, sel: Uint8Array, c: Contenu, finMs: number): Promise<void> {
-  const clair = utf8(JSON.stringify({ v: 1, jeton: c.jeton, siege: c.siege, pseudo: c.pseudo, couleur: c.couleur, kMaitre: b64u(c.kMaitre as Uint8Array<ArrayBuffer>), ...(c.sGestion ? { sGestion: b64u(c.sGestion as Uint8Array<ArrayBuffer>) } : {}) }));
+  const clair = utf8(JSON.stringify({ v: 1, jeton: c.jeton, siege: c.siege, pseudo: c.pseudo, couleur: c.couleur, kMaitre: b64u(c.kMaitre as Uint8Array<ArrayBuffer>), ...(c.sGestion ? { sGestion: b64u(c.sGestion as Uint8Array<ArrayBuffer>) } : {}), ...(c.silence ? { silence: c.silence } : {}) }));
   try {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const paquet = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: ad(index) }, cle, clair));
@@ -124,7 +124,8 @@ export async function ouvrir(index: Uint8Array, cle: CryptoKey): Promise<Contenu
     const kMaitre = unb64u(o.kMaitre);
     const sGestion = typeof o.sGestion === "string" ? unb64u(o.sGestion) : undefined;
     if (kMaitre.length !== 32 || (sGestion && sGestion.length !== 32)) return null;
-    return { jeton: o.jeton, siege: o.siege as number, pseudo: o.pseudo, couleur: o.couleur as number, kMaitre, sGestion };
+    const silence = Number.isSafeInteger(o.silence) && (o.silence as number) >= -1 ? (o.silence as number) : 0;
+    return { jeton: o.jeton, siege: o.siege as number, pseudo: o.pseudo, couleur: o.couleur as number, kMaitre, sGestion, silence };
   } catch {
     return null;
   } finally {

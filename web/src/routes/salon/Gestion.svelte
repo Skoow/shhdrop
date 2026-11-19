@@ -96,7 +96,9 @@
     <div class="qr"><QrCode text={vue.nouvelleInvitation.lien} label={t("salon.ready.link")} /></div>
     <CopyField label={t("salon.ready.password")} value={vue.nouvelleInvitation.mdp} whole />
     <p class="note">{t("salon.ready.password.hint")}</p>
-    <div><Button variant="ghost" dense onpress={() => (vue.nouvelleInvitation = null)}>{t("salon.invitation.masquer")}</Button></div>
+    <div><Button variant="ghost" dense onpress={() => {
+        vue.nouvelleInvitation = null;
+      }}>{t("salon.invitation.masquer")}</Button></div>
   </section>
 {/if}
 

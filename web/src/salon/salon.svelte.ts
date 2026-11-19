@@ -23,6 +23,7 @@ import { b64u } from "../engine/pure";
 import { lireFragment } from "./liens";
 import { exclure } from "./exclusion";
 import * as preuve from "./preuve";
+import { finSilence } from "./son";
 import { cleMembreLocal, indexMembre } from "../engine/index";
 import { KDF_CREATE } from "../engine/pure";
 
@@ -38,7 +39,7 @@ async function gestionGardee(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer>
 }
 import { creerSalon as creerAvecSession, profilPourSalon, CompteError } from "../account/session.svelte";
 
-export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin";
+export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin" | "gestion";
 export type ErreurEntree = { code: "bad_password"; essais: number } | { code: "introuvable" | "complet" | "limite" | "reseau" | "serveur" | "indisponible"; retryS?: number };
 
 /** Ce que les écrans lisent (réactif). `rev` change à chaque événement du fil. */
@@ -54,7 +55,11 @@ export const vue = $state({
   pret: null as { lien: string; mdp: string; gestion: string } | null,
   /** Créateur, après une exclusion ou « Nouveau lien d'invitation » : la nouvelle invitation (affichée, jamais gardée en clair). */
   nouvelleInvitation: null as { lien: string; mdp: string } | null,
+  /** Lien de gestion ouvert seul (« #s… ») : sièges occupés, ou null. */
+  gestionSeule: null as { present: number } | null,
   monPseudo: null as string | null,
+  /** Silencieux (v3 §14.4) : 0 = son actif, -1 = toujours, sinon échéance (ms). Gardé dans la preuve de membre chiffrée. */
+  silence: 0,
   connexion: "connexion" as "connexion" | "ouvert" | "coupe",
   dansLeGroupe: false,
   /** Envoi retenu par le moteur depuis cet instant (exigence 23), ou null. */
@@ -73,6 +78,8 @@ type Session = {
   client?: ClientSalon;
   conv?: Conversation;
   sGestion?: Uint8Array<ArrayBuffer>;
+  /** S_gestion venu d'un lien de gestion collé (pas de l'historique) : abandonné si le serveur le refuse. */
+  gestionColle?: boolean;
   /** K_lien de l'invitation d'origine, gardé après une rotation pour la preuve de membre. */
   lienOrigine?: Uint8Array<ArrayBuffer>;
   couleur?: number;
@@ -110,7 +117,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, monPseudo: null, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
 }
 
 // --- Invité : lien, mot de passe -----------------------------------------------------------------
@@ -130,6 +137,11 @@ export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<
   try {
     s.meta = await api.meta(net(), acces.k);
     s.sGestion = await gestionGardee(kLien);
+    // Lien de gestion ouvert juste avant dans cet onglet (« #s » seul, exigence C-3 32).
+    if (!s.sGestion && gestionColle) {
+      s.sGestion = gestionColle.slice();
+      s.gestionColle = true;
+    }
     const index = await indexMembre(kLien);
     s.preuve = { index, cle: null, sel: await preuve.lireSel(index) };
     vue.finMs = Date.now() + s.meta.expiresInS * 1000;
@@ -171,7 +183,17 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
     // Créateur revenu (exigence C-3 32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
     // l'ajoute ; il ne fonde pas de groupe (les membres en ligne l'ajoutent ; sinon, groupe orphelin).
     const o = { kLien: x.kLien, cles: x.cles, sGestion: x.sGestion };
-    const entree = await ClientSalon.rejoindre(d, o);
+    let entree;
+    try {
+      entree = await ClientSalon.rejoindre(d, o);
+    } catch (e) {
+      // Lien de gestion collé d'un AUTRE salon : refusé (400) ; on entre comme simple membre.
+      if (!x.gestionColle || !(e instanceof api.SalonError) || e.code !== "bad_request") throw e;
+      x.sGestion?.fill(0);
+      x.sGestion = o.sGestion = undefined;
+      x.gestionColle = false;
+      entree = await ClientSalon.rejoindre(d, o);
+    }
     demarrer(x, ClientSalon.ouvrir(d, o, entree), entree);
     vue.etape = "explication";
     // Preuve illisible avec le bon mot de passe (paquet abîmé) : effacée ; une neuve est préparée.
@@ -187,6 +209,67 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
   } finally {
     kMdp?.fill(0);
   }
+}
+
+// --- Lien de gestion seul (« #s… », exigence C-3 32) ------------------------------------------------
+
+/** S_gestion d'un lien de gestion ouvert seul, gardé en mémoire pour l'invitation ouverte ensuite. */
+let gestionColle: Uint8Array<ArrayBuffer> | undefined;
+
+/**
+ * Lien de gestion ouvert seul : il ne fait entrer personne (spec v3 §15.2). La page dit l'état du
+ * salon (sièges occupés, échéance), propose de le détruire, et garde S_gestion EN MÉMOIRE pour
+ * l'invitation ouverte ensuite dans cet onglet (le créateur y retrouve son rôle).
+ */
+export async function ouvrirGestion(sG: Uint8Array<ArrayBuffer>): Promise<void> {
+  oublier();
+  vue.etape = "chargement";
+  const eng = await loadSalonEngine().catch(() => null);
+  if (!eng) {
+    vue.erreur = { code: "reseau" };
+    vue.etape = "vide";
+    return;
+  }
+  const j = eng.jetonGestion(sG);
+  try {
+    const g = await api.gestion(net(), j);
+    oublierGestion();
+    gestionColle = sG.slice();
+    vue.gestionSeule = { present: g.present };
+    vue.finMs = Date.now() + g.expiresInS * 1000;
+    vue.etape = "gestion";
+  } catch (e) {
+    vue.erreur = erreurEntree(e);
+    vue.etape = "vide";
+  } finally {
+    j.fill(0);
+  }
+}
+
+/** « Détruire le salon » depuis le lien de gestion seul. */
+export async function detruireParGestion(): Promise<boolean> {
+  if (!gestionColle) return false;
+  const eng = await loadSalonEngine().catch(() => null);
+  if (!eng) return false;
+  const j = eng.jetonGestion(gestionColle);
+  try {
+    await api.detruire(net(), { jGestion: j });
+    oublierGestion();
+    vue.gestionSeule = null;
+    vue.fin = "detruit";
+    vue.etape = "fin";
+    return true;
+  } catch {
+    return false;
+  } finally {
+    j.fill(0);
+  }
+}
+
+/** Page quittée : le lien de gestion collé est oublié (mis à zéro). */
+export function oublierGestion(): void {
+  gestionColle?.fill(0);
+  gestionColle = undefined;
 }
 
 function deps(eng: SalonEngine) {
@@ -445,7 +528,13 @@ function origineLien(x: Session): Uint8Array {
 function ecrirePreuve(x: Session): void {
   const c = x.client;
   if (!x.preuve?.cle || !x.preuve.sel || !c || !vue.monPseudo || !x.kMaitre) return;
-  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion }, vue.finMs);
+  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion, silence: vue.silence }, vue.finMs);
+}
+
+/** Mode silencieux (v3 §14.4) : « toujours », 1 h, 8 h, ou null pour réactiver le son. */
+export function silencieux(choix: "toujours" | 1 | 8 | null): void {
+  vue.silence = choix === null ? 0 : finSilence(choix, Date.now());
+  if (s) ecrirePreuve(s);
 }
 /** Rotation reçue (ou faite) : la preuve garde la NOUVELLE K_maître_s (spec §39.13.3). */
 async function preuveRotation(x: Session, kMaitre: Uint8Array): Promise<void> {
@@ -469,6 +558,7 @@ async function reprendreParLaPreuve(x: Session, mdp: string, sel: Uint8Array<Arr
   const client = ClientSalon.reprendre(deps(x.eng), { kLien: x.kLien, cles, jeton: c.jeton, siege: c.siege, sGestion: x.sGestion });
   demarrer(x, client, { jeton: c.jeton, siege: c.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: Math.max(0, (vue.finMs - Date.now()) / 1000), maxMembers: vue.places, membersCanDestroy: false, budgetLeft: 0 });
   vue.monPseudo = c.pseudo;
+  vue.silence = c.silence ?? 0;
   envoyerProfil(x);
   vue.etape = "conversation";
   return true;
