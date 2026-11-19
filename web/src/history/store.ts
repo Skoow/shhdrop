@@ -31,7 +31,7 @@ export type HistoryEntry = {
   id: string;
   sorte: Sorte;
   origine: Origine;
-  /** Envoi : lien de gestion « https://…/s#m<S_gestion> », chiffré au repos ; "" sinon. */
+  /** Envoi : lien de gestion « https://…/s#m<S_gestion> » ; salon créé : « https://…/salon#s<S_gestion> » ; chiffré au repos ; "" sinon. */
   manage: string;
   /** Reçu : lien « https://…/s#<K_lien> » ; salon : invitation « https://…/#c<K_lien> » ; "" pour un envoi. */
   link: string;
@@ -86,6 +86,8 @@ export type Backend = {
 const MANAGE_LINK = /^https?:\/\/[^#\s]+#m[A-Za-z0-9_-]{43}$/;
 const SHARE_LINK = /^https?:\/\/[^#\s]+#[A-Za-z0-9_-]{43}$/;
 const ROOM_LINK = /^https?:\/\/[^#\s]+#c[A-Za-z0-9_-]{43}$/;
+/** Lien de gestion d'un salon créé ici (« #s<S_gestion> », plan C-3 point 2), chiffré au repos. */
+const ROOM_MANAGE_LINK = /^https?:\/\/[^#\s]+#s[A-Za-z0-9_-]{43}$/;
 const SORTES: readonly Sorte[] = ["envoi", "recu", "salon_cree", "salon_rejoint"];
 const LABEL_MAX = 64;
 const ID = /^[A-Za-z0-9_-]{22}$/;
@@ -258,7 +260,8 @@ export function cleanEntry(x: unknown): HistoryEntry | null {
   if (sorte === "envoi") {
     if (!MANAGE_LINK.test(manage) || link !== "" || label !== "" || format !== "") return null;
   } else {
-    if (manage !== "") return null;
+    // Salon créé : son lien de gestion (S_gestion) peut être gardé ; aucune autre sorte n'en a.
+    if (manage !== "" && !(sorte === "salon_cree" && ROOM_MANAGE_LINK.test(manage))) return null;
     if (sorte === "recu" ? !SHARE_LINK.test(link) || label !== "" || !(FORMATS as readonly string[]).includes(format) : !ROOM_LINK.test(link) || format !== "") return null;
     if (label.length > LABEL_MAX || /[\u0000-\u001f\u007f]/.test(label)) return null;
   }
