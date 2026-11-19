@@ -204,6 +204,21 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     // Participants : en ligne, pseudonymes, « vous ».
     if (!(await page.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(page, "Participants").click();
     await expect(page.getByText(pseudoB, { exact: true }).last()).toBeVisible();
+
+    // --- Plan C-5 : règle d'effacement, codes de vérification, destruction ----------------------------
+    await page.getByRole("radio", { name: "1 min après lecture" }).click();
+    await expect(fil(pageB).getByText(`${pseudoA} a réglé l'effacement des messages`)).toBeVisible({ timeout: 30_000 });
+    // Le code de A vu par A et par B est le même (5 groupes de 5 chiffres).
+    await page.getByText(`Voir le code de ${pseudoA}`).click();
+    const codeChezA = (await page.locator(".chiffres").first().textContent())!.trim();
+    expect(codeChezA).toMatch(/^\d{5}( \d{5}){4}$/);
+    if (!(await pageB.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(pageB, "Participants").click();
+    await pageB.getByText(`Voir le code de ${pseudoA}`).click();
+    await expect(pageB.locator(".chiffres").first()).toHaveText(codeChezA);
+    await bouton(pageB, "J'ai comparé ce code").click();
+    await expect(pageB.getByText(`Voir le code de ${pseudoA} · Code vérifié`)).toBeVisible();
+    await capture(pageB, "salon-participants");
+    expect(await axe(pageB)).toEqual([]);
     expect(erreursB).toEqual([]);
 
     // --- Le serveur ne voit rien (test bloquant, étendu au salon par l'interface) -------------------
@@ -226,6 +241,14 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       needle("secret de gestion (octets)", new Uint8Array(Buffer.from(cle(gestion), "base64url"))),
     ];
     const dir = shh.server.dataDir;
+    expect(scanDir(dir, reperes)).toEqual([]);
+    // Destruction par la créatrice : écran de fin chez l'invité, puis plus rien sur le disque.
+    await page.getByRole("button", { name: "Détruire le salon" }).first().click();
+    await page.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
+    await expect(titre(pageB, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    await expect(pageB.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible();
+    await capture(pageB, "salon-fin");
+    await expect(titre(page, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     expect(scanDir(dir, reperes)).toEqual([]);
     await shh.server.stop();
     expect(scanDir(dir, reperes)).toEqual([]);

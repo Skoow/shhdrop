@@ -112,6 +112,7 @@
 {:else if vue.etape === "fin"}
   <Cadre titre={t("salon.end.title")}>
     <p class="note" role="status">{fin()}</p>
+    {#if vue.lienReprise}<div class="actions"><Button onpress={() => location.assign(vue.lienReprise!)}>{t("salon.end.reprendre")}</Button></div>{/if}
     <div class="actions"><Button variant="secondary" onpress={() => navigate("/")}>{t("salon.end.home")}</Button></div>
   </Cadre>
 {:else if vue.etape === "chargement"}

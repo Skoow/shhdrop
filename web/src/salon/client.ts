@@ -75,6 +75,8 @@ export type EvClient =
   | { k: "echec"; local: number; code: string }
   | { k: "attente"; depuisMs: number | null }
   | { k: "nouvelleEntree"; siege: number }
+  /** Salon renouvelé (0x10) : tout ce qui est de rang ≤ `depart` est effacé, le groupe est recréé. */
+  | { k: "renouvellement"; depart: number }
   | { k: "fin"; raison: Fin };
 
 /** Enveloppe lue (types du moteur). */
@@ -158,6 +160,8 @@ export class ClientSalon {
     this.#nonce = e.nonce;
     this.createur = sGestion !== undefined;
     this.#commitMs = this.#deps.horloge.maintenant();
+    // Rien de rang ≤ celui de notre entrée ne nous concerne (renouvellements d'avant compris).
+    this.#depart = e.seq;
   }
 
   /**
@@ -407,11 +411,16 @@ export class ClientSalon {
       case 0x0e:
         this.#emettre({ k: "efface", cible: r.cible });
         return;
-      case 0x10:
+      case 0x10: {
         this.#reglages = { depart: r.depart, secondes: r.secondes, places: r.places };
-        if (r.depart > this.#depart) this.#depart = r.depart;
+        // Renouvellement (spec 2026-11-13, exigence C-3 22) : seulement s'il est postérieur à notre
+        // entrée (un 0x10 d'accueil peut redire un renouvellement d'avant notre jeton).
+        const nouveau = r.depart > this.#depart;
+        if (nouveau) this.#depart = r.depart;
         this.#emettre({ k: "reglages", depart: r.depart, secondes: r.secondes, places: r.places });
+        if (nouveau) this.#recreerLeGroupe(r.depart);
         return;
+      }
     }
   }
 
@@ -632,6 +641,34 @@ export class ClientSalon {
     this.#emettre({ k: "groupe", dansLeGroupe: true });
     this.#emettre({ k: "membres", ajoutes: [this.siege], retires: [], createurRevenu: false, membres: this.membres() });
     this.#ajouterEnAttente();
+  }
+
+  /**
+   * Renouvellement du salon (exigence C-3 22, v3 §14.7) : le serveur a effacé Commits, Welcomes et
+   * KeyPackages ; l'état MLS est jeté et un `Salon` neuf repart (même siège, même nonce, liste des
+   * membres gardée). Le créateur fonde le nouveau groupe (sa clé de rôle, donc son code, ne change
+   * pas) ; les autres publient un KeyPackage (nouvelle identité : nouveau code). Nos messages pas
+   * encore acceptés repartent sous le nouveau groupe.
+   */
+  #recreerLeGroupe(depart: number): void {
+    this.#salon?.free();
+    this.#kps.clear();
+    this.#regles.clear();
+    this.#perdues.clear();
+    this.#arreterVol();
+    this.#reprendreLaFile();
+    this.#emettre({ k: "renouvellement", depart });
+    const fonder = this.createur && this.#sGestion !== undefined;
+    this.#salon = this.#deps.eng.Salon.creer(this.siege, this.#nonce, this.#cles, fonder, this.#sGestion);
+    this.#salon.remplacerAnnonces(
+      0,
+      [...this.#annonces].map(([siege, nonce]) => ({ siege, nonce })),
+    );
+    this.#emettre({ k: "groupe", dansLeGroupe: this.dansLeGroupe() });
+    this.#emettre({ k: "membres", ajoutes: [], retires: [], createurRevenu: false, membres: this.membres() });
+    if (!this.dansLeGroupe()) this.#publierKp(true);
+    else this.#ajouterEnAttente();
+    this.#vider();
   }
 
   /** Reprise (nouvelle identité au même siège, aucun rattrapage) : retard, attente pleine. */
@@ -867,6 +904,11 @@ export class ClientSalon {
   quitter(): void {
     this.#envoyerWS(quitter());
     this.#terminer("quitte");
+  }
+
+  /** Arrêt demandé par l'écran (« Quitter et signaler » fait par la route HTTP) : secrets effacés. */
+  arreter(raison: Fin): void {
+    this.#terminer(raison);
   }
 
   #terminer(raison: Fin): void {

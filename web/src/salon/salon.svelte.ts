@@ -18,7 +18,20 @@ import { lienSalon } from "./liens";
 import { captcha as captchaDuServeur, ctx as transferCtx } from "../transfer/api";
 import { CAPTCHA_MIN_MS } from "../transfer/client";
 import { solvePow } from "../captcha/pow";
-import { recordShare } from "../history/live.svelte";
+import { allEntries, recordShare } from "../history/live.svelte";
+import { b64u } from "../engine/pure";
+import { lireFragment } from "./liens";
+
+/**
+ * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`,
+ * plan C-5 point 6) : S_gestion, ou undefined. Jamais ailleurs dans le stockage du navigateur.
+ */
+async function gestionGardee(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  const frag = "#c" + b64u(kLien as Uint8Array<ArrayBuffer>);
+  const e = (await allEntries().catch(() => [])).find((x) => x.sorte === "salon_cree" && x.link.endsWith(frag) && x.manage !== "");
+  const f = e ? lireFragment(e.manage.slice(e.manage.lastIndexOf("#"))) : null;
+  return f?.sorte === "s" ? f.cle : undefined;
+}
 import { creerSalon as creerAvecSession, profilPourSalon, CompteError } from "../account/session.svelte";
 
 export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin";
@@ -42,6 +55,8 @@ export const vue = $state({
   attenteDepuis: null as number | null,
   fin: null as Fin | null,
   membresPeuventDetruire: false,
+  /** Créateur délogé : lien d'invitation pour reprendre la main (en mémoire de la page seulement). */
+  lienReprise: null as string | null,
 });
 
 type Session = {
@@ -83,7 +98,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, monPseudo: null, dansLeGroupe: false, attenteDepuis: null, createur: false });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, monPseudo: null, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
 }
 
 // --- Invité : lien, mot de passe -----------------------------------------------------------------
@@ -102,6 +117,7 @@ export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<
   const acces = eng.cleAcces(kLien);
   try {
     s.meta = await api.meta(net(), acces.k);
+    s.sGestion = await gestionGardee(kLien);
     vue.finMs = Date.now() + s.meta.expiresInS * 1000;
     vue.etape = "motdepasse";
   } catch (e) {
@@ -135,8 +151,11 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
     x.cles?.free();
     x.cles = x.eng.clesSalon(x.kLien, kMdp);
     const d = deps(x.eng);
-    const entree = await ClientSalon.rejoindre(d, { kLien: x.kLien, cles: x.cles });
-    demarrer(x, ClientSalon.ouvrir(d, { kLien: x.kLien, cles: x.cles }, entree), entree);
+    // Créateur revenu (exigence C-3 32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
+    // l'ajoute ; il ne fonde pas de groupe (les membres en ligne l'ajoutent ; sinon, groupe orphelin).
+    const o = { kLien: x.kLien, cles: x.cles, sGestion: x.sGestion };
+    const entree = await ClientSalon.rejoindre(d, o);
+    demarrer(x, ClientSalon.ouvrir(d, o, entree), entree);
     vue.etape = "explication";
     return true;
   } catch (e) {
@@ -315,6 +334,10 @@ function surEvenement(x: Session, ev: EvClient): void {
       vue.finMs = Date.now() + ev.secondes * 1000;
       vue.places = ev.places;
       break;
+    case "renouvellement":
+      for (const cle of conv.renouveler(ev.depart)) liberer(cle);
+      fichiersOuverts.clear();
+      break;
     case "nouvelleEntree":
       conv.moi = ev.siege;
       if (vue.monPseudo) envoyerProfil(x);
@@ -322,6 +345,9 @@ function surEvenement(x: Session, ev: EvClient): void {
     case "fin":
       vue.fin = ev.raison;
       vue.etape = "fin";
+      // Créateur délogé (exigence C-3 35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »
+      // rouvre le lien d'invitation (mot de passe redemandé, lien de gestion relu dans l'historique).
+      vue.lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
       // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
       // (sauf exclusion : tout disparaît, spec §39.13.1b).
       x.client = undefined;
@@ -379,7 +405,27 @@ export function entrer(pseudo: string): boolean {
 
 /** Règle d'effacement des nouveaux messages (C-5 : réglable par tout participant ; 5 min par défaut). */
 export function regleCourante(): Regle {
-  return 2;
+  return s?.conv?.regle ?? 2;
+}
+
+/** Tout participant change la règle d'effacement (v3 §5) : message chiffré `regle`, ligne chez tous. */
+export function changerRegle(r: Regle): void {
+  const x = s;
+  if (!x?.client || !x.conv || r < 1) return;
+  x.client.envoyer({ k: "regle", regle: r }, 0);
+  x.conv.regleLocale(r);
+}
+
+/** État d'effacement d'un message à l'écran (moteur : `etatEffacement`), compte à rebours local seulement. */
+export function effacement(b: Bulle, maintenantMs: number): { etat: "visible" } | { etat: "rebours"; finMs: number } | { etat: "efface" } {
+  const x = s;
+  if (!x || b.regle === 0) return { etat: "visible" };
+  const vuMs = x.conv?.vuLe.get(b.cle) ?? null;
+  try {
+    return x.eng.etatEffacement({ regle: b.regle, maintenantMs, vuParMoiMs: vuMs, effaceParServeur: false });
+  } catch {
+    return { etat: "visible" };
+  }
 }
 
 /** Texte nettoyé par le moteur (exigence 4) ; erreur du moteur sinon (`texte_invalide`, `texte_trop_long`). */
@@ -596,8 +642,97 @@ export function reagir(b: Bulle, emoji: string): void {
 export function vu(b: Bulle): void {
   const x = s;
   if (!x?.client || b.moi || !b.id) return;
+  x.conv?.marquerVu(b.cle, Date.now());
   x.client.accuser("vu", [hexOctets(b.id)]);
   if (b.regle !== 0 && b.seq !== null) x.client.lu(b.seq);
+}
+
+// --- Codes, gestion, fin (plan C-5) ---------------------------------------------------------------
+
+/** Code de vérification d'un siège (5 groupes de 5 chiffres), ou null hors du groupe. */
+export function code(siege: number): string | null {
+  return s?.client?.empreinte(siege) ?? null;
+}
+/** « J'ai comparé ce code » : gardé sur cet appareil, en mémoire, jusqu'au prochain changement. */
+export function verifier(siege: number, oui: boolean): void {
+  const c = code(siege);
+  if (!s?.conv || !c) return;
+  if (oui) s.conv.verifies.set(siege, c);
+  else s.conv.verifies.delete(siege);
+  vue.rev++;
+}
+export function verifie(siege: number): boolean {
+  const c = code(siege);
+  return c !== null && s?.conv?.verifies.get(siege) === c;
+}
+
+/** Destruction (créateur : J_gestion ; membre : si le salon le permet). Rend vrai si faite. */
+export async function detruire(signaler = false): Promise<boolean> {
+  const x = s;
+  if (!x?.client) return false;
+  const j = x.client.jetonGestion();
+  try {
+    await api.detruire(net(), j ? { jGestion: j } : { jeton: x.client.jeton }, signaler);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    j?.fill(0);
+  }
+}
+
+/** « Quitter et signaler » (spec §39.5) : le serveur fait partir le membre et compte le signalement. */
+export async function quitterEtSignaler(): Promise<boolean> {
+  const x = s;
+  if (!x?.client) return false;
+  try {
+    await api.signaler(net(), x.client.jeton);
+  } catch {
+    return false;
+  }
+  x.client.arreter("quitte");
+  return true;
+}
+
+/** Créateur : nombre de places (2 à 10, jamais sous les présents). Rend le code d'erreur, ou null. */
+export async function reglerPlaces(n: number): Promise<string | null> {
+  const x = s;
+  const j = x?.client?.jetonGestion();
+  if (!j) return "forbidden";
+  try {
+    const r = await api.reglages(net(), j, { maxMembers: n });
+    vue.places = r.maxMembers;
+    return null;
+  } catch (e) {
+    return e instanceof api.SalonError ? e.code : "reseau";
+  } finally {
+    j.fill(0);
+  }
+}
+
+/**
+ * Créateur : renouvellement (1, 6, 12 ou 24 h depuis maintenant, conversation effacée pour tous,
+ * groupe recréé ; compte comme une création : preuve anti-robot). Rend le code d'erreur, ou null.
+ */
+export async function renouveler(h: Duree): Promise<string | null> {
+  const x = s;
+  if (!x?.client) return "forbidden";
+  const cap = await captchaDuServeur(transferCtx(location.origin)).catch(() => null);
+  if (!cap) return "reseau";
+  const p = await solvePow(cap.challenge, { fallbackOrigin: cap.fallbackOrigin, mode: "pow" }).catch(() => null);
+  if (!p || p.kind !== "pow") return "robot";
+  await new Promise((r) => setTimeout(r, Math.max(0, cap.receivedAt + CAPTCHA_MIN_MS - performance.now())));
+  const j = x.client.jetonGestion();
+  if (!j) return "forbidden";
+  try {
+    const r = await api.reglages(net(), j, { renouvelerH: h, preuve: { altcha: p.payload, hp: "", shown_at: cap.shownAt } });
+    vue.finMs = Date.now() + r.expiresInS * 1000;
+    return null;
+  } catch (e) {
+    return e instanceof api.SalonError ? e.code : "reseau";
+  } finally {
+    j.fill(0);
+  }
 }
 
 let dernierEcrit = 0;

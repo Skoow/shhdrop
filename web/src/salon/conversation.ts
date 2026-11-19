@@ -62,7 +62,9 @@ export type PieceInfo = {
 
 export type Systeme =
   | { k: "sys"; cle: string; quoi: "arrivee" | "depart" | "retour" | "exclusion" | "code" | "createur"; siege: number }
-  | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string };
+  | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string }
+  | { k: "sys"; cle: string; quoi: "regle"; siege: number; regle: Regle }
+  | { k: "sys"; cle: string; quoi: "renouvellement"; siege: number };
 
 export type Element = Bulle | Systeme;
 type SansCle<T> = T extends unknown ? Omit<T, "cle"> : never;
@@ -168,7 +170,10 @@ export class Conversation {
       if (s === this.moi) continue;
       if (e.retires.includes(s)) {
         this.#sys({ k: "sys", quoi: "retour", siege: s });
-        if (!(e.createurRevenu && s === this.createurSiege)) this.#sys({ k: "sys", quoi: "code", siege: s });
+        if (!(e.createurRevenu && s === this.createurSiege)) {
+          this.#sys({ k: "sys", quoi: "code", siege: s });
+          this.verifies.delete(s);
+        }
       } else this.#sys({ k: "sys", quoi: "arrivee", siege: s });
     }
     this.#change();
@@ -228,6 +233,8 @@ export class Conversation {
     if (!b) return;
     b.seq = seq;
     b.etat = "envoye";
+    // Expéditeur : son compte à rebours local part de l'envoi (v3 §5, `vuParMoiMs`).
+    if (!this.vuLe.has(b.cle)) this.vuLe.set(b.cle, this.maintenant());
     this.#parLocal.delete(local);
     this.#change();
   }
@@ -266,6 +273,7 @@ export class Conversation {
     const m = env.message;
     const id = hex(env.id);
     const autre = siege !== this.moi;
+    if (this.#regleSeq === 0 && env.regle >= 1 && (m.k === "texte" || m.k === "reponse")) this.regle = env.regle;
     switch (m.k) {
       case "texte":
       case "reponse": {
@@ -348,9 +356,61 @@ export class Conversation {
         this.#profil(seq, siege, m.pseudo, m.couleur);
         this.avatars.set(siege, m.avatar);
         return null;
+      case "regle":
+        // Règle d'effacement du salon (v3 §5) : tout participant la change ; elle vaut pour les
+        // messages envoyés ensuite (chacun garde la sienne). La plus récente en ordre seq gagne.
+        if (seq > this.#regleSeq && m.regle >= 1) {
+          this.#regleSeq = seq;
+          this.regle = m.regle;
+          this.#sys({ k: "sys", quoi: "regle", siege, regle: m.regle });
+          this.#change();
+        }
+        return null;
       default:
-        return null; // piece (C-4), regle (C-5), depart, rotation, inconnu
+        return null; // depart, rotation, inconnu
     }
+  }
+
+  /**
+   * Règle d'effacement des prochains messages (plan C-5 point 1) : celle du dernier message
+   * `regle` lu, sinon celle du dernier message reçu, sinon 5 min (défaut de l'écran).
+   */
+  regle: Regle = 2;
+  #regleSeq = 0;
+
+  /** Notre changement de règle, appliqué tout de suite chez nous (l'écho n'est pas relu). */
+  regleLocale(r: Regle): void {
+    this.regle = r;
+    this.#regleSeq = Number.MAX_SAFE_INTEGER - 1;
+    this.#sys({ k: "sys", quoi: "regle", siege: this.moi, regle: r });
+    this.#change();
+  }
+
+  /** Instant où cet appareil a vu chaque message (compte à rebours local, `etatEffacement`). */
+  readonly vuLe = new Map<string, number>();
+  marquerVu(cle: string, ms: number): void {
+    if (!this.vuLe.has(cle)) this.vuLe.set(cle, ms);
+    this.#change();
+  }
+
+  /** Codes de vérification comparés ici (siège → code vérifié), annulés quand le code change (exigences 9, 29). */
+  readonly verifies = new Map<number, string>();
+
+  /** Renouvellement (0x10) : tout ce qui est de rang ≤ départ quitte l'écran ; les codes sont à revérifier. */
+  renouveler(depart: number): string[] {
+    const partis: string[] = [];
+    for (let i = this.elements.length - 1; i >= 0; i--) {
+      const e = this.elements[i]!;
+      if (e.k === "bulle" && e.seq !== null && e.seq <= depart) {
+        this.elements.splice(i, 1);
+        if (e.id) this.#parId.delete(e.id);
+        partis.push(e.cle);
+      }
+    }
+    this.verifies.clear();
+    this.#sys({ k: "sys", quoi: "renouvellement", siege: this.createurSiege });
+    this.#change();
+    return partis;
   }
 
   #nouvelle(id: string, seq: number, siege: number, epoque: number, env: EnveloppeRecue, texte: string, cite: string | null): Bulle {

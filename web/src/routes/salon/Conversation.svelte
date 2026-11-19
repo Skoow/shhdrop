@@ -265,6 +265,7 @@
   function ligne(e: Extract<Element, { k: "sys" }>): string {
     if (e.quoi === "pseudo") return t("salon.room.sys.pseudo", { avant: e.avant, apres: e.apres });
     if (e.quoi === "createur") return t("salon.room.sys.createur");
+    if (e.quoi === "regle") return t("salon.room.sys.regle", { nom: nom(e.siege), regle: t(`salon.regle.${e.regle as 1 | 2 | 3}`) });
     return t(`salon.room.sys.${e.quoi}`, { nom: nom(e.siege) });
   }
   const attente = $derived(vue.attenteDepuis === null ? "" : maintenant - vue.attenteDepuis > 30_000 ? t("salon.room.wait.long") : maintenant - vue.attenteDepuis > 2_000 ? t("salon.room.wait.short") : "");
@@ -323,6 +324,7 @@
                   <time>{formatClock(e.heureMs, lang)}</time>
                   {#if e.modifie && !e.retire}<span>· {t("salon.room.edited")}</span>{/if}
                   {#if e.moi}<span class={["coche", conv.coche(e)]}>· {coche(e)}</span>{/if}
+                  {#if e.regle !== 0 && !e.retire}{@const ef = S.effacement(e, maintenant)}{#if ef.etat === "rebours"}<span class="rebours">· {ef.finMs > maintenant ? t("salon.room.rebours", { duree: formatDuration((ef.finMs - maintenant) / 1000, lang, { precise: true }) }) : t("salon.room.attente.lecture")}</span>{/if}{/if}
                 </p>
                 {#if e.reactions.length > 0}
                   <ul class="reactions">

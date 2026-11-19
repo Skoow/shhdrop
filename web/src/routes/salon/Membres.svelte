@@ -5,7 +5,7 @@
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatClock } from "../../i18n/format";
   import * as S from "../../salon/salon.svelte";
-  import InlineConfirm from "../../ui/InlineConfirm.svelte";
+  import Gestion from "./Gestion.svelte";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -14,7 +14,7 @@
   const lignes = $derived.by(() => {
     void vue.rev;
     void lang;
-    return [...conv.presents].sort((a, b) => a - b).map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true, vu: vu(s), avatar: conv.avatars.get(s) ? (S.masques.has(s) ? null : (S.pieces.urls[`avatar:${s}`] ?? null)) : null, aAvatar: !!conv.avatars.get(s) }));
+    return [...conv.presents].sort((a, b) => a - b).map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true, vu: vu(s), avatar: conv.avatars.get(s) ? (S.masques.has(s) ? null : (S.pieces.urls[`avatar:${s}`] ?? null)) : null, aAvatar: !!conv.avatars.get(s), code: S.code(s), verifie: S.verifie(s) }));
   });
 
   // Avatars annoncés : relus du serveur et déchiffrés une fois (pièce de 64 Ko au plus, JPEG).
@@ -51,13 +51,24 @@
         <span class="nom"><bdi>{l.nom}</bdi>{#if l.s === conv.moi}{" "}({t("salon.room.you")}){/if}{#if l.s === conv.createurSiege}{" · "}{t("salon.room.creator")}{/if}</span>
         <span class="vu">{l.vu}</span>
         {#if l.aAvatar && l.s !== conv.moi}<button type="button" class="masquer" aria-pressed={S.masques.has(l.s)} onclick={() => (S.masques.has(l.s) ? S.masques.delete(l.s) : S.masques.add(l.s))}>{t("salon.avatar.masquer")}</button>{/if}
+        {#if l.code}
+          <details class="code">
+            <summary>{t("salon.code.voir", { nom: l.nom })}{#if l.verifie}{" · "}{t("salon.code.verifie")}{/if}</summary>
+            <p class="chiffres" translate="no">{l.code}</p>
+            {#if l.s !== conv.moi}
+              <button type="button" class="masquer" aria-pressed={l.verifie} onclick={() => S.verifier(l.s, !l.verifie)}>{l.verifie ? t("salon.code.annuler") : t("salon.code.marquer")}</button>
+            {/if}
+          </details>
+        {/if}
       </span>
     </li>
   {/each}
 </ul>
-<div class="quitter">
-  <InlineConfirm label={t("salon.room.quit")} message={t("salon.room.quit.confirm")} confirmLabel={t("salon.room.quit")} kind="danger" triggerVariant="secondary" onconfirm={S.quitter} />
-</div>
+<section class="codes" aria-label={t("salon.code.titre")}>
+  <p class="note">{t("salon.code.inciter")}</p>
+  <p class="note">{t("salon.code.createur")}</p>
+</section>
+<Gestion />
 
 <style>
   .membres {
@@ -103,6 +114,28 @@
     background: var(--pc);
     color: var(--on-fmt);
     font-weight: 700;
+  }
+  .code summary {
+    min-height: 32px;
+    color: var(--text-2);
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .chiffres {
+    margin: var(--sp-1) 0;
+    font-family: var(--font-mono, monospace);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+  }
+  .codes {
+    margin-top: var(--sp-4);
+    display: grid;
+    gap: var(--sp-2);
+  }
+  .note {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 0.875rem;
   }
   .pastille img {
     width: 100%;

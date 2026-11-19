@@ -181,4 +181,71 @@ describe("salon : client de production, vrai serveur", () => {
   });
 });
 
+describe("salon : renouvellement (exigence C-3 22)", () => {
+  let srv: TestServer;
+  let eng: SalonEngine;
+  const fermer: ClientSalon[] = [];
+  beforeAll(async () => {
+    srv = await startServer({ salons: true });
+    eng = await loadSalonEngine();
+  });
+  afterAll(async () => {
+    for (const c of fermer) c.fermer();
+    await srv?.dispose();
+  });
+
+  async function preuve() {
+    const cap = await (await fetch(srv.origin + "/api/captcha")).json();
+    const recu = Date.now();
+    const { shown_at, fallback: _f, ...defi } = cap;
+    const p = await solveAltcha(defi);
+    await dormir(Math.max(0, recu + 3100 - Date.now()));
+    return { altcha: (p as { payload: string }).payload, hp: "" as const, shown_at };
+  }
+
+  it("le créateur renouvelle : tout est effacé, le groupe MLS est recréé, la conversation reprend", async () => {
+    const mdp = generatePassword();
+    const p = await preparer(eng, mdp, { ttlHours: 1, maxMembers: 4, membersCanDestroy: false });
+    const r = await fetch(srv.origin + "/api/salons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shh-Access": p.entetes.acces, "X-Shh-Manage": p.entetes.gestion },
+      body: JSON.stringify({ ...p.corps, ...(await preuve()) }),
+    });
+    expect(r.status).toBe(201);
+    const net = { origin: srv.origin, fetch: (...x: Parameters<typeof fetch>) => fetch(...x) };
+    const mk = async (o: { cles: ReturnType<SalonEngine["clesSalon"]>; sGestion?: Uint8Array; creerGroupe?: boolean }) => {
+      const evs: EvClient[] = [];
+      const garde: { ws?: WsLike } = {};
+      const { client } = await ClientSalon.entrer(deps(srv, eng, garde), { kLien: p.kLien, ...o });
+      client.ecouter((e) => evs.push(e));
+      fermer.push(client);
+      return { c: client, evs, ws: () => garde.ws };
+    };
+    const a = await mk({ cles: p.cles, sGestion: p.sGestion, creerGroupe: true });
+    const acces = eng.cleAcces(p.kLien);
+    const meta = await api.meta(net, acces.k);
+    const kMdp = await passwordKey(mdp, meta.salt, { ops: meta.kdfOps, mem: meta.kdfMem });
+    const b = await mk({ cles: eng.clesSalon(p.kLien, kMdp) });
+    await attendre(b, (e) => e.k === "groupe" && e.dansLeGroupe);
+    a.c.envoyer({ k: "texte", x: "avant" }, 2);
+    await attendre(b, texteRecu("avant"));
+    const codeA = b.c.empreinte(0);
+    const j = a.c.jetonGestion()!;
+    const reg = await api.reglages(net, j, { renouvelerH: 6, preuve: await preuve() });
+    j.fill(0);
+    expect(reg.depuis).toBeGreaterThan(0);
+    await attendre(a, (e) => e.k === "renouvellement");
+    await attendre(b, (e) => e.k === "renouvellement");
+    // B rentre dans le groupe neuf ; le code du créateur ne change pas (clé de rôle).
+    const fin = Date.now() + 30_000;
+    while (JSON.stringify(b.c.membres()) !== "[0,1]") {
+      if (Date.now() > fin) throw new Error(`membres ${JSON.stringify(b.c.membres())}`);
+      await dormir(20);
+    }
+    expect(b.c.empreinte(0)).toBe(codeA);
+    a.c.envoyer({ k: "texte", x: "après le renouvellement" }, 2);
+    await attendre(b, texteRecu("après le renouvellement"), 30_000);
+  });
+});
+
 const secret: { sGestion: Uint8Array } = { sGestion: new Uint8Array(32) };

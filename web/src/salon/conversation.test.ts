@@ -110,6 +110,31 @@ describe("conversation", () => {
     c.groupe({ ajoutes: [0], retires: [0], createurRevenu: true, membres: [0, 1, 2] });
     expect(c.elements.map((e) => (e.k === "sys" ? `${e.quoi}:${e.siege}` : "b"))).toEqual(["arrivee:2", "retour:2", "code:2", "createur:0", "retour:0"]);
   });
+  it("règle d'effacement (C-5) : défaut 5 min, la plus récente en ordre seq gagne, ligne affichée", () => {
+    const c = conv(0);
+    expect(c.regle).toBe(2);
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    c.message(6, 1, 3, { ...env(2, { k: "texte", x: "b" }), regle: 3 });
+    expect(c.regle).toBe(3); // sans message « regle » : celle du dernier message reçu
+    c.message(9, 2, 3, env(3, { k: "regle", regle: 1 }));
+    c.message(8, 1, 3, env(4, { k: "regle", regle: 3 })); // plus ancien : ignoré
+    expect(c.regle).toBe(1);
+    expect(c.elements.filter((e) => e.k === "sys" && e.quoi === "regle")).toHaveLength(1);
+    c.message(10, 1, 3, { ...env(5, { k: "texte", x: "c" }), regle: 3 });
+    expect(c.regle).toBe(1);
+  });
+  it("codes vérifiés : annulés quand le code change (reprise) et au renouvellement", () => {
+    const c = conv(0);
+    c.verifies.set(1, "11111-22222-33333-44444-55555");
+    c.verifies.set(2, "x");
+    c.groupe({ ajoutes: [1], retires: [1], createurRevenu: false, membres: [0, 1, 2] });
+    expect([...c.verifies.keys()]).toEqual([2]);
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    const partis = c.renouveler(7);
+    expect(partis).toEqual([hex(1)]);
+    expect(c.verifies.size).toBe(0);
+    expect(c.elements.filter((e) => e.k === "bulle")).toEqual([]);
+  });
   it("« écrit » : 6 s, effacé par le message", () => {
     const t = { v: 0 };
     const c = conv(0, t);
