@@ -1,5 +1,7 @@
 # Paiement des offres Plus et Pro : Stripe, PayPal, NOWPayments et jetons anonymes (conception)
 
+> **État au 19 novembre** : §2 à §6.1, §8 (sauf la sauvegarde), §9.1 (table et régime), §10 et la commande d'administration sont **codés et testés** (`server/internal/paiement`, `server/internal/api/handlers_paiement.go`, `web/src/paiement/`, page Offres et `/offres/retour`). Restent (plan `docs/superpowers/plans/2026-11-19-paiement.md`) : jetons RSA aveugles (§7), pass dans le coffre privé (§6.2), sauvegarde de `paiements.db`, relais de sortie (S1), limites payantes des partages (S2).
+
 **Statut** : conception du 19 novembre 2026, **à valider par le propriétaire**. Les décisions prises par défaut sont numérotées **DP-n** et marquées « à valider ». Remplace l'ébauche Paddle (`2026-11-16-paiement-paddle-design.md`, gardée pour mémoire) ; complète la spécification principale §38 (offre payante), §36 (ce que voit le serveur) et la conception du salon v3 §8 (appels).
 
 **Décisions du propriétaire reprises ici** (19 novembre) :
@@ -137,7 +139,7 @@ commandes(id BLOB(16) PK, q BLOB(32), offre, jours (30/365), renouvelle (0/1),
           moyen (1 carte, 2 PayPal, 3 crypto), etat (1 en attente, 2 payée,
           3 non aboutie, 4 anomalie, 5 révoquée), abonnement BLOB(1..64) NULL,
           cree_jour, garde_jour) WITHOUT ROWID
-references(r BLOB(32) PK = SHA-256(« shhdrop/v2/paiement/ref » ‖ 0x00 ‖ fournisseur ‖ 0x00 ‖ référence),
+refs(r BLOB(32) PK = SHA-256(« shhdrop/v2/paiement/ref » ‖ 0x00 ‖ fournisseur ‖ 0x00 ‖ référence),
            commande BLOB(16), jour) WITHOUT ROWID
 ```
 
@@ -151,7 +153,7 @@ references(r BLOB(32) PK = SHA-256(« shhdrop/v2/paiement/ref » ‖ 0x00 ‖ fo
 
 ### 5.3 Idempotence
 
-- **Un paiement ne crédite qu'une fois** : chaque confirmation porte une **référence de paiement** du prestataire (Stripe : PaymentIntent ou facture ; PayPal : capture ou vente ; NOWPayments : `payment_id`) ; son empreinte est insérée dans `references` **dans la même transaction** que le crédit ; une empreinte déjà présente → rien (200). Peu importe l'événement qui l'apporte (session terminée puis `invoice.paid`, capture puis `PAYMENT.CAPTURE.COMPLETED`, IPN rejoué).
+- **Un paiement ne crédite qu'une fois** : chaque confirmation porte une **référence de paiement** du prestataire (Stripe : PaymentIntent ou facture ; PayPal : capture ou vente ; NOWPayments : `payment_id`) ; son empreinte est insérée dans `refs` **dans la même transaction** que le crédit ; une empreinte déjà présente → rien (200). Peu importe l'événement qui l'apporte (session terminée puis `invoice.paid`, capture puis `PAYMENT.CAPTURE.COMPLETED`, IPN rejoué).
 - Création de commande : `Idempotency-Key` (Stripe) et `PayPal-Request-Id` (PayPal) dérivés de la commande ; un double clic crée deux commandes distinctes, chacune ouverte au plus une fois (sans effet).
 - Révocation, arrêt du renouvellement, « non aboutie » : opérations idempotentes (état final).
 
@@ -164,7 +166,7 @@ Dans une transaction : `fin_jour` = max(`fin_jour`, aujourd'hui) + 30 ou 365 jou
 ### 5.5 Remboursement, litige, révocation
 
 - Remboursement **total**, litige ouvert, reversement : `revoque` = 1, `jetons` = 0, `fin_jour` = aujourd'hui ; la commande passe « révoquée ». Les **jetons déjà émis restent utilisables** jusqu'à la fin de l'époque de leur clé (ils sont aveugles : personne ne sait lesquels), d'où l'émission par petits lots (§7).
-- Remboursement **partiel** (geste commercial, rétractation au prorata) : aucun effet automatique ; le propriétaire décide (`shhdrop admin paiement revoquer <commande>`).
+- Remboursement **partiel** (geste commercial, rétractation au prorata ; montant connu inférieur au prix : PayPal) : aucun effet automatique ; le propriétaire décide (`shhdrop admin paiement revoquer <commande>`, commande lue dans les métadonnées du prestataire).
 - **Commande introuvable** pour un remboursement (abonnement Stripe dont la facture n'est pas reliée) : 200, rien ; le propriétaire révoque à la main avec l'identifiant de commande lu dans les métadonnées du prestataire.
 
 ### 5.6 Résiliation et état
@@ -174,7 +176,7 @@ Dans une transaction : `fin_jour` = max(`fin_jour`, aujourd'hui) + 30 ou 365 jou
 
 ### 5.7 Purge (passe quotidienne)
 
-- Commande « en attente » ou « non aboutie » : effacée 2 jours après sa création (une page hébergée expire au plus en 24 h ; crypto : NOWPayments garde la facture ouverte jusqu'à 24 h environ).
+- Commande « en attente » ou « non aboutie » : effacée 7 jours après sa création (une page hébergée expire au plus en 24 h ; une confirmation crypto ou un webhook réessayé peut arriver plusieurs jours après : 7 jours laissent la marge, sans quoi un paiement réel resterait sans pass).
 - Commande payée ou révoquée : gardée jusqu'à `garde_jour` = fin du pass + 180 jours (délai des litiges : PayPal 180 jours, cartes jusqu'à 120 jours), puis effacée avec ses références.
 - Pass : effacé 31 jours après `fin_jour` (après la fin de validité des jetons émis, §7) ou 31 jours après sa révocation.
 
@@ -329,7 +331,7 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 | DP-9 | Ventes limitées aux 27 pays de l'UE |
 | DP-10 | Renonciation au droit de rétractation obligatoire pour payer |
 | DP-11 | Remboursement partiel : aucun effet automatique |
-| DP-12 | Rétention : commande non payée 2 jours ; commande payée jusqu'à la fin + 180 jours ; pass jusqu'à la fin + 31 jours |
+| DP-12 | Rétention : commande non payée 7 jours ; commande payée jusqu'à la fin + 180 jours ; pass jusqu'à la fin + 31 jours |
 | DP-13 | Retour unique `/offres/retour`, sans paramètre ; l'état vient du serveur |
 | DP-14 | Appels audio dans Plus, audio et vidéo dans Pro, « bientôt » |
 

@@ -183,7 +183,7 @@ export type Demo = {
   requests: { url: string; headers: Record<string, string>; postData: string | null }[];
 };
 
-export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpts, "binary" | "env" | "comptes">; pageErrors: string[] }>({
+export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpts, "binary" | "env" | "comptes" | "paiement">; pageErrors: string[] }>({
   /**
    * Exceptions non attrapées (erreur levée ou promesse rejetée sans gestionnaire) de toute page
    * du contexte du test, onglets ouverts en cours de test compris (`weberror`). Automatique : un
@@ -209,7 +209,7 @@ export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpt
    */
   shhServer: [{}, { option: true }],
   shh: async ({ page, shhServer }, use) => {
-    const server = await startServer({ binary: shhServer.binary, comptes: shhServer.comptes, env: { SHH_STATIC_DIR: DIST, ...shhServer.env } });
+    const server = await startServer({ binary: shhServer.binary, comptes: shhServer.comptes, paiement: shhServer.paiement, env: { SHH_STATIC_DIR: DIST, ...shhServer.env } });
     try {
       await probe(server.origin + "/");
       retryFirstGoto(page, server.origin);

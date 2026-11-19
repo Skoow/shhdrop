@@ -59,6 +59,8 @@
           <span class="dt num" data-details>
             {#each details(x) as d (d.k)}<span class="dr"><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></span>{/each}
           </span>
+          <!-- Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles. -->
+          {#if x !== "free"}<span class="soon" data-soon-calls>{t(x === "pro" ? "offers.soon.calls.pro" : "offers.soon.calls.plus")}</span>{/if}
           <!-- Plus de flèche ronde (retours du propriétaire du 17 novembre) : un bouton texte en bas
                de la carte ; toute la carte reste le lien. -->
           <!-- Gratuit : pas de « Voir l'offre » (17 novembre), c'est l'offre en cours. -->
@@ -408,5 +410,9 @@
     .tier.pro {
       border: 1px solid CanvasText;
     }
+  }
+  .soon {
+    color: var(--text-3);
+    font-size: var(--fs-micro);
   }
 </style>

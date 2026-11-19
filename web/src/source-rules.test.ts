@@ -76,7 +76,7 @@ describe("règles de sources", () => {
     expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, inUiDir)).toEqual([]));
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
     expect(
-      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts"),
+      offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts"),
     ).toEqual([]));
   // Spec §33, §33.1 : exception écrite, l'historique local chiffré des envois. Seul
   // history/live.svelte.ts lit `indexedDB` (pour le passer à history/store.ts, qui chiffre) ;
@@ -85,7 +85,7 @@ describe("règles de sources", () => {
     const live = files.find((f) => f.rel === "history/live.svelte.ts");
     expect(live?.text).toMatch(/indexedDB/);
     expect(live?.text).not.toMatch(/localStorage|document\.cookie|sessionStorage/);
-    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/") && !r.startsWith("account/"))).toEqual([]);
+    expect(offenders(/\bIDB(?:Factory|Database|ObjectStore|Transaction)\b/, (r) => !r.startsWith("history/") && !r.startsWith("downloads/") && !r.startsWith("account/") && !r.startsWith("paiement/"))).toEqual([]);
   });
   // D42-22 : exception écrite, l'octroi d'ouverture gardé chiffré pour revenir jusqu'à
   // l'échéance (history/returns.ts, voisin de l'historique et même mécanisme : AES-GCM, clé non
@@ -128,6 +128,18 @@ describe("règles de sources", () => {
     const apiTs = files.find((f) => f.rel === "account/api.ts")!.text;
     expect([...apiTs.matchAll(/keepalive: true/g)]).toHaveLength(2); // l'option d'appel, et son seul usage
     expect(apiTs).toMatch(/export async function deconnexion[\s\S]{0,160}keepalive: true/);
+  });
+  // Conception du paiement §5.2, §6.1 : le pass P ne part que dans X-Shh-Pass, écrit seulement par
+  // paiement/api.ts (seul fichier du paiement qui fait des requêtes) ; la base `shhdrop-pass`
+  // (exception écrite, chiffrée par une clé non extractible) n'est nommée et lue que par
+  // paiement/pass.ts ; aucun localStorage, sessionStorage ni cookie.
+  it("paiement : X-Shh-Pass seulement dans paiement/api.ts, base shhdrop-pass seulement dans paiement/pass.ts", () => {
+    expect(offenders(/X-Shh-Pass/i, (r) => r !== "paiement/api.ts")).toEqual([]);
+    expect(files.find((f) => f.rel === "paiement/api.ts")?.text).toMatch(/X-Shh-Pass/);
+    expect(offenders(/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource/, (r) => r.startsWith("paiement/") && r !== "paiement/api.ts")).toEqual([]);
+    expect(offenders(/shhdrop-pass/, (r) => r !== "paiement/pass.ts")).toEqual([]);
+    expect(files.find((f) => f.rel === "paiement/pass.ts")?.text).toMatch(/indexedDB/);
+    expect(offenders(/localStorage|sessionStorage|document\.cookie/, (r) => r.startsWith("paiement/"))).toEqual([]);
   });
   it("compte : s_profil et K_compte seulement dans account/", () => {
     expect(offenders(/s_profil|sProfil|kCompte|K_compte/, (r) => !r.startsWith("account/") && !r.startsWith("engine/"))).toEqual([]);
