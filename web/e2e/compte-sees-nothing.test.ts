@@ -34,7 +34,8 @@ import { solveAltcha } from "./altcha";
 import { ClientSalon } from "./salon-client";
 import { capturingFetch, findIn, listFiles, needle, scanDir, scanProcessMemory, type Captured, type Needle } from "./scan";
 import { startServer, type TestServer } from "./server";
-import { demarrerSMTP, type Courriel, type FauxSMTP } from "./smtp";
+import { demarrerSMTP, qp, type Courriel, type FauxSMTP } from "./smtp";
+import { base32, horlogeTotp } from "./totp";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -87,58 +88,14 @@ function fenetresCommunes(aiguilles: Uint8Array[], meules: Buffer[], n = 32): nu
   return trouvees;
 }
 
-// --- TOTP (RFC 6238 : HMAC-SHA-1, 6 chiffres, 30 s), pour jouer l'application ------------------
+// --- TOTP (RFC 6238 : HMAC-SHA-1, 6 chiffres, 30 s), pour jouer l'application (e2e/totp.ts) ---
 
-function base32(s: string): Buffer {
-  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let bits = 0;
-  let v = 0;
-  const out: number[] = [];
-  for (const c of s) {
-    v = (v << 5) | A.indexOf(c);
-    bits += 5;
-    if (bits >= 8) {
-      out.push((v >>> (bits - 8)) & 255);
-      bits -= 8;
-    }
-  }
-  return Buffer.from(out);
-}
-function codeTotp(secret: string, pas: number): string {
-  const c = Buffer.alloc(8);
-  c.writeBigUInt64BE(BigInt(pas));
-  const d = createHmac("sha1", base32(secret)).update(c).digest();
-  const o = d[19]! & 15;
-  return String((d.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
-}
 /** Un code de l'application jamais servi (le serveur refuse un pas déjà accepté, ±1 pas toléré). */
-let dernierPas = 0;
-async function prochainCode(secret: string): Promise<string> {
-  for (;;) {
-    const t = Date.now() / 1000;
-    if (30 - (t % 30) < 2) {
-      await dormir(2500); // loin d'une frontière de pas
-      continue;
-    }
-    const maintenant = Math.floor(t / 30);
-    const pas = Math.max(dernierPas + 1, maintenant - 1);
-    if (pas <= maintenant + 1) {
-      dernierPas = pas;
-      return codeTotp(secret, pas);
-    }
-    await dormir((30 - (t % 30)) * 1000 + 500);
-  }
-}
+const prochainCode = horlogeTotp();
 
 // --- Modèle unique d'e-mail (conception §21.3), décodé du quoted-printable ----------------------
 
 const CORPS = (code: string) => `Votre code : ${code.slice(0, 3)} ${code.slice(3)}\r\nIl expire dans 15 minutes.\r\nSi vous n'avez rien demandé, ignorez ce message.\r\n`;
-function qp(s: string): Buffer {
-  return Buffer.from(
-    s.replace(/=\r\n/g, "").replace(/=([0-9A-F]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16))),
-    "latin1",
-  );
-}
 /** Code d'un e-mail ; vérifie au passage qu'il est EXACTEMENT le modèle (seuls Date, Message-ID et le code varient). */
 function lireCode(m: Courriel, a: string): string {
   const t = m.data.toString("latin1");

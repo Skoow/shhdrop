@@ -4,6 +4,8 @@ server/shhdrop
 *.db*
 /tmp-data/
 web/dist-demo/
+web/dist-comptes/
+web/.dist-comptes.verrou/
 web/ui-e2e/engine-page/dist-demo/
 web/ui-e2e/__captures__/
 web/test-results/

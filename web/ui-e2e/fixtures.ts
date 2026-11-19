@@ -183,7 +183,7 @@ export type Demo = {
   requests: { url: string; headers: Record<string, string>; postData: string | null }[];
 };
 
-export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpts, "binary" | "env">; pageErrors: string[] }>({
+export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpts, "binary" | "env" | "comptes">; pageErrors: string[] }>({
   /**
    * Exceptions non attrapées (erreur levée ou promesse rejetée sans gestionnaire) de toute page
    * du contexte du test, onglets ouverts en cours de test compris (`weberror`). Automatique : un
@@ -203,10 +203,13 @@ export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpt
     },
     { auto: true },
   ],
-  /** Binaire et variables du serveur de test (par défaut : le binaire livré, SHH_STATIC_DIR seul). */
+  /**
+   * Binaire et variables du serveur de test (par défaut : le binaire livré, SHH_STATIC_DIR seul) ;
+   * `comptes` : compte activé (e2e/server.ts, StartOpts.comptes), pour compte.spec.ts.
+   */
   shhServer: [{}, { option: true }],
   shh: async ({ page, shhServer }, use) => {
-    const server = await startServer({ binary: shhServer.binary, env: { SHH_STATIC_DIR: DIST, ...shhServer.env } });
+    const server = await startServer({ binary: shhServer.binary, comptes: shhServer.comptes, env: { SHH_STATIC_DIR: DIST, ...shhServer.env } });
     try {
       await probe(server.origin + "/");
       retryFirstGoto(page, server.origin);

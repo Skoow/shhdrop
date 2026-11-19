@@ -1,12 +1,16 @@
 // Construit le binaire Go, le site (web/dist), la démo (web/dist-demo), la page d'essai du
 // moteur (ui-e2e/engine-page) et celle du salon (ui-e2e/salon-page) une fois avant tous les tests.
+// Le site avec compte (web/dist-comptes) n'est construit qu'à la demande de compte.spec.ts
+// (comptes-site.ts), avec la marque de cette exécution tirée ici (SHH_UI_RUN, vue des workers).
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const webDir = fileURLToPath(new URL("..", import.meta.url));
 const serverDir = fileURLToPath(new URL("../../server", import.meta.url));
 
 export default function globalSetup(): void {
+  process.env.SHH_UI_RUN = randomUUID();
   execFileSync("go", ["build", "-o", "shhdrop", "./cmd/shhdrop"], { cwd: serverDir, stdio: "inherit" });
   execFileSync("npm", ["run", "build"], { cwd: webDir, stdio: "inherit" });
   execFileSync("npm", ["run", "build:demo"], { cwd: webDir, stdio: "inherit" });

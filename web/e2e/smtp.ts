@@ -123,3 +123,23 @@ export async function demarrerSMTP(): Promise<FauxSMTP> {
     },
   };
 }
+
+/** Décodage quoted-printable (RFC 2045 §6.7) du corps des e-mails du serveur. */
+export function qp(s: string): Buffer {
+  return Buffer.from(
+    s.replace(/=\r\n/g, "").replace(/=([0-9A-F]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16))),
+    "latin1",
+  );
+}
+
+/**
+ * Code à 6 chiffres d'un e-mail du serveur (« Votre code : 123 456 », conception du compte §21.3),
+ * avec son destinataire. Le modèle exact de l'e-mail est vérifié par compte-sees-nothing.test.ts.
+ */
+export function codeDuCourriel(m: Courriel): { a: string[]; code: string } {
+  const t = m.data.toString("latin1");
+  const corps = qp(t.slice(t.indexOf("\r\n\r\n") + 4)).toString("utf8");
+  const c = /^Votre code : (\d{3}) (\d{3})\r\n/.exec(corps);
+  if (!c) throw new Error("faux SMTP : aucun code dans l'e-mail reçu");
+  return { a: m.a, code: c[1]! + c[2]! };
+}
