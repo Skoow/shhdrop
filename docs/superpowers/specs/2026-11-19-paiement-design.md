@@ -130,7 +130,7 @@ Client HTTP : délai total 20 s, TLS vérifié (certificats racine de l'image), 
 
 ## 5. Données gardées, idempotence, cycle de vie
 
-### 5.1 `paiements.db` (schéma 1)
+### 5.1 `paiements.db` (schéma 2)
 
 ```
 passes(q BLOB(32) PK, offre INTEGER (1 Plus, 2 Pro), debut_jour, fin_jour,
@@ -141,9 +141,13 @@ commandes(id BLOB(16) PK, q BLOB(32), offre, jours (30/365), renouvelle (0/1),
           cree_jour, garde_jour) WITHOUT ROWID
 refs(r BLOB(32) PK = SHA-256(« shhdrop/v2/paiement/ref » ‖ 0x00 ‖ fournisseur ‖ 0x00 ‖ référence),
            commande BLOB(16), jour) WITHOUT ROWID
+-- schéma 2 (jetons, §7) ; une base du schéma 1 est migrée à l'ouverture :
+passes += emis_jour, emis_n            -- émissions du jour par pass (borne S9)
+cles_jetons(jour, offre, sk BLOB PKCS#8) PK(jour, offre) WITHOUT ROWID
+depenses(h BLOB(32) PK = SHA-256(jeton), jour) WITHOUT ROWID
 ```
 
-- Fichier `SHH_DATA_DIR/paiements.db`, 0600, mêmes PRAGMA que `shares.db` (`secure_delete`, WAL), une connexion. **Sauvegardé chaque jour avec `comptes.db`** (perdre la base = perdre les pass payés ; plan, tâche 9).
+- Fichier `SHH_DATA_DIR/paiements.db`, 0600, mêmes PRAGMA que `shares.db` (`secure_delete`, WAL), une connexion. **Sauvegardé chaque jour avec `comptes.db`** (perdre la base = perdre les pass payés) : fait (tâche 9, `deploy/sauvegarder.sh`, `deploy/README.md` §12.4, §13.3), dans son propre fichier chiffré, **sans les clés privées des jetons** (retirées de la copie, `VACUUM` compris) ; à la restauration, aucune clé n'est remise et tout jeton émis avant ne passe plus.
 - `abonnement` : identifiant d'abonnement du prestataire (`sub_…`, `I-…`), seul texte gardé, **en clair parce qu'il sert à résilier** ; aucune autre référence en clair.
 
 ### 5.2 Le pass `P` et son empreinte `Q`
@@ -184,13 +188,14 @@ Dans une transaction : `fin_jour` = max(`fin_jour`, aujourd'hui) + 30 ou 365 jou
 
 ### 6.1 Sur l'appareil
 
-- Base IndexedDB `shhdrop-pass` (module `web/src/paiement/`), chiffrée comme la session du compte (`account/persist.ts`) : clé AES-256-GCM **non extractible** gardée dans la base ; honnêtement, cela ne protège que d'une lecture naïve du stockage (dit sur la page). Enregistrements : `P`, offre, rythme, moyen, commande en attente oui/non. **Exception écrite** à « aucun stockage navigateur » (`source-rules.test.ts`), comme le compte.
+- Base IndexedDB `shhdrop-pass` (module `web/src/paiement/`), chiffrée comme la session du compte (`account/persist.ts`) : clé AES-256-GCM **non extractible** gardée dans la base ; honnêtement, cela ne protège que d'une lecture naïve du stockage (dit sur la page). Enregistrements : `P`, offre, rythme, moyen, commande en attente oui/non, **pays déclaré** (pour la note de vente faite sur l'appareil, §9.3 ; jamais renvoyé au serveur) ; jetons à part (enregistrements `j:`, §7). **Exception écrite** à « aucun stockage navigateur » (`source-rules.test.ts`), comme le compte.
 - « Oublier ce pass » efface l'enregistrement ; perdre l'appareil sans compte = perdre le pass (dit avant le paiement : « Sans compte, votre offre ne vit que sur cet appareil »). **DP-7 (à valider)** : pas de « clé de secours » à recopier au lancement (simplicité) ; le compte la remplace.
 
 ### 6.2 Dans le compte (facultatif)
 
 - Coffre de **profil** (`pass`, champ texte existant) : `"shp1:" ‖ base64url(P)` (plusieurs pass : séparés par « , », 8 au plus). Le serveur du compte ne sait pas ouvrir ce coffre… **sauf** le séquestre du profil (conception du compte, R-D1) : avec la clé du serveur et la base, un exploitant peut ouvrir les profils, donc les pass. **DP-8 (à valider)** : ranger le pass dans le coffre **privé** (ouvert seulement par le mot de passe), pas dans le profil : le champ `pass` du profil reste vide. Plan, tâche 8.
-- La page Offres (page séparée, sans module de compte) ne lit pas le compte : le rangement se fait depuis l'application, à la connexion suivante (« 1 offre sur cet appareil : la ranger dans votre compte ? »).
+- La page Offres (page séparée, sans module de compte) ne lit pas le compte : le rangement se fait depuis l'application, à la connexion suivante.
+- **Fait (tâche 8, DP-8 appliquée)** : `web/src/account/pass.ts`. Champ `pass` facultatif du coffre **privé** (absent tant qu'il est vide : le JSON d'un coffre sans pass ne change pas) ; à l'ouverture d'une session, après la fusion de l'historique, chaque côté reçoit ce qui lui manque (pass de l'appareil écrits au coffre, pass du coffre rangés sur l'appareil) ; une commande encore en attente ne part pas ; le profil n'est pas touché. **Écart, à valider** : rangement automatique, sans la question « la ranger dans votre compte ? » (le coffre privé n'est lisible qu'avec le mot de passe : rien n'est montré au serveur du compte). Les jetons ne sont pas rangés (valables deux jours au plus).
 
 ### 6.3 Apps (D42-20)
 
@@ -198,15 +203,16 @@ Même format : `P` en base64url, en-tête `X-Shh-Pass`, mêmes routes ; stockage
 
 ## 7. Jetons anonymes (Privacy Pass, RSA aveugle)
 
-**État** : interface serveur prête (`paiement.Service` : « paiement confirmé → réserve de N jetons » par période, et `Prendre(P, n)` qui la décrémente), émission RSA aveugle **à faire** (plan, tâches 6 et 7). Paramètres fixés ici pour que les apps et le salon puissent s'y fier :
+**État** : fait (tâches 6 et 7) pour les **partages** ; la création d'un salon payant ne dépense pas encore de jeton (salons payants non codés). Paramètres, fixés pour que les apps et le salon puissent s'y fier :
 
-- **Protocole** : Privacy Pass, émission RFC 9578 type **0x0002** (RSA aveugle publiquement vérifiable), **RSABSSA-SHA384-PSS-Deterministic**, module de 2 048 bits (RFC 9474). **Signalement S8 (faible, exactitude)** : §38.4 écrit « Randomized » ; RFC 9578 impose la variante **Deterministic** pour le type 2 (le nonce du jeton tient lieu d'aléa) ; corrigé ici.
-- **Bibliothèques** (décision du propriétaire) : site et apps, moteur Rust `blind-rsa-signatures` **= 0.19.0** (dernière publiée le 19 novembre, à épingler exactement dans `Cargo.lock` après revue, §12) ; serveur, `github.com/cloudflare/circl` **v1.6.5** (`blindsign/blindrsa`). Vecteurs communs : `engine/vectors/privacypass.json` (RFC 9474 annexe A et nos cas : `TokenRequest`, `TokenResponse`, jeton final), rejoués en Rust, en wasm et en Go.
-- **Clés d'émission** : une paire par **offre** (Plus, Pro) et par **mois UTC** ; jetons valables le mois de leur clé et le suivant. Clés publiques publiées dans le manifeste de version signé (§28.2), pour que tout le monde reçoive la même. Clés privées : fichiers secrets (`SHH_JETONS_CLES_DIR`), hors de `SHH_DATA_DIR`.
-- **Émission** : `POST /api/jetons` (`X-Shh-Pass`, corps : jusqu'à **5** `TokenRequest`) → `TokenResponse` signées ; `jetons` décrémenté dans la même transaction ; l'appareil demande à une heure aléatoire, bien avant l'usage, et garde ses jetons à côté du pass (IndexedDB chiffrée ; coffre privé du compte).
-- **Dépense** : `Authorization: PrivateToken token=<base64url>` sur `POST /api/shares` (partage Plus/Pro) et sur la création d'un salon payant ; le serveur vérifie la signature (clé du mois ou du précédent), refuse un jeton déjà vu (`spent`, empreinte SHA-256 seule, sans date, dans `paiements.db`, purgée à la fin de l'époque), fixe le niveau (`tier`) du partage ou du salon et **ne garde rien** qui relie le partage au jeton.
-- **Ce que voit le serveur** : à l'émission, `P` (donc le pass) et le nombre de jetons ; à la dépense, un jeton valable pour une offre, jamais lequel des pass l'a obtenu (anonymat inconditionnel de la signature aveugle) ; deux partages payants du même pass ne sont pas reliables.
-- **Limite honnête** : la date d'émission et la date de dépense, rapprochées, peuvent relier un pass à un partage si très peu de personnes paient (petit anonymat) ; d'où l'émission anticipée à heure aléatoire et par lots. À dire sur la page Confidentialité.
+- **Protocole** : Privacy Pass, émission RFC 9578 type **0x0002** (RSA aveugle publiquement vérifiable), **RSABSSA-SHA384-PSS-Deterministic**, module de 2 048 bits (RFC 9474). **Signalement S8 (faible, exactitude)** : §38.4 écrit « Randomized » ; RFC 9578 impose la variante **Deterministic** pour le type 2 (le nonce du jeton tient lieu d'aléa) ; corrigé ici. Défi (`TokenChallenge`) : `0x0002 ‖ len(issuer) ‖ issuer ‖ 0x00 ‖ 0x0000` (contexte et origines vides), `issuer` = hôte de `SHH_ORIGIN` ; `token_key_id` = SHA-256 de la clé publique SPKI (RSA-PSS, SHA-384, MGF1-SHA-384, sel de 48 octets ; 72 octets d'en-tête puis PKCS #1) ; jeton de 354 octets (472 caractères base64url).
+- **Bibliothèques** (décision du propriétaire) : site et apps, moteur Rust `blind-rsa-signatures` **= 0.19.0** (fonction `jetons` de `shhdrop-core`, épinglée dans `Cargo.lock`), dans un **module wasm à part** (`engine/jetons-wasm`, ≈ 56 Ko en brotli, chargé seulement par le portefeuille de jetons : le moteur des partages reste sous son plafond de 156 000 octets, 151 Ko mesurés) ; serveur, `github.com/cloudflare/circl` **v1.6.5** (`blindsign/blindrsa`, dépendance directe de `server/go.mod`). Vecteurs communs : `engine/vectors/privacypass.json` (clé de test, `TokenRequest`, `TokenResponse`, jeton final, défi), rejoués en Rust, en wasm (vitest) et en Go.
+- **Clés d'émission (S9)** : une paire par **offre** (Plus, Pro) et par **jour UTC**, tirée par le serveur à la première demande du jour et gardée dans `paiements.db` (`cles_jetons`) ; un jeton n'est accepté que **le jour de sa clé et le lendemain**, puis la clé est effacée (passe quotidienne). Clés publiques : `GET /api/paiement/jetons/cles` (jour et offre de chaque clé, SPKI, émetteur). **Écart** au plan : ni fichiers `SHH_JETONS_CLES_DIR`, ni publication dans le manifeste de version (impossible pour une clé du jour) : voir S17.
+- **Émission** : `POST /api/paiement/jetons` (`X-Shh-Pass`, corps : 1 à **5** `TokenRequest`) → `TokenResponse` ; tout message aveuglé hors du module est refusé **avant** tout décompte ; réserve de la période décrémentée dans la même transaction ; **au plus 10 (Plus) ou 20 (Pro) jetons par pass et par jour UTC** (`EmisParJour`). L'appareil demande des lots de 3 quand il n'a plus de jeton valable, et les garde chiffrés à côté du pass (`web/src/paiement/jetons.ts`, enregistrements `j:`) ; les jetons d'une clé échue sont jetés.
+- **Dépense** : `Authorization: PrivateToken token=<base64url>` sur `POST /api/shares` d'un partage Plus ou Pro ; le serveur vérifie la signature (clé du jour ou de la veille) ; la **formule du partage est celle de la clé** qui a signé (Plus ou Pro), puis palier, durée et ouvertures sont vérifiés contre elle (§11) ; il refuse un jeton déjà vu (`depenses` : SHA-256 du jeton et jour, purgée après deux jours), rend le jeton si la création échoue ensuite, fixe la formule de l'envoi **en mémoire** (jamais en base) et **ne garde rien** qui relie le partage au jeton.
+- **Révocation (S9)** : un pass révoqué (remboursement, litige, `shhdrop admin paiement revoquer`) ne reçoit plus aucun jeton ; ceux qu'il a déjà reçus meurent **au plus tard le surlendemain** de leur émission ; entre-temps, au plus `EmisParJour` partages payants par jour d'émission peuvent encore être créés. **Limite restante, écrite** : un jeton émis ne peut pas être annulé seul sans relier jeton et pass (ce qui détruirait l'anonymat) ; la durée courte des clés est la seule borne.
+- **Ce que voit le serveur** : à l'émission, `P` (donc le pass), le nombre de jetons et le jour ; à la dépense, un jeton valable pour une offre et le jour de sa clé, jamais lequel des pass l'a obtenu (anonymat inconditionnel de la signature aveugle) ; deux partages payants du même pass ne sont pas reliables par le jeton.
+- **Limites honnêtes** : (1) le jour de la clé réduit l'ensemble d'anonymat aux pass de la même offre qui ont pris des jetons ce jour-là ou la veille (S19) ; (2) un lot est demandé au moment du premier partage payant sans jeton en réserve : l'émission et la première dépense se suivent de quelques secondes, et l'heure seule peut alors les rapprocher si peu de personnes paient (S16) ; (3) rien ne prouve à l'appareil que tous reçoivent la même clé du jour (S17). À dire sur la page Confidentialité.
 
 ## 8. Limites et abus
 
@@ -239,6 +245,7 @@ Même format : `P` en base64url, en-tête `X-Shh-Pass`, mêmes routes ; stockage
 - **Stripe** : facture créée par Stripe (`invoice_creation` pour un paiement unique ; automatique pour un abonnement), envoyée par Stripe à l'e-mail saisi chez Stripe, avec les mentions réglées par le propriétaire dans Stripe.
 - **PayPal et crypto** : aucune facture automatique ; **le propriétaire l'émet** depuis son outil de facturation, à partir de l'export du prestataire (PayPal : reçu PayPal + facture du propriétaire ; crypto : sur demande, avec le numéro de commande). Signalement S4.
 - Notre serveur **n'émet aucune facture** et ne garde aucune donnée de facturation.
+- **Note de vente sur l'appareil (fait, S4)** : sur `/offres/retour`, paiement reçu, « Télécharger la note de vente » produit un fichier HTML autonome (aucun script, aucune ressource externe, CSP dans le fichier), en français, assemblé sur l'appareil (`web/src/paiement/note.ts`) à partir du pass gardé (offre, durée, moyen, pays déclaré, date de commande), de l'état du pass (fin de la période) et du régime de TVA publié par `GET /api/paiement` (`tva` : régime et taux appliqué par pays, mêmes arrondis que `Ventiler`). Aucune requête n'emporte le pays, le montant ou une identité ; le serveur n'apprend pas qu'une note est faite. Les mentions qui dépendent du propriétaire (nom, adresse, SIREN, numéro de TVA, **numéro de la série continue**) sont en « [À COMPLÉTER] » (`VENDEUR` dans `note.ts`). **Limite** : une série continue exige le registre du vendeur ; la note porte une référence unique tirée sur l'appareil (S18). Un renouvellement est une nouvelle vente que l'appareil ne voit pas : la note ne porte que sur la période affichée.
 
 ### 9.4 Droit de la consommation
 
@@ -273,7 +280,7 @@ Désactivé par défaut, comme `SHH_COMPTES` : sans `SHH_PAIEMENT=1`, aucune rou
 
 Règles (refus de démarrer, message sans valeur secrète) : un prestataire **à moitié configuré** ; un fichier secret dans `SHH_DATA_DIR`, illisible, vide, de plus de 1 Kio, ou aux droits plus larges que 0600 ; une clé Stripe qui n'a pas le préfixe du mode ; un secret Stripe sans `whsec_` ; des plans PayPal incomplets ou en double ; `SHH_PAIEMENT=1` sans prestataire.
 
-**Sortie réseau** (signalement S1, **bloquant pour la mise en ligne**) : le serveur Go n'a **aucune route vers Internet** (`compose.yaml`, réseau `internal`). Le paiement demande trois sorties HTTPS : `api.stripe.com`, `api-m.paypal.com` (ou bac à sable), `api.nowpayments.io`. Correction prévue (plan, tâche 10) : trois relais `shhcheck relais` (comme le relais SMTP), un par cible fixe `hôte:443`, sur 172.30.53.4 à .6, `extra_hosts` vers eux ; TLS de bout en bout vérifié par le serveur.
+**Sortie réseau** (signalement S1, **bloquant pour la mise en ligne**) : le serveur Go n'a **aucune route vers Internet** (`compose.yaml`, réseau `internal`). Le paiement demande trois sorties HTTPS : `api.stripe.com`, `api-m.paypal.com` (ou bac à sable), `api.nowpayments.io`. **Corrigé (tâche 10)** : trois relais `shhcheck relais` (comme le relais SMTP), un par cible fixe `hôte:443` (production ou bac à sable selon `SHH_PAIEMENT_ESSAI`, fixé par `deploy.sh`), sur 172.30.53.4 à .6, profils `paiement-stripe`, `paiement-paypal`, `paiement-nowpayments`, démarrés seulement pour un prestataire dont les secrets sont dans `secrets/` ; `extra_hosts` vers eux ; TLS de bout en bout vérifié par le serveur ; client sans connexion gardée (le relais coupe à 60 s). `SHH_PAIEMENT` et `SHH_PAIEMENT_ESSAI` sont posés dans `compose.yaml` (`"0"` aujourd'hui), jamais dans `deploy/.env` ; `deploy.sh` vérifie secrets et réglages (`deploy/README.md` §13). Tests : `make test-sortie` (partie statique passée ; partie réseau réel : démon Docker requis), `make lint-deploy`.
 
 ## 11. Droits et format, pour les apps et le salon
 
@@ -281,8 +288,8 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 
 | Droit | Plus | Pro | Disponible |
 |---|---|---|---|
-| `partage_plus` (limites Plus : 10 Go, 3 j, 10 ouvertures) | oui | — | à la tâche P2 du plan principal |
-| `partage_pro` (limites Pro : 30 Go, 7 j, 20 ouvertures) | — | oui | idem |
+| `partage_plus` (limites Plus : 10 Gio, 2 ou 3 j, 10 ouvertures) | oui | — | **fait** (tâche 12) |
+| `partage_pro` (limites Pro : 30 Gio, 2, 3 ou 7 j, 20 ouvertures) | — | oui | **fait** (tâche 12) |
 | `premiere_ouverture` (compte à rebours au premier déverrouillage) | oui | oui | §38.9.1, à coder |
 | `salon_plus`, `salon_pro` (§38.8.1 : 3 j, 20 personnes, 5 Go ; 7 j, 50 personnes, 20 Go) | `salon_plus` | `salon_pro` | à coder |
 | `appel_audio` | oui (**DP-14, à valider**) | oui | **non : bientôt** |
@@ -291,11 +298,16 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 - Un jeton dépensé à la création d'un salon fixe le niveau du salon (`tier`) ; les appels liront ce niveau, jamais un pass ni un compte (même règle que les fonctions de §38.9.0 point 3).
 - **Appels : jamais vendus ni promis comme disponibles** tant qu'ils n'existent pas : sur la page Offres et les cartes des offres, une ligne « Appels audio et vidéo dans les salons · bientôt » (Pro) et « Appels audio · bientôt » (Plus), sans aucune incidence sur le prix ; les CGV disent que l'offre ne comprend pas les appels aujourd'hui. Spécification des appels à écrire avant tout code (salon v3 §8 : TURN relais seulement, SFrame, coût en bande passante).
 - Version du format : champ `v: 1` dans la réponse d'état ; un droit inconnu est ignoré par un client ancien.
+- **Limites payantes appliquées (tâche 12)** : contrôle **côté site et côté serveur**. Paliers de taille payants (`PAID_BUCKETS` du moteur, vecteurs `engine/vectors/v5-paliers.json`) ; le serveur (`share/tier.go`) fixe la formule de l'envoi d'après le jeton dépensé, vérifie palier, durée (Plus 48 ou 72 h, Pro 48, 72 ou 168 h), ouvertures (10, 20) et la fenêtre d'envoi (24 h) ; quotas du jour à part pour le payant (Plus 40 Gio par connexion /64 et 80 Gio par /48, Pro 100 et 200 Gio). Le site ne propose une formule payante que si un pass payé est sur l'appareil (Options) ; changer de formule recommence l'envoi. **Pas encore faits** : `premiere_ouverture`, salons payants, et une réserve de stockage séparée pour le payant (les partages payants partagent `SHH_STORAGE_MAX` avec les gratuits).
 
 ## 12. Chaîne d'approvisionnement
 
 - **Aucun SDK de paiement** : ni `stripe-go`, ni SDK PayPal, ni bibliothèque NOWPayments. Raisons : surface d'attaque, mises à jour fréquentes, dépendances transitives ; quatre appels et trois vérifications de signature tiennent dans la bibliothèque standard. Le format des événements Stripe a été relu dans `stripe-go` v84.4.0 (module téléchargé depuis `proxy.golang.org`, non ajouté au dépôt) : signature `t`/`v1`, tolérance 300 s, champs `parent.subscription_details` de la version « clover ».
-- **Privacy Pass** (tâches 6 et 7) : `github.com/cloudflare/circl` v1.6.5 (BSD-3-Clause, Cloudflare, déjà audité pour `blindrsa` par l'équipe de recherche de Cloudflare ; dépendances : `golang.org/x/sys`, `golang.org/x/crypto`) ; `blind-rsa-signatures` 0.19.0 (MIT, Frank Denis, dépend de `crypto-bigint`, `crypto-primes`, `digest`, `rand`, `sha2`…) : revue `cargo tree`, `cargo audit`, licences et taille du .wasm avant ajout. **Rien n'est ajouté aujourd'hui.**
+- **Revue des jetons (19 novembre, tâches 6 et 7)** :
+  - **Go** : `github.com/cloudflare/circl` **v1.6.5** (BSD-3-Clause, Cloudflare ; `blindsign/blindrsa`, celui de l'implémentation Privacy Pass de Cloudflare) ; aucune dépendance nouvelle à la compilation (`golang.org/x/sys` v0.50.0 était déjà là ; `golang.org/x/crypto` v0.54.0 n'apparaît que dans le graphe de modules). `go.sum` porte les empreintes.
+  - **Rust** (`Cargo.lock`, fonction `jetons` de `shhdrop-core` seulement) : `blind-rsa-signatures` **0.19.0** (MIT, Frank Denis) et ses dépendances directes : `rsa` 0.10.0, `crypto-bigint` 0.7.11, `digest` 0.11.3, `rand` 0.10.4, `rand_core` 0.10.1 (RustCrypto et rust-random, MIT ou Apache-2.0), `crypto-primes` 0.7.2 (Apache-2.0 ou MIT, Entropy), `hmac-sha256` 1.1.15 et `hmac-sha512` 1.1.13 (ISC, Frank Denis), `ct-codecs` 1.1.8 (MIT, Frank Denis), `derive_more` 2.1.1 et `derive-new` 0.7.0 (MIT, macros de compilation) ; puis `pkcs1` 0.8.0, `pkcs8` 0.11.0, `spki` 0.8.1, `der` 0.8.3, `const-oid` 0.10.2 (RustCrypto). Toutes les licences sont compatibles (MIT, Apache-2.0, ISC, BSD-3-Clause). `rand` passe de 0.10.3 à 0.10.4 pour tout le moteur. `getrandom` 0.4.3 avec `wasm_js` (aléa de WebCrypto dans le navigateur).
+  - **Avis de sécurité** : `cargo audit` **non lancé** (outil absent de la machine ; son installation n'a pas été autorisée ici) : à lancer avant la première vente. Point connu : RUSTSEC-2023-0071 (« Marvin », temps non constant des opérations à **clé privée** de `rsa` ≤ 0.9) ; ici `rsa` 0.10.0 (arithmétique en temps constant de `crypto-bigint` 0.7), et le moteur ne fait **aucune** opération à clé privée hors des tests (aveuglement, finalisation et vérification utilisent la clé publique) ; la signature est faite par le serveur Go.
+  - **Taille** : module `jetons` à part, ≈ 56 Ko en brotli ; le moteur des partages, sans lui, reste sous son plafond (`check-dist`).
 
 ## 13. Ce que le propriétaire doit fournir
 
@@ -314,7 +326,11 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 8. Réglages chez Stripe : identité du vendeur et mentions sur les factures, Stripe Tax (ou non), Radar, e-mails de reçus et de rappel ; chez PayPal : nom de marque, e-mails ; chez NOWPayments : monnaies, conversion automatique en euros ou non (choix fiscal, à voir avec le comptable).
 9. Comptable : tenue du registre OSS et des factures depuis les exports, traitement des paiements crypto (valeur en euros à la date de réception).
 10. Clés de production (`sk_live_…`, application PayPal « Live », NOWPayments production), webhooks de production déclarés de même.
-11. Validation des DP-1 à DP-14 et des signalements ci-dessous.
+11. Validation des DP-1 à DP-14 et des signalements ci-dessous (S16 à S19 en particulier).
+12. **Mentions de la note de vente** (`VENDEUR`, `web/src/paiement/note.ts`, aujourd'hui « [À COMPLÉTER] ») : nom ou dénomination, adresse, SIREN, numéro de TVA intracommunautaire (sauf franchise), et le choix pour la **série continue** des numéros (S18).
+13. **Activation** : `SHH_PAIEMENT: "1"` (et `SHH_PAIEMENT_ESSAI` selon le cas) dans `deploy/compose.yaml`, commité ; fichiers `shh_stripe_cle`, `shh_stripe_webhook`, `shh_paypal_secret`, `shh_nowpayments_cle`, `shh_nowpayments_ipn` (compte 65532, 0400) ; `SHH_TVA` et les réglages PayPal dans `deploy/.env` (`deploy/README.md` §13) ; sauvegarde du §12.4 en place le même jour.
+14. **CLAUDE.md** : la phrase « pas encore ajoutées au 19 novembre » de l'exception des jetons est à mettre à jour par le propriétaire (les deux bibliothèques sont ajoutées, aux versions épinglées).
+15. Avant la vente : `cargo audit` sur `engine/Cargo.lock` et `govulncheck` sur `server/` ; `make test-sortie` sur une machine avec Docker (partie réseau réel).
 
 ## 14. Décisions prises par défaut (à valider)
 
@@ -339,18 +355,22 @@ Liste fermée de droits, en texte, rendue par `/api/paiement/etat` et attachée 
 
 | # | Gravité | Endroit | Problème | Correction |
 |---|---|---|---|---|
-| S1 | **Bloquante** | `deploy/compose.yaml` (réseau `internal`) | Le serveur n'a aucune sortie vers Internet : aucun appel à Stripe, PayPal ou NOWPayments ne peut aboutir en production | Trois relais à cible fixe (plan, tâche 10) ; à défaut, rien ne part et la commande échoue proprement (502) |
-| S2 | **Bloquante** | `server/internal/share` | Le serveur ne connaît **aucune limite Plus/Pro** (paliers 10 et 30 Go, 7 jours, 20 ouvertures, première ouverture) : un pass payé ne donne **rien d'utilisable** aujourd'hui | Ne pas poser de clés de production avant les tâches P2 (limites payantes) et 6–7 (jetons) ; la page dit déjà ce qui est disponible |
+| S1 | ~~Bloquante~~ **corrigée** | `deploy/compose.yaml` (réseau `internal`) | Le serveur n'a aucune sortie vers Internet : aucun appel à Stripe, PayPal ou NOWPayments ne peut aboutir en production | Fait : trois relais à cible fixe (tâche 10, §10) ; partie réseau réel de `test-sortie.sh` à passer sur une machine avec Docker |
+| S2 | ~~Bloquante~~ **corrigée pour les partages** | `server/internal/share` | Le serveur ne connaissait aucune limite Plus/Pro | Fait : paliers, durées, ouvertures, quotas, contrôle site et serveur, jeton dépensé (tâche 12, §11) ; restent `premiere_ouverture` et les salons payants : ne pas les annoncer comme disponibles |
 | S3 | Élevée, légal | §9.1 | Crypto : une seule preuve de localisation (pays déclaré) ; au-delà du seuil OSS, deux preuves sont exigées | Rester sous le seuil, ou n'accepter la crypto qu'en `franchise`/`france`, ou demander une seconde preuve ; avis du comptable |
-| S4 | Élevée, légal | §9.3 | PayPal et crypto n'émettent pas de facture ; note obligatoire dès 25 € TTC | Le propriétaire émet les factures depuis son outil (export mensuel) ; ou n'ouvrir l'annuel qu'à la carte |
+| S4 | Élevée, légal | §9.3 | PayPal et crypto n'émettent pas de facture ; note obligatoire dès 25 € TTC | Fait en partie : note de vente téléchargeable sur l'appareil, mentions du vendeur à compléter (§9.3) ; reste au propriétaire la série continue (S18) et ses propres factures depuis son outil |
 | S5 | Moyenne, légal | §9.4 | Abonnements : rappel avant reconduction annuelle non fait par nous (aucun e-mail) | Activer le rappel de Stripe et PayPal ; avis du juriste |
 | S6 | Moyenne, confidentialité | §3, §5.1 | Notre base relie commande ↔ `Q`, le prestataire commande ↔ identité : ensemble, ils disent qui a payé quel pass (pas quels partages) | Assumé ; dit sur la page Confidentialité ; purge §5.7 |
 | S7 | Moyenne, exploitation | §6.3 | App Store et Google Play : vendre un service numérique hors de leur paiement peut faire refuser les apps | Aucun achat dans les apps, lecture du pass seulement |
 | S8 | Faible, exactitude | spec §38.4 | « RSABSSA-SHA384-PSS-Randomized » contredit RFC 9578 (type 2 : Deterministic) | Corrigé en §7 |
-| S9 | Moyenne, sécurité | §5.5 | Les jetons déjà émis survivent à une révocation | Lots de 5 au plus ; époque mensuelle ; dit dans les CGV |
+| S9 | Moyenne, sécurité | §5.5, §7 | Les jetons déjà émis survivent à une révocation | Fait : clés du jour (jeton valable le jour de sa clé et le lendemain), au plus 10 ou 20 jetons par pass et par jour, lots de 5 au plus, aucune clé dans les sauvegardes ; limite restante écrite au §7 ; à dire dans les CGV |
 | S10 | Moyenne, exploitation | §4.1 | Un remboursement d'une facture d'abonnement Stripe n'est pas toujours relié à sa commande (le PaymentIntent d'une facture ne porte pas nos métadonnées) | Révocation à la main par l'identifiant de commande ; plus tard, lire `invoice_payment.paid` |
-| S11 | Moyenne, exploitation | §5.1 | `paiements.db` perdue = pass payés perdus | Sauvegarde quotidienne chiffrée avec `comptes.db` (plan, tâche 9) avant toute vente |
+| S11 | Moyenne, exploitation | §5.1 | `paiements.db` perdue = pass payés perdus | Fait : sauvegarde quotidienne chiffrée avec `comptes.db` (tâche 9) ; un pass payé dans les 24 h d'avant la perte reste perdu (remboursement à la main, README §12.5) |
 | S12 | Faible, exploitation | §8 | Webhooks soumis à 60 requêtes par minute par adresse : un pic de renouvellements peut être retardé | Assumé : les prestataires réessaient ; à revoir si des retards s'observent |
 | S13 | Moyenne, exactitude | §38.8.2 | Pro annuel à 200 € : marge brute 57,7 %, sous la cible ; frais Stripe (≈ 1,5 % + 0,25 €) et PayPal (≈ 3,4 % + 0,35 €) différents de ceux d'un vendeur officiel, et la TVA à 27 % pèse sur le HT | Refaire le tableau de marge de §38.8.3 avec les vrais frais avant la première vente |
 | S14 | Moyenne, légal | §1 | « Appels audio et vidéo · bientôt » affiché à côté d'un prix peut passer pour une promesse | Mention « non compris aujourd'hui » dans les CGV et sur la carte ; aucun effet sur le prix |
 | S15 | Faible, confidentialité | §2 | La page Offres demande le pays de résidence | Nécessaire à la TVA ; jamais gardé par nous ; dit sous le champ |
+| S16 | Moyenne, confidentialité | §7, `web/src/paiement/jetons.ts` | Un lot de jetons est demandé quand le premier partage payant en manque : émission et première dépense se suivent de quelques secondes ; avec peu d'acheteurs, l'heure peut relier un pass à ce partage (la conception prévoyait une émission anticipée à heure aléatoire) | Demander un lot en avance, à une heure aléatoire, dès qu'un pass payé est sur l'appareil (au chargement de l'application), et ne dépenser que des jetons obtenus au moins quelques minutes avant |
+| S17 | Moyenne, confidentialité | §7 | Clés du jour servies par l'API : rien ne prouve à l'appareil que tous reçoivent la même ; un serveur malveillant pourrait donner une clé par personne et reconnaître ses jetons | Comparer les clés par un second chemin (par exemple les apps et le site, ou un journal public des clés du jour), ou revenir à des clés publiées dans le manifeste signé (au prix d'une révocation moins rapide) |
+| S18 | Moyenne, légal | §9.3 | La note de vente ne peut pas porter un numéro de la série continue du vendeur (aucun registre sur l'appareil, aucun compteur chez nous) | Choix du propriétaire : compteur de ventes dans `paiements.db`, rendu par `/api/paiement/etat` (sans identité ni montant), ou factures émises par son outil seulement, la note restant un récapitulatif |
+| S19 | Faible, confidentialité | §7 | Le jour de la clé dit le jour d'émission : l'ensemble d'anonymat est celui des pass de la même offre servis ce jour-là ou la veille | Assumé (prix de S9) ; à dire sur la page Confidentialité |
