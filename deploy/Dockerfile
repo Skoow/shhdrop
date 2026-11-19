@@ -39,12 +39,20 @@ RUN CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$CARGO_HOME=/cargo" \
     cargo build --release --target wasm32-unknown-unknown -p shhdrop-wasm --locked \
  && wasm-bindgen --target web --remove-name-section --remove-producers-section --experimental-reset-state-function \
     --out-dir /out/pkg --out-name shhdrop_wasm target/wasm32-unknown-unknown/release/shhdrop_wasm.wasm
+# Moteur du salon (crate shhdrop-salon-wasm, profil wasm-salon) : une commande cargo à part, comme
+# build-engine.mjs (fonctionnalités non unifiées avec le moteur des partages). Importé par le site
+# depuis l'ouverture des comptes (règles du pseudo) et par les écrans du salon.
+RUN CARGO_ENCODED_RUSTFLAGS="--remap-path-prefix=$CARGO_HOME=/cargo" \
+    cargo build --profile wasm-salon --target wasm32-unknown-unknown -p shhdrop-salon-wasm --locked \
+ && wasm-bindgen --target web --remove-name-section --remove-producers-section --experimental-reset-state-function \
+    --out-dir /out/salon/pkg --out-name shhdrop_salon_wasm target/wasm32-unknown-unknown/wasm-salon/shhdrop_salon_wasm.wasm
 
 # Le pkg seul, pour la CI (job repro-docker de .github/workflows/ci.yml), qui le compare à celui
 # de ses propres builds ; n'entre pas dans l'image :
 #   docker build -f deploy/Dockerfile --target engine-pkg --output type=local,dest=<dossier> .
 FROM scratch AS engine-pkg
 COPY --from=engine /out/pkg /pkg
+COPY --from=engine /out/salon/pkg /salon/pkg
 
 # --- Site -------------------------------------------------------------------------------
 FROM node:26.13.0-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS web
@@ -59,8 +67,9 @@ COPY web/package.json web/package-lock.json ./
 # --ignore-scripts : aucun script d'installation d'une dépendance n'est exécuté.
 RUN npm ci --ignore-scripts
 COPY web/ ./
-# Moteur construit à l'étape précédente ; build:engine vérifie seulement sa présence.
+# Moteurs construits à l'étape précédente ; build:engine vérifie seulement leur présence.
 COPY --from=engine /out/pkg ./src/engine/pkg
+COPY --from=engine /out/salon/pkg ./src/salon/pkg
 # check-dist.mjs : le build de production est conforme (variantes .br et .gz exactes,
 # aucun code de démo, aucune adresse http(s):// externe dans index.html, le CSS et
 # pdf-frame.html). Un écart arrête le build de l'image.

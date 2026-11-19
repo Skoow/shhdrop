@@ -64,15 +64,15 @@ describe("Home (UI §9.1)", () => {
       "Offres",
       "Vos questions",
     ]);
-    expect(document.querySelectorAll("[data-how-card]")).toHaveLength(3);
+    expect(document.querySelectorAll("[data-how-card]")).toHaveLength(4); // ajouter, chiffrer, partager, effacé (19 novembre, 5)
     // « Comment ça marche » (19 novembre, 3, maquette « La trame ») : trois illustrations fixes,
     // cachées aux lecteurs d'écran, et trois étapes numérotées ; l'infographie a sa section, titrée
     // par son h2 visible, avec ses sept étapes à droite.
     expect(document.querySelector(".hero [data-demo]")).toBeNull();
     expect(document.querySelector("#comment [data-demo]")).toBeNull();
     expect(document.querySelector(".demo-sec [data-demo]")!.getAttribute("aria-labelledby")).toBe("demo-title");
-    expect([...document.querySelectorAll("#comment svg.ill")].map((s) => s.getAttribute("aria-hidden"))).toEqual(["true", "true", "true"]);
-    expect([...document.querySelectorAll("ol.steps3 > li[data-how-card] .n")].map((e) => e.textContent)).toEqual(["1", "2", "3"]);
+    expect([...document.querySelectorAll("#comment svg.ill")].map((s) => s.getAttribute("aria-hidden"))).toEqual(["true", "true", "true", "true"]);
+    expect([...document.querySelectorAll("ol.steps3 > li[data-how-card] .n")].map((e) => e.textContent)).toEqual(["1", "2", "3", "4"]);
     const priv = [...document.querySelectorAll("[data-priv-card]")];
     expect(priv).toHaveLength(4);
     expect(priv.map((c) => c.querySelector("h3")!.textContent!.trim())).toEqual(["Partage sans compte", "Rien de lisible sur le serveur", "Photos et vidéos nettoyées", "Salon éphémère bientôt"]);

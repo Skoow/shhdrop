@@ -602,21 +602,26 @@
     -webkit-mask-size: 5px 5px;
     mask-size: 5px 5px;
   }
+  /* Plus effacé (19 novembre, 5) : la trame s'affine plus vite, « rie » commence à partir en
+     points, « n. » n'est presque plus que poussière. */
   .s1 .g {
-    --r: 2.5px;
+    --r: 2.2px;
   }
   .s2 .g {
-    --r: 1.95px;
+    --r: 1.55px;
+    opacity: 0.92;
   }
   .s3 .g {
-    --r: 1.8px;
-    color: var(--accent);
-  }
-  .s4 .g {
     --r: 1.25px;
     color: var(--accent);
-    opacity: 0.55;
+    opacity: 0.75;
   }
+  .s4 .g {
+    --r: 0.85px;
+    color: var(--accent);
+    opacity: 0.3;
+  }
+  .s3::before,
   .s4::before,
   .s4::after {
     content: attr(data-c);
@@ -624,26 +629,33 @@
     inset: 0;
     color: var(--accent);
     pointer-events: none;
-    -webkit-mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
-    mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
-    -webkit-mask-size: 8px 7px;
-    mask-size: 8px 7px;
-    transform: translate(0.3em, -0.08em);
-    opacity: 0.8;
+    -webkit-mask-image: radial-gradient(circle, #000 1.1px, transparent 1.8px);
+    mask-image: radial-gradient(circle, #000 1.1px, transparent 1.8px);
+    -webkit-mask-size: 9px 8px;
+    mask-size: 9px 8px;
+  }
+  .s3::before {
+    transform: translate(0.18em, -0.05em);
+    opacity: 0.45;
+  }
+  .s4::before {
+    transform: translate(0.4em, -0.1em);
+    opacity: 0.7;
   }
   .s4::after {
-    -webkit-mask-size: 11px 9px;
-    mask-size: 11px 9px;
-    -webkit-mask-position: 4px 3px;
-    mask-position: 4px 3px;
-    transform: translate(0.7em, 0.1em);
-    opacity: 0.45;
+    -webkit-mask-size: 13px 11px;
+    mask-size: 13px 11px;
+    -webkit-mask-position: 5px 4px;
+    mask-position: 5px 4px;
+    transform: translate(0.85em, 0.12em);
+    opacity: 0.35;
   }
   @media (forced-colors: active) {
     .g {
       -webkit-mask-image: none;
       mask-image: none;
     }
+    .s3::before,
     .s4::before,
     .s4::after {
       display: none;
@@ -666,6 +678,15 @@
     }
   }
   @media (max-width: 639px) {
+    /* Assurances : une colonne alignée à gauche, centrée dans la page (plus de ligne coupée au
+       hasard, 19 novembre, 5). */
+    .home:not(.compact) .meta {
+      flex-direction: column;
+      align-items: flex-start;
+      justify-self: center;
+      width: fit-content;
+      max-width: 100%;
+    }
     .home:not(.compact) .hero {
       gap: var(--sp-4);
       padding-block: var(--sp-3) var(--sp-6);

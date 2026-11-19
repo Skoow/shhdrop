@@ -25,10 +25,8 @@
 // feraient passer à wasm-bindgen un ancien .wasm resté dans engine/target.
 //
 // SHH_ENGINE_PREBUILT=1 : pkg/ a déjà été construit par la même commande dans une autre étape
-// (image Docker : étape Rust, deploy/Dockerfile) ; le script vérifie seulement sa présence. Le
-// module du salon n'y est pas encore (aucune page du site ne l'importe) : quand une page
-// l'importera, le build échouera sans lui (import introuvable) tant que deploy/Dockerfile ne le
-// construit pas.
+// (image Docker : étape Rust, deploy/Dockerfile) ; le script vérifie seulement la présence des
+// deux pkg/ (partages et salon).
 //
 // Usage : node scripts/build-engine.mjs (npm run build:engine).
 import { execFileSync } from "node:child_process";
@@ -42,8 +40,6 @@ const web = dirname(dirname(fileURLToPath(import.meta.url)));
 const engine = join(web, "..", "engine");
 const out = join(web, "src", "engine", "pkg");
 
-const FILES = ["shhdrop_wasm.js", "shhdrop_wasm.d.ts", "shhdrop_wasm_bg.wasm", "shhdrop_wasm_bg.wasm.d.ts"];
-
 /** Crate, nom de sortie, dossier pkg/ et options propres de wasm-bindgen. */
 const MODULES = [
   { crate: "shhdrop-wasm", profile: "release", name: "shhdrop_wasm", out, extra: ["--experimental-reset-state-function"] },
@@ -55,7 +51,7 @@ function run(cmd, args, cwd, env = process.env) {
 }
 
 if (process.env.SHH_ENGINE_PREBUILT === "1") {
-  const missing = FILES.filter((f) => !existsSync(join(out, f)));
+  const missing = MODULES.flatMap((m) => [".js", ".d.ts", "_bg.wasm", "_bg.wasm.d.ts"].map((x) => join(m.out, m.name + x))).filter((f) => !existsSync(f));
   if (missing.length) throw new Error(`SHH_ENGINE_PREBUILT=1 mais pkg/ incomplet : ${missing.join(", ")}`);
   console.log("build-engine : moteur déjà construit (SHH_ENGINE_PREBUILT=1)");
   process.exit(0);

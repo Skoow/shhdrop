@@ -1,5 +1,5 @@
 <script module lang="ts">
-  // Nuée de points de l'illustration « Partagez » : positions tirées une fois, à
+  // Nuée de points de l'illustration « Effacé » : positions tirées une fois, à
   // graine fixe (même dessin au build et dans la page), plus clairsemées vers la droite.
   function cloud() {
     let s = 0x5eed;
@@ -36,7 +36,7 @@
   import SecureDemo from "../../ui/SecureDemo.svelte";
   import TabIcon from "../../ui/TabIcon.svelte";
 
-  const how = ["add", "seal", "go"] as const;
+  const how = ["add", "seal", "go", "gone"] as const;
   const priv = ["account", "server", "clean", "room"] as const;
   const uid = $props.id();
   // Page : coin replié en haut à droite.
@@ -51,12 +51,19 @@
   <ol class="steps3">
     {#each how as k, i (k)}
       <li class="st rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
-        <svg class={["ill", { wide: k === "go" }]} viewBox={k === "go" ? "0 0 200 164" : "0 0 128 164"} aria-hidden="true" focusable="false">
+        <svg class={["ill", { wide: k === "gone" }]} viewBox={k === "gone" ? "0 0 200 164" : "0 0 128 164"} aria-hidden="true" focusable="false">
           {#if k === "add"}
             <path d={PAGE} fill="#ebe6dc" />
             <path d="M92 0V32H124Z" fill="#bdb6a8" />
             <rect x="16" y="18" width="30" height="16" fill="#0b0d10" />
             {#each [56, 78, 100, 122, 144] as y, j (y)}<rect x="16" {y} width={[84, 92, 70, 84, 92][j]} height="3.5" fill="#0b0d10" />{/each}
+          {:else if k === "go"}
+            <!-- Deux cartes, deux chemins : le lien (maillons) et le mot de passe (points menthe). -->
+            <rect x="0" y="8" width="128" height="64" rx="10" fill="#ebe6dc" />
+            <rect x="22" y="28" width="44" height="24" rx="12" fill="none" stroke="#0b0d10" stroke-width="6" />
+            <rect x="62" y="28" width="44" height="24" rx="12" fill="none" stroke="#0b0d10" stroke-width="6" />
+            <rect x="1.5" y="93.5" width="125" height="61" rx="10" fill="#0b0d10" stroke="#5fe3b5" stroke-width="3" />
+            {#each [32, 48, 64, 80, 96] as x (x)}<circle cx={x} cy="124" r="5" fill="#5fe3b5" />{/each}
           {:else}
             <defs><clipPath id="{uid}-{k}"><path d={PAGE} /></clipPath></defs>
             <g clip-path="url(#{uid}-{k})">
@@ -189,7 +196,10 @@
   /* ---------- Comment ça marche : trois illustrations reliées par des pointillés ---------- */
   /* Téléphone : deux colonnes, la troisième étape sur toute la largeur ; une seule colonne quand le
      texte est agrandi (9 rem : 288 px à 200 %). */
+  /* Téléphone et tablette : deux colonnes (une seule si le texte est agrandi : 9 rem = 288 px à
+     200 %) ; ordinateur : quatre, reliées par un pointillé. Chaque illustration a la même hauteur. */
   .steps3 {
+    --iw: min(110px, 28vw);
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
     gap: var(--sp-7) var(--sp-5);
@@ -204,20 +214,13 @@
     gap: var(--sp-4);
     min-width: 0;
   }
-  .st:last-child {
-    grid-column: 1 / -1;
-  }
-  /* --iw : largeur d'une page dessinée ; la nuée de la troisième déborde à droite. */
-  .steps3 {
-    --iw: min(120px, 32vw);
-  }
   .ill {
     display: block;
     width: var(--iw);
     height: auto;
   }
   .ill.wide {
-    width: calc(var(--iw) * 200 / 128);
+    width: min(100%, calc(var(--iw) * 200 / 128));
   }
   .tx {
     display: grid;
@@ -236,27 +239,29 @@
     color: #aab6d3;
     font-size: 0.9375rem;
     line-height: 1.55;
+    overflow-wrap: break-word;
   }
-  @media (min-width: 760px) {
+  .st h3 {
+    overflow-wrap: break-word;
+  }
+  @media (min-width: 1024px) {
     .steps3 {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      --gap: clamp(28px, 3vw, 56px);
+      --iw: clamp(110px, 10vw, 170px);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: var(--sp-6) var(--gap);
-    }
-    .st:last-child {
-      grid-column: auto;
-    }
-    .steps3 {
-      --gap: clamp(32px, 4vw, 72px);
-      --iw: clamp(130px, 14vw, 210px);
     }
     /* Pointillé vers l'illustration suivante, à mi-hauteur de la page dessinée. */
     .st:not(:last-child)::after {
       content: "";
       position: absolute;
       inset-block-start: calc(var(--iw) * 164 / 128 / 2);
-      inset-inline-start: calc(var(--iw) + 24px);
-      inset-inline-end: calc(24px - var(--gap));
+      inset-inline-start: calc(var(--iw) + 20px);
+      inset-inline-end: calc(20px - var(--gap));
       border-block-start: 3px dotted rgb(235 230 220 / 0.35);
+    }
+    .st:nth-child(3)::after {
+      inset-inline-start: calc(var(--iw) + 20px);
     }
   }
 
@@ -393,11 +398,11 @@
     color: var(--accent);
     font-weight: 600;
   }
+  /* Sous le lien, en petit, sur toute la largeur (19 novembre, 5). */
   .link figcaption {
-    max-width: 60ch;
     color: #8f9cbd;
-    font-size: var(--fs-small);
-    line-height: 1.55;
+    font-size: var(--fs-micro);
+    line-height: 1.5;
   }
   @media (max-width: 599px) {
     .lk {

@@ -221,16 +221,20 @@ jobs:
         run: |
           docker build -f deploy/Dockerfile --build-arg SHH_BUILD_ID --target engine-pkg --output "type=local,dest=$RUNNER_TEMP/image" .
           docker build -f deploy/Dockerfile --build-arg SHH_BUILD_ID --target web-dist --output "type=local,dest=$RUNNER_TEMP/image" .
-          # SHA256SUMS : « ./… » pour dist/, « pkg/… » pour le moteur (web/scripts/repro.sh).
+          # SHA256SUMS : « ./… » pour dist/, « pkg/… » pour le moteur, « salon/pkg/… » pour celui du salon (web/scripts/repro.sh).
           grep '  \./' sums/SHA256SUMS > "$RUNNER_TEMP/ci-dist.sums" || true
           grep '  pkg/' sums/SHA256SUMS > "$RUNNER_TEMP/ci-pkg.sums" || true
+          grep '  salon/pkg/' sums/SHA256SUMS > "$RUNNER_TEMP/ci-salon.sums" || true
           # Liste vide = rien à comparer : échec. Le diff compare ensuite les listes entières
           # (un fichier en plus ou en moins dans l'image échoue aussi).
           [ -s "$RUNNER_TEMP/ci-dist.sums" ] || { echo "aucun fichier de dist/ dans SHA256SUMS" >&2; exit 1; }
           [ -s "$RUNNER_TEMP/ci-pkg.sums" ] || { echo "aucun fichier pkg/ dans SHA256SUMS" >&2; exit 1; }
+          [ -s "$RUNNER_TEMP/ci-salon.sums" ] || { echo "aucun fichier salon/pkg/ dans SHA256SUMS" >&2; exit 1; }
           (cd "$RUNNER_TEMP/image/dist" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/image-dist.sums"
           (cd "$RUNNER_TEMP/image" && find pkg -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/image-pkg.sums"
+          (cd "$RUNNER_TEMP/image" && find salon/pkg -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/image-salon.sums"
           diff "$RUNNER_TEMP/ci-pkg.sums" "$RUNNER_TEMP/image-pkg.sums"
+          diff "$RUNNER_TEMP/ci-salon.sums" "$RUNNER_TEMP/image-salon.sums"
           diff "$RUNNER_TEMP/ci-dist.sums" "$RUNNER_TEMP/image-dist.sums"
           echo "image identique à la CI : $(wc -l < "$RUNNER_TEMP/image-pkg.sums") fichiers pkg/, $(wc -l < "$RUNNER_TEMP/image-dist.sums") fichiers dist/"
       - name: Image complète

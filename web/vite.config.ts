@@ -397,6 +397,8 @@ export function precompress(): Plugin {
       outDir = join(c.root, c.build.outDir);
     },
     closeBundle() {
+      // Build raté : dist/ peut manquer ; ne pas masquer l'erreur d'origine par un ENOENT.
+      if (!existsSync(outDir)) return;
       const walk = (d: string): string[] => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
       for (const f of walk(outDir)) {
         if (!COMPRESSIBLE.test(f)) continue;

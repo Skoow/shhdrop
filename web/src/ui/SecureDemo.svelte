@@ -894,6 +894,22 @@
       gap: 32px;
     }
   }
+  /* Téléphone et tablette (19 novembre, 5) : la liste entière sous la scène répétait l'animation ;
+     seule l'étape en cours s'affiche (« étape n sur 7 » est dans l'en-tête). Les autres restent
+     lues par les lecteurs d'écran ; mouvement réduit : la liste entière (storyboard). */
+  @media (max-width: 1023px) {
+    .dw:not(.board) .steps li:not(.now) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
   /* Étapes : cochées au fil de l'animation, l'étape en cours surlignée. */
   .steps {
     display: grid;
