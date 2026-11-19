@@ -9,8 +9,10 @@
 // §13). Limite écrite : une série de numéros continue exige un registre tenu par le vendeur ;
 // la note porte une référence unique tirée sur l'appareil, pas un numéro de cette série.
 //
-// Document HTML autonome : aucune ressource externe, aucun script (CSP dans le fichier), en
-// français (langue des mentions légales), imprimable en PDF depuis le navigateur.
+// Document HTML autonome : aucune ressource externe, aucun script, toutes les valeurs échappées,
+// en français (langue des mentions légales), imprimable en PDF depuis le navigateur. Pas de CSP
+// dans le fichier : la règle de check-dist (aucune balise CSP dans un build de production, trace
+// de la démo) l'interdit ; rien dans la note n'en a besoin (aucun code, aucune adresse).
 import { PAID } from "../limits";
 import type { Moyen, OffrePayante, Tva } from "./api";
 
@@ -119,7 +121,6 @@ export function noteHtml(d: NoteDonnees): string {
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${echapper(l.titre)} ${echapper(reference(d))}</title>
 <style>
@@ -144,4 +145,21 @@ ${l.mentions.map((m) => `<li>${echapper(m)}</li>`).join("\n")}
 </body>
 </html>
 `;
+}
+
+/** Téléchargement sur l'appareil (lien <a download> sur un Blob, révoqué après une minute). */
+export function telechargerNote(d: NoteDonnees): void {
+  const url = URL.createObjectURL(new Blob([noteHtml(d)], { type: "text/html;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomFichier(d);
+  a.rel = "noopener";
+  a.hidden = true;
+  document.body.append(a);
+  try {
+    a.click();
+  } finally {
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
 }

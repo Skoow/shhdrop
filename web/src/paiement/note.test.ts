@@ -73,10 +73,10 @@ describe("note de vente", () => {
     expect(champ(n, "Total TTC")).toBe("7,00 €");
   });
 
-  it("HTML : autonome (CSP sans rien d'externe, aucun script), valeurs échappées", () => {
-    const h = noteHtml(d({ id: "<script>x" }));
-    expect(h).toContain(`content="default-src 'none'; style-src 'unsafe-inline'"`);
-    expect(h).not.toMatch(/<script|src=|href=|url\(/i);
+  it("HTML : autonome (rien d'externe, aucun script), valeurs échappées", () => {
+    const h = noteHtml(d({ id: "<script>x", pays: "DE", tva: { ...OSS } }));
+    expect(h).not.toMatch(/<script|src=|href=|url\(|http-equiv/i);
+    expect(noteHtml(d({ fin: "2026-12-20" })).match(/<[a-z0-9]+/g)!.every((t) => ["<html", "<head", "<meta", "<title", "<style", "<body", "<h1", "<p", "<br", "<table", "<tr", "<th", "<td", "<ul", "<li"].includes(t))).toBe(true);
     expect(h).toContain("Note de vente");
     expect(h).toContain("5,88 €");
     expect(h).toContain("SG-20261120-SCRIPTX");

@@ -7,8 +7,7 @@
   import { href } from "../app/router.svelte";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { lireEtat, lireOffre, resilier, type EtatPaiement } from "../paiement/api";
-  import { nomFichier, noteHtml } from "../paiement/note";
-  import { clickDownload, REVOKE_AFTER_MS } from "../viewers/save";
+  import { telechargerNote } from "../paiement/note";
   import { garder, idbDuNavigateur, lirePasses, oublier, type PassGarde } from "../paiement/pass";
 
   let { rapide = 3000, lent = 30000 }: { rapide?: number; lent?: number } = $props();
@@ -64,17 +63,14 @@
   // Note de vente (conception §9.3, S4) : assemblée ici ; seul GET /api/paiement est lu (régime
   // de TVA, public), rien n'est envoyé.
   let noteErr = $state(false);
-  async function telechargerNote(): Promise<void> {
+  async function noteDeVente(): Promise<void> {
     noteErr = false;
     const o = await lireOffre();
     if (!g || !e?.fin || !o?.tva) {
       noteErr = true;
       return;
     }
-    const html = noteHtml({ id: g.id, offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, pays: g.pays, cree: g.cree, fin: e.fin, tva: o.tva, maintenant: Date.now() });
-    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
-    clickDownload(url, nomFichier({ maintenant: Date.now() }));
-    setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+    telechargerNote({ id: g.id, offre: g.offre, jours: g.jours, renouvelle: g.renouvelle, moyen: g.moyen, pays: g.pays, cree: g.cree, fin: e.fin, tva: o.tva, maintenant: Date.now() });
   }
 
   async function oublierCommande(): Promise<void> {
@@ -105,7 +101,7 @@
     {#if arret === "ok"}<p class="body" data-stopped>{t("offers.ret.stopped")}</p>{/if}
     {#if arret === "erreur"}<p class="err" role="alert">{t("offers.ret.stop.err")}</p>{/if}
     {#if g && e.fin}
-      <button type="button" class="act" onclick={telechargerNote} data-note>{t("offers.ret.note")}</button>
+      <button type="button" class="act" onclick={noteDeVente} data-note>{t("offers.ret.note")}</button>
       <p class="body">{t("offers.ret.note.hint")}</p>
       {#if noteErr}<p class="err" role="alert">{t("offers.ret.note.err")}</p>{/if}
     {/if}
