@@ -31,6 +31,28 @@
     void vue.rev;
     return conv.elements.map((e) => (e.k === "bulle" ? { ...e, reactions: e.reactions.map((r) => ({ ...r })) } : { ...e }));
   });
+  // Albums (v3 §14.3) : photos envoyées ensemble (même auteur, à la suite, à moins d'une minute
+  // d'écart) affichées en grille. Chaque photo reste un message à part (accusés, réactions,
+  // retrait, effacement) : seule la mise en page change. Calculé sur l'appareil.
+  const albums = $derived.by(() => {
+    const dans = new Map<string, "debut" | "suite">();
+    let run: Bulle[] = [];
+    const clore = () => {
+      if (run.length >= 2) run.forEach((b, i) => dans.set(b.cle, i === 0 ? "debut" : "suite"));
+      run = [];
+    };
+    for (const e of elements) {
+      const img = e.k === "bulle" && !e.retire && e.piece?.sorte === "image" ? e : null;
+      const prec = run.at(-1);
+      if (img && prec && prec.siege === img.siege && prec.moi === img.moi && img.heureMs - prec.heureMs <= 60_000) run.push(img);
+      else {
+        clore();
+        if (img) run.push(img);
+      }
+    }
+    clore();
+    return dans;
+  });
   let maintenant = $state(Date.now());
   const ecrivent = $derived((void vue.rev, void maintenant, conv.ecrivent()));
   const enLigne = $derived((void vue.rev, [...conv.presents].filter((s) => conv.presence.get(s)?.enLigne).length));
@@ -357,9 +379,10 @@
           {#if e.k === "sys"}
             <li class="sys">{ligne(e)}</li>
           {:else}
-            <li class={["msg", { moi: e.moi }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
+            {@const al = albums.get(e.cle)}
+            <li class={["msg", { moi: e.moi, album: al !== undefined }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
               <div class="bulle">
-                {#if !e.moi}<span class="auteur">{nomDe(e)}</span>{/if}
+                {#if !e.moi && al !== "suite"}<span class="auteur">{nomDe(e)}</span>{/if}
                 {#if e.retire}
                   <p class="retire">{t("salon.room.retracted")}</p>
                 {:else}
@@ -577,8 +600,26 @@
     margin: 0;
     padding: var(--sp-3) 0;
     display: grid;
+    /* Albums : jusqu'à 4 photos par rangée (2 sur téléphone) ; tout le reste prend la rangée. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--sp-2);
     min-height: 40vh;
+  }
+  .fil > :global(li) {
+    grid-column: 1 / -1;
+  }
+  .fil > .msg.album {
+    grid-column: auto;
+  }
+  .album :global(.img) {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+  @media (max-width: 600px) {
+    .fil {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
   .silence {
     display: flex;

@@ -225,6 +225,15 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     expect(octetsZip.includes(Buffer.from(contenuDoc))).toBe(true); // stocké : octets tels quels
     expect(octetsZip.includes(Buffer.from(nomDoc))).toBe(true);
     await pageB.keyboard.press("Escape");
+    // Album (v3 §14.3) : deux photos envoyées ensemble, en grille chez B ; chacune reste un message.
+    await zone(page).locator('input[type="file"]').setInputFiles([
+      { name: `album-1-${r}.jpg`, mimeType: "image/jpeg", buffer: image },
+      { name: `album-2-${r}.jpg`, mimeType: "image/jpeg", buffer: image },
+    ]);
+    await expect(fil(pageB).locator("li.msg.album img.img")).toHaveCount(2, { timeout: 60_000 });
+    await expect(fil(pageB).locator("li.msg.album .auteur")).toHaveCount(1);
+    await fil(pageB).locator("li.msg.album").last().scrollIntoViewIfNeeded();
+    await capture(pageB, "salon-album");
 
     // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
     await capture(page, "salon-conversation");
