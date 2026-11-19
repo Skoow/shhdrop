@@ -8,6 +8,9 @@
 // texte de message, pseudonyme, mot de passe, clé du lien ni de gestion dans le dossier de
 // données (base, WAL, conversations, pièces) ni dans les sorties du serveur.
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { findIn, needle, scanDir } from "../e2e/scan";
 import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
@@ -15,6 +18,7 @@ import { siteComptes } from "./comptes-site";
 import { axe, capture, expect, test as base } from "./fixtures";
 
 const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
+const FICHIERS = fileURLToPath(new URL("./files", import.meta.url));
 const SMTP_MDP = "SmtpUiSecretVq4nRw";
 
 const test = base.extend<{ smtp: FauxSMTP }, { site: string }>({
@@ -171,6 +175,28 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await page.getByRole("button", { name: "Retirer pour tous" }).last().click(); // confirmation
     await expect(fil(pageB).locator("p.texte").getByText(t3, { exact: true })).toHaveCount(0, { timeout: 30_000 });
     await expect(fil(pageB).getByText("Message retiré").first()).toBeVisible();
+    // --- Pièces (plan C-4) : une image affichée chez B, un document enregistré chez B ---------------
+    const nomDoc = `notes-${r}.txt`;
+    const contenuDoc = `Contenu repère du document ${r} `.repeat(50);
+    const image = readFileSync(join(FICHIERS, "lac-gele.jpg"));
+    await zone(page).locator('input[type="file"]').setInputFiles([
+      { name: `photo-${r}.jpg`, mimeType: "image/jpeg", buffer: image },
+      { name: nomDoc, mimeType: "text/plain", buffer: Buffer.from(contenuDoc) },
+    ]);
+    // Image : déchiffrée et affichée d'office chez B (16 Mo au plus).
+    await expect(fil(pageB).locator("img.img")).toHaveCount(1, { timeout: 60_000 });
+    await expect(fil(pageB).getByText(nomDoc, { exact: true })).toBeVisible({ timeout: 60_000 });
+    const telechargement = pageB.waitForEvent("download");
+    await fil(pageB).locator("li").filter({ hasText: nomDoc }).getByRole("button", { name: "Enregistrer" }).click();
+    const dl = await telechargement;
+    expect(dl.suggestedFilename()).toBe(nomDoc);
+    expect(readFileSync((await dl.path())!, "utf8")).toBe(contenuDoc);
+    // Écran « Fichiers » : les deux pièces, du plus récent au plus ancien.
+    await bouton(pageB, "Fichiers").click();
+    await expect(pageB.getByRole("dialog").getByText(nomDoc, { exact: true })).toBeVisible();
+    await capture(pageB, "salon-fichiers");
+    await pageB.keyboard.press("Escape");
+
     // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
     await capture(page, "salon-conversation");
     await capture(pageB, "salon-conversation-invite");
@@ -187,6 +213,10 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       needle("texte 1 modifié", t1b),
       needle("texte 2", `Réponse de B ${r}`),
       needle("texte retiré", t3),
+      needle("nom du document", nomDoc),
+      needle("nom de la photo", `photo-${r}.jpg`),
+      needle("contenu du document", contenuDoc.slice(0, 60)),
+      needle("début de la photo (après l'en-tête JPEG)", new Uint8Array(image.subarray(200, 264))),
       needle("pseudo A", pseudoA),
       needle("pseudo B", pseudoB),
       needle("mot de passe du salon", mdp),

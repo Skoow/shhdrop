@@ -14,7 +14,13 @@
   const lignes = $derived.by(() => {
     void vue.rev;
     void lang;
-    return [...conv.presents].sort((a, b) => a - b).map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true, vu: vu(s) }));
+    return [...conv.presents].sort((a, b) => a - b).map((s) => ({ s, nom: nom(s), couleur: conv.couleur(s), enLigne: conv.presence.get(s)?.enLigne === true, vu: vu(s), avatar: conv.avatars.get(s) ? (S.masques.has(s) ? null : (S.pieces.urls[`avatar:${s}`] ?? null)) : null, aAvatar: !!conv.avatars.get(s) }));
+  });
+
+  // Avatars annoncés : relus du serveur et déchiffrés une fois (pièce de 64 Ko au plus, JPEG).
+  $effect(() => {
+    void vue.rev;
+    for (const s of conv.presents) if (conv.avatars.get(s)) void S.avatarDe(s);
   });
 
   function nom(s: number): string {
@@ -40,10 +46,11 @@
 <ul class="membres">
   {#each lignes as l (l.s)}
     <li class={`c${l.couleur}`}>
-      <span class="pastille" aria-hidden="true">{[...l.nom][0]?.toLocaleUpperCase() ?? ""}{#if l.enLigne}<span class="point"></span>{/if}</span>
+      <span class="pastille" aria-hidden="true">{#if l.avatar}<img src={l.avatar} alt="" />{:else}{[...l.nom][0]?.toLocaleUpperCase() ?? ""}{/if}{#if l.enLigne}<span class="point"></span>{/if}</span>
       <span class="qui">
         <span class="nom"><bdi>{l.nom}</bdi>{#if l.s === conv.moi}{" "}({t("salon.room.you")}){/if}{#if l.s === conv.createurSiege}{" · "}{t("salon.room.creator")}{/if}</span>
         <span class="vu">{l.vu}</span>
+        {#if l.aAvatar && l.s !== conv.moi}<button type="button" class="masquer" aria-pressed={S.masques.has(l.s)} onclick={() => (S.masques.has(l.s) ? S.masques.delete(l.s) : S.masques.add(l.s))}>{t("salon.avatar.masquer")}</button>{/if}
       </span>
     </li>
   {/each}
@@ -96,6 +103,27 @@
     background: var(--pc);
     color: var(--on-fmt);
     font-weight: 700;
+  }
+  .pastille img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .masquer {
+    justify-self: start;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 0.8125rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .masquer[aria-pressed="true"] {
+    color: var(--accent);
   }
   .point {
     position: absolute;

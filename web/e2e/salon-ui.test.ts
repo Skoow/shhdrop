@@ -9,6 +9,7 @@ import { loadSalonEngine, type SalonEngine } from "../src/salon/engine";
 import { ClientSalon, type EvClient, type WsLike } from "../src/salon/client";
 import { preparer } from "../src/salon/creation";
 import * as api from "../src/salon/api";
+import { envoyerPiece, lirePiece } from "../src/salon/pieces";
 import { solveAltcha } from "./altcha";
 import { startServer, type TestServer } from "./server";
 
@@ -118,6 +119,30 @@ describe("salon : client de production, vrai serveur", () => {
     // Accusés groupés (2,5 s) : « vu » de B chez A.
     b.c.accuser("vu", [mb.enveloppe.id]);
     await attendre(a, (e) => e.k === "message" && e.enveloppe.message.k === "vu" && e.siege === 1, 10_000);
+  });
+
+  it("pièce (plan C-4) : fichier chiffré par le moteur, lié à sa trame, relu octet pour octet ; vocal", async () => {
+    const [a, b] = membres;
+    const net = { origin: srv.origin, fetch: (...x: Parameters<typeof fetch>) => fetch(...x) };
+    // 70 000 octets : deux morceaux, palier 16 ; nom et type dans le message chiffré seulement.
+    const contenu = new Uint8Array(70_000);
+    for (let i = 0; i < contenu.length; i += 65536) crypto.getRandomValues(contenu.subarray(i, Math.min(contenu.length, i + 65536)));
+    const ref = await envoyerPiece(net, a!.c.jeton, new Blob([contenu]), { nom: "rapport.pdf", mime: "application/pdf", vocal: false });
+    expect(ref.palier).toBe(16);
+    a!.c.envoyer({ k: "piece", r: ref.r, piece: ref.piece, palier: ref.palier, nom: "rapport.pdf", mime: "application/pdf", taille: contenu.length, sorte: "fichier", dureeMs: null }, 0, ref.piece);
+    const m = (await attendre(b!, (e) => e.k === "message" && e.enveloppe.message.k === "piece")) as Extract<EvClient, { k: "message" }>;
+    const p = m.enveloppe.message as Extract<typeof m.enveloppe.message, { k: "piece" }>;
+    expect(p.nom).toBe("rapport.pdf");
+    const lu = new Uint8Array(await (await lirePiece(net, b!.c.jeton, p)).arrayBuffer());
+    expect(lu).toEqual(contenu);
+    // Vocal (défaut signalé, plan C-4) : le plus petit vocal non vide prend le palier 16
+    // (1 048 880 o ; le palier 1 ne garde que le morceau du manifeste) et la réserve d'un siège
+    // neuf est vide : le premier vocal attend environ 4 min de présence. Le serveur le dit (429 et
+    // délai), l'écran aussi (« Doucement »), sans rien envoyer.
+    const e = await envoyerPiece(net, a!.c.jeton, new Blob([new Uint8Array(4000)]), { nom: "vocal.webm", mime: "audio/webm", vocal: true }).catch((x) => x);
+    expect(e).toBeInstanceOf(api.SalonError);
+    expect(e).toMatchObject({ status: 429, code: "limit" });
+    expect(e.retryS).toBeGreaterThan(200);
   });
 
   it("reconnexion : rattrapage avec `depuis`, ni perte ni doublon", async () => {

@@ -7,8 +7,12 @@
 import { generatePassword, passwordKey } from "../engine/index";
 import { loadSalonEngine, type ClesSalon, type Regle, type SalonEngine } from "./engine";
 import * as api from "./api";
+import { SvelteSet } from "svelte/reactivity";
 import { ClientSalon, type EvClient, type Fin } from "./client";
-import { Conversation, type Bulle } from "./conversation";
+import { Conversation, type Bulle, type PieceInfo } from "./conversation";
+import { AFFICHE_MAX, PIECE_MAX, envoyerPiece, lirePiece } from "./pieces";
+import { stripMetadata } from "../media/strip";
+import { clickDownload, REVOKE_AFTER_MS } from "../viewers/save";
 import { preparer, oublier as oublierPreparation, type Duree } from "./creation";
 import { lienSalon } from "./liens";
 import { captcha as captchaDuServeur, ctx as transferCtx } from "../transfer/api";
@@ -49,6 +53,8 @@ type Session = {
   conv?: Conversation;
   sGestion?: Uint8Array<ArrayBuffer>;
   couleur?: number;
+  /** Notre photo pour ce salon (pièce chiffrée, v3 §7.2), annoncée dans notre profil. */
+  avatar?: { r: Uint8Array; piece: Uint8Array; palier: number } | null;
   stop: (() => void)[];
 };
 let s: Session | undefined;
@@ -76,6 +82,7 @@ export function oublier(): void {
   s.kLien.fill(0);
   s.sGestion?.fill(0);
   s = undefined;
+  oublierPieces();
   Object.assign(vue, { etape: "vide", erreur: null, pret: null, monPseudo: null, dansLeGroupe: false, attenteDepuis: null, createur: false });
 }
 
@@ -210,6 +217,11 @@ export function versExplication(): void {
 }
 
 /** Pseudonyme proposé (compte : réglage « Proposer mon pseudo et ma photo »). */
+/** Photo du compte proposée pour ce salon (même réglage), ou null. */
+export function photoProposee(): Uint8Array | null {
+  return (__COMPTES__ && profilPourSalon()?.photo) || null;
+}
+
 export function pseudoPropose(): string {
   return (__COMPTES__ && profilPourSalon()?.pseudo) || "";
 }
@@ -271,9 +283,13 @@ function surEvenement(x: Session, ev: EvClient): void {
       }
       break;
     }
-    case "efface":
+    case "efface": {
+      // Message effacé : sa pièce quitte aussi la mémoire de la page (URL révoquée, v3 §5).
+      const b = conv.elements.find((e) => e.k === "bulle" && e.seq === ev.cible);
+      if (b?.k === "bulle") liberer(b.cle);
       conv.efface(ev.cible);
       break;
+    }
     case "chiffre":
       conv.chiffre(ev.local, ev.id);
       break;
@@ -324,9 +340,11 @@ function envoyerProfil(x: Session): void {
   x.couleur ??= x.conv.couleurLibre();
   const pseudo = vue.monPseudo;
   const couleur = x.couleur;
-  x.client.envoyer({ k: "profil", pseudo, couleur, avatar: null }, 0, undefined, (local) => {
+  const avatar = x.avatar ?? null;
+  x.client.envoyer({ k: "profil", pseudo, couleur, avatar }, 0, undefined, (local) => {
     profilsEnVol.set(local, { pseudo, couleur });
     x.conv!.monProfil(pseudo, couleur);
+    x.conv!.avatars.set(x.client!.siege, avatar);
   });
 }
 /** Nos messages `profil` en attente de leur rang (numéro local → contenu). */
@@ -391,7 +409,180 @@ export function retirer(b: Bulle): void {
   const x = s;
   if (!x?.client || !x.conv || !b.id || !b.moi || b.seq === null) return;
   x.client.retirerPourTous(b.seq, hexOctets(b.id), b.regle);
+  liberer(b.cle);
   x.conv.retirerLocal(b.id);
+}
+
+// --- Pièces (plan C-4) -------------------------------------------------------------------------
+
+/** Fichiers ouverts ou enregistrés ici (écran « Fichiers » : « Nouveau » sinon), en mémoire seulement. */
+export const fichiersOuverts = new SvelteSet<string>();
+/** Avatars masqués pour soi (v3 §7.2 : une photo peut être choquante), en mémoire seulement. */
+export const masques = new SvelteSet<number>();
+/** Adresses blob: des pièces affichées (clé de la bulle → URL), révoquées à l'effacement. */
+export const pieces = $state({ urls: {} as Record<string, string>, erreurs: {} as Record<string, string>, aConfirmer: [] as File[], avertissement: "" });
+/** Nos fichiers d'origine (clé de bulle) : affichés et enregistrés sans les relire du serveur. */
+const originaux = new Map<string, Blob>();
+let pieceLocale = 0;
+let fileDesEnvois: Promise<void> = Promise.resolve();
+
+/** Types d'image affichés (jamais SVG, spec §39.5 et UI §12.4). */
+const IMAGES_SURES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MIME = /^[a-z]+\/[a-z0-9][a-z0-9.+-]{0,80}$/;
+
+function liberer(cle: string): void {
+  const u = pieces.urls[cle];
+  if (u) URL.revokeObjectURL(u);
+  delete pieces.urls[cle];
+  originaux.delete(cle);
+}
+function oublierPieces(): void {
+  for (const k of Object.keys(pieces.urls)) liberer(k);
+  originaux.clear();
+  pieces.aConfirmer = [];
+  pieces.erreurs = {};
+}
+
+function sorteDe(mime: string): PieceInfo["sorte"] {
+  if (IMAGES_SURES.has(mime)) return "image";
+  if (mime.startsWith("video/")) return "video";
+  return "fichier";
+}
+
+/**
+ * Fichiers choisis (sélecteur, glisser-déposer, coller) : nettoyés comme les partages
+ * (stripMetadata), puis envoyés un par un, chacun dans son message. Ceux dont le nettoyage a
+ * échoué (ou protégés) attendent « Envoyer tel quel » (`telQuel`), dans `pieces.aConfirmer`.
+ */
+export async function envoyerFichiers(fichiers: File[], telQuel = false): Promise<void> {
+  const x = s;
+  if (!x?.client || !x.conv) return;
+  pieces.avertissement = "";
+  for (const f of fichiers) {
+    if (f.size > PIECE_MAX) {
+      pieces.avertissement = "trop_gros";
+      continue;
+    }
+    const mime = MIME.test(f.type) ? f.type : "application/octet-stream";
+    let nom: string;
+    try {
+      nom = x.eng.nettoyerNom(f.name) || "fichier";
+    } catch {
+      nom = "fichier";
+    }
+    let donnees: Blob = f;
+    if (!telQuel) {
+      const r = await stripMetadata(f, mime, nom).catch(() => ({ state: "echec" as const, reason: "" }));
+      if (r.state === "nettoye") donnees = r.data;
+      else if (r.state === "echec" || r.state === "protege") {
+        pieces.aConfirmer = [...pieces.aConfirmer, f];
+        continue;
+      }
+    }
+    envoyerBlob(x, donnees, { nom, mime, sorte: sorteDe(mime), dureeMs: null, vocal: false });
+  }
+}
+
+/** « Envoyer tel quel » des fichiers qui n'ont pas pu être nettoyés ; ou abandon. */
+export function confirmerTelQuel(oui: boolean): void {
+  const f = pieces.aConfirmer;
+  pieces.aConfirmer = [];
+  if (oui) void envoyerFichiers(f, true);
+}
+
+/** Vocal enregistré ici (enregistreur du site, métadonnées déjà retirées). */
+export function envoyerVocal(v: { blob: Blob; mime: string; ext: string; ms: number }): void {
+  const x = s;
+  if (!x?.client) return;
+  envoyerBlob(x, v.blob, { nom: `vocal.${v.ext}`, mime: MIME.test(v.mime) ? v.mime.split(";")[0]! : "audio/webm", sorte: "vocal", dureeMs: Math.round(v.ms), vocal: true });
+}
+
+function envoyerBlob(x: Session, donnees: Blob, p: { nom: string; mime: string; sorte: PieceInfo["sorte"]; dureeMs: number | null; vocal: boolean }): void {
+  const conv = x.conv!;
+  const local = --pieceLocale;
+  conv.pieceEnvoi(local, { nom: p.nom, mime: p.mime, taille: donnees.size, sorte: p.sorte, dureeMs: p.dureeMs });
+  const cle = `l${local}`;
+  originaux.set(cle, donnees);
+  if (p.sorte === "image" || p.sorte === "vocal" || p.sorte === "video") pieces.urls[cle] = URL.createObjectURL(new Blob([donnees], { type: p.mime }));
+  // Une pièce à la fois (le serveur admet deux envois non finalisés par connexion).
+  fileDesEnvois = fileDesEnvois.then(async () => {
+    const c = x.client;
+    if (!c || s !== x) return;
+    try {
+      const ref = await envoyerPiece(net(), c.jeton, donnees, { nom: p.nom, mime: p.mime, vocal: p.vocal, progres: (f) => conv.progresPiece(local, f) });
+      conv.progresPiece(local, 1, ref);
+      c.envoyer({ k: "piece", r: ref.r, piece: ref.piece, palier: ref.palier, nom: p.nom, mime: p.mime, taille: donnees.size, sorte: p.sorte, dureeMs: p.dureeMs }, 0, ref.piece, (l) => {
+        conv.rattacher(local, l);
+      });
+    } catch (e) {
+      const code = e instanceof api.SalonError ? (e.code === "limit" ? `limite:${e.retryS ?? 0}` : e.code) : (e as Error).message;
+      conv.echec(local, code);
+    }
+  });
+}
+
+/**
+ * Pièce à afficher (image, vocal, vidéo) : relue du serveur et déchiffrée, adresse blob: d'un
+ * type sûr seulement ; rien d'autre n'est jamais montré dans la page (UI §12.4).
+ */
+export async function afficherPiece(b: Bulle): Promise<void> {
+  const x = s;
+  const p = b.piece;
+  if (!x?.client || !p?.ref || pieces.urls[b.cle]) return;
+  const mime = p.sorte === "image" && IMAGES_SURES.has(p.mime) ? p.mime : p.sorte === "vocal" ? "audio/webm" : p.sorte === "video" ? p.mime : null;
+  if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
+  try {
+    const blob = await lirePiece(net(), x.client.jeton, p.ref);
+    if (s !== x) return;
+    pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: p.sorte === "vocal" && p.mime.startsWith("audio/") ? p.mime : mime }));
+  } catch (e) {
+    pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+  }
+}
+
+/** « Enregistrer » : le fichier, sous son nom nettoyé, en octets bruts (jamais ouvert par la page). */
+export async function enregistrerPiece(b: Bulle): Promise<void> {
+  const x = s;
+  const p = b.piece;
+  if (!x?.client || !p) return;
+  try {
+    const blob = originaux.get(b.cle) ?? (p.ref ? await lirePiece(net(), x.client.jeton, p.ref) : null);
+    if (!blob) return;
+    const url = URL.createObjectURL(new Blob([blob], { type: "application/octet-stream" }));
+    let nom = "fichier";
+    try {
+      nom = x.eng.nettoyerNom(p.nom) || nom;
+    } catch {
+      // nom refusé par le moteur : nom neutre
+    }
+    clickDownload(url, nom);
+    setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+  } catch (e) {
+    pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+  }
+}
+
+/** Notre photo pour ce salon (ré-encodée 256 × 256 par ui/avatar.ts) : envoyée chiffrée, puis annoncée. */
+export async function choisirAvatar(photo: Uint8Array | null): Promise<void> {
+  const x = s;
+  if (!x?.client) return;
+  if (!photo) x.avatar = null;
+  else x.avatar = await envoyerPiece(net(), x.client.jeton, new Blob([photo as Uint8Array<ArrayBuffer>], { type: "image/jpeg" }), { nom: "avatar.jpg", mime: "image/jpeg", vocal: false });
+  if (vue.monPseudo) envoyerProfil(x);
+}
+
+/** Avatar d'un siège (profil) : adresse blob: (image/jpeg seulement), ou null. */
+export async function avatarDe(siege: number): Promise<void> {
+  const x = s;
+  const cle = `avatar:${siege}`;
+  const ref = x?.conv?.avatars.get(siege);
+  if (!x?.client || !ref || pieces.urls[cle]) return;
+  try {
+    const blob = await lirePiece(net(), x.client.jeton, ref);
+    if (s === x && blob.size <= 65536) pieces.urls[cle] = URL.createObjectURL(new Blob([blob], { type: "image/jpeg" }));
+  } catch {
+    // avatar indisponible : l'initiale reste
+  }
 }
 
 export function reagir(b: Bulle, emoji: string): void {

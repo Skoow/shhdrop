@@ -16,6 +16,10 @@
   import Sheet from "../../ui/Sheet.svelte";
   import Membres from "./Membres.svelte";
   import Emojis from "./Emojis.svelte";
+  import Piece from "./Piece.svelte";
+  import Fichiers from "./Fichiers.svelte";
+  import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
+  import { Mic, Paperclip } from "../../ui/Icon";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -50,6 +54,40 @@
   let nonLus = $state(0);
 
   const QUICK = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+  // --- Pièces (plan C-4) -------------------------------------------------------------------------
+  let fichiers = $state(false);
+  let vocal = $state(false);
+  let joindre: HTMLInputElement | undefined = $state();
+  function choisis(): void {
+    const l = [...(joindre?.files ?? [])];
+    if (joindre) joindre.value = "";
+    if (l.length > 0) void S.envoyerFichiers(l);
+  }
+  function deposer(e: DragEvent): void {
+    const l = [...(e.dataTransfer?.files ?? [])];
+    if (l.length === 0) return;
+    e.preventDefault();
+    void S.envoyerFichiers(l);
+  }
+  /** Coller une image (ou un fichier) dans le champ : envoyée comme pièce ; du texte reste du texte. */
+  function coller(e: ClipboardEvent): void {
+    const l = [...(e.clipboardData?.files ?? [])];
+    if (l.length === 0) return;
+    e.preventDefault();
+    void S.envoyerFichiers(l);
+  }
+  function voir(cle: string): void {
+    fichiers = false;
+    document.getElementById(`m-${cle}`)?.scrollIntoView({ block: "center" });
+  }
+  function echec(code: string): string {
+    if (code.startsWith("limite:")) return t("salon.piece.err.limite", { duree: formatDuration(Number(code.slice(7)), lang) });
+    if (code === "budget") return t("salon.piece.err.budget");
+    if (code === "vocal_trop_long" || code === "trop_gros") return t(`salon.piece.err.${code}`);
+    if (code === "plein") return t("salon.room.full");
+    return t("salon.room.tick.echec");
+  }
 
   onMount(() => {
     const id = setInterval(() => (maintenant = Date.now()), 1000);
@@ -244,13 +282,18 @@
         <span>{t("salon.room.expires", { duree: formatDuration(reste, lang, { precise: reste < 300 }) })}</span>
       </p>
     </div>
-    {#if !large}<Button variant="secondary" dense onpress={() => {
-          membres = true;
-        }}>{t("salon.room.members")}</Button>{/if}
+    <div class="boutons">
+      <Button variant="secondary" dense onpress={() => {
+          fichiers = true;
+        }}>{t("salon.files.title")}</Button>
+      {#if !large}<Button variant="secondary" dense onpress={() => {
+            membres = true;
+          }}>{t("salon.room.members")}</Button>{/if}
+    </div>
   </header>
 
   <div class="corps">
-    <section class="col" aria-label={t("salon.room.label")}>
+    <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
       {#if vue.connexion === "coupe"}<p class="bandeau" role="status">{t("salon.room.reconnect")}</p>{/if}
       {#if !vue.dansLeGroupe}<p class="bandeau" role="status">{t("salon.room.waitgroup")}</p>{/if}
       <div role="log" aria-live="off" bind:this={fil}>
@@ -259,7 +302,7 @@
           {#if e.k === "sys"}
             <li class="sys">{ligne(e)}</li>
           {:else}
-            <li class={["msg", { moi: e.moi }, `c${conv.couleur(e.siege)}`]} data-id={e.id ?? undefined} use:surveiller={e}>
+            <li class={["msg", { moi: e.moi }, `c${conv.couleur(e.siege)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
               <div class="bulle">
                 {#if !e.moi}<span class="auteur">{nom(e.siege)}</span>{/if}
                 {#if e.retire}
@@ -267,10 +310,15 @@
                 {:else}
                   {@const q = cite(e)}
                   {#if q}<blockquote class="cite"><span class="qn">{q.nom}</span> <bdi>{q.texte}</bdi></blockquote>{/if}
-                  <p class="texte"><bdi
-                      >{#each morceaux(e.texte) as m, i (i)}{#if m.lien}<a href={m.t} target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{m.t}</a>{:else}{m.t}{/if}{/each}</bdi
-                    ></p>
+                  {#if e.piece}
+                    <Piece b={e} />
+                  {:else}
+                    <p class="texte"><bdi
+                        >{#each morceaux(e.texte) as m, i (i)}{#if m.lien}<a href={m.t} target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{m.t}</a>{:else}{m.t}{/if}{/each}</bdi
+                      ></p>
+                  {/if}
                 {/if}
+                {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>{/if}
                 <p class="meta">
                   <time>{formatClock(e.heureMs, lang)}</time>
                   {#if e.modifie && !e.retire}<span>· {t("salon.room.edited")}</span>{/if}
@@ -314,6 +362,17 @@
 
       <div class="saisie">
         {#if attente}<p class="note" role="status">{attente}</p>{/if}
+        {#if S.pieces.avertissement}<p class="err" role="status">{t("salon.piece.err.trop_gros")}</p>{/if}
+        {#if S.pieces.aConfirmer.length > 0}
+          <div class="confirmer" role="group" aria-label={t("salon.piece.nonnettoye")}>
+            <p class="note">{t("salon.piece.nonnettoye")}</p>
+            <ul>{#each S.pieces.aConfirmer as f, i (i)}<li><bdi>{f.name}</bdi></li>{/each}</ul>
+            <div class="ligne">
+              <Button variant="secondary" dense onpress={() => S.confirmerTelQuel(true)}>{t("salon.piece.telquel")}</Button>
+              <Button variant="ghost" dense onpress={() => S.confirmerTelQuel(false)}>{t("salon.piece.annuler")}</Button>
+            </div>
+          </div>
+        {/if}
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
         {#if reponse}
           <div class="contexte">
@@ -330,6 +389,9 @@
         {#if emojis}<Emojis onpick={(x) => ((texte += x), saisie?.focus())} onclose={() => ((emojis = false), saisie?.focus())} />{/if}
         <div class="ligne">
           <button type="button" class="emo" aria-label={emojis ? t("salon.room.emoji.close") : t("salon.room.emoji")} aria-expanded={emojis} onclick={() => (emojis = !emojis)}>☺</button>
+          <button type="button" class="emo" aria-label={t("salon.piece.joindre")} onclick={() => joindre?.click()}><Paperclip size={20} aria-hidden="true" /></button>
+          <button type="button" class="emo" aria-label={t("salon.piece.vocal")} onclick={() => (vocal = true)}><Mic size={20} aria-hidden="true" /></button>
+          <input bind:this={joindre} type="file" multiple hidden onchange={choisis} />
           <label class="sr-only" for="salon-saisie">{t("salon.room.input")}</label>
           <textarea
             id="salon-saisie"
@@ -343,6 +405,7 @@
             enterkeyhint={tactile ? "enter" : "send"}
             onkeydown={clavier}
             oninput={frappe}
+            onpaste={coller}
           ></textarea>
           <Button dense onpress={envoyer}>{t("salon.room.send")}</Button>
         </div>
@@ -359,6 +422,8 @@
 {#if !large}
   <Sheet bind:open={membres} title={t("salon.room.members")}><Membres /></Sheet>
 {/if}
+<Sheet bind:open={fichiers} title={t("salon.files.title")}><Fichiers onvoir={voir} /></Sheet>
+<VoiceRecorder bind:open={vocal} ondone={(v) => S.envoyerVocal(v)} />
 
 <style>
   .salon {
@@ -381,6 +446,23 @@
     --p7: #4fd8e0;
     --p8: #e0a8f0;
     --p9: #d9c3a0;
+  }
+  .boutons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    justify-content: flex-end;
+  }
+  .confirmer {
+    display: grid;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--warn);
+    border-radius: 12px;
+  }
+  .confirmer ul {
+    margin: 0;
+    padding-inline-start: 1.2em;
   }
   .tete {
     display: flex;

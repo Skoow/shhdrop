@@ -180,6 +180,51 @@ export async function exclure(
   await appel(n, "POST", "/exclure", { "X-Shh-Manage": cle(jGestion), "X-Shh-Access-New": cle(r.kAccesNouvelle) }, body);
 }
 
+// --- Pièces (plan C-4 ; serveur : handlers_salon_pieces.go) --------------------------------------
+
+/** POST /api/salons/pieces : identifiant de la pièce (16 octets) et jeton d'envoi signé. */
+export async function creerPiece(n: Net, jeton: string, bucket: number, vocal: boolean): Promise<{ piece: Bytes; envoi: string }> {
+  const o = await appel(n, "POST", "/pieces", { "X-Shh-Membre": jeton }, { bucket, vocal });
+  const t = o.upload_token;
+  if (typeof t !== "string" || t.length < 20 || /\s/.test(t)) throw invalide();
+  return { piece: octets(o, "piece", 16), envoi: t };
+}
+
+async function brut(n: Net, method: "GET" | "PUT" | "POST", path: string, headers: Record<string, string>, body?: BodyInit): Promise<Response> {
+  try {
+    return await n.fetch(n.origin + "/api/salons" + path, { method, headers, body, credentials: "omit", redirect: "error", cache: "no-store" });
+  } catch {
+    throw new Error("reseau");
+  }
+}
+
+/** PUT /api/salons/pieces/segments/{n} : segment entier (jeton d'envoi en Bearer). */
+export async function envoyerSegment(n: Net, envoi: string, seg: number, corps: Uint8Array<ArrayBuffer>): Promise<void> {
+  const r = await brut(n, "PUT", `/pieces/segments/${seg}`, { Authorization: `Bearer ${envoi}`, "Content-Type": "application/octet-stream" }, corps);
+  if (r.status !== 204) await lireReponse(r);
+}
+
+/** POST /api/salons/pieces/finalize : la pièce est prête (aucun bourrage demandé au serveur). */
+export async function finaliserPiece(n: Net, envoi: string): Promise<void> {
+  await lireReponse(await brut(n, "POST", "/pieces/finalize", { Authorization: `Bearer ${envoi}`, "Content-Type": "application/json" }, JSON.stringify({ fill_from: 0, fill_to: 0 })));
+}
+
+/** GET /api/salons/pieces/segments/{n} : segment chiffré d'une pièce (404 : pièce indisponible). */
+export async function lireSegment(n: Net, jeton: string, piece: Uint8Array, seg: number): Promise<Uint8Array<ArrayBuffer>> {
+  const r = await brut(n, "GET", `/pieces/segments/${seg}`, { "X-Shh-Membre": jeton, "X-Shh-Piece": b64u(piece as Bytes) });
+  if (!r.ok) await lireReponse(r);
+  try {
+    return new Uint8Array(await r.arrayBuffer());
+  } catch {
+    throw new Error("reseau");
+  }
+}
+
+/** POST /api/salons/pieces/retirer : l'auteur retire sa pièce (avant tout lien à une trame). */
+export async function retirerPiece(n: Net, jeton: string, piece: Uint8Array): Promise<void> {
+  await appel(n, "POST", "/pieces/retirer", { "X-Shh-Membre": jeton, "X-Shh-Piece": b64u(piece as Bytes) }, {});
+}
+
 /** Corps de la création (POST /api/salons) ; les en-têtes sont posés par account/api.ts. */
 export type CorpsCreation = {
   ttl_hours: 1 | 6 | 12 | 24;

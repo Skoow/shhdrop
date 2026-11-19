@@ -171,6 +171,10 @@ describe("règles de sources", () => {
     expect(offenders(/\bWebSocket\b/, (r) => !r.startsWith("salon/"))).toEqual([]);
     expect(offenders(/localStorage|sessionStorage|indexedDB|document\.cookie/, (r) => r.startsWith("salon/") || r.startsWith("routes/salon/"))).toEqual([]);
   });
+  // Plan C-4, point 1 : la graine R en clair (seedBytes, seedFromBytes) ne sert qu'aux pièces du
+  // salon, où elle voyage dans un message MLS ; jamais dans un partage (R y reste dans l'enveloppe).
+  it("salon : seedBytes et seedFromBytes seulement dans salon/pieces.ts (et engine/)", () =>
+    expect(offenders(/\bseed(?:Bytes|FromBytes)\b/, (r) => r !== "salon/pieces.ts" && !r.startsWith("engine/"))).toEqual([]));
   // Exigence C-3 33 (spec salon v3 §15.2) : S_gestion n'est jamais montré au serveur, seulement
   // J_gestion (jetonGestion) ; aucun en-tête X-Shh-Manage n'est écrit hors de salon/api.ts et account/api.ts.
   it("salon : X-Shh-Manage du salon écrit seulement par salon/api.ts et account/api.ts", () => {

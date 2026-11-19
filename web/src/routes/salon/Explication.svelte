@@ -7,7 +7,8 @@
   import { untrack } from "svelte";
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatDuration } from "../../i18n/format";
-  import { vue, entrer, pseudoPropose, verifierPseudo, conversation } from "../../salon/salon.svelte";
+  import { vue, entrer, pseudoPropose, photoProposee, choisirAvatar, verifierPseudo, conversation } from "../../salon/salon.svelte";
+  import AvatarPicker from "../../ui/AvatarPicker.svelte";
   import Cadre from "../compte/Cadre.svelte";
   import TextField from "../../ui/TextField.svelte";
   import Button from "../../ui/Button.svelte";
@@ -16,6 +17,7 @@
   const refuse = untrack(() => conversation()?.pseudoRefuse === true);
   let pseudo = $state(untrack(() => vue.monPseudo ?? pseudoPropose()));
   let essaye = $state(false);
+  let photo = $state<Uint8Array | null>(untrack(() => photoProposee()));
   let champ: HTMLInputElement | undefined = $state();
   const reste = $derived(Math.max(0, (vue.finMs - Date.now()) / 1000));
   const duree = $derived(formatDuration(reste, getLang(), { coarse: true }));
@@ -25,6 +27,7 @@
   function go(): void {
     essaye = true;
     if (!entrer(pseudo)) champ?.focus();
+    else if (photo) void choisirAvatar(photo);
   }
   $effect(() => {
     if (refuse) untrack(() => champ?.focus());
@@ -64,6 +67,11 @@
         }
       }}
     />
+    <!-- Photo pour ce salon (v3 §7.2), facultative : ré-encodée sur l'appareil, envoyée chiffrée. -->
+    <div class="photo" role="group" aria-label={t("salon.avatar.photo")}>
+      <span class="note">{t("salon.avatar.photo")}</span>
+      <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} />
+    </div>
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>
     {#if !vue.dansLeGroupe}<p class="note" role="status">{t("salon.intro.wait")}</p>{/if}
   </div>

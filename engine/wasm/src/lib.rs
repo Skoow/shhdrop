@@ -860,6 +860,28 @@ pub fn new_seed(provider: &Provider) -> core::result::Result<JsSeed, JsValue> {
     })))
 }
 
+/// Graine R en clair (32 octets), pour les pièces du salon SEULEMENT (spec salon v3 §3.4 : la
+/// pièce est un paquet d'un élément sous R, et R voyage dans un message MLS chiffré de bout en
+/// bout ; plan C-4). Les partages ne l'appellent jamais (R y reste dans l'enveloppe E). SECRET :
+/// copie que l'appelant met à zéro dès qu'elle est dans le message.
+#[wasm_bindgen(js_name = seedBytes)]
+pub fn seed_bytes(seed: &JsSeed) -> Uint8Array {
+    Uint8Array::from(&seed.0.r.as_bytes()[..])
+}
+
+/// Graine R lue dans un message du salon (32 octets, sinon `graine_invalide`) : comme une R
+/// déballée par `open`, elle ne donne que des clés d'ouverture (`contentKeysChecked`).
+#[wasm_bindgen(js_name = seedFromBytes)]
+pub fn seed_from_bytes(provider: &Provider, r: &[u8]) -> core::result::Result<JsSeed, JsValue> {
+    let r = Seed::from_slice(r).map_err(js_err)?;
+    Ok(JsSeed(Rc::new(SeedCell {
+        p: Rc::new(Web(provider.clone())),
+        r,
+        fresh: false,
+        keys_made: Cell::new(false),
+    })))
+}
+
 /// Clés de contenu d'un paquet : K_contenu (chez le fournisseur) et engagement. `creatable` :
 /// tirées d'une R neuve par `contentKeys`, seules à pouvoir chiffrer un manifeste.
 #[wasm_bindgen]

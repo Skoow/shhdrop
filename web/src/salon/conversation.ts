@@ -43,6 +43,21 @@ export type Bulle = {
   vus: number[];
   /** Réactions : émoji → sièges, dans l'ordre d'arrivée. */
   reactions: { emoji: string; sieges: number[] }[];
+  /** Pièce (plan C-4) : fichier, image, vidéo ou vocal ; null pour un texte. */
+  piece: PieceInfo | null;
+};
+
+/** Pièce d'un message : ce que dit le message chiffré (nom nettoyé par le moteur à l'affichage). */
+export type PieceInfo = {
+  nom: string;
+  mime: string;
+  taille: number;
+  sorte: "fichier" | "image" | "video" | "vocal";
+  dureeMs: number | null;
+  /** Référence chiffrée (graine, identifiant, palier) ; null tant que notre envoi n'est pas fini. */
+  ref: { r: Uint8Array; piece: Uint8Array; palier: number } | null;
+  /** Envoi en cours (0 à 1), chez l'expéditeur seulement. */
+  progres: number | null;
 };
 
 export type Systeme =
@@ -194,6 +209,7 @@ export class Conversation {
       recus: [],
       vus: [],
       reactions: [],
+      piece: null,
     };
     this.elements.push(b);
     this.#parLocal.set(local, b);
@@ -276,6 +292,7 @@ export class Conversation {
           recus: [],
           vus: [],
           reactions: [],
+          piece: null,
         };
         this.elements.push(b);
         this.#parId.set(id, b);
@@ -318,18 +335,82 @@ export class Conversation {
           this.#change();
         }
         return null;
+      case "piece": {
+        if (this.#parId.has(id)) return null;
+        const b = this.#nouvelle(id, seq, siege, epoque, env, "", null);
+        b.piece = { nom: m.nom, mime: m.mime, taille: m.taille, sorte: m.sorte, dureeMs: m.dureeMs, ref: { r: m.r, piece: m.piece, palier: m.palier }, progres: null };
+        this.elements.push(b);
+        this.#parId.set(id, b);
+        this.#change();
+        return autre ? { recu: env.id } : null;
+      }
       case "profil":
         this.#profil(seq, siege, m.pseudo, m.couleur);
+        this.avatars.set(siege, m.avatar);
         return null;
       default:
         return null; // piece (C-4), regle (C-5), depart, rotation, inconnu
     }
   }
 
+  #nouvelle(id: string, seq: number, siege: number, epoque: number, env: EnveloppeRecue, texte: string, cite: string | null): Bulle {
+    return {
+      k: "bulle",
+      cle: id,
+      id,
+      seq,
+      local: null,
+      siege,
+      moi: siege === this.moi,
+      texte,
+      cite,
+      modifie: false,
+      retire: false,
+      heureMs: env.heureMs,
+      regle: env.regle,
+      epoque,
+      etat: "envoye",
+      echec: null,
+      attendus: this.membres.filter((s) => s !== siege),
+      recus: [],
+      vus: [],
+      reactions: [],
+      piece: null,
+    };
+  }
+
+  /** Avatar annoncé par chaque siège (profil), ou null : initiale sur sa couleur (v3 §7.2). */
+  readonly avatars = new Map<number, { r: Uint8Array; piece: Uint8Array; palier: number } | null>();
+
+  /** Notre pièce en cours d'envoi (numéro local négatif, tant qu'elle n'est pas chiffrée). */
+  pieceEnvoi(local: number, p: Omit<PieceInfo, "ref" | "progres">): void {
+    this.envoye(local, { sorte: "texte", texte: "" }, 0);
+    const b = this.#parLocal.get(local)!;
+    b.piece = { ...p, ref: null, progres: 0 };
+    this.#change();
+  }
+  progresPiece(local: number, f: number, ref?: PieceInfo["ref"]): void {
+    const b = this.#parLocal.get(local);
+    if (!b?.piece) return;
+    b.piece.progres = f;
+    if (ref) b.piece.ref = ref;
+    this.#change();
+  }
+  /** Le message de la pièce part : son numéro local devient celui du client. */
+  rattacher(ancien: number, local: number): void {
+    const b = this.#parLocal.get(ancien);
+    if (!b) return;
+    this.#parLocal.delete(ancien);
+    b.local = local;
+    if (b.piece) b.piece.progres = null;
+    this.#parLocal.set(local, b);
+  }
+
   #retirer(b: Bulle): void {
     b.retire = true;
     b.texte = "";
     b.reactions = [];
+    b.piece = null; // la pièce quitte aussi l'écran (sa trame et sa pièce quittent le serveur)
     this.#change();
   }
 
