@@ -684,7 +684,11 @@ fn manifest_of(c: &Value) -> Manifest {
             }
         })
         .collect();
-    Manifest { rights, items }
+    Manifest {
+        rights,
+        title: None,
+        items,
+    }
 }
 
 #[test]

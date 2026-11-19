@@ -62,6 +62,10 @@
   const o = opened;
   const viewOnly = o.manifest.rights === "voir";
   const entries = o.manifest.items;
+  // Nom du partage (19 novembre) : texte de l'expéditeur, déjà nettoyé par le moteur, hostile
+  // quand même : affiché en texte brut (jamais en HTML), isolé (bdi), jamais dans le titre de
+  // l'onglet (il entrerait dans l'historique du navigateur).
+  const shareTitle = typeof o.manifest.title === "string" && o.manifest.title !== "" ? o.manifest.title : null;
   const enc = new TextEncoder();
   const totals = entries.map((e) => (e.kind === "text" ? enc.encode(e.text ?? "").length : e.size));
   const names = entries.map((_, i) => o.safeName(i));
@@ -413,7 +417,9 @@
 <div class="content" bind:this={panel}>
   <header class="top">
     <div class="tt">
-      <h1 class="title" tabindex="-1" data-large-title bind:this={heading}>{t("content.title")}</h1>
+      <h1 class="title" tabindex="-1" data-large-title data-share-title={shareTitle !== null ? "" : undefined} bind:this={heading}>
+        {#if shareTitle !== null}<span class="sr-only">{t("content.title")}, </span><bdi>{shareTitle}</bdi>{:else}{t("content.title")}{/if}
+      </h1>
       <NamesTip />
     </div>
     <p class="sum num">
@@ -562,6 +568,8 @@
   }
   .title {
     margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-size: var(--fs-h2);
     font-weight: var(--fw-h2);
     font-stretch: var(--wd-h2);

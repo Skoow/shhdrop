@@ -17,6 +17,7 @@ import {
   accessKeys,
   b64u,
   checkOrigin,
+  cleanTitle,
   contentKeys,
   deriveAccess,
   elementSealer,
@@ -700,7 +701,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     finalize: (items: { id: string; item: Item }[], f: CreateOpts) => finalize(items, f),
   };
 
-  async function finalize(list: { id: string; item: Item }[], f: CreateOpts): Promise<{ link: string; manage: string; expiresInS: number }> {
+  async function finalize(list: { id: string; item: Item }[], f: CreateOpts): Promise<{ link: string; manage: string; expiresInS: number; title?: string }> {
     if (!(TTL_HOURS as readonly number[]).includes(f.ttlHours)) throw new Error("duree_invalide");
     if (!Number.isInteger(f.maxOpens) || f.maxOpens < 1 || f.maxOpens > MAX_OPENS) throw new Error("ouvertures_invalides");
     f.prepared?.proof.catch(() => undefined);
@@ -847,7 +848,11 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
           entries.push({ kind: "file", name: item.name, mime: item.mime, size: e.data!.size, first: e.first, sealer: e.sealer!, ...(item.clean ? { clean: item.clean } : {}), ...(sum && /^[0-9a-f]{64}$/.test(sum) ? { sha256: sum } : {}) });
         }
       }
-      const opts = { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined };
+      // Nom du partage (19 novembre) : tel que saisi au moteur, qui le nettoie et refuse un nom
+      // trop long (« titre_trop_long ») ; sa forme nettoyée, celle que lira le destinataire, est
+      // rendue avec le lien pour « Lien prêt » et l'historique.
+      const opts = { rights: f.rights as Rights | undefined, keepTtlH: f.keepTtlH as KeepTtl | undefined, title: f.title };
+      const title = f.title === undefined ? undefined : await cleanTitle(f.title);
       // Empreintes en trop (200 fichiers aux noms très longs) : le manifeste déborderait ; il part
       // alors sans empreinte plutôt que d'empêcher l'envoi (le refus de validation n'use pas la
       // clé, moteur). Le composeur borne la taille sans les empreintes.
@@ -900,7 +905,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       closed = true;
       clearInterval(keepTimer);
       const base = f.base ?? "/";
-      const out = { link: await shareLink(origin, cr.kLien, base), manage: await manageLink(origin, cr.sGestion, base), expiresInS };
+      const out = { link: await shareLink(origin, cr.kLien, base), manage: await manageLink(origin, cr.sGestion, base), expiresInS, ...(title === undefined ? {} : { title }) };
       for (const e of els.values()) e.sealer?.forget();
       cr.kLien.fill(0);
       cr.sGestion.fill(0);

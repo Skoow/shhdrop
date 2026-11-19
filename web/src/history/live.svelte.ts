@@ -7,7 +7,7 @@
 // relectures passent par `refreshShare` (poll.ts : visible, 5 min, gigue).
 import { accountFlag } from "../app/account-flag.svelte";
 import { getDemo } from "../app/demo-hooks";
-import { destroyShare, fetchMeta, shareStatus } from "../index";
+import { cleanTitle, destroyShare, fetchMeta, shareStatus } from "../index";
 import { destroyedPatch, missingPatch, pollHistory, statusPatch, type PollError, type Poller, type RefreshResult, type Status } from "./poll";
 import { presence } from "./presence.svelte";
 import { pageReturns } from "./returns";
@@ -50,8 +50,11 @@ export function setAccountPrefs(p: { keepReceived: boolean } | null): void {
   accountFlag.connected = p !== null;
 }
 
-/** Ajout ou retrait d'une entrée par un geste sur cet appareil (synchronisation du compte). */
-export type LocalChange = { kind: "add" | "remove"; entry: HistoryEntry };
+/**
+ * Ajout, retrait ou renommage (titre d'un envoi, 19 novembre) d'une entrée par un geste sur cet
+ * appareil (synchronisation du compte).
+ */
+export type LocalChange = { kind: "add" | "remove" | "rename"; entry: HistoryEntry };
 const listeners = new Set<(c: LocalChange) => void>();
 /** Écoute les ajouts et retraits faits sur cet appareil ; rend l'arrêt. */
 export function onLocalChange(f: (c: LocalChange) => void): () => void {
@@ -188,6 +191,28 @@ export async function recordShare(e: NewEntry): Promise<string | null> {
  */
 export async function recordReceived(r: { link: string; expiresAt: number; itemsCount: number; sizeBytes: number; format: string }): Promise<string | null> {
   return recordShare({ sorte: "recu", manage: "", link: r.link, format: r.format, createdAt: Date.now(), sizeBytes: r.sizeBytes, itemsCount: r.itemsCount, expiresAt: r.expiresAt, maxOpens: 0 });
+}
+
+/**
+ * Renomme un envoi sur cet appareil (titre du partage, 19 novembre) : nettoyé par le moteur comme
+ * à l'envoi (cleanTitle) ; vide ou rien que des invisibles : plus de titre. Ne change PAS ce que
+ * voit le destinataire (le manifeste chiffré est figé). Rend l'entrée, ou null.
+ */
+export async function renameShare(id: string, raw: string): Promise<HistoryEntry | null> {
+  const h = await store();
+  if (!h) return null;
+  try {
+    const old = await h.get(id);
+    if (!old || old.sorte !== "envoi") return null;
+    const label = (await cleanTitle(raw)) ?? "";
+    if (label === old.label) return old;
+    const e = await h.update(id, { label });
+    await reload(h);
+    if (e) notify({ kind: "rename", entry: e });
+    return e;
+  } catch {
+    return null;
+  }
 }
 
 export async function forgetShare(id: string): Promise<void> {

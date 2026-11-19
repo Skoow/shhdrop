@@ -84,6 +84,8 @@ pub enum Error {
     PseudoCaracteres,
     /// Pseudo qui mêle plusieurs écritures.
     PseudoEcritures,
+    /// Nom du partage de plus de `manifest::TITLE_MAX` points de code après nettoyage.
+    TitreTropLong,
 }
 
 impl Error {
@@ -127,6 +129,7 @@ impl Error {
             Error::PseudoLongueur => "pseudo_longueur",
             Error::PseudoCaracteres => "pseudo_caracteres",
             Error::PseudoEcritures => "pseudo_ecritures",
+            Error::TitreTropLong => "titre_trop_long",
         }
     }
 }
@@ -198,6 +201,7 @@ mod tests {
         assert_eq!(Error::AdresseNonAscii.to_string(), "adresse_non_ascii");
         assert_eq!(Error::MdpCourt.to_string(), "mdp_court");
         assert_eq!(Error::MdpLong.to_string(), "mdp_long");
+        assert_eq!(Error::TitreTropLong.to_string(), "titre_trop_long");
         assert_eq!(Error::MdpAdresse.to_string(), "mdp_adresse");
         assert_eq!(Error::PseudoLongueur.to_string(), "pseudo_longueur");
         assert_eq!(Error::PseudoCaracteres.to_string(), "pseudo_caracteres");

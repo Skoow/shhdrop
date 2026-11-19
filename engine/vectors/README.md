@@ -147,6 +147,20 @@ Mêmes conventions que `v2.json` (hex minuscule, JSON à clés triées, 2 espace
 
 Extension facultative du manifeste v2 (décision du propriétaire du 16 novembre, spec §29.3) : champ `sha256` d'une entrée de fichier, 64 chiffres hexadécimaux minuscules, écrit après `clean`. `read` : manifestes et empreinte attendue à la lecture (`null` : ignorée) ; `write` : entrée et `manifest_json` exact. Lu par `engine/core/tests/empreinte.rs`. `v2.json` n'est pas modifié : sans empreinte, le manifeste reste identique octet pour octet.
 
+## Nom du partage (`v2-titre.json`)
+
+Extension facultative du manifeste v2 (demande du propriétaire du 19 novembre, spec §29.3) : champ `title`, écrit après `keep_ttl_h` et avant `items`. **Produit par le moteur Rust** : `engine/core/tests/titre.rs` l'écrit (`SHH_GEN_TITRE=1 cargo test -p shhdrop-core --test titre`) à partir de tables dont les sorties sont écrites à la main, puis le relit ; sans la variable, le test échoue si le fichier n'est plus exactement celui du moteur. `web/src/engine/engine.test.ts` rejoue `clean` (`cleanTitle`) et `seal` (`sealFinal` puis déchiffrement du morceau du manifeste) avec le build WebAssembly et WebCrypto. `v2.json` n'est pas modifié : sans titre, le manifeste reste identique octet pour octet.
+
+Mêmes conventions que `v2.json`. Textes en hex UTF-8 (`in_hex`, `title_hex`, `title_in_hex`) : les invisibles restent lisibles ; `null` : aucun titre. Graine `k` et `r` : SHA-256(UTF-8(`shhdrop/vecteurs/v2-titre/` + étiquette)).
+
+| Clé | Contenu |
+|---|---|
+| `constants` | `TITLE_MAX` (80 points de code après nettoyage). |
+| `clean` | Entrée → titre lu (`title_hex`, lecture tolérante : `null` si vide ou trop long) et `seal` (`title_hex`, ou `titre_trop_long`). Blancs Unicode, commandes C0/DEL/C1, inversions et isolats de sens, LRM/RLM/ALM, largeur nulle, BOM, étiquettes, U+FE0E ; séquences emoji gardées (U+200D, U+FE0F) ; NFC après le retrait ; 80 et 81 points de code, 80 et 81 emoji, compte après nettoyage et après NFC (U+0344). |
+| `read` | `manifest_json` → `title_hex` : absent, nombre, `null`, tableau, objet, vide, blancs, nettoyé à la lecture, 81 points de code, demi-paire isolée (U+FFFD), clé répétée, champ après `items`. Jamais une erreur. |
+| `write` | Droits, durée, titre demandé (`title_in_hex`, nettoyé par `title_for_seal`) → `manifest_json` exact. |
+| `seal` | `seal_final_titled` / `sealFinal` : `r`, une entrée de fichier, titre → `bucket`, `header`, `tail_sha256`, `manifest_json`, ou `error` (`titre_trop_long`). |
+
 ## Liens sous `/s` (`v3-liens.json`)
 
 Décision du propriétaire du 16 novembre (spec §32, `docs/superpowers/specs/2026-11-16-liens-s-et-pages-design.md`) : les liens écrits ont un « s » avant le « # » (`https://hôte/s#<clé>`, `…/s#m<clé>`), et `parseLink` lit les deux formes. `v2.json` n'est pas modifié : ses 10 cas `shareLink`/`manageLink` réussis (forme racine) et ses 2 cas `parseLink` qui refusaient `…/s#…` sont **remplacés** par les 49 cas de `v3-liens.json` ; tous ses autres cas restent valables. Lu par `engine/core/tests/vectors.rs` et, côté site, par `web/src/engine/link-vectors.testutil.ts`.

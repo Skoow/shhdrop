@@ -61,3 +61,63 @@ describe("ShareCard : dernière lecture (audit R3)", () => {
     expect(render(entry({ lastSeenAt: T - 26 * 3600_000 }), T, true)).toMatch(/^État lu le 11 nov\., 16 h 58 · /);
   });
 });
+
+// Titre du partage (19 novembre) : en tête de la carte, texte brut isolé ; renommer sur cet appareil
+// seulement (l'écran le dit) ; sans `onrename` (accueil), pas de renommage.
+describe("ShareCard : titre du partage", () => {
+  const mountCard = (e: HistoryEntry, onrename?: (s: string) => Promise<boolean>, compact = false) => {
+    c = mount(ShareCard as never, { target: document.body, props: { entry: e, now: T, compact, onrefresh: async () => undefined, ondestroy: async () => false, onremove: () => undefined, onrename } }) as Record<string, unknown>;
+    flushSync();
+  };
+
+  it("affiché en tête, en texte brut (bdi), et nomme la carte ; sans titre : aucune ligne", () => {
+    setLang("fr");
+    mountCard(entry({ label: "<img src=x> Contrat" }), undefined, true);
+    const name = document.querySelector("[data-share-title]")!;
+    expect(name.querySelector("bdi")!.textContent).toBe("<img src=x> Contrat");
+    expect(document.querySelector("img")).toBeNull();
+    const card = document.querySelector("[data-share-card]")!;
+    expect(card.getAttribute("aria-labelledby")!.split(" ")[0]).toBe(name.id);
+    void unmount(c!);
+    document.body.innerHTML = "";
+    mountCard(entry(), undefined, true);
+    expect(document.querySelector("[data-share-title]")).toBeNull();
+  });
+
+  it("renommer : champ prérempli, 80 caractères au plus, l'aide dit que le destinataire ne voit pas le changement", async () => {
+    setLang("fr");
+    const calls: string[] = [];
+    mountCard(entry({ label: "Ancien" }), async (s) => (calls.push(s), true));
+    const btn = [...document.querySelectorAll("button")].find((b) => b.textContent!.trim() === "Renommer")!;
+    btn.click();
+    flushSync();
+    const form = document.querySelector("[data-rename]")!;
+    const input = form.querySelector("input")!;
+    expect(input.value).toBe("Ancien");
+    expect(input.getAttribute("maxlength")).toBe("80");
+    expect(form.textContent).toContain("le destinataire voit toujours le nom choisi à l'envoi");
+    input.value = "Nouveau";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    flushSync();
+    [...form.querySelectorAll("button")].find((b) => b.textContent!.trim() === "Enregistrer le nom")!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    flushSync();
+    expect(calls).toEqual(["Nouveau"]);
+    expect(document.querySelector("[data-rename]")).toBeNull();
+  });
+
+  it("renommage refusé : message, le champ reste ; sans onrename : pas de bouton", async () => {
+    setLang("fr");
+    mountCard(entry(), async () => false);
+    [...document.querySelectorAll("button")].find((b) => b.textContent!.trim() === "Renommer")!.click();
+    flushSync();
+    [...document.querySelectorAll<HTMLButtonElement>("[data-rename] button")].find((b) => b.textContent!.trim() === "Enregistrer le nom")!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    flushSync();
+    expect(document.querySelector("[data-rename] [role=alert]")!.textContent).toBe("Le nom n'a pas pu être modifié.");
+    void unmount(c!);
+    document.body.innerHTML = "";
+    mountCard(entry());
+    expect([...document.querySelectorAll("button")].some((b) => b.textContent!.trim() === "Renommer")).toBe(false);
+  });
+});

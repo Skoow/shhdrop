@@ -713,6 +713,7 @@ fn alea_indisponible_rien_n_est_scelle() {
 fn expected(entries: &[FinalEntry], rights: Rights) -> Manifest {
     Manifest {
         rights,
+        title: None,
         items: entries
             .iter()
             .map(|e| Entry {

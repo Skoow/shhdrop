@@ -7,13 +7,13 @@
   import { MediaQuery } from "svelte/reactivity";
   import { chrome, type AddGesture } from "../app/chrome.svelte";
   import Assurances from "../ui/Assurances.svelte";
-  import { CONTENT_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
+  import { CONTENT_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, TITLE_MAX, generatePassword, type ElementStatus, type Item, type KeepTtl } from "../index";
   import { blockKey, canClean, createComposer, type AddReport, type ComposeItem, type Source } from "../flows/compose.svelte";
   import { rowStatus, toDraftList } from "../flows/preupload";
   import { addActions, desktopActions, type AddId } from "../flows/add-actions";
   import { captureSupport } from "../media/capture";
   import { fromPasteEvent } from "../flows/intake";
-  import { createOptions, sendRights, viewableInBrowser, viewOnlyBlockers, type Rights } from "../flows/options.svelte";
+  import { createOptions, sendRights, sendTitle, viewableInBrowser, viewOnlyBlockers, type Rights } from "../flows/options.svelte";
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { announce } from "../ui/announce";
@@ -43,7 +43,7 @@
   import Options from "./Options.svelte";
 
   /** ids : identifiants des lignes, dans l'ordre de `items` (brouillon d'envoi, spec §41.14). */
-  export type SendState = { items: Item[]; ids: string[]; ttlHours: number; maxOpens: number; password: string; rights: Rights; keepTtlH?: KeepTtl };
+  export type SendState = { items: Item[]; ids: string[]; ttlHours: number; maxOpens: number; password: string; rights: Rights; keepTtlH?: KeepTtl; /** Nom du partage (19 novembre), tel que saisi. */ title?: string };
   type Props = {
     /** Envoi (Task 17). Sans lui : avis « Envoi : prochaine étape ». */
     onsend?: (state: SendState) => void;
@@ -430,7 +430,14 @@
   const uncleaned = $derived(composer.uncleanedCount);
   // Format jamais lu : dit à part, sans parler d'échec (audit D5).
   const unsupported = $derived(composer.unsupportedCount);
-  const reasonText = $derived(composerBlock ? t(blockKey(composerBlock), { max: composerBlock === "trop_gros" ? formatBytes(CONTENT_MAX, lang) : num(TEXT_MAX) }) : "");
+  // Nom du partage trop long (19 novembre) : bloqué ici, avant le moteur (« titre_trop_long »).
+  const reasonText = $derived(
+    composerBlock
+      ? t(blockKey(composerBlock), { max: composerBlock === "trop_gros" ? formatBytes(CONTENT_MAX, lang) : num(TEXT_MAX) })
+      : options.titleTooLong
+        ? t("options.name.tooLong", { max: num(TITLE_MAX) })
+        : "",
+  );
   // Chaque fichier part dès son ajout ; un retrait interrompt son envoi et l'efface du serveur.
   // untrack : le brouillon met à jour l'état des lignes pendant l'appel (pas une dépendance).
   $effect(() => {
@@ -591,7 +598,7 @@
 
   function send() {
     if (reasonText) return;
-    const state: SendState = { items: composer.toApiItems(), ids: composer.items.map((i) => i.id), ttlHours: options.ttlHours, maxOpens: options.maxOpens, password: options.password, ...sendRights(options) };
+    const state: SendState = { items: composer.toApiItems(), ids: composer.items.map((i) => i.id), ttlHours: options.ttlHours, maxOpens: options.maxOpens, password: options.password, ...sendRights(options), ...sendTitle(options) };
     if (onsend) onsend(state);
     else say(t("compose.send.soon"));
   }

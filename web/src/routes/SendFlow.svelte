@@ -205,6 +205,7 @@
       password: state.password,
       rights: state.rights,
       keepTtlH: state.keepTtlH,
+      ...(state.title === undefined ? {} : { title: state.title }),
     };
     guard();
     setView("sealing");

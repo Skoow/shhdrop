@@ -33,7 +33,8 @@ export type SendError = "reseau" | "interrompu" | "limite" | "plein" | "gele" | 
 export type Step = "chiffre" | "envoye" | "scelle";
 
 type Prepared = NonNullable<CreateOpts["prepared"]>;
-type Created = { link: string; manage: string; expiresInS: number };
+/** `title` : nom du partage tel que le moteur l'a écrit (nettoyé), absent sans nom. */
+type Created = { link: string; manage: string; expiresInS: number; title?: string };
 
 export type SendDeps = {
   createShare: (origin: string, items: Item[], opts: CreateOpts) => Promise<Created>;
@@ -58,6 +59,8 @@ export type SendOpts = {
   password: string;
   rights?: Rights;
   keepTtlH?: KeepTtl;
+  /** Nom du partage (19 novembre), facultatif. */
+  title?: string;
 };
 
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === "AbortError";
@@ -247,6 +250,7 @@ export function createSender(deps: SendDeps) {
           password: o.password,
           rights: o.rights,
           keepTtlH: o.keepTtlH,
+          ...(o.title === undefined ? {} : { title: o.title }),
           prepared,
           signal,
           solveCaptcha: async (challenge, ctx) => {

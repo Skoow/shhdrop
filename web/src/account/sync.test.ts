@@ -11,7 +11,7 @@ import { linkKey, type HistoryEntry } from "../history/store";
 import { deriverCompte } from "../engine/index";
 import { clesDuCompte, ouvrirEnveloppe } from "./keys";
 import { ouvrir, priveDeJson, REGLAGES_DEFAUT, type CoffrePrive, type Profil } from "./vaults";
-import { deCoffre, fusionner, versCoffre } from "./sync";
+import { deCoffre, fusionner, renommerEntree, versCoffre } from "./sync";
 import * as C from "./session.svelte";
 
 const MDP = "correct horse battery";
@@ -281,6 +281,31 @@ describe("format des entrées du coffre privé", () => {
     }
     expect(deCoffre("recus", { id: "x".repeat(22), lien: "https://shh.test/#m" + "a".repeat(43), cree: 1, expire: 2, taille: 1, elements: 1, format: "image" }, T0)).toBeNull();
     expect(deCoffre("recus", { id: "x".repeat(22), lien: "https://shh.test/#" + "a".repeat(43), cree: 1, expire: 2, taille: 1, elements: 1, format: "image", mot_de_passe: "x" }, T0)).not.toHaveProperty("mot_de_passe");
+  });
+
+  // Nom du partage (19 novembre) : `libelle` d'un envoi, seulement s'il y en a un ; entrée d'avant
+  // (sans libellé) relue sans titre ; renommage : seul le libellé de l'entrée du même lien change.
+  it("envoi : titre du partage dans le coffre (libelle), aller-retour, renommage", () => {
+    const e = entree({ sorte: "envoi", label: "Contrat Dupont" });
+    const { liste, valeur } = versCoffre(e);
+    expect(valeur.libelle).toBe("Contrat Dupont");
+    expect(deCoffre(liste, valeur, T0)!.label).toBe("Contrat Dupont");
+    const sans = versCoffre(entree({ sorte: "envoi" })).valeur;
+    expect(sans).not.toHaveProperty("libelle");
+    expect(deCoffre("envois", sans, T0)!.label).toBe("");
+    // Mal formé (trop long, commande) : entrée refusée à la relecture, comme toute entrée mal formée.
+    expect(deCoffre("envois", { ...valeur, libelle: "a".repeat(81) }, T0)).toBeNull();
+    expect(deCoffre("envois", { ...valeur, libelle: "a\u0000" }, T0)).toBeNull();
+    expect(deCoffre("envois", { ...valeur, libelle: 5 }, T0)).toBeNull();
+    const autre = entree({ sorte: "envoi" });
+    const p: CoffrePrive = { salons: [], recus: [], rejoints: [], envois: [valeur, versCoffre(autre).valeur] };
+    const r = renommerEntree(p, { ...e, label: "Contrat signé" });
+    expect(r.envois.map((v) => v.libelle)).toEqual(["Contrat signé", undefined]);
+    expect(r.envois[0]).toEqual({ ...valeur, libelle: "Contrat signé" });
+    // Titre retiré : plus de libellé ; entrée absente du coffre : ajoutée.
+    expect(renommerEntree(p, { ...e, label: "" }).envois[0]).not.toHaveProperty("libelle");
+    const neuve = entree({ sorte: "envoi", label: "Neuve" });
+    expect(renommerEntree(p, neuve).envois.map((v) => v.libelle)).toEqual(["Contrat Dupont", undefined, "Neuve"]);
   });
 
   it("fusion : appareil → coffre (sans doublon), coffre → appareil (origine compte), retraits et entrées finies depuis 7 jours", () => {

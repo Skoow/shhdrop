@@ -15,11 +15,15 @@
 //   d'une lecture naïve du stockage. La vraie protection est le verrouillage de l'appareil.
 // - Une entrée ne contient que : le lien de gestion (S_gestion), l'heure locale de création,
 //   la taille, le nombre d'éléments, l'échéance, le maximum d'ouvertures, les ouvertures
-//   observées et l'état. JAMAIS K_lien, le lien de partage, le mot de passe, un nom ou un
-//   contenu : tout champ inconnu est ignoré (`clean`).
+//   observées, l'état et le nom du partage (`label`, demande du propriétaire du 19 novembre :
+//   celui du manifeste, renommable ici sans changer ce que voit le destinataire ; chiffré comme
+//   le reste de l'entrée). JAMAIS K_lien, le lien de partage, le mot de passe, un nom d'élément
+//   ou un contenu : tout champ inconnu est ignoré (`clean`).
 // - Entrée terminée (détruite ou expirée) retirée 7 jours après sa fin.
 // - Stockage absent ou refusé : openHistory rend null et le site marche sans historique.
 // Aucune requête réseau ici (relectures : poll.ts).
+
+import { TITLE_MAX } from "../limits";
 
 export type HistoryState = "ready" | "draining" | "gone" | "expired";
 export type Opening = { count: number; between: [number, number] };
@@ -35,7 +39,10 @@ export type HistoryEntry = {
   manage: string;
   /** Reçu : lien « https://…/s#<K_lien> » ; salon : invitation « https://…/#c<K_lien> » ; "" pour un envoi. */
   link: string;
-  /** Libellé local d'un salon (64 caractères au plus) ; "" sinon. */
+  /**
+   * Libellé local d'un salon (64 caractères au plus) ; envoi : titre du partage (19 novembre,
+   * TITLE_MAX points de code au plus, déjà nettoyé par le moteur) ; "" sinon.
+   */
   label: string;
   /** Reçu : sorte dominante (FORMATS) ; "" sinon. */
   format: string;
@@ -90,6 +97,8 @@ const ROOM_LINK = /^https?:\/\/[^#\s]+#c[A-Za-z0-9_-]{43}$/;
 const ROOM_MANAGE_LINK = /^https?:\/\/[^#\s]+#s[A-Za-z0-9_-]{43}$/;
 const SORTES: readonly Sorte[] = ["envoi", "recu", "salon_cree", "salon_rejoint"];
 const LABEL_MAX = 64;
+/** Nom d'un envoi : TITLE_MAX (limits.ts) points de code au plus ; ni commande C0, DEL ni C1. */
+const CONTROLS = /[\u0000-\u001f\u007f-\u009f]/;
 const ID = /^[A-Za-z0-9_-]{22}$/;
 const STATES: readonly HistoryState[] = ["ready", "draining", "gone", "expired"];
 const AAD = "shhdrop/history/v1/";
@@ -258,7 +267,8 @@ export function cleanEntry(x: unknown): HistoryEntry | null {
   const format = o.format ?? "";
   if (typeof manage !== "string" || typeof link !== "string" || typeof label !== "string" || typeof format !== "string") return null;
   if (sorte === "envoi") {
-    if (!MANAGE_LINK.test(manage) || link !== "" || label !== "" || format !== "") return null;
+    if (!MANAGE_LINK.test(manage) || link !== "" || format !== "") return null;
+    if ([...label].length > TITLE_MAX || CONTROLS.test(label)) return null;
   } else {
     // Salon créé : son lien de gestion (S_gestion) peut être gardé ; aucune autre sorte n'en a.
     if (manage !== "" && !(sorte === "salon_cree" && ROOM_MANAGE_LINK.test(manage))) return null;

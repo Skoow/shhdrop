@@ -179,3 +179,36 @@ describe("ouverture de l'historique : un échec passager n'est pas gardé (relec
     expect(live.shares.entries.map((e) => e.manage)).toEqual([OTHER]);
   });
 });
+
+// Renommer un envoi (19 novembre) : nettoyé par le vrai moteur (WebAssembly lu sur le disque),
+// gardé sur l'appareil, signalé au compte (« rename ») ; un reçu ne se renomme pas.
+describe("renameShare : titre d'un envoi sur cet appareil", () => {
+  it("nettoyé par le moteur comme à l'envoi ; vide : plus de titre ; signal « rename » ; reçu refusé", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const wasm = join(dirname(fileURLToPath(import.meta.url)), "../engine/pkg/shhdrop_wasm_bg.wasm");
+    vi.stubGlobal("fetch", async () => new Response(readFileSync(wasm)));
+    const e = await seed();
+    expect(e.label).toBe("");
+    const seen: { kind: string; label: string }[] = [];
+    live.onLocalChange((c) => seen.push({ kind: c.kind, label: c.entry.label }));
+    const r = await live.renameShare(e.id, "  Contrat ‮ Dupont​  ");
+    expect(r!.label).toBe("Contrat Dupont");
+    expect(live.shares.entries[0]!.label).toBe("Contrat Dupont");
+    // Même nom : rien n'est réécrit ni signalé.
+    await live.renameShare(e.id, "Contrat Dupont");
+    expect(seen).toEqual([{ kind: "rename", label: "Contrat Dupont" }]);
+    expect((await live.renameShare(e.id, " ​ "))!.label).toBe("");
+    expect(seen.at(-1)).toEqual({ kind: "rename", label: "" });
+    // Trop long après nettoyage : le moteur ne garde rien (le champ borne à 80).
+    expect((await live.renameShare(e.id, "a".repeat(81)))!.label).toBe("");
+    // Entrée inconnue : null.
+    expect(await live.renameShare("z".repeat(22), "x")).toBeNull();
+    // Un partage reçu ne porte pas de titre.
+    const now = Date.now();
+    await live.recordReceived({ link: "https://x.test/s#" + "C".repeat(43), expiresAt: now + 3600_000, itemsCount: 1, sizeBytes: 1, format: "file" });
+    const recu = live.shares.all.find((x) => x.sorte === "recu")!;
+    expect(await live.renameShare(recu.id, "x")).toBeNull();
+  });
+});

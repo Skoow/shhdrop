@@ -89,6 +89,26 @@ describe("création puis ouverture (texte, image 300 Kio, fichier 5 Mio)", () =>
   });
 });
 
+// Nom du partage (19 novembre) : écrit dans le manifeste chiffré, nettoyé par le moteur, relu
+// tel quel à l'ouverture ; sans nom, rien ; trop long, refusé avant toute requête de finalisation.
+describe("nom du partage : aller-retour chiffré", () => {
+  const srv = useServer();
+  it("nettoyé à l'envoi, rendu avec le lien, relu par le destinataire ; absent sans nom ; 81 caractères refusés", async () => {
+    const r = await share(srv(), [textItem("x")], 1, { title: "  Photos\u202e du  week-end 😀 " });
+    expect(r.title).toBe("Photos du week-end 😀");
+    const o = await openShare(r.link, PW, srv().origin);
+    expect(o.manifest.title).toBe("Photos du week-end 😀");
+    expect(o.manifest.items[0]!.text).toBe("x");
+    await o.done();
+    const sans = await share(srv(), [textItem("y")]);
+    expect(sans.title).toBeUndefined();
+    const o2 = await openShare(sans.link, PW, srv().origin);
+    expect(o2.manifest).not.toHaveProperty("title");
+    await o2.done();
+    await expect(share(srv(), [textItem("z")], 1, { title: "a".repeat(81) })).rejects.toThrow("titre_trop_long");
+  });
+});
+
 describe("mauvais mot de passe ×5", () => {
   const srv = useServer();
   it("essais restants 4, 3, 2, 1 puis introuvable", async () => {
