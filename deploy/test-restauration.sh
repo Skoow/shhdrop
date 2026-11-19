@@ -291,7 +291,7 @@ check "paiements.db créée par le serveur (65532, 0600)" test "$(stat -c %u:%a 
 q_hex=5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
 setpriv --reuid=65532 --regid=65532 --clear-groups -- sqlite3 "$pdb" \
 	"INSERT INTO passes(q, offre, debut_jour, fin_jour, jetons, recharge_jour, revoque) VALUES(x'$q_hex', 2, 86400, 864000, 100, 172800, 0);
-	 INSERT INTO cles_jetons(jour, offre, sk) VALUES(86400, 2, randomblob(1190));"
+	 INSERT INTO cles_jetons(jour, offre, sk) VALUES(86400, 2, x'$(printf 'c3%.0s' $(seq 1 1190))');"
 rm -f -- "$depot"/*
 check "sauvegarde des deux bases" sauvegarder "$work/env"
 pcopie=$(find "$depot" -type f -name 'paiements-*.db.age' | head -n 1)
@@ -300,6 +300,11 @@ check "paiements : le fichier commence par age-encryption.org/v1" test "$(head -
 refuse "paiements : pas l'empreinte du pass en clair" contient "$q_hex" "$pcopie"
 refuse "paiements : pas d'en-tête SQLite en clair" grep -qaF -- "SQLite format 3" "$pcopie"
 "$here/restaurer.sh" verifier "$pcopie" "$work/identite.txt" >"$work/verifier-p.txt" 2>&1 || true
+age -d -i "$work/identite.txt" -o "$work/pclair.db" "$pcopie"
+check "paiements : la copie n'a aucune clé de jetons (retirées avant le chiffrement)" test "$(sqlite3 "$work/pclair.db" 'SELECT count(*) FROM cles_jetons;')" = 0
+refuse "paiements : aucun octet d'une clé de jetons dans la copie déchiffrée" grep -qaF -- "$(printf '\303%.0s' $(seq 1 64))" "$work/pclair.db"
+check "paiements : la copie déchiffrée garde le pass" test "$(sqlite3 "$work/pclair.db" "SELECT count(*) FROM passes WHERE q=x'$q_hex';")" = 1
+rm -f -- "$work/pclair.db"
 check "paiements : verifier compte un pass" grep -q '^intégrité : ok ; base des paiements ; schéma [0-9]* ; 1 pass$' "$work/verifier-p.txt"
 rm -f -- "$pdb" "$pdb-wal" "$pdb-shm"
 check "paiements : installer" "$here/restaurer.sh" installer "$pcopie" "$work/identite.txt" "$racine/data"

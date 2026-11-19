@@ -9,7 +9,8 @@
 #   1. copie cohérente de la base (« sqlite3 .backup », serveur en marche ou non), faite
 #      sous le compte propriétaire de la base (65532), dans <SHH_DATA_ROOT>/sauvegarde/ : le
 #      clair temporaire ne quitte jamais le volume chiffré (refus sinon) ;
-#   2. PRAGMA integrity_check de la copie (une copie abîmée n'est pas envoyée) ;
+#   2. PRAGMA integrity_check de la copie (une copie abîmée n'est pas envoyée) ; pour
+#      paiements.db, les clés privées d'émission des jetons sont retirées de la copie ;
 #   3. chiffrement par age (format age-encryption.org/v1, X25519) vers la clé PUBLIQUE de
 #      l'exploitant ; le clair est effacé aussitôt après ;
 #   4. envoi du seul chiffré au stockage objet (compte en écriture seule, chez un autre
@@ -123,6 +124,17 @@ sauver() {
 	n=$("${as_owner[@]}" sqlite3 -bail "$clair" \
 		"SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('$2','$3','$4');") || n=
 	[ "$n" = 3 ] || die "copie de $base.db sans les tables $2, $3 et $4 : rien n'est envoyé"
+
+	# 2 bis. paiements.db : clés privées d'émission des jetons retirées de la copie (jamais dans
+	# une sauvegarde : une copie volée ne doit pas permettre de signer des jetons ; elles ne
+	# servent que deux jours et la restauration les retire de toute façon, S9). VACUUM : aucune
+	# page libre ne garde leurs octets.
+	if [ "$base" = paiements ]; then
+		"${as_owner[@]}" sqlite3 -bail "$clair" "PRAGMA journal_mode=DELETE; PRAGMA secure_delete=ON; DELETE FROM cles_jetons; VACUUM;" >/dev/null ||
+			die "retrait des clés de jetons de la copie impossible : rien n'est envoyé"
+		n=$("${as_owner[@]}" sqlite3 -bail "$clair" "SELECT count(*) FROM cles_jetons;") || n=
+		[ "$n" = 0 ] || die "clés de jetons encore dans la copie : rien n'est envoyé"
+	fi
 
 	# 3. Chiffrement, puis effacement du clair.
 	age -r "$dest" -o "$chiffre" "$clair" || die "chiffrement par age impossible"
