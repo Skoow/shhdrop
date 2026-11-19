@@ -318,7 +318,7 @@ describe("vite.config.ts résolu", () => {
 
   // Plan du compte, lot 9 : drapeau de construction __COMPTES__, faux par défaut et toujours faux
   // dans la démo (aucun serveur) ; vrai seulement si SHH_SITE_COMPTES=1 au build de production.
-  it("__COMPTES__ : false par défaut et dans la démo, true seulement avec SHH_SITE_COMPTES=1 (production)", async () => {
+  it("__COMPTES__ : false par défaut en production, true avec SHH_SITE_COMPTES=1, toujours dans la démo (compte essayable)", async () => {
     const define = async (mode: string | undefined, env: string | undefined) => {
       const was = process.env.SHH_SITE_COMPTES;
       if (env === undefined) delete process.env.SHH_SITE_COMPTES;
@@ -334,8 +334,8 @@ describe("vite.config.ts résolu", () => {
     expect(await define(undefined, "0")).toBe("false");
     expect(await define(undefined, "true")).toBe("false");
     expect(await define(undefined, "1")).toBe("true");
-    expect(await define("demo", undefined)).toBe("false");
-    expect(await define("demo", "1")).toBe("false");
+    expect(await define("demo", undefined)).toBe("true");
+    expect(await define("demo", "1")).toBe("true");
   });
 
   // Plan du compte, lot 10 : App.svelte ne voit les pages du compte que par routes/compte/pages.ts,

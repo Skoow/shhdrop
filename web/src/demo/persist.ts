@@ -10,6 +10,7 @@
 //   durée de vie maximale d'un partage et sa grâce) ; un partage retiré perd ses segments.
 // - Toute erreur (stockage refusé, quota) : la démo continue en mémoire, comme avant.
 // Jamais dans le build de production (garde demoGuard, check-dist).
+import type { InstantaneCompte } from "./fake-compte";
 import type { Snapshot } from "./fake-server";
 
 export const MARK = "__SHH_DEMO__";
@@ -195,4 +196,32 @@ export async function openDemoStore(w: Window, now: () => number = Date.now): Pr
       segs = new Map();
     },
   };
+}
+
+/**
+ * Compte essayable de la démo (19 novembre) : l'état du faux serveur du compte de CET onglet
+ * (demo/fake-compte.ts : adresses, A_auth, enveloppes et coffres chiffrés, sessions), en
+ * sessionStorage, pour qu'un rechargement retrouve le compte ; perdu à la fermeture de l'onglet,
+ * jamais vu par un autre onglet ni envoyé. Refus du stockage : le compte vit le temps de la page.
+ */
+export const COMPTE_KEY = "shh.demo.compte";
+
+export function loadCompte(w: Window): InstantaneCompte | null {
+  try {
+    const t = w.sessionStorage.getItem(COMPTE_KEY);
+    if (t === null) return null;
+    const v = JSON.parse(t) as InstantaneCompte;
+    return v?.v === 1 && Array.isArray(v.comptes) && Array.isArray(v.sessions) && Array.isArray(v.pseudos) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCompte(w: Window, s: InstantaneCompte): void {
+  try {
+    if (s.comptes.length === 0 && s.sessions.length === 0) w.sessionStorage.removeItem(COMPTE_KEY);
+    else w.sessionStorage.setItem(COMPTE_KEY, JSON.stringify(s));
+  } catch {
+    /* stockage refusé ou plein : le compte vit le temps de la page */
+  }
 }

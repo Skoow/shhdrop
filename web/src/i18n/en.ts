@@ -1322,6 +1322,7 @@ export const en = {
   "account.err.autre": "Something went wrong. Try again.",
   "account.err.coffre": "Your encrypted data won't open on this device. Sign in again.",
   "account.verifying": "Checking…",
+  "account.demo.code": "Code for {email}:",
   "account.login.title": "Sign in",
   "account.stay": "Stay signed in on this device",
   "account.stay.hint": "Avoid on a shared device.",

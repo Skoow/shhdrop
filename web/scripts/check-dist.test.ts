@@ -366,10 +366,9 @@ describe("check-dist.mjs --demo", () => {
     expect(run(["--demo", site(good())])).toEqual({ code: 0, err: "" });
   });
 
-  it("compte : jamais dans la démo (aucun serveur), même avec --comptes", () => {
-    const r = run(["--demo", "--comptes", site({ ...good(), "assets/install-a.js": good()["assets/install-a.js"] + 'x="/api/compte"' })]);
-    expect(r.code).toBe(1);
-    expect(r.err).toContain("module de compte « /api/compte »");
+  it("compte : admis dans la démo (compte essayable, faux serveur de l'onglet, 19 novembre)", () => {
+    const r = run(["--demo", site({ ...good(), "assets/install-a.js": good()["assets/install-a.js"] + 'x="/api/compte"' })]);
+    expect(r.code).toBe(0);
   });
 
   it("échoue sans la marque", () => {

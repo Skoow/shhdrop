@@ -9,9 +9,10 @@ import { demoPrefixed } from "../app/title";
 import { getLang } from "../i18n/i18n.svelte";
 import { SHARE_FRAGMENT, type CaptchaProof } from "../index";
 import DemoBanner from "./DemoBanner.svelte";
+import { createFauxCompte } from "./fake-compte";
 import { createFakeServer } from "./fake-server";
 import { fakeXHRClass } from "./fake-xhr";
-import { openDemoStore } from "./persist";
+import { loadCompte, openDemoStore, saveCompte } from "./persist";
 
 export const MARK = "__SHH_DEMO__";
 
@@ -27,6 +28,11 @@ const OUTAGE = { atFraction: 0.5, ms: 20_000 };
 const READY_NOTE = {
   fr: "Démo\u202f: ce lien ne marche que dans cet onglet. Rien n'est envoyé.",
   en: "Demo: this link only works in this tab. Nothing is sent.",
+} as const;
+/** Pages du compte : rien n'est envoyé, le compte n'existe que dans cet onglet. */
+const COMPTE_NOTE = {
+  fr: "Démo\u202f: aucun e-mail n'est envoyé ; ce compte n'existe que dans cet onglet et disparaît à sa fermeture.",
+  en: "Demo: no e-mail is sent; this account only exists in this tab and disappears when it closes.",
 } as const;
 const INVALID_LINK_NOTE = {
   fr: "(normal en démo : un partage n'existe que dans l'onglet qui l'a créé)",
@@ -66,6 +72,7 @@ const isApiPath = (p: string) => /^\/api(\/|$)/i.test(p);
 export async function installDemo(w: Window): Promise<void> {
   const q = new URLSearchParams(w.location.search);
   const rate = q.has("lent") ? SLOW_RATE : RATE;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const store = await openDemoStore(w).catch(() => null);
   const fake = createFakeServer({
     rateBytesPerS: rate,
@@ -75,13 +82,17 @@ export async function installDemo(w: Window): Promise<void> {
     onSegment: store ? (id, n, d) => store.saveSegment(id, n, d) : undefined,
   });
   store?.release();
+  // Compte essayable (19 novembre) : faux serveur du compte de cet onglet, aucun e-mail envoyé.
+  const compte = createFauxCompte({ restore: loadCompte(w), onChange: (s) => saveCompte(w, s) });
   const isApi = (u: URL) => u.origin === w.location.origin && isApiPath(u.pathname);
+  const isCompte = (u: URL) => /^\/api\/compte(\/|$)/.test(u.pathname);
 
   // Seules les URL /api/* de l'origine sont détournées ; le reste (fichiers du site) part normalement.
   const original = w.fetch.bind(w);
   w.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const req = new Request(input, init);
-    return isApi(new URL(req.url)) ? fake.handle(req) : original(req);
+    const u = new URL(req.url);
+    return isApi(u) ? (isCompte(u) ? compte.handle(req) : fake.handle(req)) : original(req);
   };
   const g = w as Window & { XMLHttpRequest: typeof XMLHttpRequest };
   g.XMLHttpRequest = fakeXHRClass(g.XMLHttpRequest, isApi, (r) => fake.handle(r), rate);
@@ -96,7 +107,6 @@ export async function installDemo(w: Window): Promise<void> {
   prefix();
   new MutationObserver(prefix).observe(d.head, { subtree: true, childList: true, characterData: true });
 
-  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   setDemo({
     solveCaptcha: async (): Promise<CaptchaProof> => ({ kind: "pow", payload: "demo" }),
     openAsRecipient(link: string) {
@@ -115,6 +125,10 @@ export async function installDemo(w: Window): Promise<void> {
     },
     get readyNote() {
       return READY_NOTE[getLang()];
+    },
+    compteCode: () => compte.dernierCode(),
+    get compteNote() {
+      return COMPTE_NOTE[getLang()];
     },
     get securityGaps() {
       return SECURITY_GAPS[getLang()].join("\n");

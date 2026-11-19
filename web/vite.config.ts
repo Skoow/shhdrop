@@ -145,7 +145,7 @@ export function engineWasm(base: string, demo: boolean): Plugin {
 /**
  * Module WebAssembly du salon (engine/salon-wasm, Task 9 du salon), à part du moteur des partages.
  * ./source, importé par un module de src/salon/, est remplacé par source.verified.ts (production)
- * ou source.demo.ts (démo : pas de salon) ; tout autre chemin vers src/salon/source.ts arrête le
+ * ou source.demo.ts (démo : seulement les règles du pseudo, pour le compte essayable) ; tout autre chemin vers src/salon/source.ts arrête le
  * build. Production : au premier import du module virtuel virtual:shh-salon (donc seulement si
  * une page importe src/salon/engine.ts), le .wasm est écrit sous assets/salon-EMPREINTE.wasm ;
  * son adresse et son empreinte SHA-384 vont dans le script, jamais ses octets (lu par fetch avec
@@ -170,8 +170,11 @@ export function salonWasm(base: string, demo: boolean): Plugin {
     load(id) {
       if (id.replace(/\\/g, "/").endsWith("/src/salon/source.ts")) this.error("shh-salon : src/salon/source.ts (lecture sans empreinte) n'entre jamais dans un build");
       if (id !== "\0" + VIRTUAL) return null;
-      if (demo) this.error("shh-salon : pas de module du salon dans la démo");
       const wasm = readFileSync(join(here, "src/salon/pkg/shhdrop_salon_wasm_bg.wasm"));
+      // Démo (compte essayable, 19 novembre) : sa CSP (connect-src 'none') interdit de lire un
+      // .wasm ; le module est donc en base64, dans un morceau que source.demo.ts charge à part,
+      // au premier besoin (le pseudo de l'inscription), jamais avec les pages de partage.
+      if (demo) return `export const wasm = ${JSON.stringify(wasm.toString("base64"))};`;
       const fileName = `assets/salon-${createHash("sha256").update(wasm).digest("base64url").slice(0, 8)}.wasm`;
       this.emitFile({ type: "asset", fileName, source: wasm });
       return `export const src = ${JSON.stringify(base + fileName)}; export const integrity = ${JSON.stringify(sha384(wasm))};`;
@@ -408,14 +411,16 @@ export function precompress(): Plugin {
 
 /**
  * Compte par e-mail (plan du compte, lot 9) : drapeau de construction __COMPTES__, `false` par
- * défaut. Vrai seulement si SHH_SITE_COMPTES vaut exactement « 1 » au build de production ; jamais
- * dans la démo (aucun serveur). Faux, aucun écran n'importe src/account/ (source-rules.test.ts) :
+ * défaut en production. Vrai si SHH_SITE_COMPTES vaut exactement « 1 » au build de production, et
+ * toujours dans la démo (19 novembre : son faux serveur du compte répond dans l'onglet). Faux, aucun écran n'importe src/account/ (source-rules.test.ts) :
  * aucun code du compte dans le site (contrôle : scripts/check-dist.mjs sans --comptes).
  * Activation publique : décision D8 du propriétaire (conception du compte §20), avec SHH_COMPTES=1
  * côté serveur.
  */
 export function comptesActifs(demo: boolean): boolean {
-  return !demo && process.env.SHH_SITE_COMPTES === "1";
+  // Démo : toujours (propriétaire, 19 novembre : connexion essayable ; faux serveur du compte de
+  // l'onglet, src/demo/fake-compte.ts, aucun e-mail envoyé).
+  return demo || process.env.SHH_SITE_COMPTES === "1";
 }
 
 /**

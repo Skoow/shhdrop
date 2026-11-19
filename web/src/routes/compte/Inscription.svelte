@@ -27,6 +27,7 @@
   import MotDePasse from "./MotDePasse.svelte";
   import { obtenirPreuve, preparerPreuve } from "./preuve";
   import Renvoi from "./Renvoi.svelte";
+  import DemoCode from "./DemoCode.svelte";
 
   // Seul paramètre lu dans l'adresse : « ?suite=salon » (suite(), router.svelte.ts).
   const apres = suite(location.search);
@@ -153,6 +154,7 @@
     </ul>
   {:else if etape === "code"}
     <p class="note">{t("account.code.sent")}</p>
+    <DemoCode />
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <PseudoField bind:value={pseudo} verifier={verifierPseudo} error={errs.pseudo} bind:el={els.pseudo} onsaisie={() => (errs.pseudo = undefined)} />
       <CodeField label={t("account.code")} error={errs.code} bind:value={code} bind:el={els.code} onvalue={() => (errs.code = undefined)} />

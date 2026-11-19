@@ -1327,6 +1327,7 @@ export const fr = {
   "account.err.autre": "Une erreur est survenue. Réessayez.",
   "account.err.coffre": "Vos données chiffrées ne s'ouvrent pas sur cet appareil. Reconnectez-vous.",
   "account.verifying": "Vérification…",
+  "account.demo.code": "Code pour {email}\u202f:",
   "account.login.title": "Se connecter",
   "account.stay": "Rester connecté sur cet appareil",
   "account.stay.hint": "À éviter sur un appareil partagé.",

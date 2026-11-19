@@ -18,6 +18,7 @@
   import { erreur, jourLong, type Champ } from "../erreurs";
   import Identite from "../Identite.svelte";
   import Renvoi from "../Renvoi.svelte";
+  import DemoCode from "../DemoCode.svelte";
   import Section from "./Section.svelte";
 
   type Props = { etat: EtatServeur | null };
@@ -121,6 +122,7 @@
   {:else if vue === "code"}
     <form class="form" novalidate onsubmit={(e) => e.preventDefault()}>
       <p class="note">{t("account.email.sent")}</p>
+      <DemoCode />
       <CodeField label={t("account.code")} error={errs.code} bind:value={code} bind:el={els.code} onvalue={() => (errs.code = undefined)} />
       {#if etat?.totp}<CodeField label={t("account.totp")} hint={t("account.totp.next")} error={errs.totp} bind:value={totp} bind:el={els.totp} onvalue={() => (errs.totp = undefined)} />{/if}
       {#if global}<p class="err" role="alert">{global}</p>{/if}

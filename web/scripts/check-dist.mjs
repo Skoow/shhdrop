@@ -92,7 +92,7 @@ const metaRe = (attrs) => {
  */
 const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
 
-/** Rend la liste des problèmes (vide si tout va bien). `comptes` : build avec __COMPTES__ (jamais pour la démo). */
+/** Rend la liste des problèmes (vide si tout va bien). `comptes` : build de production avec __COMPTES__ (la démo l'a toujours). */
 /** Pages d'information servies par leur propre fichier (vite.config.ts, PAGE_PATHS). */
 export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html"];
 
@@ -200,7 +200,9 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     for (const m of findErrorListeners(text)) problems.push(`${f.rel} : écouteur global d'erreurs « ${m} » (spec §35.1)`);
   }
 
-  if (demo || !comptes)
+  // Compte : jamais en production sans --comptes ; toujours dans la démo (compte essayable, faux
+  // serveur de l'onglet, 19 novembre).
+  if (!demo && !comptes)
     for (const f of all) {
       if (/\.(woff2?|png|jpe?g|gif|ico|webp|avif|wasm)$/i.test(f.rel)) continue;
       for (const t of ACCOUNT_TRACES) if (f.data.includes(t)) problems.push(`${f.rel} : module de compte « ${t} » dans un build sans __COMPTES__`);

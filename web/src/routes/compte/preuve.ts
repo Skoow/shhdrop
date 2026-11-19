@@ -4,6 +4,7 @@
 // tôt 3,1 s après la réception (proofForm). Un défi sert une fois ; échu (2 min) ou bientôt
 // échu : un nouveau est lu. Aucune clé n'existe encore à ce moment (le repli reCAPTCHA, §26,
 // resterait possible ici : la clé du compte n'est tirée qu'après, par account/session.svelte.ts).
+import { getDemo } from "../../app/demo-hooks";
 import { solvePow } from "../../captcha/pow";
 import { PREPARED_MIN_LEFT_MS, prepareCaptcha, proofForm, type CaptchaProof, type PreparedCaptcha } from "../../index";
 
@@ -21,11 +22,14 @@ function lancer() {
 
 /** Lit un défi et lance la preuve, s'il n'y en a pas déjà une en cours. */
 export function preparerPreuve(): void {
+  if (getDemo() !== null) return; // démo : preuve factice, rien à calculer
   if (prete === null) lancer();
 }
 
 /** Champs anti-robot pour UNE requête ; erreurs : celles de prepareCaptcha (réseau, limite). */
 export async function obtenirPreuve(): Promise<Preuve> {
+  // Démo (compte essayable) : son faux serveur n'exige aucune preuve, comme pour un partage.
+  if (getDemo() !== null) return { altcha: "demo", hp: "", shown_at: "demo" };
   if (prete === null) lancer();
   let p = prete!;
   prete = null;

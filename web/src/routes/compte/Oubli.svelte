@@ -22,6 +22,7 @@
   import MotDePasse from "./MotDePasse.svelte";
   import { obtenirPreuve, preparerPreuve } from "./preuve";
   import Renvoi from "./Renvoi.svelte";
+  import DemoCode from "./DemoCode.svelte";
 
   let etape = $state<"adresse" | "code" | "attente" | "mdp" | "fini">("adresse");
   let email = $state("");
@@ -141,6 +142,7 @@
   {:else if etape === "code"}
     <p class="note">{t("account.forgot.sent")}</p>
     <form novalidate onsubmit={(e) => e.preventDefault()}>
+      <DemoCode />
       <CodeField label={t("account.code")} error={errs.code} bind:value={code} bind:el={els.code} onvalue={() => (errs.code = undefined)} />
       {#if totpDemande}
         <p class="note">{t("account.forgot.totpNeeded")}</p>
