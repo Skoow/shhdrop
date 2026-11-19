@@ -28,7 +28,7 @@ describe("Home (UI §9.1)", () => {
   it("accueil (refonte du 12 novembre) : sur-titre, titre, phrase, deux boutons, méta, infographie, composeur, sections", () => {
     show();
     const h1 = document.querySelector("h1")!;
-    expect(title(h1)).toBe("Un lien, un mot de passe, puis plus rien.");
+    expect(title(h1)).toBe("Un lien, un mot de passe, puis ça s'efface.");
     expect(document.querySelectorAll("h1")).toHaveLength(1);
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(h1.classList.contains("compact")).toBe(false);
@@ -50,7 +50,7 @@ describe("Home (UI §9.1)", () => {
     expect(document.querySelector("[data-ctas] .bx-s")!.textContent).toMatch(/^200\séléments · 2\sGo au total$/);
     expect(document.querySelector('[data-make="room"]')!.textContent).toContain("bientôt");
     const meta = [...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim());
-    expect(meta).toEqual(["Gratuit", "Partage sans compte", "Durée et ouvertures au choix"]);
+    expect(meta).toEqual(["Gratuit", "Partage sans compte", "Effacement automatique"]);
     expect(document.querySelector("[data-demo]")).not.toBeNull();
     const a = [...document.querySelectorAll("a")].find((x) => x.textContent?.trim() === "Tous les détails de sécurité")!;
     expect(a.getAttribute("href")).toBe("/securite");
@@ -60,7 +60,7 @@ describe("Home (UI §9.1)", () => {
     expect(h2).toEqual([
       "Comment ça marche",
       "Ce qui se passe quand vous partagez", // section de l'infographie (19 novembre, 3)
-      "Pensé pour la confidentialité",
+      "Ce qui reste hors de notre portée",
       "Offres",
       "Vos questions",
     ]);
@@ -85,7 +85,7 @@ describe("Home (UI §9.1)", () => {
     // Retours du 15 novembre : prix prévu et sens de chaque chiffre dans les cartes (lus dans PAID).
     const card = (x: string) => document.querySelector(`[data-offer="${x}"]`)!;
     const norm = (s: string | null | undefined) => (s ?? "").replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
-    expect(norm(card("free").querySelector("[data-price]")!.textContent)).toBe("0 € pour toujours");
+    expect(norm(card("free").querySelector("[data-price]")!.textContent)).toBe("0 € sans abonnement");
     expect(norm(card("plus").querySelector("[data-price]")!.textContent)).toBe(`${PAID.plus.month} € / mois ou ${PAID.plus.year} € / an`);
     expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus"]);
     expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
@@ -117,18 +117,18 @@ describe("Home (UI §9.1)", () => {
   it("titre (K1, K8) : phrase entière lisible, copie mot par mot cachée, respiration avant « puis »", () => {
     show();
     const h1 = document.querySelector("h1")!;
-    expect(h1.querySelector(".sr-only")!.textContent).toBe("Un lien, un mot de passe, puis plus rien.");
+    expect(h1.querySelector(".sr-only")!.textContent).toBe("Un lien, un mot de passe, puis ça s'efface.");
     const copy = h1.querySelector('[aria-hidden="true"]')!;
     const words = [...copy.querySelectorAll<HTMLElement>(".w")];
-    expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "plus", "rien."]);
+    expect(words.map((w) => w.textContent)).toEqual(["Un", "lien,", "un", "mot", "de", "passe,", "puis", "ça", "s'efface."]);
     // Titre affiché d'emblée dans son état final (17 novembre) : aucun délai d'entrée par mot.
     expect(words.map((w) => w.style.getPropertyValue("--d"))).toEqual(words.map(() => ""));
     // « plus rien. » (19 novembre, « La trame » ; « puis » reste plein) : chaque lettre a son rang, qui décale son
     // effacement en trame de points.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
-    expect(letters.map((l) => l.textContent).join("")).toBe("plusrien.");
+    expect(letters.map((l) => l.textContent).join("")).toBe("ças'efface.");
     // Figé (19 novembre, 4) : « p » en trame serrée, « lus » blanc, « rie » menthe, « n. » qui s'envole.
-    expect(letters.map((l) => [...l.classList].find((c) => /^s\d$/.test(c)))).toEqual(["s1", "s2", "s2", "s2", "s3", "s3", "s3", "s4", "s4"]);
+    expect(letters.map((l) => [...l.classList].find((c) => /^s\d$/.test(c)))).toEqual(["s1", "s1", "s2", "s2", "s2", "s3", "s3", "s3", "s4", "s4", "s4"]);
   });
 
   it("plus d'entrée animée (18 novembre : accueil écrit au build, affiché avant le script)", () => {
@@ -189,10 +189,10 @@ describe("Home (UI §9.1)", () => {
   it("anglais", () => {
     setLang("en");
     show();
-    expect(title(document.querySelector("h1")!)).toBe("One link, one password, then nothing.");
-    expect(document.querySelector("#hero-make")!.textContent).toBe("Or create one here");
+    expect(title(document.querySelector("h1")!)).toBe("One link, one password, then it's gone.");
+    expect(document.querySelector("#hero-make")!.textContent).toBe("Or create something here");
     expect([...document.querySelectorAll("[data-lede] b.hl")].map((b) => b.textContent)).toEqual(["voice messages", "notes", "chat room"]);
     expect(document.querySelector("[data-pick]")!.textContent!.trim()).toBe("Choose files");
-    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free", "Share without an account", "Lifetime and opens of your choice"]);
+    expect([...document.querySelectorAll("[data-meta] li")].map((l) => l.textContent!.trim())).toEqual(["Free", "Share without an account", "Erased automatically"]);
   });
 });

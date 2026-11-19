@@ -53,7 +53,7 @@ export function erreur(e: unknown, moment: Moment): Erreur {
       return { texte: t("account.err.etape") };
     case "limit":
     case "limite":
-      return { texte: t("account.err.limit", { duree: formatDuration(x.retryAfterS ?? 60, getLang()) }) };
+      return { texte: t("account.err.limit", { duration: formatDuration(x.retryAfterS ?? 60, getLang()) }) };
     case "busy":
       return { texte: t(moment === "inscription" || moment === "code" ? "account.err.busy" : "account.err.busyAutre") };
     case "reseau":

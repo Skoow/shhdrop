@@ -43,8 +43,8 @@ describe("textes publics et compte par e-mail", () => {
     for (const comptes of [false, true]) {
       expect(tout("fr", comptes)).not.toMatch(/ni e-mail|100\s?%/iu);
       expect(tout("en", comptes)).not.toMatch(/no e-?mail|100\s?%/iu);
-      expect(texte("confidentialite", "fr", comptes)).toContain("Aucun cookie.");
-      expect(texte("confidentialite", "en", comptes)).toContain("No cookies.");
+      expect(texte("confidentialite", "fr", comptes)).toContain("Aucun cookie de notre part");
+      expect(texte("confidentialite", "en", comptes)).toContain("No cookies of ours");
     }
     for (const dict of [fr, en] as Record<string, string>[]) for (const [k, v] of Object.entries(dict)) expect(v, k).not.toMatch(/\b(ni e-mail|no e-?mail)\b|100\s?%/iu);
   });

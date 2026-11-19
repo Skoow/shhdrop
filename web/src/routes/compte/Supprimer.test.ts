@@ -61,7 +61,7 @@ describe("Supprimer le compte", () => {
   it("pass en cours : sa perte est annoncée", async () => {
     account.profil = { ...account.profil!, pass: "plus" };
     await monter(Supprimer, { etat: ETAT, onretour: vi.fn() });
-    expect(texte()).toContain("Votre pass Plus sera perdu. Un remboursement ne se demande qu'au vendeur.");
+    expect(texte()).toContain("Votre abonnement Plus sera perdu avec le compte.");
   });
 
   it("confirmation sur place, mot de passe vérifié, progression annoncée, puis « Compte supprimé. »", async () => {

@@ -114,7 +114,7 @@ test.describe("fr-FR", () => {
 
     await browse(page, [PHOTOS[0]!]);
     // Page d'envoi « /envoyer » (D41-37) : le composeur était déjà là, le focus reste où il est.
-    await expect(page.getByRole("heading", { level: 2, name: "Votre envoi" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Votre partage" })).toBeVisible();
     await browse(page, MIXED.slice(1));
     await addNote(page, "Le code de la porte est 4512B.\nÀ ce soir !", "Code de la porte");
     await expect(rows(page)).toHaveCount(10);

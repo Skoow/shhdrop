@@ -358,6 +358,14 @@
   main:focus {
     outline: none;
   }
+  /* Accueil : sa dernière section (la FAQ, plaque en relief) touche le pied de page ; sinon une
+     bande du fond de page restait entre les deux, comme une couture ratée (revue du 19 novembre). */
+  main:has(> :global(.home)) {
+    padding-block-end: 0;
+  }
+  main:has(> :global(.home)) + .foot {
+    margin-block-start: 0;
+  }
 
   /* Pied de page (retours UI7) : lueur discrète de la DA sous un filet supérieur lumineux (le
      grain de l'aurore passe dessous), marque à gauche au même bord intérieur que l'en-tête,

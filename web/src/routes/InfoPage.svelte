@@ -41,7 +41,7 @@
 </script>
 
 <article class="info" data-info={name} aria-labelledby="info-title">
-  <header class="hd band" style:--tone="92 128 255">
+  <header class="hd band">
     <p class="eyebrow" aria-hidden="true"><span class="dotm"></span>shhgone</p>
     <h1 id="info-title" class="title" tabindex="-1" data-large-title>{page.title}</h1>
     <p class="lede">{page.lede}</p>

@@ -10,7 +10,7 @@ import { addFile, addText, readyHeading, sendButton } from "./send-helpers";
 // origine partagée par tous les sites GitHub Pages du compte : « ne mettez rien de réel ».
 const BANNER_FR = "Démo : rien n'est envoyé, le lien ne marche que dans cet onglet. N'y mettez rien de réel.";
 const BANNER_EN = "Demo: nothing is sent, the link only works in this tab. Don't put anything real in it.";
-const TITLE_FR = "Un lien, un mot de passe, puis plus rien.";
+const TITLE_FR = "Un lien, un mot de passe, puis ça s'efface.";
 
 const ID = Buffer.from(Uint8Array.from({ length: 16 }, (_, i) => i * 11 + 3)).toString("base64url");
 const KEY = Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => 200 - i * 5)).toString("base64url");

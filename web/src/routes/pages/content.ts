@@ -87,9 +87,9 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
           "Empêcher une capture d'écran, une photo de l'écran ou une copie : ce que le destinataire voit ou télécharge lui appartient.",
           "Effacer l'historique de votre navigateur. Nous retirons la clé de la barre d'adresse, mais le navigateur a déjà noté l'adresse complète dans son historique (parfois synchronisé). Ouvrez le lien en navigation privée pour laisser moins de traces.",
           "Garantir que la mémoire de l'appareil est vidée : nous l'effaçons du mieux possible. Pour qu'un rechargement ne coûte pas une ouverture, le lien et un jeton d'ouverture restent dans le stockage de cet onglet le temps de l'ouverture (jamais le mot de passe ni le contenu).",
-          "Tout effacer dans les fichiers. Photos, PDF et documents bureautiques perdent leurs informations cachées (lieu, appareil, auteur, dates), comme les vidéos et les vocaux enregistrés ici. Les vidéos et les sons importés, et les archives, partent tels quels : leur ligne le dit. Ce qui se voit dans l'image ou se lit dans le document reste : la vignette d'aperçu d'une photo est gardée (elle peut montrer la photo d'avant un recadrage ou une retouche), un PDF ne perd que ses propriétés de document (ses pages, leurs miniatures et ses images restent telles quelles), les commentaires d'un document gardent leurs auteurs, et un PDF modifié plusieurs fois peut garder d'anciens passages.",
+          "Tout effacer dans les fichiers. Photos, PDF et documents bureautiques perdent leurs informations cachées (lieu, appareil, auteur, dates), comme les vidéos et les sons, si vous les nettoyez avant l'envoi (un geste, sur votre appareil ; sans lui, le fichier part tel quel). Les archives et les formats non pris en charge partent tels quels : leur ligne le dit. Ce qui se voit dans l'image ou se lit dans le document reste : la vignette d'aperçu d'une photo est gardée (elle peut montrer la photo d'avant un recadrage ou une retouche), un PDF ne perd que ses propriétés de document (ses pages, leurs miniatures et ses images restent telles quelles), les commentaires d'un document gardent leurs auteurs, et un PDF modifié plusieurs fois peut garder d'anciens passages.",
           "Vérifier l'expéditeur : un lien peut venir de n'importe qui.",
-          "Vous protéger d'un site piégé : si notre serveur ou notre code était compromis, le site servi pourrait voler les clés. C'est pour cela que le code est public et que chaque version peut être vérifiée.",
+          "Vous protéger d'un site piégé : si notre serveur ou notre code était compromis, le site servi pourrait voler les clés. C'est pour cela que le code est public et que le site se reconstruit à l'identique depuis ce code.",
           "Cacher votre adresse IP au serveur et à l'hébergeur pendant la connexion.",
         ],
       },
@@ -133,14 +133,14 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Le contenu chiffré et le strict nécessaire pour le servir : sa taille arrondie, son échéance arrondie au quart d'heure, le nombre d'ouvertures restantes et d'essais ratés, des vérificateurs qui ne permettent pas de déchiffrer.",
           "Rien de cela ne contient votre nom, votre adresse e-mail, votre adresse IP, le nom de vos fichiers ou leur contenu en clair.",
-          `Tout est effacé à l'échéance (${v.h} h au plus en gratuit), après la dernière ouverture, ou à la destruction.`,
+          `Tout est effacé à l'échéance (${v.h} h au plus en gratuit), ou plus tôt à la destruction. Après la dernière ouverture, le contenu chiffré reste jusqu'à l'échéance, pour que le destinataire puisse y revenir, sauf s'il le détruit.`,
         ],
       },
       {
         h: "Ce que nous ne gardons pas",
         list: [
           "Votre adresse IP n'est pas enregistrée. Le serveur la voit le temps de la connexion, comme tout site web, mais ne l'écrit nulle part.",
-          "Aucun cookie. Pas de cookie de mesure, donc pas de bandeau.",
+          "Aucun cookie de notre part, et aucune mesure d'audience. Seul le repli Google reCAPTCHA, si vous le choisissez, peut déposer les cookies de Google, dans son cadre à part.",
           "Aucun journal des partages, aucune mesure d'audience. Le serveur tient seulement, en mémoire, des compteurs globaux pour son exploitation (par exemple le nombre de partages créés depuis son dernier démarrage) : rien par personne, par adresse ni par partage, rien sur disque.",
         ],
       },
@@ -164,7 +164,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Vos droits",
         p: [
-          "Nous ne savons pas qui vous êtes : il n'y a donc pas de données personnelles à vous rendre ou à corriger. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
+          "Nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits ou poser une question, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
         ],
       },
     ],
@@ -192,13 +192,13 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
   }),
   signaler: (v) => ({
     title: "Signaler un abus",
-    lede: "Un partage illégal ou malveillant ? Vous pouvez le détruire vous-même, tout de suite.",
+    lede: "Un partage illégal ou malveillant ? Si vous avez le lien et le mot de passe, vous pouvez le détruire vous-même, tout de suite.",
     blocks: [
       {
         h: "Depuis le partage",
         list: [
           "Ouvrez le partage avec son lien et son mot de passe.",
-          "Le partage ouvert, touchez « Signaler ce partage » en bas de la page, dans le pied (colonne « Confiance »), choisissez ce qui se passe, puis touchez « Signaler et détruire ».",
+          "Le partage ouvert, choisissez « Signaler ce partage » en bas de la page, dans le pied (colonne « Confiance »), choisissez ce qui se passe, puis « Signaler et détruire ».",
           "Le partage est détruit aussitôt pour tout le monde : les téléchargements en cours sont coupés, aucune ouverture ne reste possible.",
         ],
       },
@@ -260,9 +260,9 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
           "Prevent a screenshot, a photo of the screen or a copy: what the recipient sees or downloads is theirs.",
           "Erase your browser history. We remove the key from the address bar, but the browser has already recorded the full address in its history (sometimes synced). Open the link in a private window to leave fewer traces.",
           "Guarantee the device's memory is wiped: we clear it as best we can. So that a reload doesn't cost an open, the link and an open token stay in this tab's storage while the share is open (never the password or the content).",
-          "Remove everything from files. Photos, PDFs and office documents lose their hidden information (location, device, author, dates), as do videos and voice notes recorded here. Imported videos and sounds, and archives, are sent as they are: their row says so. What is visible in the picture or readable in the document stays: a photo keeps its preview thumbnail (it may show the photo as it was before cropping or editing), a PDF only loses its document properties (its pages, their thumbnails and its images stay as they are), comments in a document keep their authors, and a PDF edited several times may keep older passages.",
+          "Remove everything from files. Photos, PDFs and office documents lose their hidden information (location, device, author, dates), as do videos and audio, if you clean them before sending (one tap, on your device; without it, the file is sent as is). Archives and unsupported formats are sent as they are: their row says so. What is visible in the picture or readable in the document stays: a photo keeps its preview thumbnail (it may show the photo as it was before cropping or editing), a PDF only loses its document properties (its pages, their thumbnails and its images stay as they are), comments in a document keep their authors, and a PDF edited several times may keep older passages.",
           "Verify the sender: a link can come from anyone.",
-          "Protect you from a tampered site: if our server or code were compromised, the site could steal keys. That is why the code is public and every version can be verified.",
+          "Protect you from a tampered site: if our server or code were compromised, the site could steal keys. That is why the code is public and the site can be rebuilt identically from it.",
           "Hide your IP address from the server and the host while you are connected.",
         ],
       },
@@ -306,14 +306,14 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "The encrypted content and only what is needed to serve it: its rounded size, its expiry rounded to the quarter hour, the opens and failed attempts left, and verifiers that cannot decrypt anything.",
           "None of it holds your name, email address, IP address, file names or readable content.",
-          `Everything is erased when it expires (${v.h} h at most on the free plan), after the last open, or when destroyed.`,
+          `Everything is erased when it expires (${v.h} h at most on the free plan), or sooner when destroyed. After the last open, the encrypted content stays until it expires, so the recipient can come back to it, unless they destroy it.`,
         ],
       },
       {
         h: "What we don't keep",
         list: [
           "Your IP address is not recorded. The server sees it while you are connected, like any website, but never writes it down.",
-          "No cookies. No measurement cookies, so no banner.",
+          "No cookies of ours, and no analytics. Only the Google reCAPTCHA fallback, if you choose it, may set Google's cookies, inside its separate frame.",
           "No log of shares, no audience measurement. The server only keeps, in memory, global counters for its own operation (for example the number of shares created since it last started): nothing per person, per address or per share, nothing on disk.",
         ],
       },
@@ -337,7 +337,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Your rights",
         p: [
-          "We don't know who you are, so there is no personal data to hand back or correct. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+          "We keep nothing that could identify you or find your shares from your identity. To exercise your rights or ask a question, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
         ],
       },
     ],
@@ -365,13 +365,13 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
   }),
   signaler: (v) => ({
     title: "Report abuse",
-    lede: "An illegal or malicious share? You can destroy it yourself, right away.",
+    lede: "An illegal or malicious share? If you have the link and the password, you can destroy it yourself, right away.",
     blocks: [
       {
         h: "From the share",
         list: [
           "Open the share with its link and password.",
-          "With the share open, tap “Report this share” at the bottom of the page, in the footer (“Trust” column), choose what is going on, then tap “Report and destroy”.",
+          "With the share open, choose “Report this share” at the bottom of the page, in the footer (“Trust” column), choose what is going on, then “Report and destroy”.",
           "The share is destroyed at once for everyone: downloads in progress are cut, no open remains possible.",
         ],
       },
@@ -399,7 +399,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         list: [
           "Votre adresse e-mail n'est gardée qu'en empreinte (un calcul à sens unique, avec une clé secrète du serveur) : nous ne la gardons pas en clair. Elle passe par notre serveur le temps d'envoyer un code, et par notre fournisseur d'envoi d'e-mails (nom à compléter par le propriétaire), qui voit l'adresse, l'heure et le code. L'e-mail ne contient que le code.",
           "Votre mot de passe ne quitte jamais votre appareil : le serveur reçoit seulement une valeur qui en est tirée, et n'en garde qu'une empreinte.",
-          "Votre pseudo, votre photo, votre langue et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe : le service peut donc les lire. Votre pseudo n'est gardé qu'en empreinte, pour qu'il reste unique.",
+          "Votre pseudo, votre photo, votre langue et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe : le service peut donc les lire. Pour vérifier qu'il est unique, une forme simplifiée de votre pseudo est aussi gardée, en empreinte seulement.",
           "Vos liens, les salons que vous rejoignez et la gestion de vos salons et partages sont dans un second coffre, chiffré par votre mot de passe seulement : nous ne pouvons pas les lire. Après un mot de passe oublié, ce coffre est perdu, sauf ce qui est encore sur un de vos appareils.",
           "Nous savons quels salons votre compte a créés, le temps de leur vie, pour pouvoir bannir un compte qui nuit ; jamais quels partages.",
           "Dates gardées au jour (création, ancienneté), dernière connexion au mois : aucune heure, aucune adresse IP, aucun nom d'appareil en clair.",
@@ -413,7 +413,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       {
         h: "Vos droits",
         p: [
-          "Sans compte, nous ne savons pas qui vous êtes : il n'y a pas de données personnelles à vous rendre ou à corriger. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
+          "Sans compte, nous ne gardons rien qui permette de vous identifier ni de retrouver vos partages à partir de votre identité. Pour exercer vos droits, utilisez le contact des mentions légales. Un partage peut être détruit à tout moment par son expéditeur (lien de gestion) ou, à la dernière ouverture, par son destinataire.",
           "Avec un compte : vous pouvez exporter vos données (le fichier est fait sur votre appareil), corriger votre pseudo, votre photo et votre adresse, et supprimer votre compte à tout moment depuis ses paramètres. L'empreinte de votre adresse reste une donnée personnelle : pour une demande faite par adresse ou un recours contre un bannissement, écrivez-nous (contact des mentions légales).",
         ],
       },
@@ -459,7 +459,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
         list: [
           "Your email address is kept only as a fingerprint (a one-way computation with a secret server key): we do not keep it in readable form. It passes through our server while a code is sent, and through our email delivery provider (name to be completed by the owner), which sees the address, the time and the code. The email holds only the code.",
           "Your password never leaves your device: the server only receives a value derived from it, and keeps only a fingerprint of that.",
-          "Your nickname, photo, language and subscription are encrypted, but kept so that they can be given back if you forget your password: the service can therefore read them. Your nickname is kept only as a fingerprint, so that it stays unique.",
+          "Your nickname, photo, language and subscription are encrypted, but kept so that they can be given back if you forget your password: the service can therefore read them. To check that it is unique, a simplified form of your nickname is also kept, as a fingerprint only.",
           "Your links, the rooms you join and the management of your rooms and shares are in a second vault, encrypted by your password only: we cannot read them. After a forgotten password, this vault is lost, except what is still on one of your devices.",
           "We know which rooms your account created, for as long as they live, so that an account that does harm can be banned; never which shares.",
           "Dates kept to the day (creation, seniority), last sign-in to the month: no time of day, no IP address, no readable device name.",
@@ -473,7 +473,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       {
         h: "Your rights",
         p: [
-          "Without an account, we do not know who you are: there is no personal data to give back or correct. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
+          "Without an account, we keep nothing that could identify you or find your shares from your identity. To exercise your rights, use the contact in the legal notice. A share can be destroyed at any time by its sender (management link) or, at the last open, by its recipient.",
           "With an account: you can export your data (the file is made on your device), correct your nickname, photo and address, and delete your account at any time from its settings. The fingerprint of your address is still personal data: for a request made by address or an appeal against a ban, write to us (contact in the legal notice).",
         ],
       },

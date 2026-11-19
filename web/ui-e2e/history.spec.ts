@@ -177,7 +177,7 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/envois");
     await confirm(page, page.locator(".hist .foot"), "Effacer l'historique", "Effacer");
     await expect(page.locator("[data-history-empty]")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Aucun envoi pour l'instant" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Aucun partage pour l'instant" })).toBeVisible();
     await expect(page.getByText("sur cet appareil seulement", { exact: false }).first()).toBeVisible();
     await expect.poll(async () => (await rawDb(page)).count).toBe(0);
     expect(await axe(page)).toEqual([]);
@@ -260,7 +260,7 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/envois");
     await expect(page.getByRole("heading", { name: "L'historique est désactivé" })).toBeVisible();
     await page.getByRole("button", { name: "L'activer pour les prochains envois" }).click();
-    await expect(page.getByRole("heading", { name: "Aucun envoi pour l'instant" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Aucun partage pour l'instant" })).toBeVisible();
     // Le prochain envoi est gardé.
     await sendShare(page, shh.origin + "/", { text: "Celui-ci, oui", isMobile });
     await expect(keepSwitch(page)).toHaveAttribute("aria-checked", "true");
@@ -286,7 +286,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByRole("heading", { name: "Historique indisponible dans ce navigateur" })).toBeVisible();
     await expect(page.getByText("Le site marche quand même", { exact: false })).toBeVisible();
     await page.goto(shh.origin + "/");
-    await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis plus rien." })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis ça s'efface." })).toBeVisible();
     await expect(page.locator("[data-active-shares]")).toHaveCount(0);
   });
 });
@@ -296,7 +296,7 @@ test.describe("en-US", () => {
   test("My shares : textes anglais, pied de page", async ({ page, shh, isMobile }) => {
     await page.goto(shh.origin + "/envois");
     await expect(page.getByRole("heading", { level: 1, name: "My shares" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Nothing sent yet" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No shares yet" })).toBeVisible();
     // « My shares » n'est dans l'en-tête que s'il y a des partages (17 novembre) : ici, aucun.
     await expect(page.getByRole("banner").getByRole("link", { name: "My shares", exact: true })).toHaveCount(0);
     // Une simple visite (accueil, « Vos envois ») ne crée aucune base dans le navigateur.

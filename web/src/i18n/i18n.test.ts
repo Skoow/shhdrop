@@ -32,7 +32,7 @@ describe("dictionnaires", () => {
 
   it("aucune promesse plus forte que le modèle de menaces (spec §2, §18)", () => {
     // Le serveur voit l'adresse IP, les tailles et les heures ; un site piégé reste une limite assumée.
-    const banned = [/100\s*%/u, /ne voit rien/iu, /can'?t see/iu, /ne peuvent les lire/iu];
+    const banned = [/100\s*%/u, /ne voit rien/iu, /can'?t see/iu, /ne peuvent les lire/iu, /ne lit rien/iu, /reads nothing/iu, /rien n'a été exposé/iu, /nothing was exposed/iu, /pour toujours/iu, /\bforever\b/iu, /nous ne pouvons rien lire/iu, /can'?t read anything/iu];
     for (const [lang, d] of [["fr", fr], ["en", en]] as const)
       for (const [k, v] of Object.entries(d))
         for (const re of banned) expect(re.test(v), `${lang} ${k} : « ${v} » contient ${re}`).toBe(false);
@@ -67,8 +67,8 @@ describe("dictionnaires", () => {
     expect(en["destroyed.body"]).toBe(
       "This share has been destroyed. It has been erased from the server. Anything you already saved on this device is not affected.",
     );
-    expect(fr["hero.title"]).toBe("Un lien, un mot de passe, puis plus rien.");
-    expect(en["hero.title"]).toBe("One link, one password, then nothing.");
+    expect(fr["hero.title"]).toBe("Un lien, un mot de passe, puis ça s'efface.");
+    expect(en["hero.title"]).toBe("One link, one password, then it's gone.");
   });
 
   // Plan du compte, lot 10 : textes exacts de la conception (§12.1, §12.2, §21.2.4, §21.3, §21.15).
@@ -76,7 +76,7 @@ describe("dictionnaires", () => {
     const N = NNBSP;
     const exacts: Record<string, string> = {
       "account.signup.title": "Créer un compte",
-      "account.signup.sub": "Un compte gratuit sert seulement à créer des salons. Partager et rejoindre restent sans compte.",
+      "account.signup.sub": "Le compte sert à créer des salons et à garder un abonnement. Partager, ouvrir et rejoindre restent sans compte.",
       "account.email.hint": `C'est votre seul moyen de récupérer le compte${N}: utilisez une adresse que vous gardez.`,
       "account.password.hint": `10${N}caractères au moins`,
       "account.age.err": "Cochez cette case pour continuer.",
@@ -92,7 +92,7 @@ describe("dictionnaires", () => {
       "account.err.mdpAdresse": "Le mot de passe ne doit pas être votre adresse.",
       "account.err.code.other": `Code incorrect. Il reste {n}${N}essais.`,
       "account.err.codeExpire": "Code expiré. Demandez-en un nouveau.",
-      "account.err.limit": "Trop de tentatives. Réessayez dans {duree}.",
+      "account.err.limit": "Trop de tentatives. Réessayez dans {duration}.",
       "account.err.busy": "Les inscriptions sont momentanément fermées. Réessayez plus tard.",
       "account.err.reseau": "Connexion perdue. Vérifiez votre réseau et réessayez.",
       "account.stay.hint": "À éviter sur un appareil partagé.",
@@ -135,7 +135,7 @@ describe("dictionnaires", () => {
       "account.data.export": "Exporter mes données",
       "account.data.inactive": `Sans connexion pendant 13${N}mois, ce compte est effacé. Nous ne pouvons pas vous prévenir${N}: nous n'avons pas votre adresse.`,
       "account.delete.done": "Compte supprimé.",
-      "account.delete.pass": "Votre pass Plus sera perdu. Un remboursement ne se demande qu'au vendeur.",
+      "account.delete.pass": "Votre abonnement Plus sera perdu avec le compte.",
       "account.delete.device": "Effacer aussi les données de cet appareil",
       "report.question": `Que se passe-t-il${N}?`,
       "report.share.body": "Le partage sera détruit tout de suite pour tout le monde. Nous ne voyons pas le contenu et ne gardons que la catégorie, sans rien qui vous identifie.",
@@ -204,14 +204,14 @@ describe("t et langue", () => {
 
   it("remplace les paramètres nommés", () => {
     setLang("fr");
-    expect(t("compose.removed", { name: "a.png" })).toBe("a.png supprimé");
+    expect(t("compose.removed", { name: "a.png" })).toBe("Supprimé\u202f: a.png");
     setLang("en");
-    expect(t("compose.removed", { name: "a.png" })).toBe("a.png deleted");
+    expect(t("compose.removed", { name: "a.png" })).toBe("Deleted: a.png");
   });
 
   it("ne réinterprète pas les accolades d'une valeur (nom de fichier)", () => {
     setLang("en");
-    expect(t("compose.removed", { name: "{name}$&.png" })).toBe("{name}$&.png deleted");
+    expect(t("compose.removed", { name: "{name}$&.png" })).toBe("Deleted: {name}$&.png");
   });
 
   it("pluriel : suffixe .one / .other selon n et la langue", () => {
@@ -254,7 +254,7 @@ describe("t et langue", () => {
       expect(t(k as never)).toBe(k);
       expect(t(k as never, { n: 1 })).toBe(k);
     }
-    expect(t("compose.removed", { name: "x", __proto__: "y", constructor: "z" } as never)).toBe("x supprimé");
+    expect(t("compose.removed", { name: "x", __proto__: "y", constructor: "z" } as never)).toBe("Supprimé\u202f: x");
   });
 
   it("une clé inconnue se voit (jamais de texte vide)", () => {

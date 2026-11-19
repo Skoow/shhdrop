@@ -111,7 +111,7 @@ describe("ReportSheet", () => {
       const banner = dlg().querySelector(".banner.warn");
       if (n <= 2) {
         expect(banner, `catégorie ${n}`).not.toBeNull();
-        expect(banner!.textContent!.replace(/\s+/g, " ")).toContain("Vous pouvez aussi le signaler aux autorités : PHAROS, internet-signalement.gouv.fr. Pour que nous puissions agir sur le contenu, envoyez-nous le lien par la page Signaler un abus.");
+        expect(banner!.textContent!.replace(/\s+/g, " ")).toContain("Vous pouvez aussi le signaler aux autorités : PHAROS, internet-signalement.gouv.fr. Si vous avez le lien et le mot de passe, vous pouvez aussi le détruire vous-même : voir la page Signaler un abus.");
         const liens = [...banner!.querySelectorAll("a")];
         expect(liens.map((a) => a.getAttribute("href"))).toEqual(["https://www.internet-signalement.gouv.fr/", "/signaler"]);
         for (const a of liens) expect(a.getAttribute("rel")).toBe("noopener noreferrer");

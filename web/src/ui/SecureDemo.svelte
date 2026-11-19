@@ -319,7 +319,7 @@
 </div>
   <ol class="steps" data-demo-steps>
     {#each STEPS as n (n)}
-      {@const done = !reduced && n < shown}
+      {@const done = reduced || n < shown}
       <li class={{ done, now: !reduced && n === shown }} aria-current={!reduced && n === shown ? "step" : undefined}>
         <span class="ck" aria-hidden="true">{#if done}<Check size={13} strokeWidth={3} />{/if}</span>
         <span class="st">{t(`demo.s${n}.t` as "demo.s1.t")}</span> <span class="sd">{t(`demo.s${n}.d` as "demo.s1.d")}</span>

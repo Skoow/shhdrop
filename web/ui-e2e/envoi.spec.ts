@@ -55,7 +55,7 @@ test("premier écran : titre, trois assurances, zone de dépôt compacte, offres
   // « Votre envoi » est le titre visible. Les assurances sont dans le cadre de dépôt.
   await expect(page.getByRole("heading", { level: 1, name: "Nouveau partage" })).toHaveCount(1);
   await expect(page.locator("[data-dz-box] [data-assure]")).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis plus rien." })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Un lien, un mot de passe, puis ça s'efface." })).toHaveCount(0);
   // Trois assurances : libellés complets lus ; pastilles alignées, même hauteur, une seule ligne.
   const items = page.getByRole("list", { name: "En bref" }).getByRole("listitem");
   for (const [i, l] of ["Chiffré dans votre navigateur", "Partage sans compte", "Le lien s'autodétruit"].entries()) await expect(items.nth(i)).toContainText(l);

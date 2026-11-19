@@ -44,7 +44,7 @@ test.describe("fr-FR", () => {
     await fullFoot(page);
 
     await page.goto(shh.origin + "/envoyer");
-    await expect(page.getByRole("heading", { name: "Votre envoi" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Votre partage" })).toBeVisible();
     await noSettings(page);
     await fullFoot(page);
     // Ordinateur : l'écran d'envoi tient entier dans l'écran, le pied vient dessous.

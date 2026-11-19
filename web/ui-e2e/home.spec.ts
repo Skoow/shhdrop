@@ -22,7 +22,7 @@ async function drag(page: Page, type: "dragenter" | "dragover" | "dragleave" | "
   );
 }
 
-const TITLE_FR = "Un lien, un mot de passe, puis plus rien.";
+const TITLE_FR = "Un lien, un mot de passe, puis ça s'efface.";
 
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR" });
@@ -36,10 +36,10 @@ test.describe("fr-FR", () => {
     await expect(certs).toHaveCount(3);
     // Cadre d'envoi (19 novembre) : « Choisir des fichiers », puis Photo ou vidéo, Vocal, Salon. Plus de « Parcourir ».
     await expect(page.getByRole("button", { name: /^Choisir des fichiers/ })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Ou créez sur place" }).getByRole("button")).toHaveText([/Photo ou vidéo/, /Vocal/, /Salon/]);
+    await expect(page.getByRole("group", { name: "Ou créer sur place" }).getByRole("button")).toHaveText([/Photo ou vidéo/, /Vocal/, /Salon/]);
     await expect(page.getByRole("button", { name: "Parcourir les fichiers" })).toHaveCount(0);
     // Limites gratuites (spec §41.2), lues des constantes.
-    for (const h of ["Comment ça marche", "Pensé pour la confidentialité", "Offres", "Vos questions"])
+    for (const h of ["Comment ça marche", "Ce qui reste hors de notre portée", "Offres", "Vos questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     // Infographie : sept étapes lisibles en liste, le dessin caché.
     await expect(page.locator("[data-demo-steps] li")).toHaveCount(7);
@@ -267,7 +267,7 @@ test.describe("fr-FR", () => {
     await cta.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await cta.click();
     await expect(page).toHaveURL(shh.origin + "/envoyer");
-    await expect(page.getByRole("heading", { name: "Votre envoi" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Votre partage" })).toBeVisible();
     // Téléphone : « Créer sur place » a ouvert la feuille « Ajouter » ; la refermer d'abord.
     if (isMobile) {
       await page.keyboard.press("Escape");
@@ -461,11 +461,11 @@ test.describe("en-US", () => {
   test("titre, infographie, sections en anglais ; axe ; capture", async ({ page, shh, isMobile }) => {
     await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1280, height: 900 });
     await page.goto(shh.origin + "/");
-    await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then nothing." })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then it's gone." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Or create one here" })).toBeVisible();
-    for (const h of ["How it works", "Built for privacy", "Plans", "Your questions"])
+    await expect(page.getByRole("group", { name: "Or create something here" })).toBeVisible();
+    for (const h of ["How it works", "What stays out of our reach", "Plans", "Your questions"])
       await expect(page.getByRole("heading", { level: 2, name: h, exact: true })).toHaveCount(1);
     expect(await noHScroll(page)).toBe(true);
     expect(await axe(page)).toEqual([]);

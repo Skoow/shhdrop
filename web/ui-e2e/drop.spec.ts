@@ -117,7 +117,7 @@ test("page d'envoi vide « /envoyer » : atteinte par « Commencer » ou directe
   await expect(page).toHaveURL(shh.origin + "/envoyer");
   await noViewTransition(page);
   await closeAddSheet(page);
-  await expect(page.getByRole("heading", { name: "Votre envoi" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Votre partage" })).toBeVisible();
   await expect(page.locator("[data-row]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Tout supprimer" })).toHaveCount(0);
   const zone = page.locator(".dropzone.empty");

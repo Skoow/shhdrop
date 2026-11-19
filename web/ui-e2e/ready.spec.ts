@@ -103,7 +103,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByText("Vous ne pourrez plus les afficher. Terminer ?")).toBeVisible();
     await page.getByRole("button", { name: "Terminer" }).click();
     // Composeur vide (page /envoyer, D41-37) : « Ajouter » sur téléphone, zone de dépôt sur ordinateur.
-    await expect(page.getByRole("button", { name: /^(Commencer|Ou créez sur place|Ajouter)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(Commencer|Ou créer sur place|Ajouter)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first()).toBeVisible();
     await expect(page.locator("[data-row]")).toHaveCount(0);
     const body = await page.evaluate(() => document.body.innerText);
     expect(body).not.toContain(link);
@@ -128,9 +128,9 @@ test.describe("fr-FR", () => {
     expect(await page.evaluate(() => document.body.innerText)).not.toContain(link);
     await page.waitForTimeout(2600); // gomme du logo
     await capture(page, "ready-deleted");
-    await page.getByRole("button", { name: "Nouvel envoi" }).click();
+    await page.getByRole("button", { name: "Nouveau partage" }).click();
     // Composeur vide (page /envoyer, D41-37) : « Ajouter » sur téléphone, zone de dépôt sur ordinateur.
-    await expect(page.getByRole("button", { name: /^(Commencer|Ou créez sur place|Ajouter)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(Commencer|Ou créer sur place|Ajouter)/ }).or(page.locator(".dropzone")).filter({ visible: true }).first()).toBeVisible();
     expect(await armed(page)).toBe(false);
   });
 

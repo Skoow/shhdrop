@@ -49,7 +49,7 @@ describe("Inscription, étape 1", () => {
   it("titre, sous-titre, champs avec étiquettes et autocomplete exacts, lien « J'ai déjà un compte »", async () => {
     await monter(Inscription);
     expect(document.querySelector("h1")!.textContent).toBe("Créer un compte");
-    expect(texte()).toContain("Un compte gratuit sert seulement à créer des salons. Partager et rejoindre restent sans compte.");
+    expect(texte()).toContain("Le compte sert à créer des salons et à garder un abonnement. Partager, ouvrir et rejoindre restent sans compte.");
     expect(champ("Adresse e-mail").getAttribute("autocomplete")).toBe("email");
     expect(champ("Mot de passe").getAttribute("autocomplete")).toBe("new-password");
     expect(champ("Mot de passe").type).toBe("password");
