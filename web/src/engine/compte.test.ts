@@ -93,7 +93,7 @@ describe("compte.json : rejoué par le moteur WebAssembly", () => {
       const ref = V.deriver.find((x: { label: string }) => x.label === c.same_key_as);
       expect(c.a_auth).toBe(ref.a_auth);
     }
-  });
+  }, 30_000); // Argon2id (volontairement lent) plusieurs fois : 5 s ne suffisaient pas sur la CI chargée (19 novembre).
 
   it("cles : K_prive, K_profil, K_etiquette par le moteur et par WebCrypto (HKDF)", async () => {
     for (const c of V.cles) {

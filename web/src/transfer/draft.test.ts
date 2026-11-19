@@ -295,16 +295,34 @@ describe("brouillon (spec §41.14)", { timeout: 60_000 }, () => {
 
   it("D42-6 : grand fichier retiré pendant son premier segment : sa place non envoyée est rendue, le suivant se place juste après", async () => {
     const { fake, seen, net } = setup(4 * 1048576); // un segment par seconde
+    // Déterministe (CI du 19 novembre : sur une machine lente, le segment 2 partait avant le retrait
+    // et l'effacement couvrait 1 à 3) : à partir du troisième PUT (segment 2), les envois attendent
+    // que b soit retiré.
+    let puts = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const held = {
+      ...net,
+      fetch: (async (u: RequestInfo | URL, i?: RequestInit) => {
+        if ((i?.method ?? (u instanceof Request ? u.method : "GET")) === "PUT" && ++puts >= 3) {
+          await gate;
+          // Envoi de b annulé pendant l'attente : comme un vrai réseau, la requête n'arrive pas.
+          if (i?.signal?.aborted) throw new DOMException("annulé", "AbortError");
+        }
+        return net.fetch(u, i);
+      }) as typeof globalThis.fetch,
+    };
     const a = file(1000, 1), b = file(40 * 1048576, 2), c = file(5 * 1048576, 3);
-    const d = createDraft(ORIGIN, { ...net, solveCaptcha, auto: true });
+    const d = createDraft(ORIGIN, { ...held, solveCaptcha, auto: true });
     d.sync([{ id: "a", data: a }, { id: "b", data: b }]);
     await until(() => d.status("a")?.phase === "pret" && d.status("b")?.phase === "envoi");
     d.sync([{ id: "a", data: a }, { id: "c", data: c }]); // b (segments 1 à 10) retiré pendant l'envoi du segment 1
+    release();
     const r = await d.finalize([{ id: "a", item: fileItem("a", a) }, { id: "c", item: fileItem("c", c) }], { ttlHours: 1, maxOpens: 1, password: PW, solveCaptcha });
     expect(JSON.parse(seen.find((x) => x.path === "/api/shares/erase")!.body.toString())).toEqual({ from: 1, to: 2 });
     expect(seen.some((x) => x.path === "/api/shares/grow")).toBe(false); // c aux segments 2 et 3, sous la réservation
     expect(fake.inspect()[0]).toMatchObject({ bucket: 400 });
-    const o = await openShare(r.link, PW, ORIGIN, undefined, net);
+    const o = await openShare(r.link, PW, ORIGIN, undefined, held);
     expect(o.manifest.items[1]!.offset).toBe(2 * SEG_PLAIN);
     expect(Buffer.from(await o.item(1)).equals(Buffer.from(await c.arrayBuffer()))).toBe(true);
   });
