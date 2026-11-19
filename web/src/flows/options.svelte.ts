@@ -1,7 +1,7 @@
 // Options de l'envoi (UI §9.3, spec §31, §34) : durée, ouvertures, mot de passe, droits du
 // destinataire. En mémoire seulement : le mot de passe n'est jamais rangé ni journalisé.
 // Le mot de passe est toujours généré (D41-15) : aucune saisie, donc aucun contrôle ici.
-import { MAX_OPENS, OPENS_DEFAULT, PREVIEW_MAX, TTL_DEFAULT, TTL_HOURS, type TtlHours } from "../index";
+import { MAX_OPENS, OPENS_DEFAULT, TTL_DEFAULT, TTL_HOURS, previewKindOf, type TtlHours } from "../index";
 
 export type Rights = "voir" | "enregistrer" | "coffre";
 
@@ -79,18 +79,16 @@ export function sendRights(o: Pick<Options, "rights" | "ttlHours">): { rights: R
 }
 
 
-// SVG : jamais affiché (scan de sécurité du 7 novembre). PDF : pas de visionneuse tant que la
-// Task 22 (cadre isolé) n'est pas livrée ; le remettre ici avec elle.
-const VIEWABLE = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/heic",
-  "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "audio/webm", "audio/wav",
-  "video/mp4", "video/webm", "video/quicktime",
-]);
 type Viewable = { kind: "file" | "text"; base: string; ext: string; mime: string; size: number };
 
-/** Le destinataire peut-il ouvrir cet élément dans le navigateur, sans le télécharger ? Même liste blanche que la visionneuse (previewKind). */
+/**
+ * Le destinataire peut-il ouvrir cet élément dans le navigateur, sans le télécharger ? Même règle
+ * que sa visionneuse (previewKindOf, transfer/safety.ts) : images, sons, vidéos, textes et PDF
+ * (cadre isolé, Task 22). Une seule liste, pour que l'avertissement ne dérive plus (revue du
+ * 19 novembre : les PDF étaient encore annoncés « impossibles à ouvrir »).
+ */
 export function viewableInBrowser(i: Viewable): boolean {
-  return i.kind === "text" || (i.size <= PREVIEW_MAX && VIEWABLE.has(i.mime.split(";")[0]!.trim().toLowerCase()));
+  return previewKindOf({ kind: i.kind, mime: i.mime.trim(), size: i.size } as Parameters<typeof previewKindOf>[0]) !== "none";
 }
 
 /** Éléments qui ne pourront pas être ouverts sans téléchargement (spec §34). */

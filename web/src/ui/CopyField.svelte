@@ -5,11 +5,21 @@
   import { copyText } from "./clipboard";
   import { haptic } from "./native";
   import Button from "./Button.svelte";
-  import { Check, Copy } from "./Icon";
+  import IconButton from "./IconButton.svelte";
+  import { Check, Copy, Eye, EyeOff } from "./Icon";
 
-  /** `whole` : valeur montrée en entier, sur plusieurs lignes au besoin (mot de passe : ce qu'on lit = ce qu'on copie). */
-  type Props = { label: string; value: string; whole?: boolean };
-  let { label, value, whole = false }: Props = $props();
+  /**
+   * `whole` : valeur montrée en entier, sur plusieurs lignes au besoin (mot de passe : ce qu'on lit = ce qu'on copie).
+   * `secret` : masquée à l'arrivée (propriétaire, 19 novembre), bouton œil pour l'afficher ou la
+   * masquer ; « Copier » copie toujours la vraie valeur, même masquée. Masquée, elle n'est pas
+   * lue par les lecteurs d'écran non plus (le bouton dit qu'elle est masquée).
+   */
+  type Props = { label: string; value: string; whole?: boolean; secret?: boolean };
+  let { label, value, whole = false, secret = false }: Props = $props();
+  let shown = $state(false);
+  const hidden = $derived(secret && !shown);
+  // Autant de points que de caractères : la longueur n'est pas un secret (elle est fixe).
+  const dots = $derived("•".repeat(value.length));
 
   // Troncature au milieu par CSS seulement (la largeur décide) : une tête qui s'ellipse et une
   // queue fixe. Le texte visible n'est pas sélectionnable : on ne peut pas copier une valeur
@@ -64,12 +74,19 @@
         aria-describedby="{uid}-hint"
       />
     {:else}
-      {#if whole}
+      {#if hidden}
+        <span class="val vis whole masked" translate="no" aria-hidden="true" data-masked>{dots}</span>
+      {:else if whole}
         <span class="val vis whole" translate="no" aria-hidden="true">{value}</span>
       {:else}
         <span class="val vis" translate="no" aria-hidden="true"><span class="head">{head}</span><span class="tail">{tail}</span></span>
       {/if}
-      <span class="sr-only">{value}</span>
+      {#if !hidden}<span class="sr-only">{value}</span>{/if}
+    {/if}
+    {#if secret && !manual}
+      <IconButton variant="secondary" label={t(shown ? "copy.hide" : "copy.show", { label })} aria-pressed={shown} onpress={() => void (shown = !shown)} data-reveal>
+        {#if shown}<EyeOff size={20} strokeWidth={1.75} />{:else}<Eye size={20} strokeWidth={1.75} />{/if}
+      </IconButton>
     {/if}
     <!-- Nom accessible = texte visible + suffixe masqué (WCAG 2.5.3 : le nom commence par le libellé visible). -->
     <Button variant="secondary" dense onpress={copy}>
@@ -131,6 +148,11 @@
     overflow-wrap: anywhere;
     font-size: var(--fs-mono);
     letter-spacing: 0.04em;
+  }
+  /* Points du masque : plus serrés, même hauteur de ligne que la valeur. */
+  .masked {
+    letter-spacing: 0.08em;
+    color: var(--text-2);
   }
   .head {
     flex: 0 1 auto;

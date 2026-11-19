@@ -231,9 +231,9 @@
         <span class="num">{formatBytes(item.size, getLang())}</span>
         {#if duration !== null}<span class="sep" aria-hidden="true">·</span><span class="num">{formatClock(duration)}</span>{/if}
         {#if item.kind === "file"}
-          <!-- Empreinte SHA-256 (16 novembre) : sur la ligne du type et de la taille (elle passe à
-               la ligne seulement faute de place) ; sélectionnée d'un toucher pour la copier, entière
-               au survol. Elle change si le fichier est nettoyé. -->
+          <!-- Empreinte SHA-256 (16 novembre) : sur sa propre ligne, sous le type et la taille
+               (19 novembre) ; sélectionnée d'un toucher pour la copier, entière au survol. Elle
+               change si le fichier est nettoyé. -->
           <HashLine sum={digestOf(item.data)} />
         {/if}
         {#if upload}

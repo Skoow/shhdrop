@@ -1,7 +1,7 @@
 <script lang="ts">
   // « Lien prêt » (UI §9.5) : affiché seulement après la résolution de createShare. L'avertissement
-  // « plus jamais affichés » en tête ; deux cartes (M18) : le lien et le mot de passe, chacun
-  // avec sa copie ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
+  // « plus jamais affichés » en tête ; un seul cadre (19 novembre) : le lien et le mot de passe
+  // (masqué à l'arrivée), chacun avec sa copie, et les informations du partage en bas ; puis « Partager » (feuille : envoyer vers une app, copier le lien et le mot
   // de passe, QR code du lien et du mot de passe, D41-29) et « Copier le lien et le mot de
   // passe » ; lien de gestion replié ; Supprimer ce partage (secondaire) ; Terminé (principal,
   // collé en bas sur téléphone). Les valeurs ne viennent que des props (Copier lit l'état, jamais le
@@ -17,7 +17,7 @@
   import { copyText } from "../ui/clipboard";
   import CopyField from "../ui/CopyField.svelte";
   import Deadline from "../ui/Deadline.svelte";
-  import { ChevronDown, ClipboardX, Copy, Eye, Lock, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
+  import { ClipboardX, Copy, Eye, Lock, QrCode as QrIcon, Send, Share2, Trash2 } from "../ui/Icon";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
   import Logo from "../ui/Logo.svelte";
   import QrCode from "../ui/QrCode.svelte";
@@ -213,18 +213,15 @@
           <!-- Titre de niveau 1 : le composeur (et son h1) est masqué pendant cet écran. -->
           <h1 id="ready-title" class="title" tabindex="-1" data-large-title bind:this={heading}>{t("ready.title")}</h1>
           <p class="meta num">{summary}</p>
-          <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
-          <!-- Heure de fin seule (audit M16) : le serveur l'arrondit au quart d'heure supérieur ;
-               un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
-          <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /></p>
-          <p class="self">{selfDestruct}</p>
         </div>
       </header>
 
       <p class="never" data-fan><ClipboardX size={18} strokeWidth={1.75} aria-hidden="true" />{t("ready.never")}</p>
 
-      <div class="card" role="group" aria-label={t("ready.link.title")} data-fan>
-        <CopyField label={t("ready.link.label")} value={result.link} />
+      <!-- Un seul cadre (propriétaire, 19 novembre) : le lien, le mot de passe (masqué à l'arrivée,
+           œil pour l'afficher, copiable masqué), puis les informations du partage en bas. -->
+      <div class="card" role="group" aria-label={t("ready.card")} data-fan data-ready-card>
+        <div class="cell" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
         {#if demo}
           <div class="row">
             <Button variant="ghost" dense onpress={() => demo.openAsRecipient(result!.link)}>
@@ -234,10 +231,14 @@
           </div>
           <p class="demo-note" data-demo-note>{demo.readyNote}</p>
         {/if}
-      </div>
-
-      <div class="card" role="group" aria-label={t("ready.pw.title")} data-fan>
-        <CopyField label={t("ready.pw.title")} value={result.password} whole />
+        <div class="cell" role="group" aria-label={t("ready.pw.title")}><CopyField label={t("ready.pw.title")} value={result.password} whole secret /></div>
+        <div class="facts" data-ready-facts>
+          <p class="active num"><span class="dot" aria-hidden="true"></span>{t("ready.active")}</p>
+          <!-- Heure de fin seule (audit M16) : le serveur l'arrondit au quart d'heure supérieur ;
+               un décompte « 12 h 12 min » à côté de « 12 h » semblait faux. La phrase dit l'arrondi. -->
+          <p class="when"><Deadline expiresInS={result?.expiresInS ?? 0} countdown={false} /></p>
+          <p class="self">{selfDestruct}</p>
+        </div>
       </div>
 
       <div class="send" data-fan>
@@ -252,22 +253,20 @@
         {#if copyNote && !sheet}<p class="note" role="status">{copyNote}</p>{/if}
       </div>
 
-      <details class="card manage">
-        <summary class="ct">
-          <span>{t("ready.manage.title")}</span>
-          <ChevronDown class="chev" size={20} strokeWidth={1.75} aria-hidden="true" />
-        </summary>
-        <div class="manage-body">
-          <CopyField label={t("ready.manage.label")} value={result.manage} />
-          <p class="hint">{t("ready.manage.hint")}</p>
-        </div>
-      </details>
-
+      <!-- « Gérer ce partage » retiré (propriétaire, 19 novembre) : avec l'historique, le partage se
+           suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
+           seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
       <div class="keep" data-keep>
         {#if keepReady && shares.status === "unavailable"}
           <p class="hint" data-keep-unavailable>{t("ready.keep.unavailable")}</p>
         {:else}
           <Switch label={t("ready.keep")} hint={t("ready.keep.hint")} checked={keep} disabled={!keepReady} onchange={setKeep} />
+        {/if}
+        {#if keepReady && (!keep || shares.status === "unavailable")}
+          <div class="manage" data-manage>
+            <CopyField label={t("ready.manage.label")} value={result.manage} />
+            <p class="hint">{t("ready.manage.hint")}</p>
+          </div>
         {/if}
       </div>
 
@@ -333,7 +332,7 @@
   }
   .ready,
   .gone {
-    width: min(100%, 720px);
+    width: min(100%, 600px);
     margin-inline: auto;
     padding: var(--sp-6) var(--sp-4) var(--sp-8);
   }
@@ -404,18 +403,13 @@
   }
   .card {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
     min-width: 0;
     padding: var(--sp-4);
     border: 1px solid var(--hair-2);
     border-radius: var(--r-xl);
     background: var(--vessel);
     box-shadow: var(--edge-hi);
-  }
-  .ct {
-    margin: 0;
-    font-size: var(--fs-h3);
-    line-height: var(--lh-h3);
   }
   .row {
     display: flex;
@@ -473,38 +467,22 @@
     flex: none;
     color: var(--warn);
   }
-  .manage {
-    gap: 0;
+  .cell {
+    min-width: 0;
   }
-  .manage summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    min-height: 44px;
-    cursor: pointer;
-    list-style: none;
+  .facts {
+    display: grid;
+    gap: var(--sp-1);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--hair-2);
   }
-  .manage summary::-webkit-details-marker {
-    display: none;
-  }
-  .manage :global(.chev) {
-    flex: none;
-    color: var(--text-2);
-    transition: transform var(--dur-fast) var(--ease-out);
-  }
-  .manage[open] :global(.chev) {
-    transform: rotate(180deg);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .manage :global(.chev) {
-      transition: none;
-    }
-  }
-  .manage-body {
+  .keep {
     display: grid;
     gap: var(--sp-3);
-    padding-top: var(--sp-3);
+  }
+  .manage {
+    display: grid;
+    gap: var(--sp-2);
   }
   .done {
     display: grid;

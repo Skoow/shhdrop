@@ -20,7 +20,12 @@ const clip = (page: Page) => readClipboard(page);
 const linkCard = (page: Page) => page.getByRole("group", { name: "Lien", exact: true });
 const pwCard = (page: Page) => page.getByRole("group", { name: "Mot de passe", exact: true });
 /** Valeur complète d'un CopyField (texte pour lecteur d'écran). */
-const valueOf = (page: Page, card: ReturnType<typeof linkCard>) => card.locator(".sr-only").first().textContent().then((s) => s ?? "");
+/** Valeur lue par le lecteur d'écran ; le mot de passe est d'abord affiché (masqué à l'arrivée). */
+const valueOf = async (page: Page, card: ReturnType<typeof linkCard>) => {
+  const eye = card.locator("[data-reveal]");
+  if ((await eye.count()) > 0 && (await eye.getAttribute("aria-pressed")) !== "true") await eye.click();
+  return (await card.locator(".sr-only").first().textContent()) ?? "";
+};
 
 test.describe("fr-FR", () => {
   test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
@@ -35,30 +40,36 @@ test.describe("fr-FR", () => {
     await toReady(page, context, shh.origin);
     await expect(readyHeading(page)).toBeFocused();
 
-    // Ordre du DOM : avertissement → carte lien → carte mot de passe → gestion repliée →
-    // Supprimer → Terminé (scan UX, « Lien prêt » : hiérarchie).
+    // Ordre du DOM (19 novembre) : avertissement → un seul cadre (lien, mot de passe, infos) →
+    // Supprimer → Terminé ; plus de « Gérer ce partage ».
     const order = await page.evaluate(() => {
-      const els = [...document.querySelectorAll(".ready p.never, .ready [role=group][aria-label], .ready details.manage, .ready .danger-zone, .ready .done")];
-      return els.map((e) => e.getAttribute("aria-label") ?? e.className.split(" ").find((c) => c && !c.startsWith("svelte-") && c !== "card"));
+      const els = [...document.querySelectorAll(".ready p.never, .ready [data-ready-card] [role=group][aria-label], .ready [data-ready-facts], .ready .danger-zone, .ready .done")];
+      return els.map((e) => e.getAttribute("aria-label") ?? e.className.split(" ").find((c) => c && !c.startsWith("svelte-")));
     });
-    expect(order).toEqual(["never", "Lien", "Mot de passe", "manage", "danger-zone", "done"]);
+    expect(order).toEqual(["never", "Lien", "Mot de passe", "facts", "danger-zone", "done"]);
+    await expect(page.getByText("Gérer ce partage")).toHaveCount(0);
     await expect(page.locator(".ready p.never")).toHaveText("Ce lien et ce mot de passe ne seront plus jamais affichés.");
     // Terminé : action principale ; Supprimer : secondaire.
     await expect(page.getByRole("button", { name: "Terminé" })).toHaveClass(/\bprimary\b/);
     await expect(page.getByRole("button", { name: "Supprimer ce partage" })).not.toHaveClass(/\bprimary\b/);
-    // Lien de gestion replié par défaut, ouvert d'un clic sur son titre.
-    const manage = page.locator("details.manage");
-    await expect(manage).not.toHaveAttribute("open");
-    await expect(manage.getByRole("button", { name: /^Copier/ })).toBeHidden();
-    await manage.getByText("Gérer ce partage").click();
-    await expect(manage).toHaveAttribute("open");
-    await expect(manage.getByRole("button", { name: /^Copier/ })).toBeVisible();
-    await expect(manage.locator(".sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
+    // Mot de passe masqué à l'arrivée ; « Copier » donne la vraie valeur, même masquée.
+    await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
+    await expect(pwCard(page).locator("[data-reveal]")).toHaveAttribute("aria-pressed", "false");
+    // Lien de gestion : caché avec l'historique, montré sans lui (seul moyen de suivre le partage).
+    await expect(page.locator("[data-manage]")).toHaveCount(0);
+    const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
+    await keep.click();
+    await expect(page.locator("[data-manage] .sr-only").first()).toHaveText(/#m[A-Za-z0-9_-]{43}$/);
+    await keep.click();
+    await expect(page.locator("[data-manage]")).toHaveCount(0);
     // Plus d'avertissement « par un autre moyen » (décision du propriétaire du 8 novembre).
     await expect(page.locator(".ready").getByText("autre moyen", { exact: false })).toHaveCount(0);
 
     const link = await valueOf(page, linkCard(page));
     const password = await valueOf(page, pwCard(page));
+    // Remasqué : la copie qui suit se fait masquée.
+    await pwCard(page).locator("[data-reveal]").click();
+    await expect(pwCard(page).locator("[data-masked]")).toBeVisible();
     expect(link).toMatch(LINK_RE);
     expect(password.length).toBeGreaterThanOrEqual(8);
     expect(await linkCard(page).innerText()).not.toContain(password);

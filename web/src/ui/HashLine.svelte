@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Empreinte SHA-256 d'un fichier (décision du propriétaire du 16 novembre), en petit sur la
-  // ligne du type et de la taille, au même endroit chez l'expéditeur (calculée sur son appareil)
+  // Empreinte SHA-256 d'un fichier (décision du propriétaire du 16 novembre), en petit sur sa
+  // propre ligne, sous le type et la taille, alignée sur le nom (propriétaire, 19 novembre), au même endroit chez l'expéditeur (calculée sur son appareil)
   // et chez le destinataire (lue dans le manifeste chiffré, donc celle de l'expéditeur).
   // Sélectionnée d'un toucher pour la copier, entière au survol ; coupée par « … » si la place
   // manque. `sum` : hexadécimal, « erreur », ou null (calcul en cours).
@@ -15,10 +15,12 @@
 >
 
 <style>
+  /* Toute une ligne du bloc .meta (flex qui passe à la ligne), toujours la dernière. */
   .hash {
     display: block;
-    flex: 1 1 14ch;
-    min-width: 14ch;
+    order: 9;
+    flex: 0 0 100%;
+    min-width: 0;
     overflow: hidden;
     color: var(--text-3);
     font-family: var(--font-mono);

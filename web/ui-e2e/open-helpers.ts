@@ -72,8 +72,21 @@ export async function sendShare(
   await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
   const read = async (l: ReturnType<Page["locator"]>) => (await l.locator(".sr-only").first().textContent()) ?? "";
   const link = await read(page.getByRole("group", { name: "Lien", exact: true }));
-  const password = await read(page.getByRole("group", { name: "Mot de passe", exact: true }));
-  const manage = await read(page.locator(".manage"));
+  // Mot de passe masqué à l'arrivée (19 novembre) : l'œil l'affiche, puis le remasque.
+  const pw = page.getByRole("group", { name: "Mot de passe", exact: true });
+  await pw.locator("[data-reveal]").click();
+  const password = await read(pw);
+  await pw.locator("[data-reveal]").click();
+  // Lien de gestion : montré seulement sans historique (19 novembre). Historique coupé le temps
+  // de le lire, puis remis (l'entrée est gardée de nouveau, comme avant).
+  const keep = page.getByRole("switch", { name: "Garder dans mon historique" });
+  const wasOn = (await keep.count()) > 0 && (await keep.getAttribute("aria-checked")) === "true";
+  if (wasOn) await keep.click();
+  const manage = await read(page.locator("[data-manage]"));
+  if (wasOn) {
+    await keep.click();
+    await expect(keep).toHaveAttribute("aria-checked", "true");
+  }
   expect(link).toMatch(/#[A-Za-z0-9_-]{43}$/);
   return { link, password, manage };
 }

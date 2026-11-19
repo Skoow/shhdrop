@@ -313,6 +313,7 @@ test.describe("fr-FR : envoi (Tasks 17–18)", () => {
     expect(manage).toMatch(/\/shhgone\/s#m[A-Za-z0-9_-]{43}$/);
     expect(await storage(page)).toBe(0);
     await capture(page, "demo-ready");
+    await page.getByRole("group", { name: "Mot de passe", exact: true }).locator("[data-reveal]").click();
     const password = (await page.getByRole("group", { name: "Mot de passe", exact: true }).locator(".sr-only").first().textContent()) ?? "";
     // Même onglet (le faux serveur garde les partages de l'onglet) : la page /s se charge,
     // ouverture complète, puis destruction.
