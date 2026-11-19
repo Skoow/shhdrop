@@ -48,6 +48,7 @@ fn ecriture() {
         };
         let m = Manifest {
             rights: Rights::new("enregistrer", None).unwrap(),
+            title: None,
             items: vec![Entry {
                 kind,
                 name: "a.bin".into(),

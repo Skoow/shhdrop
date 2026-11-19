@@ -159,7 +159,14 @@ export type ManifestEntry = {
   sha256?: string;
 };
 
-export type ManifestV2 = { v: 2; rights: Rights; keep_ttl_h?: KeepTtl; items: ManifestEntry[] };
+export type ManifestV2 = {
+  v: 2;
+  rights: Rights;
+  keep_ttl_h?: KeepTtl;
+  /** Nom du partage (19 novembre), nettoyé par le moteur à la lecture ; texte de l'expéditeur, hostile : affiché en texte brut seulement. */
+  title?: string;
+  items: ManifestEntry[];
+};
 export type Manifest = ManifestV2;
 
 /** Palier canonique v2 : le plus petit palier de capacité ≥ fin des données + 4 + MANIFEST_MAX. */

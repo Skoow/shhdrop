@@ -568,6 +568,7 @@ fn ecriture_json_stringify() {
     let all: String = (0u8..0x20).map(char::from).collect();
     let m = Manifest {
         rights: Rights::Coffre(KeepTtl::H1),
+        title: None,
         items: vec![Entry {
             kind: Kind::File,
             name: format!("{all}\"\\/\u{7f}\u{2028}\u{2029}é😀"),
@@ -594,6 +595,7 @@ fn ecriture_json_stringify() {
     // Ordre des droits : sans keep_ttl_h hors coffre.
     let m = Manifest {
         rights: Rights::Voir,
+        title: None,
         items: vec![],
     };
     assert_eq!(*to_json(&m), br#"{"v":2,"rights":"voir","items":[]}"#[..]);

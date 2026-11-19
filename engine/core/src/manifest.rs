@@ -1,11 +1,17 @@
 //! Manifeste chiffré du paquet (spec §29.3, §34, §41.14), comme `crypto/container.ts` :
 //! lecture stricte (`parse`, même refus que `parseManifest`, tous en `paquet_corrompu`) et
 //! écriture octet pour octet identique à `JSON.stringify` (`to_json`), champs dans l'ordre
-//! `v, rights, keep_ttl_h?, items[{kind, name, mime, size, offset, text?, k?, clean?, sha256?}]`.
+//! `v, rights, keep_ttl_h?, title?, items[{kind, name, mime, size, offset, text?, k?, clean?, sha256?}]`.
 //! `sha256` (16 novembre, décision du propriétaire) : empreinte SHA-256 du fichier tel qu'envoyé,
 //! en hexadécimal minuscule (64 caractères), calculée sur l'appareil de l'expéditeur ; fichiers
 //! seulement. Facultative et ignorée si mal formée (comme `clean`) : un ancien lecteur l'ignore,
 //! un ancien manifeste n'en a pas.
+//! `title` (19 novembre, demande du propriétaire) : nom du partage choisi par l'expéditeur, vu
+//! par le destinataire et gardé dans l'historique de l'expéditeur. Facultatif ; nettoyé par
+//! [`clean_title`] à l'écriture comme à la lecture ; refusé au scellement au-delà de
+//! [`TITLE_MAX`] points de code (`titre_trop_long`, [`title_for_seal`]). À la lecture, absent,
+//! mal typé, vide après nettoyage ou trop long : aucun titre, jamais une erreur. Un ancien
+//! lecteur l'ignore (champ inconnu).
 //!
 //! Lecture comme `JSON.parse` : clé répétée → la dernière valeur compte ; BOM initial retiré
 //! (TextDecoder) ; nombres lus en IEEE 754 (`3.0`, `3e0` et `-0` sont des entiers sûrs).
@@ -16,9 +22,11 @@
 use crate::encoding::{b64u, unb64u};
 use crate::error::{Error, Result};
 use crate::format::{MANIFEST_MAX, MAX_ITEMS, MAX_SAFE, TEXT_BYTES_MAX, TEXT_MAX};
+use crate::texte::est_ignorable;
 use core::fmt;
 use serde_json::Value;
 use subtle::ConstantTimeEq;
+use unicode_normalization::UnicodeNormalization;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Durée de conservation d'un partage « coffre », en heures : 1, 6, 12 ou 24.
@@ -233,10 +241,94 @@ impl fmt::Debug for Entry {
     }
 }
 
+/// Nom du partage (19 novembre), déjà nettoyé par [`clean_title`] : 1 à [`TITLE_MAX`] points
+/// de code. Mis à zéro à la destruction ; `Debug` ne le montre pas.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Title(String);
+
+impl Title {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Drop for Title {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl fmt::Debug for Title {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Title(…)")
+    }
+}
+
+/// Longueur maximale du nom du partage, en points de code, après nettoyage.
+pub const TITLE_MAX: usize = 80;
+
+/// Nettoyage du nom du partage (19 novembre), le même à l'écriture et à la lecture :
+/// 1. toute espace Unicode (`White_Space` : tabulation, saut de ligne, U+00A0, U+2028…) devient
+///    U+0020 ;
+/// 2. retrait des autres caractères de commande (C0, DEL, C1) et de tout
+///    `Default_Ignorable_Code_Point` ([`est_ignorable`] : inversions et isolats de sens
+///    U+202A–U+202E et U+2066–U+2069, LRM, RLM, ALM, largeur nulle, BOM, étiquettes…), sauf
+///    U+200D et U+FE0F, gardés pour les séquences emoji ;
+/// 3. NFC ;
+/// 4. espaces regroupées, rognées en bord.
+///
+/// `None` si rien ne reste ou si le résultat dépasse [`TITLE_MAX`] points de code (lecture
+/// tolérante : un titre hostile ou d'une version future vaut « aucun titre »).
+pub fn clean_title(raw: &str) -> Option<Title> {
+    title_for_seal(raw).ok().flatten()
+}
+
+/// Nom du partage demandé au scellement : nettoyé comme [`clean_title`] ; vide après nettoyage :
+/// aucun titre ; plus de [`TITLE_MAX`] points de code : `titre_trop_long`.
+pub fn title_for_seal(raw: &str) -> Result<Option<Title>> {
+    let mut t = cleaned(raw);
+    match t.chars().count() {
+        0 => Ok(None),
+        n if n <= TITLE_MAX => Ok(Some(Title(t))),
+        _ => {
+            t.zeroize();
+            Err(Error::TitreTropLong)
+        }
+    }
+}
+
+fn cleaned(raw: &str) -> String {
+    let mut kept = String::with_capacity(raw.len());
+    for c in raw.chars() {
+        if c.is_whitespace() {
+            kept.push(' ');
+        } else if !c.is_control() && (c == '\u{200D}' || c == '\u{FE0F}' || !est_ignorable(c)) {
+            kept.push(c);
+        }
+    }
+    let mut out = String::with_capacity(kept.len());
+    let mut space = false;
+    for c in kept.nfc() {
+        if c == ' ' {
+            space = !out.is_empty();
+        } else {
+            if space {
+                out.push(' ');
+                space = false;
+            }
+            out.push(c);
+        }
+    }
+    kept.zeroize();
+    out
+}
+
 /// Manifeste v2 (la version `v: 2` est implicite).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
     pub rights: Rights,
+    /// Nom du partage (19 novembre) ; absent des anciens manifestes.
+    pub title: Option<Title>,
     pub items: Vec<Entry>,
 }
 
@@ -276,6 +368,7 @@ fn read(v: &Value, data_len: u64) -> Result<Manifest> {
         .collect::<Result<Vec<_>>>()?;
     Ok(Manifest {
         rights: Rights::read(o),
+        title: o.get("title").and_then(Value::as_str).and_then(clean_title),
         items,
     })
 }
@@ -455,6 +548,10 @@ fn write(m: &Manifest, out: &mut dyn FnMut(&[u8])) {
     if let Some(h) = m.rights.keep_ttl_h() {
         out(b",\"keep_ttl_h\":");
         number(u64::from(h), out);
+    }
+    if let Some(t) = &m.title {
+        out(b",\"title\":");
+        string(t.as_str(), out);
     }
     out(b",\"items\":[");
     for (i, e) in m.items.iter().enumerate() {
