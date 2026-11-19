@@ -166,7 +166,7 @@
     </div>
   {:else}
     <div class="actions">
-      <Button onpress={() => navigate("/")}>{t("account.continue")}</Button>
+      <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>
     </div>
   {/if}
 </Cadre>

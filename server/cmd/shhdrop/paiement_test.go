@@ -92,7 +92,7 @@ func TestRetourOffresServi(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "index.html"), []byte("<!doctype html>index"), 0o644)
 	os.WriteFile(filepath.Join(dir, "offres.html"), []byte("<!doctype html>offres"), 0o644)
-	h, err := staticHandler(dir, false)
+	h, err := staticHandler(dir, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}

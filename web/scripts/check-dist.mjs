@@ -177,6 +177,14 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
       problems.push(...checkSri("s.html", sHtml, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
       if (!/<meta name="robots" content="noindex"/.test(sHtml)) problems.push("s.html : sans « noindex »");
       if (/assets\/index-[^"]+\.js/.test(sHtml)) problems.push("s.html : charge le script de l'application d'envoi");
+      // Exigence C-3 1 (spec salon v3 §3.6.1) : la page d'ouverture des partages ne charge ni le
+      // module du salon ni sa colle (aucun script qu'elle cite ne les cite).
+      const base = demo ? DEMO_BASE : "/";
+      for (const m of sHtml.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+\.js)"/g)) {
+        const rel = m[1].startsWith(base) ? m[1].slice(base.length) : m[1];
+        const text = byRel.get(rel)?.toString("utf8") ?? "";
+        if (/assets\/salon-[^"'\s/]+\.wasm|shhdrop_salon_wasm|recevoirTrame/.test(text)) problems.push(`s.html : ${rel} charge le module du salon`);
+      }
     }
   }
 

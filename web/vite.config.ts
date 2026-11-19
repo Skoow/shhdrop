@@ -445,12 +445,38 @@ export function comptesPages(actifs: boolean): Plugin {
   };
 }
 
+/**
+ * Salon (plan C-3) : drapeau de construction __SALONS__. Vrai en production avec le compte
+ * (SHH_SITE_COMPTES=1 : créer un salon exige un compte, D42-26) ; toujours faux dans la démo
+ * (GitHub Pages n'a pas de serveur du salon : le salon y reste « bientôt », sans faux serveur).
+ */
+export function salonsActifs(demo: boolean): boolean {
+  return !demo && comptesActifs(demo);
+}
+
+/**
+ * Écrans du salon (plan C-3) : App.svelte ne les voit que par src/routes/salon/pages.ts. Sans
+ * __SALONS__, ce module est remplacé par pages.off.ts : ni écran, ni client, ni WebSocket.
+ */
+export function salonPages(actifs: boolean): Plugin {
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  return {
+    name: "shh-salons",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (actifs || !/^\.\/routes\/salon\/pages(?:\.ts)?$/.test(source)) return null;
+      if (!(importer ?? "").replace(/\\/g, "/").endsWith("/src/App.svelte")) return null;
+      return join(here, "src/routes/salon/pages.off.ts");
+    },
+  };
+}
+
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
-    plugins: [comptesPages(comptesActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
+    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
-    define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)) },
+    define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)), __SALONS__: JSON.stringify(salonsActifs(demo)) },
     build: {
       outDir: demo ? "dist-demo" : "dist",
       assetsInlineLimit: 0,

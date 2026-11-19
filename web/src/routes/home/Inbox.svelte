@@ -169,7 +169,11 @@
         <p class="sub">{t("home.inbox.empty.body")}</p>
         <div class="acts">
           <Button variant="primary" onpress={() => navigate("/envoyer")}>{t("home.inbox.empty.send")}</Button>
-          <Button variant="secondary" aria-disabled="true" onpress={() => announce(t("home.inbox.new.room.d"))}>{t("home.inbox.new.room")}</Button>
+          {#if __SALONS__}
+            <Button variant="secondary" onpress={() => navigate("/salon/nouveau")}>{t("home.inbox.new.room")}</Button>
+          {:else}
+            <Button variant="secondary" aria-disabled="true" onpress={() => announce(t("home.inbox.new.room.d"))}>{t("home.inbox.new.room")}</Button>
+          {/if}
         </div>
       </div>
     {:else if shown.length === 0}

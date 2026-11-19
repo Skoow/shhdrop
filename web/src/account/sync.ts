@@ -28,7 +28,8 @@ export function versCoffre(e: HistoryEntry): { liste: Liste; valeur: EntreePrive
     case "recu":
       return { liste: "recus", valeur: { ...base, lien: e.link, taille: e.sizeBytes, elements: e.itemsCount, format: e.format } };
     default:
-      return { liste: LISTE[e.sorte], valeur: { ...base, invitation: e.link, libelle: e.label } };
+      // Salon créé : son lien de gestion (S_gestion, « #s », plan C-3) part au coffre (§10.4).
+      return { liste: LISTE[e.sorte], valeur: { ...base, invitation: e.link, libelle: e.label, ...(e.sorte === "salon_cree" && e.manage !== "" ? { gestion: e.manage } : {}) } };
   }
 }
 
@@ -40,7 +41,7 @@ export function deCoffre(liste: Liste, v: EntreePrivee, now: number): HistoryEnt
     id: v.id,
     sorte,
     origine: "compte",
-    manage: sorte === "envoi" ? v.gestion : "",
+    manage: sorte === "envoi" ? v.gestion : sorte === "salon_cree" ? (v.gestion ?? "") : "",
     link: sorte === "envoi" ? "" : sorte === "recu" ? v.lien : v.invitation,
     label: sorte.startsWith("salon") ? v.libelle : "",
     format: sorte === "recu" ? v.format : "",

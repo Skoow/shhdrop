@@ -353,7 +353,7 @@ func TestPagesDuCompteSeulementAvecComptes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, comptes := range []bool{false, true} {
-		h, err := staticHandler(dir, comptes)
+		h, err := staticHandler(dir, comptes, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -362,6 +362,48 @@ func TestPagesDuCompteSeulementAvecComptes(t *testing.T) {
 			h.ServeHTTP(w, httptest.NewRequest("GET", p, nil))
 			if want := map[bool]int{false: 404, true: 200}[comptes]; w.Code != want {
 				t.Fatalf("comptes=%v %s : %d, attendu %d", comptes, p, w.Code, want)
+			}
+		}
+	}
+}
+
+// Pages du salon (plan C-3) : table SALON_PATHS du routeur égale à salonRoutes, et 200
+// seulement avec le salon (SHH_SALONS=1 et SHH_COMPTES=1), sinon 404 comme une page inconnue.
+func TestPagesDuSalon(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "..", "web", "src", "app", "router.svelte.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := strings.Index(string(src), "const SALON_PATHS")
+	if i < 0 {
+		t.Fatal("table SALON_PATHS introuvable")
+	}
+	bloc := string(src)[i:]
+	bloc = bloc[:strings.Index(bloc, "};")]
+	got := map[string]bool{}
+	for _, m := range regexp.MustCompile(`(?m)^  "(/[a-z/-]+)": "[a-z]+",$`).FindAllStringSubmatch(bloc, -1) {
+		got[m[1]] = true
+	}
+	if len(got) == 0 || !maps.Equal(got, salonRoutes) {
+		t.Fatalf("pages du salon du client %v, du serveur %v", got, salonRoutes)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<!doctype html>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, salons := range []bool{false, true} {
+		h, err := staticHandler(dir, true, salons)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for p := range salonRoutes {
+			if appRoutes[p] || compteRoutes[p] {
+				t.Fatalf("%s est aussi une autre page", p)
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest("GET", p, nil))
+			if want := map[bool]int{false: 404, true: 200}[salons]; w.Code != want {
+				t.Fatalf("salons=%v %s : %d, attendu %d", salons, p, w.Code, want)
 			}
 		}
 	}

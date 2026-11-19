@@ -7,7 +7,7 @@ export default defineConfig({
   // sans DOM ne sont pas concernés.
   resolve: { conditions: ["browser"] },
   // Drapeau de construction du compte (vite.config.ts) : faux sous vitest comme par défaut.
-  define: { __COMPTES__: "false" },
+  define: { __COMPTES__: "false", __SALONS__: "false" },
   test: {
     environment: "node",
     // ui-e2e/ : tests Playwright (npm run test:ui), pas vitest.

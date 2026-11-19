@@ -1,0 +1,758 @@
+// État du salon pour les écrans (plan C-3, Task 6) : relie le client (client.ts), le fil
+// (conversation.ts) et les étapes de l'interface (lien, mot de passe, explication, salon prêt,
+// conversation, fin). Une seule session de salon par page, en mémoire seulement : rien n'est
+// gardé dans le stockage du navigateur (hors l'historique local chiffré, sur demande : lien
+// d'invitation et, pour le créateur, lien de gestion, jamais le mot de passe). Les secrets
+// (K_lien, S_gestion, clés) sont effacés à `oublier` (fin, départ, exclusion, page quittée).
+import { generatePassword, passwordKey } from "../engine/index";
+import { loadSalonEngine, type ClesSalon, type Regle, type SalonEngine } from "./engine";
+import * as api from "./api";
+import { SvelteSet } from "svelte/reactivity";
+import { ClientSalon, type EvClient, type Fin } from "./client";
+import { Conversation, type Bulle, type PieceInfo } from "./conversation";
+import { AFFICHE_MAX, PIECE_MAX, envoyerPiece, lirePiece } from "./pieces";
+import { stripMetadata } from "../media/strip";
+import { clickDownload, REVOKE_AFTER_MS } from "../viewers/save";
+import { preparer, oublier as oublierPreparation, type Duree } from "./creation";
+import { lienSalon } from "./liens";
+import { captcha as captchaDuServeur, ctx as transferCtx } from "../transfer/api";
+import { CAPTCHA_MIN_MS } from "../transfer/client";
+import { solvePow } from "../captcha/pow";
+import { allEntries, recordShare } from "../history/live.svelte";
+import { b64u } from "../engine/pure";
+import { lireFragment } from "./liens";
+
+/**
+ * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`,
+ * plan C-5 point 6) : S_gestion, ou undefined. Jamais ailleurs dans le stockage du navigateur.
+ */
+async function gestionGardee(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  const frag = "#c" + b64u(kLien as Uint8Array<ArrayBuffer>);
+  const e = (await allEntries().catch(() => [])).find((x) => x.sorte === "salon_cree" && x.link.endsWith(frag) && x.manage !== "");
+  const f = e ? lireFragment(e.manage.slice(e.manage.lastIndexOf("#"))) : null;
+  return f?.sorte === "s" ? f.cle : undefined;
+}
+import { creerSalon as creerAvecSession, profilPourSalon, CompteError } from "../account/session.svelte";
+
+export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin";
+export type ErreurEntree = { code: "bad_password"; essais: number } | { code: "introuvable" | "complet" | "limite" | "reseau" | "serveur" | "indisponible"; retryS?: number };
+
+/** Ce que les écrans lisent (réactif). `rev` change à chaque événement du fil. */
+export const vue = $state({
+  etape: "vide" as Etape,
+  rev: 0,
+  erreur: null as ErreurEntree | null,
+  /** Échéance du salon (ms, horloge de l'appareil). */
+  finMs: 0,
+  places: 0,
+  createur: false,
+  /** Salon prêt (créateur) : lien d'invitation, mot de passe, lien de gestion (affichés, jamais gardés). */
+  pret: null as { lien: string; mdp: string; gestion: string } | null,
+  monPseudo: null as string | null,
+  connexion: "connexion" as "connexion" | "ouvert" | "coupe",
+  dansLeGroupe: false,
+  /** Envoi retenu par le moteur depuis cet instant (exigence 23), ou null. */
+  attenteDepuis: null as number | null,
+  fin: null as Fin | null,
+  membresPeuventDetruire: false,
+  /** Créateur délogé : lien d'invitation pour reprendre la main (en mémoire de la page seulement). */
+  lienReprise: null as string | null,
+});
+
+type Session = {
+  eng: SalonEngine;
+  kLien: Uint8Array<ArrayBuffer>;
+  cles?: ClesSalon;
+  meta?: api.Meta;
+  client?: ClientSalon;
+  conv?: Conversation;
+  sGestion?: Uint8Array<ArrayBuffer>;
+  couleur?: number;
+  /** Notre photo pour ce salon (pièce chiffrée, v3 §7.2), annoncée dans notre profil. */
+  avatar?: { r: Uint8Array; piece: Uint8Array; palier: number } | null;
+  stop: (() => void)[];
+};
+let s: Session | undefined;
+
+const net = (): api.Net => api.netParDefaut();
+const ouvrirWS = (url: string) => new WebSocket(url) as unknown as import("./client").WsLike;
+
+/** Le fil courant (null avant l'entrée). */
+export function conversation(): Conversation | null {
+  return s?.conv ?? null;
+}
+export function client(): ClientSalon | null {
+  return s?.client ?? null;
+}
+export function moteur(): SalonEngine | null {
+  return s?.eng ?? null;
+}
+
+/** Oublie tout (secrets mis à zéro, WebSocket fermé). */
+export function oublier(): void {
+  if (!s) return;
+  for (const f of s.stop) f();
+  s.client?.fermer();
+  if (!s.client) s.cles?.free();
+  s.kLien.fill(0);
+  s.sGestion?.fill(0);
+  s = undefined;
+  oublierPieces();
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, monPseudo: null, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
+}
+
+// --- Invité : lien, mot de passe -----------------------------------------------------------------
+
+/** Lien « #c… » lu : secondes restantes et paramètres du mot de passe (meta), sans rien révéler de plus. */
+export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<void> {
+  oublier();
+  vue.etape = "chargement";
+  const eng = await loadSalonEngine().catch(() => null);
+  if (!eng) {
+    vue.erreur = { code: "reseau" };
+    vue.etape = "vide";
+    return;
+  }
+  s = { eng, kLien: kLien.slice(), stop: [] };
+  const acces = eng.cleAcces(kLien);
+  try {
+    s.meta = await api.meta(net(), acces.k);
+    s.sGestion = await gestionGardee(kLien);
+    vue.finMs = Date.now() + s.meta.expiresInS * 1000;
+    vue.etape = "motdepasse";
+  } catch (e) {
+    vue.erreur = erreurEntree(e);
+    vue.etape = "vide";
+  } finally {
+    acces.k.fill(0);
+    acces.v.fill(0);
+  }
+}
+
+function erreurEntree(e: unknown): ErreurEntree {
+  if (e instanceof api.SalonError) {
+    if (e.code === "bad_password") return { code: "bad_password", essais: e.attemptsLeft ?? 0 };
+    if (e.code === "not_found") return { code: "introuvable" };
+    if (e.code === "full") return { code: "complet" };
+    if (e.code === "limit") return { code: "limite", retryS: e.retryS };
+    return { code: e.status >= 500 ? "serveur" : "indisponible" };
+  }
+  return { code: "reseau" };
+}
+
+/** Mot de passe tapé : Argon2id, `rejoindre` (une place est prise), WebSocket ; puis la page d'explication. */
+export async function deverrouiller(mdp: string): Promise<boolean> {
+  const x = s;
+  if (!x?.meta) return false;
+  vue.erreur = null;
+  let kMdp: Uint8Array | undefined;
+  try {
+    kMdp = await passwordKey(mdp.normalize("NFC"), x.meta.salt, { ops: x.meta.kdfOps, mem: x.meta.kdfMem });
+    x.cles?.free();
+    x.cles = x.eng.clesSalon(x.kLien, kMdp);
+    const d = deps(x.eng);
+    // Créateur revenu (exigence C-3 32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
+    // l'ajoute ; il ne fonde pas de groupe (les membres en ligne l'ajoutent ; sinon, groupe orphelin).
+    const o = { kLien: x.kLien, cles: x.cles, sGestion: x.sGestion };
+    const entree = await ClientSalon.rejoindre(d, o);
+    demarrer(x, ClientSalon.ouvrir(d, o, entree), entree);
+    vue.etape = "explication";
+    return true;
+  } catch (e) {
+    vue.erreur = erreurEntree(e);
+    if (vue.erreur.code === "introuvable") vue.etape = "vide";
+    return false;
+  } finally {
+    kMdp?.fill(0);
+  }
+}
+
+function deps(eng: SalonEngine) {
+  return { net: net(), eng, ouvrirWS };
+}
+
+// --- Créateur -------------------------------------------------------------------------------------
+
+export type ErreurCreation =
+  | { code: "palier"; salons: number; places: number; heures: number }
+  | { code: "banni"; jusqu: string }
+  | { code: "compte_requis" | "limite" | "reseau" | "serveur" | "occupe" | "robot"; retryS?: number };
+
+/**
+ * Crée le salon (compte exigé, conception §10.4) : clés et mot de passe tirés ici, preuve
+ * anti-robot, création avec la session, entrée comme créateur (siège 0, il fonde le groupe),
+ * puis « Salon prêt ». `garder` : lien d'invitation et lien de gestion dans l'historique local
+ * chiffré (puis le coffre du compte). Rend l'erreur, ou null.
+ */
+export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCanDestroy: boolean; garder: boolean; onEtape?: (e: "cles" | "robot" | "envoi") => void }): Promise<ErreurCreation | null> {
+  oublier();
+  const eng = await loadSalonEngine().catch(() => null);
+  if (!eng) return { code: "reseau" };
+  const mdp = generatePassword();
+  o.onEtape?.("cles");
+  let p: Awaited<ReturnType<typeof preparer>> | undefined;
+  try {
+    p = await preparer(eng, mdp, o);
+    o.onEtape?.("robot");
+    const origin = location.origin;
+    const cap = await captchaDuServeur(transferCtx(origin));
+    const preuve = await solvePow(cap.challenge, { fallbackOrigin: cap.fallbackOrigin, mode: "pow" });
+    // Le serveur refuse une création moins de 3 s après le défi (même règle que les partages).
+    // (receivedAt : horloge monotone de la page, comme la validité du défi, transfer/api.ts).
+    await new Promise((r) => setTimeout(r, Math.max(0, cap.receivedAt + CAPTCHA_MIN_MS - performance.now())));
+    o.onEtape?.("envoi");
+    if (preuve.kind !== "pow") return { code: "robot" };
+    const r = await creerAvecSession(p.entetes, { ...p.corps, altcha: preuve.payload, hp: "", shown_at: cap.shownAt });
+    const lien = lienSalon(origin, "c", p.kLien, import.meta.env.BASE_URL);
+    const gestion = lienSalon(origin, "s", p.sGestion, import.meta.env.BASE_URL);
+    if (o.garder)
+      await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: Date.now() + r.expiresInS * 1000, maxOpens: 0 });
+    s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, stop: [] };
+    const d = deps(eng);
+    const entree = await ClientSalon.rejoindre(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion });
+    demarrer(s, ClientSalon.ouvrir(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, creerGroupe: true }, entree), entree);
+    vue.pret = { lien, mdp, gestion };
+    vue.etape = "pret";
+    return null;
+  } catch (e) {
+    if (p && !s) oublierPreparation(p);
+    if (e instanceof CompteError) {
+      if (e.code === "palier" && e.palier) return { code: "palier", ...e.palier };
+      if (e.code === "banni") return { code: "banni", jusqu: e.jusqu ?? "" };
+      if (e.code === "compte_requis" || e.code === "aucune_session") return { code: "compte_requis" };
+      if (e.code === "limit") return { code: "limite", retryS: e.retryAfterS };
+      if (e.code === "busy") return { code: "occupe", retryS: e.retryAfterS };
+      if (e.code === "bad_request") return { code: "robot" };
+      return { code: e.status >= 500 ? "serveur" : "reseau" };
+    }
+    if (e instanceof Error && e.message === "aucune_session") return { code: "compte_requis" };
+    return { code: "reseau" };
+  }
+}
+
+/** Salon prêt → page d'explication et pseudonyme (le créateur ne retape pas le mot de passe). */
+export function versExplication(): void {
+  if (vue.etape === "pret") vue.etape = "explication";
+}
+
+/** Pseudonyme proposé (compte : réglage « Proposer mon pseudo et ma photo »). */
+/** Photo du compte proposée pour ce salon (même réglage), ou null. */
+export function photoProposee(): Uint8Array | null {
+  return (__COMPTES__ && profilPourSalon()?.photo) || null;
+}
+
+export function pseudoPropose(): string {
+  return (__COMPTES__ && profilPourSalon()?.pseudo) || "";
+}
+
+// --- Conversation -------------------------------------------------------------------------------
+
+function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
+  x.client = c;
+  x.conv = new Conversation(c.siege, (p) => x.eng.cleUnicite(p));
+  x.conv.surChangement(() => vue.rev++);
+  vue.finMs = Date.now() + e.expiresInS * 1000;
+  vue.places = e.maxMembers;
+  vue.createur = c.createur;
+  vue.membresPeuventDetruire = e.membersCanDestroy;
+  vue.fin = null;
+  x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
+}
+
+function surEvenement(x: Session, ev: EvClient): void {
+  const c = x.client!;
+  const conv = x.conv!;
+  switch (ev.k) {
+    case "liste":
+      conv.liste(
+        ev.annonces.map((a) => a.siege),
+        ev.createur,
+      );
+      for (const a of ev.annonces) if (a.derniereMin > 0) conv.presenceDe(a.siege, { enLigne: false, derniereMin: a.derniereMin });
+      break;
+    case "arrivee":
+    case "reprise":
+      conv.arrivee(ev.siege);
+      break;
+    case "depart":
+      conv.depart(ev.siege);
+      break;
+    case "exclusion":
+      if (ev.siege !== undefined) conv.depart(ev.siege, true);
+      break;
+    case "presence":
+      conv.presenceDe(ev.siege, { enLigne: ev.enLigne, derniereMin: ev.derniereMin });
+      break;
+    case "membres":
+      conv.groupe(ev);
+      vue.dansLeGroupe = c.dansLeGroupe();
+      // Les nouveaux venus ne lisent rien d'avant leur arrivée : chacun leur redit son profil.
+      if (vue.monPseudo && ev.ajoutes.some((s2) => s2 !== c.siege)) envoyerProfil(x);
+      break;
+    case "groupe":
+      vue.dansLeGroupe = ev.dansLeGroupe;
+      break;
+    case "message": {
+      const r = conv.message(ev.seq, ev.siege, ev.epoque, ev.enveloppe);
+      if (r) c.accuser("recu", [r.recu]);
+      // Notre pseudonyme pris par un siège arrivé avant : retour au champ (exigence 11).
+      if (conv.pseudoRefuse && vue.etape === "conversation") {
+        vue.monPseudo = null;
+        vue.etape = "explication";
+      }
+      break;
+    }
+    case "efface": {
+      // Message effacé : sa pièce quitte aussi la mémoire de la page (URL révoquée, v3 §5).
+      const b = conv.elements.find((e) => e.k === "bulle" && e.seq === ev.cible);
+      if (b?.k === "bulle") liberer(b.cle);
+      conv.efface(ev.cible);
+      break;
+    }
+    case "chiffre":
+      conv.chiffre(ev.local, ev.id);
+      break;
+    case "accepte": {
+      conv.accepte(ev.local, ev.seq);
+      const p = profilsEnVol.get(ev.local);
+      if (p) {
+        profilsEnVol.delete(ev.local);
+        conv.monProfil(p.pseudo, p.couleur, ev.seq);
+      }
+      break;
+    }
+    case "echec":
+      conv.echec(ev.local, ev.code);
+      break;
+    case "attente":
+      vue.attenteDepuis = ev.depuisMs;
+      break;
+    case "connexion":
+      vue.connexion = ev.etat;
+      break;
+    case "reglages":
+      vue.finMs = Date.now() + ev.secondes * 1000;
+      vue.places = ev.places;
+      break;
+    case "renouvellement":
+      for (const cle of conv.renouveler(ev.depart)) liberer(cle);
+      fichiersOuverts.clear();
+      break;
+    case "nouvelleEntree":
+      conv.moi = ev.siege;
+      if (vue.monPseudo) envoyerProfil(x);
+      break;
+    case "fin":
+      vue.fin = ev.raison;
+      vue.etape = "fin";
+      // Créateur délogé (exigence C-3 35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »
+      // rouvre le lien d'invitation (mot de passe redemandé, lien de gestion relu dans l'historique).
+      vue.lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
+      // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
+      // (sauf exclusion : tout disparaît, spec §39.13.1b).
+      x.client = undefined;
+      x.kLien.fill(0);
+      x.sGestion?.fill(0);
+      if (ev.raison === "exclu") {
+        x.conv = new Conversation(0, () => "");
+      }
+      break;
+  }
+  vue.rev++;
+}
+
+function envoyerProfil(x: Session): void {
+  if (!x.client || !x.conv || !vue.monPseudo) return;
+  x.couleur ??= x.conv.couleurLibre();
+  const pseudo = vue.monPseudo;
+  const couleur = x.couleur;
+  const avatar = x.avatar ?? null;
+  x.client.envoyer({ k: "profil", pseudo, couleur, avatar }, 0, undefined, (local) => {
+    profilsEnVol.set(local, { pseudo, couleur });
+    x.conv!.monProfil(pseudo, couleur);
+    x.conv!.avatars.set(x.client!.siege, avatar);
+  });
+}
+/** Nos messages `profil` en attente de leur rang (numéro local → contenu). */
+const profilsEnVol = new Map<number, { pseudo: string; couleur: number }>();
+
+/** Erreur du pseudonyme (règles du moteur, unicité dans le salon), ou null s'il est valable. */
+export function verifierPseudo(p: string): { code: "longueur" | "caracteres" | "ecritures" | "pris" | "invalide" } | { ok: string } {
+  const x = s;
+  if (!x) return { code: "invalide" };
+  let net2: string;
+  try {
+    net2 = x.eng.pseudoValide(p);
+  } catch (e) {
+    const m = (e as Error).message;
+    return { code: m === "pseudo_longueur" ? "longueur" : m === "pseudo_caracteres" ? "caracteres" : m === "pseudo_ecritures" ? "ecritures" : "invalide" };
+  }
+  if (x.conv?.pseudoPris(net2)) return { code: "pris" };
+  return { ok: net2 };
+}
+
+/** « Entrer dans le salon » : pseudonyme annoncé (chiffré) aux membres, puis la conversation. */
+export function entrer(pseudo: string): boolean {
+  const x = s;
+  const v = verifierPseudo(pseudo);
+  if (!x || !("ok" in v)) return false;
+  vue.monPseudo = v.ok;
+  if (x.conv) x.conv.pseudoRefuse = false;
+  envoyerProfil(x);
+  vue.etape = "conversation";
+  return true;
+}
+
+/** Règle d'effacement des nouveaux messages (C-5 : réglable par tout participant ; 5 min par défaut). */
+export function regleCourante(): Regle {
+  return s?.conv?.regle ?? 2;
+}
+
+/** Tout participant change la règle d'effacement (v3 §5) : message chiffré `regle`, ligne chez tous. */
+export function changerRegle(r: Regle): void {
+  const x = s;
+  if (!x?.client || !x.conv || r < 1) return;
+  x.client.envoyer({ k: "regle", regle: r }, 0);
+  x.conv.regleLocale(r);
+}
+
+/** État d'effacement d'un message à l'écran (moteur : `etatEffacement`), compte à rebours local seulement. */
+export function effacement(b: Bulle, maintenantMs: number): { etat: "visible" } | { etat: "rebours"; finMs: number } | { etat: "efface" } {
+  const x = s;
+  if (!x || b.regle === 0) return { etat: "visible" };
+  const vuMs = x.conv?.vuLe.get(b.cle) ?? null;
+  try {
+    return x.eng.etatEffacement({ regle: b.regle, maintenantMs, vuParMoiMs: vuMs, effaceParServeur: false });
+  } catch {
+    return { etat: "visible" };
+  }
+}
+
+/** Texte nettoyé par le moteur (exigence 4) ; erreur du moteur sinon (`texte_invalide`, `texte_trop_long`). */
+export function nettoyer(x: string): string {
+  if (!s) throw new Error("texte_invalide");
+  return s.eng.nettoyerTexte(x);
+}
+
+export function envoyerTexte(texte: string, cite: string | null): void {
+  const x = s;
+  if (!x?.client || !x.conv) return;
+  const t = x.eng.nettoyerTexte(texte);
+  const regle = regleCourante();
+  const message = cite ? { k: "reponse" as const, cible: hexOctets(cite), x: t } : { k: "texte" as const, x: t };
+  x.client.envoyer(message, regle, undefined, (local) => x.conv!.envoye(local, { sorte: cite ? "reponse" : "texte", texte: t, cite }, regle));
+}
+
+export function modifier(b: Bulle, texte: string): void {
+  const x = s;
+  if (!x?.client || !x.conv || !b.id || !b.moi) return;
+  const t = x.eng.nettoyerTexte(texte);
+  x.client.envoyer({ k: "modif", cible: hexOctets(b.id), x: t }, b.regle);
+  x.conv.modifierLocal(b.id, t);
+}
+
+export function retirer(b: Bulle): void {
+  const x = s;
+  if (!x?.client || !x.conv || !b.id || !b.moi || b.seq === null) return;
+  x.client.retirerPourTous(b.seq, hexOctets(b.id), b.regle);
+  liberer(b.cle);
+  x.conv.retirerLocal(b.id);
+}
+
+// --- Pièces (plan C-4) -------------------------------------------------------------------------
+
+/** Fichiers ouverts ou enregistrés ici (écran « Fichiers » : « Nouveau » sinon), en mémoire seulement. */
+export const fichiersOuverts = new SvelteSet<string>();
+/** Avatars masqués pour soi (v3 §7.2 : une photo peut être choquante), en mémoire seulement. */
+export const masques = new SvelteSet<number>();
+/** Adresses blob: des pièces affichées (clé de la bulle → URL), révoquées à l'effacement. */
+export const pieces = $state({ urls: {} as Record<string, string>, erreurs: {} as Record<string, string>, aConfirmer: [] as File[], avertissement: "" });
+/** Nos fichiers d'origine (clé de bulle) : affichés et enregistrés sans les relire du serveur. */
+const originaux = new Map<string, Blob>();
+let pieceLocale = 0;
+let fileDesEnvois: Promise<void> = Promise.resolve();
+
+/** Types d'image affichés (jamais SVG, spec §39.5 et UI §12.4). */
+const IMAGES_SURES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MIME = /^[a-z]+\/[a-z0-9][a-z0-9.+-]{0,80}$/;
+
+function liberer(cle: string): void {
+  const u = pieces.urls[cle];
+  if (u) URL.revokeObjectURL(u);
+  delete pieces.urls[cle];
+  originaux.delete(cle);
+}
+function oublierPieces(): void {
+  for (const k of Object.keys(pieces.urls)) liberer(k);
+  originaux.clear();
+  pieces.aConfirmer = [];
+  pieces.erreurs = {};
+}
+
+function sorteDe(mime: string): PieceInfo["sorte"] {
+  if (IMAGES_SURES.has(mime)) return "image";
+  if (mime.startsWith("video/")) return "video";
+  return "fichier";
+}
+
+/**
+ * Fichiers choisis (sélecteur, glisser-déposer, coller) : nettoyés comme les partages
+ * (stripMetadata), puis envoyés un par un, chacun dans son message. Ceux dont le nettoyage a
+ * échoué (ou protégés) attendent « Envoyer tel quel » (`telQuel`), dans `pieces.aConfirmer`.
+ */
+export async function envoyerFichiers(fichiers: File[], telQuel = false): Promise<void> {
+  const x = s;
+  if (!x?.client || !x.conv) return;
+  pieces.avertissement = "";
+  for (const f of fichiers) {
+    if (f.size > PIECE_MAX) {
+      pieces.avertissement = "trop_gros";
+      continue;
+    }
+    const mime = MIME.test(f.type) ? f.type : "application/octet-stream";
+    let nom: string;
+    try {
+      nom = x.eng.nettoyerNom(f.name) || "fichier";
+    } catch {
+      nom = "fichier";
+    }
+    let donnees: Blob = f;
+    if (!telQuel) {
+      const r = await stripMetadata(f, mime, nom).catch(() => ({ state: "echec" as const, reason: "" }));
+      if (r.state === "nettoye") donnees = r.data;
+      else if (r.state === "echec" || r.state === "protege") {
+        pieces.aConfirmer = [...pieces.aConfirmer, f];
+        continue;
+      }
+    }
+    envoyerBlob(x, donnees, { nom, mime, sorte: sorteDe(mime), dureeMs: null, vocal: false });
+  }
+}
+
+/** « Envoyer tel quel » des fichiers qui n'ont pas pu être nettoyés ; ou abandon. */
+export function confirmerTelQuel(oui: boolean): void {
+  const f = pieces.aConfirmer;
+  pieces.aConfirmer = [];
+  if (oui) void envoyerFichiers(f, true);
+}
+
+/** Vocal enregistré ici (enregistreur du site, métadonnées déjà retirées). */
+export function envoyerVocal(v: { blob: Blob; mime: string; ext: string; ms: number }): void {
+  const x = s;
+  if (!x?.client) return;
+  envoyerBlob(x, v.blob, { nom: `vocal.${v.ext}`, mime: MIME.test(v.mime) ? v.mime.split(";")[0]! : "audio/webm", sorte: "vocal", dureeMs: Math.round(v.ms), vocal: true });
+}
+
+function envoyerBlob(x: Session, donnees: Blob, p: { nom: string; mime: string; sorte: PieceInfo["sorte"]; dureeMs: number | null; vocal: boolean }): void {
+  const conv = x.conv!;
+  const local = --pieceLocale;
+  conv.pieceEnvoi(local, { nom: p.nom, mime: p.mime, taille: donnees.size, sorte: p.sorte, dureeMs: p.dureeMs });
+  const cle = `l${local}`;
+  originaux.set(cle, donnees);
+  if (p.sorte === "image" || p.sorte === "vocal" || p.sorte === "video") pieces.urls[cle] = URL.createObjectURL(new Blob([donnees], { type: p.mime }));
+  // Une pièce à la fois (le serveur admet deux envois non finalisés par connexion).
+  fileDesEnvois = fileDesEnvois.then(async () => {
+    const c = x.client;
+    if (!c || s !== x) return;
+    try {
+      const ref = await envoyerPiece(net(), c.jeton, donnees, { nom: p.nom, mime: p.mime, vocal: p.vocal, progres: (f) => conv.progresPiece(local, f) });
+      conv.progresPiece(local, 1, ref);
+      c.envoyer({ k: "piece", r: ref.r, piece: ref.piece, palier: ref.palier, nom: p.nom, mime: p.mime, taille: donnees.size, sorte: p.sorte, dureeMs: p.dureeMs }, 0, ref.piece, (l) => {
+        conv.rattacher(local, l);
+      });
+    } catch (e) {
+      const code = e instanceof api.SalonError ? (e.code === "limit" ? `limite:${e.retryS ?? 0}` : e.code) : (e as Error).message;
+      conv.echec(local, code);
+    }
+  });
+}
+
+/**
+ * Pièce à afficher (image, vocal, vidéo) : relue du serveur et déchiffrée, adresse blob: d'un
+ * type sûr seulement ; rien d'autre n'est jamais montré dans la page (UI §12.4).
+ */
+export async function afficherPiece(b: Bulle): Promise<void> {
+  const x = s;
+  const p = b.piece;
+  if (!x?.client || !p?.ref || pieces.urls[b.cle]) return;
+  const mime = p.sorte === "image" && IMAGES_SURES.has(p.mime) ? p.mime : p.sorte === "vocal" ? "audio/webm" : p.sorte === "video" ? p.mime : null;
+  if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
+  try {
+    const blob = await lirePiece(net(), x.client.jeton, p.ref);
+    if (s !== x) return;
+    pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: p.sorte === "vocal" && p.mime.startsWith("audio/") ? p.mime : mime }));
+  } catch (e) {
+    pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+  }
+}
+
+/** « Enregistrer » : le fichier, sous son nom nettoyé, en octets bruts (jamais ouvert par la page). */
+export async function enregistrerPiece(b: Bulle): Promise<void> {
+  const x = s;
+  const p = b.piece;
+  if (!x?.client || !p) return;
+  try {
+    const blob = originaux.get(b.cle) ?? (p.ref ? await lirePiece(net(), x.client.jeton, p.ref) : null);
+    if (!blob) return;
+    const url = URL.createObjectURL(new Blob([blob], { type: "application/octet-stream" }));
+    let nom = "fichier";
+    try {
+      nom = x.eng.nettoyerNom(p.nom) || nom;
+    } catch {
+      // nom refusé par le moteur : nom neutre
+    }
+    clickDownload(url, nom);
+    setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+  } catch (e) {
+    pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+  }
+}
+
+/** Notre photo pour ce salon (ré-encodée 256 × 256 par ui/avatar.ts) : envoyée chiffrée, puis annoncée. */
+export async function choisirAvatar(photo: Uint8Array | null): Promise<void> {
+  const x = s;
+  if (!x?.client) return;
+  if (!photo) x.avatar = null;
+  else x.avatar = await envoyerPiece(net(), x.client.jeton, new Blob([photo as Uint8Array<ArrayBuffer>], { type: "image/jpeg" }), { nom: "avatar.jpg", mime: "image/jpeg", vocal: false });
+  if (vue.monPseudo) envoyerProfil(x);
+}
+
+/** Avatar d'un siège (profil) : adresse blob: (image/jpeg seulement), ou null. */
+export async function avatarDe(siege: number): Promise<void> {
+  const x = s;
+  const cle = `avatar:${siege}`;
+  const ref = x?.conv?.avatars.get(siege);
+  if (!x?.client || !ref || pieces.urls[cle]) return;
+  try {
+    const blob = await lirePiece(net(), x.client.jeton, ref);
+    if (s === x && blob.size <= 65536) pieces.urls[cle] = URL.createObjectURL(new Blob([blob], { type: "image/jpeg" }));
+  } catch {
+    // avatar indisponible : l'initiale reste
+  }
+}
+
+export function reagir(b: Bulle, emoji: string): void {
+  const x = s;
+  if (!x?.client || !x.conv || !b.id || b.retire) return;
+  x.client.envoyer({ k: "reaction", cible: hexOctets(b.id), emoji }, b.regle);
+  x.conv.reagirLocal(b.id, emoji);
+}
+
+/** Message affiché 1 s, page visible : accusé « vu » (chiffré) et, règles 1 à 3, lecture au serveur. */
+export function vu(b: Bulle): void {
+  const x = s;
+  if (!x?.client || b.moi || !b.id) return;
+  x.conv?.marquerVu(b.cle, Date.now());
+  x.client.accuser("vu", [hexOctets(b.id)]);
+  if (b.regle !== 0 && b.seq !== null) x.client.lu(b.seq);
+}
+
+// --- Codes, gestion, fin (plan C-5) ---------------------------------------------------------------
+
+/** Code de vérification d'un siège (5 groupes de 5 chiffres), ou null hors du groupe. */
+export function code(siege: number): string | null {
+  return s?.client?.empreinte(siege) ?? null;
+}
+/** « J'ai comparé ce code » : gardé sur cet appareil, en mémoire, jusqu'au prochain changement. */
+export function verifier(siege: number, oui: boolean): void {
+  const c = code(siege);
+  if (!s?.conv || !c) return;
+  if (oui) s.conv.verifies.set(siege, c);
+  else s.conv.verifies.delete(siege);
+  vue.rev++;
+}
+export function verifie(siege: number): boolean {
+  const c = code(siege);
+  return c !== null && s?.conv?.verifies.get(siege) === c;
+}
+
+/** Destruction (créateur : J_gestion ; membre : si le salon le permet). Rend vrai si faite. */
+export async function detruire(signaler = false): Promise<boolean> {
+  const x = s;
+  if (!x?.client) return false;
+  const j = x.client.jetonGestion();
+  try {
+    await api.detruire(net(), j ? { jGestion: j } : { jeton: x.client.jeton }, signaler);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    j?.fill(0);
+  }
+}
+
+/** « Quitter et signaler » (spec §39.5) : le serveur fait partir le membre et compte le signalement. */
+export async function quitterEtSignaler(): Promise<boolean> {
+  const x = s;
+  if (!x?.client) return false;
+  try {
+    await api.signaler(net(), x.client.jeton);
+  } catch {
+    return false;
+  }
+  x.client.arreter("quitte");
+  return true;
+}
+
+/** Créateur : nombre de places (2 à 10, jamais sous les présents). Rend le code d'erreur, ou null. */
+export async function reglerPlaces(n: number): Promise<string | null> {
+  const x = s;
+  const j = x?.client?.jetonGestion();
+  if (!j) return "forbidden";
+  try {
+    const r = await api.reglages(net(), j, { maxMembers: n });
+    vue.places = r.maxMembers;
+    return null;
+  } catch (e) {
+    return e instanceof api.SalonError ? e.code : "reseau";
+  } finally {
+    j.fill(0);
+  }
+}
+
+/**
+ * Créateur : renouvellement (1, 6, 12 ou 24 h depuis maintenant, conversation effacée pour tous,
+ * groupe recréé ; compte comme une création : preuve anti-robot). Rend le code d'erreur, ou null.
+ */
+export async function renouveler(h: Duree): Promise<string | null> {
+  const x = s;
+  if (!x?.client) return "forbidden";
+  const cap = await captchaDuServeur(transferCtx(location.origin)).catch(() => null);
+  if (!cap) return "reseau";
+  const p = await solvePow(cap.challenge, { fallbackOrigin: cap.fallbackOrigin, mode: "pow" }).catch(() => null);
+  if (!p || p.kind !== "pow") return "robot";
+  await new Promise((r) => setTimeout(r, Math.max(0, cap.receivedAt + CAPTCHA_MIN_MS - performance.now())));
+  const j = x.client.jetonGestion();
+  if (!j) return "forbidden";
+  try {
+    const r = await api.reglages(net(), j, { renouvelerH: h, preuve: { altcha: p.payload, hp: "", shown_at: cap.shownAt } });
+    vue.finMs = Date.now() + r.expiresInS * 1000;
+    return null;
+  } catch (e) {
+    return e instanceof api.SalonError ? e.code : "reseau";
+  } finally {
+    j.fill(0);
+  }
+}
+
+let dernierEcrit = 0;
+/** « En train d'écrire » : au plus toutes les 4 s pendant la frappe (plan C-3, point 8). */
+export function ecrit(): void {
+  const t = Date.now();
+  if (t - dernierEcrit < 4_000) return;
+  dernierEcrit = t;
+  s?.client?.ecrit();
+}
+
+/** « Quitter le salon » : `0x03`, secrets effacés. */
+export function quitter(): void {
+  s?.client?.quitter();
+}
+
+/** Reconnexion tout de suite (onglet revenu, réseau revenu). */
+export function reveiller(): void {
+  s?.client?.reveiller();
+}
+
+const hexOctets = (h: string) => Uint8Array.from(h.match(/../g) ?? [], (x) => parseInt(x, 16));
+

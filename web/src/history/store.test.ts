@@ -310,6 +310,12 @@ describe("historique de l'appareil : quatre sortes (lot 11)", () => {
     await expect(h.add({ sorte: "salon_cree", manage: "", link: LINK2, createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
     await expect(h.add({ sorte: "salon_cree", manage: "", link: ROOM.replace("r", "s"), label: "x".repeat(65), createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
     await expect(h.add({ ...fresh(), sorte: "autre" } as unknown as NewEntry)).rejects.toThrow();
+    // Salon créé (plan C-3, point 2) : lien de gestion « #s » seulement ; jamais pour un salon rejoint.
+    const GESTION = "https://shhgone.com/salon#s" + "G".repeat(43);
+    const c = await h.add({ sorte: "salon_cree", manage: GESTION, link: ROOM.replace(/.{8}$/, "Zzzzzzzz"), label: "", createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 });
+    expect(c.manage).toBe(GESTION);
+    await expect(h.add({ sorte: "salon_rejoint", manage: GESTION, link: ROOM.replace(/.{8}$/, "Yyyyyyyy"), createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
+    await expect(h.add({ sorte: "salon_cree", manage: MANAGE, link: ROOM.replace(/.{8}$/, "Xxxxxxxx"), createdAt: T0, sizeBytes: 0, itemsCount: 0, expiresAt: T0 + 1, maxOpens: 0 })).rejects.toThrow();
   });
 
   it("le même lien reçu n'est gardé qu'une fois ; un autre lien fait une autre entrée", async () => {

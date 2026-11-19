@@ -2,8 +2,8 @@
 // handlers_compte.go). SEUL fichier du compte qui fait des requêtes, et seul fichier du site qui
 // écrit l'en-tête X-Shh-Session (source-rules.test.ts) :
 // - toutes les routes sont sous /api/compte/ ; le jeton de session ne part vers aucune autre route
-//   (ni /api/shares, ni /api/manage, ni /api/salons : la création de salon avec session viendra
-//   avec les écrans du salon, C-5, conception §10.4) ;
+//   (ni /api/shares, ni /api/manage, ni les autres routes du salon), sauf POST /api/salons, la
+//   création d'un salon (creerSalon, conception §10.4 ; écrans du salon, plan C-3) ;
 // - JSON strict : clés exactes, jamais `null` (le serveur le refuse), secrets en base64url sans
 //   bourrage ; rien dans l'URL ; sans cookie (credentials: "omit"), sans redirection ;
 // - un seul essai : aucune route du compte n'est rejouée d'elle-même (un code, une écriture de
@@ -24,10 +24,12 @@ export class CompteError extends Error {
   readonly jusqu?: string;
   readonly gen?: number;
   readonly retryAfterS?: number;
+  /** Refus `palier` d'une création de salon (409) : limites du palier du compte. */
+  readonly palier?: { salons: number; places: number; heures: number };
   constructor(
     readonly status: number,
     readonly code: string,
-    extra: { attemptsLeft?: number; jusqu?: string; gen?: number; retryAfterS?: number } = {},
+    extra: { attemptsLeft?: number; jusqu?: string; gen?: number; retryAfterS?: number; palier?: { salons: number; places: number; heures: number } } = {},
   ) {
     super(code);
     Object.assign(this, extra);
@@ -77,6 +79,10 @@ async function erreur(r: Response): Promise<CompteError> {
     jusqu: typeof j.jusqu === "string" ? j.jusqu : undefined,
     gen: int(j.gen),
     retryAfterS: int(j.retry_after_s) ?? (/^\d{1,9}$/.test(ra) ? Number(ra) : undefined),
+    palier:
+      j.error === "palier" && int(j.salons) !== undefined && int(j.places) !== undefined && int(j.heures) !== undefined
+        ? { salons: j.salons as number, places: j.places as number, heures: j.heures as number }
+        : undefined,
   });
 }
 
@@ -418,4 +424,38 @@ export async function exporter(n: Net, session: string): Promise<ExportServeur> 
 /** Suppression du compte (session récente) : salons créés fermés par le serveur. */
 export async function supprimer(n: Net, session: string): Promise<{ salonsFermes: number }> {
   return { salonsFermes: entier(await appel(n, "POST", "supprimer", { session, body: {} }), "salons_fermes") };
+}
+
+// --- Salon ----------------------------------------------------------------------------------
+
+/**
+ * Création d'un salon avec la session du compte (conception §10.4 ; SHH_COMPTES=1 l'exige) :
+ * POST /api/salons, seule route hors de /api/compte qui reçoit X-Shh-Session. `acces` :
+ * K_accès_s, `gestion` : J_gestion (jamais S_gestion, spec salon v3 §15.2), en base64url ;
+ * le corps vient de salon/api.ts (CorpsCreation). Refus : 409 palier (CompteError.palier),
+ * 403 banni (jusqu), 401 compte_requis, 429 limit, 400 bad_request (preuve anti-robot).
+ */
+export async function creerSalon(n: Net, session: string, entetes: { acces: string; gestion: string }, corps: Obj): Promise<{ expiresInS: number }> {
+  let r: Response;
+  try {
+    r = await n.fetch(`${n.origin}/api/salons`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shh-Session": session, "X-Shh-Access": entetes.acces, "X-Shh-Manage": entetes.gestion },
+      body: JSON.stringify(corps),
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("reseau");
+  }
+  if (!r.ok) throw await erreur(r);
+  let o: unknown;
+  try {
+    o = JSON.parse(await r.text());
+  } catch {
+    throw invalide();
+  }
+  if (typeof o !== "object" || o === null || Array.isArray(o)) throw invalide();
+  return { expiresInS: entier(o as Obj, "expires_in_s") };
 }

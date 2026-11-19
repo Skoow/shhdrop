@@ -12,6 +12,9 @@ declare const __SHH_BUILD__: string | undefined;
 /** Compte par e-mail (vite.config.ts, comptesActifs) : false par défaut et dans la démo ; false sous vitest. */
 declare const __COMPTES__: boolean;
 
+/** Salon (plan C-3) : vrai en production avec le compte (création exigée par D42-26), faux dans la démo (pas de serveur du salon) ; faux sous vitest. */
+declare const __SALONS__: boolean;
+
 // Cadre PDF isolé : le worker de pdf.js, chargé sur le fil principal (UI §13).
 declare module "pdfjs-dist/build/pdf.worker.mjs" {
   export const WorkerMessageHandler: unknown;

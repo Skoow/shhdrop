@@ -1,0 +1,162 @@
+import { describe, expect, it } from "vitest";
+import { Conversation, morceaux, type Bulle } from "./conversation";
+import type { EnveloppeRecue } from "./client";
+import type { Message } from "./engine";
+
+// Clé d'unicité simplifiée pour le test (le site passe cleUnicite du moteur).
+const cle = (p: string) => p.toLowerCase().replace(/0/g, "o");
+const id = (n: number) => new Uint8Array(16).fill(n);
+const hex = (n: number) => Array.from(id(n), (x) => x.toString(16).padStart(2, "0")).join("");
+const env = (n: number, message: Message): EnveloppeRecue => ({ id: id(n), heureMs: 1000, regle: 2, message });
+
+function conv(moi = 0, t = { v: 0 }) {
+  const c = new Conversation(moi, cle, () => t.v);
+  c.liste([0, 1, 2], 0);
+  c.groupe({ ajoutes: [], retires: [], createurRevenu: false, membres: [0, 1, 2] });
+  c.elements.length = 0;
+  return c;
+}
+const bulles = (c: Conversation) => c.elements.filter((x): x is Bulle => x.k === "bulle");
+
+describe("conversation", () => {
+  it("texte reçu : affiché, accusé « reçu » demandé ; doublon d'identifiant ignoré", () => {
+    const c = conv();
+    expect(c.message(5, 1, 3, env(1, { k: "texte", x: "salut" }))).toEqual({ recu: id(1) });
+    expect(c.message(9, 1, 3, env(1, { k: "texte", x: "autre" }))).toBeNull();
+    expect(bulles(c).map((b) => [b.texte, b.seq, b.attendus])).toEqual([["salut", 5, [0, 2]]]);
+  });
+  it("modif et retrait : de l'auteur seulement", () => {
+    const c = conv();
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    c.message(6, 2, 3, env(2, { k: "modif", cible: id(1), x: "pirate" }));
+    c.message(7, 2, 3, env(3, { k: "retrait", cible: id(1) }));
+    expect(bulles(c)[0]).toMatchObject({ texte: "a", modifie: false, retire: false });
+    c.message(8, 1, 3, env(4, { k: "modif", cible: id(1), x: "b" }));
+    expect(bulles(c)[0]).toMatchObject({ texte: "b", modifie: true });
+    c.message(9, 1, 3, env(5, { k: "retrait", cible: id(1) }));
+    expect(bulles(c)[0]).toMatchObject({ texte: "", retire: true });
+    c.message(10, 1, 3, env(6, { k: "modif", cible: id(1), x: "revenu" }));
+    expect(bulles(c)[0]!.texte).toBe("");
+  });
+  it("réactions : une par siège, la même la retire", () => {
+    const c = conv();
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    c.message(6, 2, 3, env(2, { k: "reaction", cible: id(1), emoji: "👍" }));
+    c.message(7, 0, 3, env(3, { k: "reaction", cible: id(1), emoji: "👍" }));
+    expect(bulles(c)[0]!.reactions).toEqual([{ emoji: "👍", sieges: [2, 0] }]);
+    c.message(8, 2, 3, env(4, { k: "reaction", cible: id(1), emoji: "😂" }));
+    expect(bulles(c)[0]!.reactions).toEqual([{ emoji: "👍", sieges: [0] }, { emoji: "😂", sieges: [2] }]);
+    c.message(9, 2, 3, env(5, { k: "reaction", cible: id(1), emoji: "😂" }));
+    expect(bulles(c)[0]!.reactions).toEqual([{ emoji: "👍", sieges: [0] }]);
+  });
+  it("nos messages : en attente, chiffré, accepté, puis reçu et vu une fois par siège attendu", () => {
+    const c = conv();
+    c.envoye(1, { sorte: "texte", texte: "moi" }, 2);
+    const b = bulles(c)[0]!;
+    expect(c.coche(b)).toBe("attente");
+    c.chiffre(1, id(7));
+    c.accepte(1, 12);
+    expect(c.coche(b)).toBe("envoye");
+    c.message(13, 1, 3, env(8, { k: "recu", ids: [id(7)] }));
+    c.message(14, 1, 3, env(9, { k: "recu", ids: [id(7)] }));
+    c.message(15, 3, 3, env(10, { k: "vu", ids: [id(7)] })); // siège non attendu : ignoré
+    expect(b.recus).toEqual([1]);
+    expect(c.coche(b)).toBe("envoye");
+    c.message(16, 2, 3, env(11, { k: "vu", ids: [id(7)] }));
+    expect(c.coche(b)).toBe("recu");
+    c.message(17, 1, 3, env(12, { k: "vu", ids: [id(7)] }));
+    expect(c.coche(b)).toBe("vu");
+    expect(b.vus).toEqual([2, 1]);
+  });
+  it("réponse : citation par identifiant ; efface (0x0E) retire la bulle", () => {
+    const c = conv();
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    c.message(6, 2, 3, env(2, { k: "reponse", cible: id(1), x: "b" }));
+    expect(bulles(c)[1]!.cite).toBe(hex(1));
+    c.efface(5);
+    expect(bulles(c).map((b) => b.texte)).toEqual(["b"]);
+    expect(c.bulle(hex(1))).toBeUndefined();
+  });
+  it("pseudonymes : unicité, le premier en ordre seq garde le nom ; changement annoncé", () => {
+    const c = conv(2);
+    c.message(5, 1, 3, env(1, { k: "profil", pseudo: "Leo", couleur: 1, avatar: null }));
+    c.message(6, 2, 3, env(2, { k: "profil", pseudo: "LE0", couleur: 2, avatar: null }));
+    expect(c.nom(1).pseudo).toBe("Leo");
+    expect(c.nom(2)).toEqual({ pseudo: null, numero: 3 });
+    expect(c.pseudoRefuse).toBe(true);
+    expect(c.pseudoPris("leo")).toBe(true);
+    c.message(7, 2, 3, env(3, { k: "profil", pseudo: "Lou", couleur: 2, avatar: null }));
+    expect(c.pseudoRefuse).toBe(false);
+    c.message(8, 1, 3, env(4, { k: "profil", pseudo: "Léa", couleur: 1, avatar: null }));
+    expect(c.elements.at(-1)).toMatchObject({ k: "sys", quoi: "pseudo", siege: 1, avant: "Leo", apres: "Léa" });
+    expect(c.couleurLibre()).toBe(0);
+  });
+  it("notre profil : appliqué chez nous, puis au rang de notre trame ; perdu contre un rang antérieur", () => {
+    const c = conv(0);
+    c.monProfil("Ana", 3);
+    expect(c.nom(0).pseudo).toBe("Ana");
+    expect(c.couleur(0)).toBe(3);
+    c.message(4, 1, 3, env(1, { k: "profil", pseudo: "ANA", couleur: 1, avatar: null }));
+    expect(c.nom(1).pseudo).toBe("ANA");
+    // Notre trame a pris le rang 9 : celle du siège 1 (rang 4) garde le pseudonyme.
+    c.monProfil("Ana", 3, 9);
+    expect(c.nom(0).pseudo).toBeNull();
+    expect(c.pseudoRefuse).toBe(true);
+  });
+  it("groupe : arrivée, retour (code changé), créateur revenu sans « code changé »", () => {
+    const c = conv(1);
+    c.groupe({ ajoutes: [2], retires: [], createurRevenu: false, membres: [0, 1, 2] });
+    c.groupe({ ajoutes: [2], retires: [2], createurRevenu: false, membres: [0, 1, 2] });
+    c.groupe({ ajoutes: [0], retires: [0], createurRevenu: true, membres: [0, 1, 2] });
+    expect(c.elements.map((e) => (e.k === "sys" ? `${e.quoi}:${e.siege}` : "b"))).toEqual(["arrivee:2", "retour:2", "code:2", "createur:0", "retour:0"]);
+  });
+  it("règle d'effacement (C-5) : défaut 5 min, la plus récente en ordre seq gagne, ligne affichée", () => {
+    const c = conv(0);
+    expect(c.regle).toBe(2);
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    c.message(6, 1, 3, { ...env(2, { k: "texte", x: "b" }), regle: 3 });
+    expect(c.regle).toBe(3); // sans message « regle » : celle du dernier message reçu
+    c.message(9, 2, 3, env(3, { k: "regle", regle: 1 }));
+    c.message(8, 1, 3, env(4, { k: "regle", regle: 3 })); // plus ancien : ignoré
+    expect(c.regle).toBe(1);
+    expect(c.elements.filter((e) => e.k === "sys" && e.quoi === "regle")).toHaveLength(1);
+    c.message(10, 1, 3, { ...env(5, { k: "texte", x: "c" }), regle: 3 });
+    expect(c.regle).toBe(1);
+  });
+  it("codes vérifiés : annulés quand le code change (reprise) et au renouvellement", () => {
+    const c = conv(0);
+    c.verifies.set(1, "11111-22222-33333-44444-55555");
+    c.verifies.set(2, "x");
+    c.groupe({ ajoutes: [1], retires: [1], createurRevenu: false, membres: [0, 1, 2] });
+    expect([...c.verifies.keys()]).toEqual([2]);
+    c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
+    const partis = c.renouveler(7);
+    expect(partis).toEqual([hex(1)]);
+    expect(c.verifies.size).toBe(0);
+    expect(c.elements.filter((e) => e.k === "bulle")).toEqual([]);
+  });
+  it("« écrit » : 6 s, effacé par le message", () => {
+    const t = { v: 0 };
+    const c = conv(0, t);
+    c.message(5, 1, 3, env(1, { k: "ecrit" }));
+    expect(c.ecrivent()).toEqual([1]);
+    t.v = 7000;
+    expect(c.ecrivent()).toEqual([]);
+    t.v = 0;
+    c.message(6, 1, 3, env(2, { k: "ecrit" }));
+    c.message(7, 1, 3, env(3, { k: "texte", x: "x" }));
+    expect(c.ecrivent()).toEqual([]);
+  });
+});
+
+describe("morceaux", () => {
+  it("liens https et http seulement, ponctuation finale laissée au texte", () => {
+    expect(morceaux("voir https://exemple.fr/a?b=1. puis")).toEqual([
+      { lien: false, t: "voir " },
+      { lien: true, t: "https://exemple.fr/a?b=1" },
+      { lien: false, t: ". puis" },
+    ]);
+    expect(morceaux("javascript:alert(1) ftp://x data:text/html,x")).toEqual([{ lien: false, t: "javascript:alert(1) ftp://x data:text/html,x" }]);
+    expect(morceaux("http://")).toEqual([{ lien: false, t: "http://" }]);
+  });
+});

@@ -261,6 +261,19 @@ export function newSeed(): Promise<Seed> {
   return run((e) => e.wasm.newSeed(e.provider));
 }
 
+/**
+ * Pièces du salon seulement (spec salon v3 §3.4, plan C-4) : R en clair (32 octets) pour le
+ * message MLS qui l'accompagne. SECRET : copie que l'appelant met à zéro. Jamais pour un partage.
+ */
+export function seedBytes(r: Seed): Promise<Uint8Array<ArrayBuffer>> {
+  return run((e) => e.wasm.seedBytes(r) as Uint8Array<ArrayBuffer>);
+}
+
+/** Pièces du salon : R lue dans un message (clés d'ouverture seulement, comme après `open`). */
+export function seedFromBytes(r: Uint8Array): Promise<Seed> {
+  return run((e) => e.wasm.seedFromBytes(e.provider, r));
+}
+
 /** K_contenu et engagement d'une R neuve, une seule fois par R (cle_deja_utilisee ensuite). */
 export function contentKeys(r: Seed): Promise<ContentKeys> {
   return run((e) => e.wasm.contentKeys(r));

@@ -510,6 +510,26 @@ export async function changerPseudo(p: string): Promise<void> {
   await ecrireProfil({ pseudo: affiche });
 }
 
+// --- Salon ----------------------------------------------------------------------------------
+
+/**
+ * Crée un salon avec la session ouverte (conception §10.4) : en-têtes du salon (K_accès_s,
+ * J_gestion, base64url) et corps faits par l'écran de création (salon/api.ts, CorpsCreation).
+ * Le secret de gestion entre ensuite au coffre par l'historique de l'appareil (entrée
+ * `salon_cree`, sync.ts, écriture différée). Sans session : Error("aucune_session").
+ */
+export async function creerSalon(entetes: { acces: string; gestion: string }, corps: Record<string, unknown>): Promise<{ expiresInS: number }> {
+  const o = ouverteOuErreur();
+  return garde(() => api.creerSalon(deps.net, o.jeton, entetes, corps));
+}
+
+/** Pseudo et photo du compte à proposer à l'entrée d'un salon (réglage « Proposer mon pseudo et ma photo »), ou null. */
+export function profilPourSalon(): { pseudo: string; photo: Uint8Array | null } | null {
+  const p = account.profil;
+  if (!ouverte || !p || !p.reglages.proposerProfil) return null;
+  return { pseudo: p.pseudo, photo: p.photo };
+}
+
 // --- Coffres ---------------------------------------------------------------------------------
 
 function ouverteOuErreur(): Ouverte {

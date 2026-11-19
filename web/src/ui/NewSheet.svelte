@@ -3,6 +3,7 @@
   // Écrire une note (page d'envoi, geste joué par le composeur à son montage), Créer un salon
   // (bientôt : il dépend des écrans du salon, C-3 ; annoncé, rien n'est demandé au serveur).
   import { goToSend, type AddGesture } from "../app/chrome.svelte";
+  import { navigate } from "../app/router.svelte";
   import { formatBytes } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX } from "../limits";
@@ -35,10 +36,19 @@
       </button>
     </li>
     <li>
-      <button type="button" class="it soon" data-new-item aria-disabled="true" onclick={() => announce(t("home.inbox.new.room.d"))}>
-        <span class="ic room"><MessagesSquare size={22} /></span>
-        <span class="tx"><span class="t">{t("home.inbox.new.room")}</span> · <span class="d">{t("home.inbox.new.room.d")}</span></span>
-      </button>
+      {#if __SALONS__}
+        <!-- Salon (plan C-3) : la page de création. -->
+        <button type="button" class="it" data-new-item onclick={() => ((open = false), navigate("/salon/nouveau"))}>
+          <span class="ic room"><MessagesSquare size={22} /></span>
+          <span class="tx"><span class="t">{t("home.inbox.new.room")}</span> · <span class="d">{t("home.inbox.new.room.live")}</span></span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+      {:else}
+        <button type="button" class="it soon" data-new-item aria-disabled="true" onclick={() => announce(t("home.inbox.new.room.d"))}>
+          <span class="ic room"><MessagesSquare size={22} /></span>
+          <span class="tx"><span class="t">{t("home.inbox.new.room")}</span> · <span class="d">{t("home.inbox.new.room.d")}</span></span>
+        </button>
+      {/if}
     </li>
   </ul>
 </Sheet>

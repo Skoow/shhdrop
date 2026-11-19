@@ -188,10 +188,15 @@
   <ul class="main">
     <li>{@render menu("share", t("nav.share"), shareItems)}</li>
     <li>
-      <button type="button" class="nl room" aria-disabled="true" aria-describedby="{uid}-room" onclick={() => announce(t("tabs.soon.chat"))}>
-        {t("nav.room")}<span class="soon">{t("foot.soon")}</span>
-      </button>
-      <span id="{uid}-room" class="sr-only">{t("tabs.soon.chat")}</span>
+      {#if __SALONS__}
+        <!-- Salon (plan C-3) : création, compte exigé (la page mène à la connexion sans session). -->
+        <a class="nl room" href={href("/salon/nouveau")} aria-current={here("/salon/nouveau")} onclick={(e) => (busy ? e.preventDefault() : followLink(e, "/salon/nouveau"))} {...off}>{t("nav.room")}</a>
+      {:else}
+        <button type="button" class="nl room" aria-disabled="true" aria-describedby="{uid}-room" onclick={() => announce(t("tabs.soon.chat"))}>
+          {t("nav.room")}<span class="soon">{t("foot.soon")}</span>
+        </button>
+        <span id="{uid}-room" class="sr-only">{t("tabs.soon.chat")}</span>
+      {/if}
     </li>
     <li>{@render menu("security", t("nav.security"), secItems)}</li>
     <li>

@@ -95,7 +95,12 @@
         {/if}
       {:else}
         <p class="sub">{entry.sorte === "salon_cree" ? t("home.inbox.created", { date }) : t("home.inbox.joined", { date })}</p>
-        <p class="sub">{t("home.inbox.room.later")}</p>
+        {#if __SALONS__}
+          <!-- Salon (plan C-3) : le lien d'invitation gardé ouvre la page du salon (le mot de passe reste demandé). -->
+          <div class="acts"><Button variant="primary" onpress={() => location.assign(entry.link)}>{t("home.inbox.room.open")}</Button></div>
+        {:else}
+          <p class="sub">{t("home.inbox.room.later")}</p>
+        {/if}
       {/if}
       <div class="acts">
         <Button variant="ghost" onpress={onremove}>
