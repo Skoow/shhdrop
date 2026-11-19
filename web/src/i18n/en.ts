@@ -409,7 +409,6 @@ export const en = {
   "ready.selfdestruct": "Erases itself: after {opens}, or at that time ({ttl} after sending, rounded up to the next quarter hour).",
   "ready.opens.one": "{n} open",
   "ready.opens.other": "{n} opens",
-  "ready.card": "Link and password",
   "ready.link.title": "Link",
   "ready.link.label": "Share link",
   "ready.share": "Share",

@@ -606,14 +606,14 @@ test.describe("fr-FR", () => {
         });
         await capture(page, `compose-mix9-${size.width}`);
         expect(heads.map((h) => h.t)).toEqual(["Texte", "Photos", "Vidéos", "Documents", "Archives"]);
-        // Listes compactes (décision du 7 novembre) : à 1440 × 900, la liste défile en elle-même
-        // (la page, jamais) ; à 1920 × 1080, tout tient.
-        if (size.width === 1920) expect(heads.filter((h) => !h.ok), `${size.width}`).toEqual([]);
-        else {
-          await page.locator(".group h3", { hasText: "Archives" }).scrollIntoViewIfNeeded();
+        // Listes compactes (décision du 7 novembre) : la liste défile en elle-même, jamais la page.
+        // Depuis le 19 novembre, l'empreinte SHA-256 a sa propre ligne : à 1920 × 1080 aussi, neuf
+        // éléments dépassent la zone ; chaque catégorie y reste atteignable.
+        for (const cat of ["Texte", "Archives"]) {
+          await page.locator(".group h3", { hasText: cat }).scrollIntoViewIfNeeded();
           // La liste a défilé en elle-même ; la page, non (le pied de page reste dessous).
           expect(await page.evaluate(() => scrollY)).toBe(0);
-          await expect(page.locator(".group h3", { hasText: "Archives" })).toBeInViewport();
+          await expect(page.locator(".group h3", { hasText: cat })).toBeInViewport();
         }
       }
     } else await capture(page, "compose-mix9");

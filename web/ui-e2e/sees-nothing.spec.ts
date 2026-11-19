@@ -65,7 +65,9 @@ test.describe("fr-FR", () => {
     ];
 
     // Témoin : la capture voit bien les en-têtes et les corps (S_gestion part, par conception, en en-tête).
-    const manage = (await page.locator(".manage .sr-only").first().textContent()) ?? "";
+    // Lien de gestion : montré seulement sans historique (19 novembre).
+    await page.getByRole("switch", { name: "Garder dans mon historique" }).click();
+    const manage = (await page.locator("[data-manage] .sr-only").first().textContent()) ?? "";
     const sGestion = new Uint8Array(Buffer.from(manage.slice(manage.indexOf("#m") + 2), "base64url"));
     expect(findIn(Buffer.concat(sent.map((s) => s.data)), [needle("témoin S_gestion", sGestion as Uint8Array<ArrayBuffer>)])).toEqual(["témoin S_gestion"]);
     // Chemin d'ouverture (Tasks 20, 21, 23) : le destinataire ouvre le lien dans cet onglet,

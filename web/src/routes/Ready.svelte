@@ -220,7 +220,7 @@
 
       <!-- Un seul cadre (propriétaire, 19 novembre) : le lien, le mot de passe (masqué à l'arrivée,
            œil pour l'afficher, copiable masqué), puis les informations du partage en bas. -->
-      <div class="card" role="group" aria-label={t("ready.card")} data-fan data-ready-card>
+      <div class="card" data-fan data-ready-card>
         <div class="cell" role="group" aria-label={t("ready.link.title")}><CopyField label={t("ready.link.label")} value={result.link} /></div>
         {#if demo}
           <div class="row">

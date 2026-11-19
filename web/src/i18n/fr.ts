@@ -410,7 +410,6 @@ export const fr = {
   "ready.selfdestruct": "S'efface tout seul\u202f: après {opens}, ou à cette heure ({ttl} après l'envoi, arrondie au quart d'heure supérieur).",
   "ready.opens.one": "{n}\u202fouverture",
   "ready.opens.other": "{n}\u202fouvertures",
-  "ready.card": "Lien et mot de passe",
   "ready.link.title": "Lien",
   "ready.link.label": "Lien de partage",
   "ready.share": "Partager",
