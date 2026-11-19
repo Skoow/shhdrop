@@ -128,8 +128,11 @@ describe("check-dist.mjs, production", () => {
       const r = run([d]);
       expect(r.code, trace).toBe(1);
       expect(r.err, trace).toMatch(/assets\/index-a\.js : module de compte « (\/api\/compte|shhdrop-compte) » dans un build sans __COMPTES__/);
-      expect(run(["--comptes", d]), trace).toEqual({ code: 0, err: "" });
+      if (trace.includes("/api/compte")) expect(run(["--comptes", d]), trace).toEqual({ code: 0, err: "" });
     }
+    // --comptes sans module de compte : refusé (build fait sans SHH_SITE_COMPTES=1).
+    const vide = site({ "index.html": PROD_INDEX, "assets/index-a.js": "console.info(1)" });
+    expect(run(["--comptes", vide]).err).toContain("module de compte absent alors que --comptes est demandé");
   });
 
   it("échoue si un fichier contient __SHH_DEMO__", () => {

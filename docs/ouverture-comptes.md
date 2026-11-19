@@ -60,6 +60,14 @@ Source : `docs/superpowers/specs/2026-11-14-compte-email-design.md`, §20 et §2
 - **Tests unitaires** : du compte (`web/src/account`, `web/src/routes/compte`) et du serveur (`server/internal/compte`, `server/internal/api/compte_test.go`).
 - **Test « le serveur ne voit rien » étendu au compte** : `web/e2e/compte-sees-nothing.test.ts`, bloquant.
 - **Démo** : parcours par l'interface (`web/ui-e2e/compte.demo.spec.ts`) et faux serveur du compte testé (`web/src/demo/fake-compte.test.ts`, TOTP contre les vecteurs de la RFC 6238).
-- **Tests de bout en bout contre le vrai serveur**, comptes activés et faux SMTP local (`web/ui-e2e/compte.spec.ts`) : en cours d'ajout.
+- **Tests de bout en bout contre le vrai serveur**, comptes activés et faux SMTP local (`web/ui-e2e/compte.spec.ts`), par l'interface réelle :
+  - inscription, connexion, mauvais mot de passe ;
+  - « Rester connecté » et deux onglets ;
+  - mot de passe oublié, changement de mot de passe ;
+  - double authentification ;
+  - suppression ;
+  - « le serveur ne voit rien » (dossier de données et sorties du serveur fouillés : ni adresse, ni mot de passe, ni pseudo, ni clé TOTP).
+
+  Pour l'instant sous Chromium seulement : WebKit est à activer après un premier passage vert en CI.
 
 Ce qui reste à votre charge : les décisions (point 1), l'avis du juriste (point 2) et les comptes chez les fournisseurs (point 4). Le reste est prêt.

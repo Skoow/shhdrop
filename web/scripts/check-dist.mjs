@@ -207,6 +207,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
       if (/\.(woff2?|png|jpe?g|gif|ico|webp|avif|wasm)$/i.test(f.rel)) continue;
       for (const t of ACCOUNT_TRACES) if (f.data.includes(t)) problems.push(`${f.rel} : module de compte « ${t} » dans un build sans __COMPTES__`);
     }
+  // Avec --comptes, le module de compte doit être là (sinon le build n'a pas pris SHH_SITE_COMPTES=1
+  // et les pages du compte manqueraient en silence).
+  if (comptes && !demo && !all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes("/api/compte")))
+    problems.push("module de compte absent alors que --comptes est demandé (build fait sans SHH_SITE_COMPTES=1 ?)");
 
   if (!demo) {
     for (const f of all)
