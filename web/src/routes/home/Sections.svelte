@@ -121,7 +121,7 @@
        Exemple, jamais une vraie clé. -->
   <figure class="link rv" data-key-note {@attach reveal}>
     <div class="lk" aria-hidden="true">
-      <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">https://…/s</span></span>
+      <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">shhgone.com/s</span></span>
       <span class="lk-b"><span class="lk-l"><KeyRound size={13} strokeWidth={2} />{t("home.key.browser")}</span><span class="lk-v num">#Kq7mXw2Rt9</span></span>
     </div>
     <figcaption>{t("home.key.note")}</figcaption>
