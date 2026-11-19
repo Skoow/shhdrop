@@ -94,6 +94,9 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   if (info !== undefined) return { name: info };
   if (p === "/offres") return { name: "offres" };
   if (p === "/offres.html") return { name: "offres" };
+  // Retour de la page hébergée du prestataire de paiement (conception du paiement §2) : la page
+  // des Offres, qui affiche l'état du paiement ; aucune donnée dans l'adresse.
+  if (p === "/offres/retour") return { name: "offres" };
   if (p === "/envoyer") return { name: "envoyer" };
   // Tableau de bord « Vos envois » (spec §33, §33.1) : historique local, aucun secret dans l'adresse.
   if (p === "/envois") return { name: "envois" };

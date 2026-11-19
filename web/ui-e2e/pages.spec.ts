@@ -76,8 +76,8 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   await co.locator('[data-tier="pro"]').getByText("Choisir Pro").click();
   const sum = co.locator("[data-summary]");
   expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € \/ mois/);
-  // Compte et paiement pas encore ouverts : le bouton le dit, aucun champ, aucun prélèvement.
-  const go = sum.getByRole("button", { name: "Créer mon compte et payer" });
+  // Paiement pas ouvert sur ce serveur (sans SHH_PAIEMENT) : le bouton le dit, aucun prélèvement.
+  const go = sum.getByRole("button", { name: "Payer sur la page sécurisée de Stripe" });
   await expect(go).toBeDisabled();
   await expect(go).toHaveAccessibleDescription(/Rien n'est demandé ni prélevé aujourd'hui\./);
   await expect(page.locator("main form, main input[type=email], main input[type=password], main img")).toHaveCount(0);

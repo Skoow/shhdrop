@@ -42,6 +42,8 @@ var allowedMaps = map[string]string{
 	"limits/limits.go:join48":           "§9.5 entrées de l'heure (§39.3.6)",
 	"limits/limits.go:frame64":          "§9.5 trames de la minute (§39.3.6)",
 	"limits/limits.go:frame48":          "§9.5 trames de la minute (§39.3.6)",
+	"limits/limits.go:paie64":           "§9.5 commandes de paiement de l'heure par connexion (conception du paiement §8)",
+	"limits/limits.go:paie48":           "§9.5 commandes de paiement de l'heure par /48 (conception du paiement §8)",
 	"limits/slots.go:c64":               "§9.5 transferts simultanés",
 	"limits/slots.go:c48":               "§9.5 transferts simultanés",
 	"limits/slots.go:n":                 "§9.5 transferts simultanés, par envoi et par ouverture (audit I3, M4 ; id interne, durée du transfert)",
@@ -224,15 +226,23 @@ var smtpPermis = map[string]bool{"net.Dialer": true, "tls.Dialer": true, "smtp.N
 // par nom de paquet ci-dessous).
 var paquetsReseau = map[string]bool{"net": true, "net/http": true, "net/smtp": true, "crypto/tls": true}
 
+// paiementPermis : ce que internal/paiement/http.go, et lui seul, peut appeler parmi sortants
+// (conception du paiement §4) : le client HTTPS des prestataires (Stripe, PayPal, NOWPayments),
+// créé seulement avec SHH_PAIEMENT=1 (TestClientPaiementSeulementAvecPaiement). Rien d'autre :
+// ni net.Dial, ni tls.Dial, ni http.Get ou http.DefaultClient.
+var paiementPermis = map[string]bool{"http.Client": true, "http.Transport": true, "http.NewRequestWithContext": true}
+
 // TestNoOutgoingHTTP : aucun client sortant hors de captcha/recaptcha.go et, pour SMTP
-// seulement, internal/courriel/smtp.go.
+// seulement, internal/courriel/smtp.go ; pour les prestataires de paiement seulement,
+// internal/paiement/http.go.
 func TestNoOutgoingHTTP(t *testing.T) {
-	smtpVu := false
+	smtpVu, paiementVu := false, false
 	for _, g := range sources(t, "..") {
 		if strings.HasSuffix(g.rel, "internal/captcha/recaptcha.go") {
 			continue
 		}
 		smtpGo := g.rel == "internal/courriel/smtp.go"
+		paiementGo := g.rel == "internal/paiement/http.go"
 		for _, imp := range g.f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
 			if paquetsReseau[p] && imp.Name != nil {
@@ -252,6 +262,8 @@ func TestNoOutgoingHTTP(t *testing.T) {
 				switch {
 				case smtpGo && smtpPermis[k]:
 					smtpVu = smtpVu || k == "smtp.NewClient"
+				case paiementGo && paiementPermis[k]:
+					paiementVu = paiementVu || k == "http.Client"
 				case sortants[k]:
 					t.Errorf("%s : %s (client sortant interdit, spec §35.1)", g.rel, k)
 				}
@@ -262,6 +274,58 @@ func TestNoOutgoingHTTP(t *testing.T) {
 	if !smtpVu {
 		t.Error("internal/courriel/smtp.go n'appelle plus smtp.NewClient : exemption périmée, à retirer")
 	}
+	if !paiementVu {
+		t.Error("internal/paiement/http.go ne crée plus de http.Client : exemption périmée, à retirer")
+	}
+}
+
+// TestClientPaiementSeulementAvecPaiement : avec SHH_PAIEMENT=0, aucune connexion sortante vers
+// un prestataire. Le seul client (paiement.NouveauClient) n'est créé qu'à l'intérieur d'un
+// « if » qui lit Paiement (cfg.Paiement), dans son corps « alors », hors du paquet paiement.
+func TestClientPaiementSeulementAvecPaiement(t *testing.T) {
+	vu := false
+	for _, g := range sources(t, "..") {
+		if strings.HasPrefix(g.rel, "internal/paiement/") {
+			continue
+		}
+		var pile []ast.Node
+		ast.Inspect(g.f, func(n ast.Node) bool {
+			if n == nil {
+				pile = pile[:len(pile)-1]
+				return true
+			}
+			pile = append(pile, n)
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			if id, ok := sel.X.(*ast.Ident); !ok || id.Name != "paiement" || sel.Sel.Name != "NouveauClient" {
+				return true
+			}
+			vu = true
+			for i := len(pile) - 2; i >= 0; i-- {
+				if st, ok := pile[i].(*ast.IfStmt); ok && litChamp(st.Cond, "Paiement") && pile[i+1] == st.Body {
+					return true
+				}
+			}
+			t.Errorf("%s : paiement.NouveauClient hors d'un « if …Paiement » (avec SHH_PAIEMENT=0, aucune sortie)", g.rel)
+			return true
+		})
+	}
+	if !vu {
+		t.Error("paiement.NouveauClient n'est plus appelé : test périmé")
+	}
+}
+
+func litChamp(e ast.Expr, nom string) bool {
+	vu := false
+	ast.Inspect(e, func(n ast.Node) bool {
+		if s, ok := n.(*ast.SelectorExpr); ok && s.Sel.Name == nom {
+			vu = true
+		}
+		return !vu
+	})
+	return vu
 }
 
 // TestCourrielSeulementAvecComptes : avec SHH_COMPTES=0, aucune connexion sortante n'est

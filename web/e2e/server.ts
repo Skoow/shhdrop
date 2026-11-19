@@ -59,6 +59,13 @@ export type StartOpts = {
    * second port libre.
    */
   comptes?: { cle: Uint8Array; smtpPort: number; smtpMdp: string; from: string; admin?: string };
+  /**
+   * Paiement activé (SHH_PAIEMENT=1, bacs à sable, conception du paiement §10) avec Stripe et
+   * NOWPayments : clés d'essai et secrets de webhook écrits dans un dossier à part (0400),
+   * supprimé par dispose(). Les secrets de webhook sont rendus (webhookStripe, ipnNOWPayments)
+   * pour signer de faux webhooks. Aucun appel sortant tant qu'aucune commande n'atteint le serveur.
+   */
+  paiement?: { webhookStripe: string; ipnNOWPayments: string };
 };
 
 /** Port TCP libre sur 127.0.0.1 (ouvert puis refermé : une course est possible, sans conséquence en test). */
@@ -76,9 +83,11 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
   let salons: Record<string, string> = {};
   let secrets: string | undefined;
   let adminOrigin: string | undefined;
-  if (opts.salons || opts.comptes) {
+  if (opts.salons || opts.comptes || opts.paiement) {
     const port = await portLibre();
-    salons = { SHH_LISTEN: `127.0.0.1:${port}`, SHH_ORIGIN: `http://127.0.0.1:${port}`, SHH_SALONS: "1" };
+    salons = { SHH_LISTEN: `127.0.0.1:${port}`, SHH_ORIGIN: `http://127.0.0.1:${port}` };
+    // Paiement seul : SHH_ORIGIN (adresses de retour) sans le salon.
+    if (opts.salons || opts.comptes) salons.SHH_SALONS = "1";
   }
   if (opts.comptes) {
     const c = opts.comptes;
@@ -103,6 +112,24 @@ export async function startServer(opts: StartOpts = {}): Promise<TestServer> {
       adminOrigin = `http://127.0.0.1:${p}`;
       Object.assign(salons, { SHH_ADMIN_LISTEN: `127.0.0.1:${p}`, SHH_ADMIN_TOKEN: c.admin });
     }
+  }
+  if (opts.paiement) {
+    secrets ??= mkdtempSync(join(tmpdir(), "shh-e2e-secrets-"));
+    const f = (nom: string, v: string) => {
+      const p = join(secrets!, nom);
+      writeFileSync(p, v);
+      chmodSync(p, 0o400);
+      return p;
+    };
+    Object.assign(salons, {
+      SHH_PAIEMENT: "1",
+      SHH_PAIEMENT_ESSAI: "1",
+      SHH_TVA: "oss",
+      SHH_STRIPE_CLE_FILE: f("stripe", "sk_test_e2e"),
+      SHH_STRIPE_WEBHOOK_FILE: f("stripe_webhook", opts.paiement.webhookStripe),
+      SHH_NOWPAYMENTS_CLE_FILE: f("np", "np-e2e"),
+      SHH_NOWPAYMENTS_IPN_FILE: f("np_ipn", opts.paiement.ipnNOWPayments),
+    });
   }
   const retirerSecrets = () => {
     if (secrets) rmSync(secrets, { recursive: true, force: true });

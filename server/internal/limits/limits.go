@@ -55,6 +55,9 @@ const (
 	// Entrées (POST /api/salons/rejoindre) par heure (fenêtre fixe UTC).
 	JoinsPer64 = 20
 	JoinsPer48 = 60
+	// Commandes de paiement par heure (conception du paiement §8) : par connexion et par /48.
+	CommandesPer64 = 10
+	CommandesPer48 = 30
 	// Trames montantes par minute (fenêtre fixe), toutes connexions WebSocket confondues.
 	// 480 par connexion (IPv4 ou /64) et 960 par /48 (revue finale C-2, I4, 12 novembre) : une
 	// famille ou un bureau derrière un même NAT partage une adresse IPv4, et un membre actif
@@ -106,6 +109,9 @@ type Limiter struct {
 	hour    int64 // heure courante (heures depuis 1970)
 	join64  map[string]int
 	join48  map[string]int
+	// Paiement (conception du paiement §8) : commandes de l'heure.
+	paie64 map[string]int
+	paie48 map[string]int
 	frame64 map[string]int
 	frame48 map[string]int
 	// Envois en cours (BeginUpload → FinishUpload / CancelUpload / AbandonUpload) : id →
@@ -280,6 +286,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.hour = h
 		l.join64 = map[string]int{}
 		l.join48 = map[string]int{}
+		l.paie64, l.paie48 = map[string]int{}, map[string]int{}
 		l.echec64, l.echec48, l.echecCpt = map[string]int{}, map[string]int{}, map[string]int{}
 		l.totpCpt, l.coffreCpt, l.pseudoCpt = map[string]int{}, map[string]int{}, map[string]int{}
 		l.bannirHeure = 0
@@ -686,6 +693,16 @@ func (l *Limiter) AllowJoin(ip netip.Addr) bool {
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
 	return l.allowPairLocked(ip, l.join64, l.join48, JoinsPer64, JoinsPer48)
+}
+
+// AllowCommande : création d'une commande de paiement, CommandesPer64 par heure (fenêtre
+// fixe UTC) par connexion et CommandesPer48 par /48 (conception du paiement §8). Refus :
+// JoinRetry donne le délai jusqu'à l'heure suivante.
+func (l *Limiter) AllowCommande(ip netip.Addr) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotateLocked(l.now())
+	return l.allowPairLocked(ip, l.paie64, l.paie48, CommandesPer64, CommandesPer48)
 }
 
 // AllowFrame : trame montante du salon, FramesPer64 par minute (fenêtre fixe) par connexion

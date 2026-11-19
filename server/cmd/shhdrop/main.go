@@ -464,6 +464,14 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if err := brancherComptes(cfg, cpt, lim, sm); err != nil {
 		return err
 	}
+	// Paiement (SHH_PAIEMENT=1) : base à part, secrets lus et vérifiés avant l'écoute.
+	pai, err := setupPaiement(cfg)
+	if err != nil {
+		return err
+	}
+	if pai != nil {
+		defer pai.db.Close()
+	}
 	// Vidage du WAL au démarrage, APRÈS les purges (partages : PurgeAtStart et Reconcile ;
 	// salons : PurgerAuDemarrage) et avant l'écoute : ni un -wal laissé par un arrêt brutal ni
 	// les lignes que les purges viennent d'effacer ne restent lisibles dans shares.db-wal ou
@@ -501,8 +509,12 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	sal := salonsOf(cfg, sm, cpt)
+	if pai != nil {
+		sal.Paiement = pai.svc // SHH_PAIEMENT=0 : nil, aucune route /api/paiement/*
+	}
 	handler, probes := api.NewWithProbes(svc, token.New(tokKey, cfg.Now), lim,
-		captcha.New(capKey, cfg.Now), static, cfg.BehindProxy, cfg.TrustedProxies, salonsOf(cfg, sm, cpt), capacityOf(cfg))
+		captcha.New(capKey, cfg.Now), static, cfg.BehindProxy, cfg.TrustedProxies, sal, capacityOf(cfg))
 	srv := newHTTPServer(handler)
 	if sm != nil {
 		// net/http ne suit plus une connexion mise à niveau : Shutdown ne l'attend pas.
@@ -556,6 +568,13 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	} else {
 		close(edone)
 	}
+	// Paiement : passe quotidienne (commandes non payées, commandes et pass échus).
+	pdone := make(chan struct{})
+	if pai != nil {
+		go func() { janitor.Paiements(jctx, pai.svc, cfg.Now, time.Hour); close(pdone) }()
+	} else {
+		close(pdone)
+	}
 	rdone := make(chan struct{})
 	if sm != nil {
 		go func() { sm.Run(jctx); close(rdone) }()
@@ -570,6 +589,7 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 		<-vdone
 		<-cdone
 		<-edone
+		<-pdone
 	}()
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()

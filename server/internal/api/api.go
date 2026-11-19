@@ -25,6 +25,7 @@ import (
 	"github.com/skoow/shhdrop/server/internal/captcha"
 	"github.com/skoow/shhdrop/server/internal/compte"
 	"github.com/skoow/shhdrop/server/internal/limits"
+	"github.com/skoow/shhdrop/server/internal/paiement"
 	"github.com/skoow/shhdrop/server/internal/salon"
 	"github.com/skoow/shhdrop/server/internal/share"
 	"github.com/skoow/shhdrop/server/internal/token"
@@ -338,10 +339,15 @@ func NewWithProbes(svc *share.Service, sig *token.Signer, lim *limits.Limiter, c
 // Comptes : service du compte (SHH_COMPTES=1, qui exige SHH_SALONS=1) ; nil → aucune route
 // /api/compte/* (même 404 qu'une route inconnue). Rangé ici : le compte ne sert qu'à créer des
 // salons (conception du compte §1).
+//
+// Paiement : service du paiement (SHH_PAIEMENT=1, conception du paiement §10) ; nil → aucune
+// route /api/paiement/* (même 404 qu'une route inconnue). Rangé ici pour garder la signature de
+// New ; indépendant du salon et du compte.
 type Salons struct {
-	Origin  string
-	M       *salon.Manager
-	Comptes *compte.Service
+	Origin   string
+	M        *salon.Manager
+	Comptes  *compte.Service
+	Paiement *paiement.Service
 }
 
 func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
@@ -371,6 +377,9 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	}
 	if sal.Comptes != nil {
 		compteAPI{server: s, c: sal.Comptes}.routes(api)
+	}
+	if sal.Paiement != nil {
+		paiementAPI{server: s, p: sal.Paiement}.routes(api)
 	}
 	api.HandleFunc("/api/", notFoundAPI)
 

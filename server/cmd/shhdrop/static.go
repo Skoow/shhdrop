@@ -215,9 +215,12 @@ var appRoutes = map[string]bool{
 // pageFiles : pages servies par leur propre fichier HTML : pages d'information (web/vite.config.ts,
 // PAGE_PATHS ; web/scripts/check-dist.mjs, INFO_PAGES) et page d'ouverture « /s » (s.html).
 var pageFiles = map[string]string{
-	"/securite":         "securite.html",
-	"/confidentialite":  "confidentialite.html",
-	"/offres":           "offres.html",
+	"/securite":        "securite.html",
+	"/confidentialite": "confidentialite.html",
+	"/offres":          "offres.html",
+	// Retour de la page hébergée du prestataire de paiement (conception du paiement §2 point 5) :
+	// même page que les Offres, qui lit l'état chez le serveur ; aucune donnée dans l'adresse.
+	"/offres/retour":    "offres.html",
 	"/conditions":       "conditions.html",
 	"/mentions-legales": "mentions-legales.html",
 	"/signaler":         "signaler.html",

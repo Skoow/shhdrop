@@ -2,13 +2,20 @@
   // Page Offres (décision du propriétaire du 16 novembre) : une seule présentation des offres,
   // sans redite. On choisit la facturation (mensuelle ou annuelle), puis son offre (Plus ou Pro ;
   // Gratuit est l'offre en cours, rien à choisir) ; un récapitulatif dit le prix et les moyens de
-  // paiement. Étapes suivantes du parcours : créer son compte, choisir son moyen de paiement,
-  // payer. Elles ne sont pas encore ouvertes (compte : décision D8 après le juriste ; paiement :
-  // prestataire et statut juridique, spec §38.5) : le bouton le dit, rien n'est demandé ni prélevé
-  // (§38.1 : jamais un bouton « Payer » qui ne paie pas). Chiffres lus dans PAID et limits.ts.
+  // paiement. Chiffres lus dans PAID et limits.ts.
+  //
+  // Paiement (conception du paiement, 19 novembre) : le bouton n'est actif que si CE serveur
+  // propose le moyen choisi (GET /api/paiement ; démo, serveur sans paiement : inactif, la raison
+  // est dite), le pays (UE) choisi, le rythme de l'annuel choisi (jamais présélectionné) et la
+  // case de renonciation cochée (jamais précochée, §38.1). Au clic : un pass P est tiré et rangé
+  // sur l'appareil AVANT la commande, puis la page hébergée du prestataire s'ouvre (redirection,
+  // aucun script tiers ici). Rien n'est payé sur Shhgone.
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX, MAX_OPENS, PAID, TTL_MAX_HOURS, type PaidTier } from "../limits";
+  import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur } from "../paiement/api";
+  import { garder, idbDuNavigateur, nouvelId, oublier, tirerPass } from "../paiement/pass";
+  import { href } from "../app/router.svelte";
   import { Check, Lock, Timer } from "./Icon";
 
   type Billing = "month" | "year";
@@ -31,11 +38,14 @@
   ];
   const price = (x: PaidTier) => (billing === "month" ? PAID[x].month : PAID[x].year);
   const per = $derived(billing === "month" ? t("offers.per.month") : t("offers.per.year"));
-  // Moyen de paiement (propriétaire, 18 et 19 novembre) : carte bancaire (Stripe), PayPal, crypto.
-  // Rien n'est encore branché : le choix ne fait que préparer le récapitulatif.
+  // Moyen de paiement (propriétaire, 18 et 19 novembre) : carte bancaire (Stripe), PayPal, crypto
+  // (NOWPayments). Noms de l'écran (clés de texte) → noms de l'API.
   type Means = "card" | "paypal" | "crypto";
   let means = $state<Means>("card");
   const MEANS: readonly Means[] = ["card", "paypal", "crypto"];
+  const API: Readonly<Record<Means, Moyen>> = { card: "carte", paypal: "paypal", crypto: "crypto" };
+  // Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles.
+  const appels = (x: PaidTier) => t(x === "pro" ? "offers.soon.calls.pro" : "offers.soon.calls.plus");
   // Ce que l'offre choisie ajoute au gratuit (lu dans PAID et limits.ts).
   const adds = $derived(
     chosen
@@ -47,6 +57,82 @@
         ]
       : [],
   );
+
+  // Offre de CE serveur (null : pas de paiement ici, ou pas encore lue).
+  let serveur = $state<OffreServeur | null>(null);
+  $effect(() => {
+    let vivant = true;
+    void lireOffre().then((o) => {
+      if (vivant) serveur = o;
+    });
+    return () => {
+      vivant = false;
+    };
+  });
+  // Annuel par carte ou PayPal : paiement unique ou renouvellement, au choix, jamais présélectionné.
+  let renew = $state<"once" | "auto" | null>(null);
+  const renewAsked = $derived(billing === "year" && means !== "crypto");
+  const renouvelle = $derived(means === "crypto" ? false : billing === "month" ? true : renew === "auto");
+  let pays = $state("");
+  let waiver = $state(false);
+  const regions = $derived.by(() => {
+    let dn: Intl.DisplayNames | null = null;
+    try {
+      dn = new Intl.DisplayNames([lang], { type: "region" });
+    } catch {
+      dn = null;
+    }
+    return (serveur?.pays ?? []).map((c) => ({ c, n: dn?.of(c) ?? c })).sort((a, b) => a.n.localeCompare(b.n, lang));
+  });
+  const who = $derived(t(`offers.who.${means}`));
+  // Première raison qui empêche de payer (dite sous le bouton), ou null.
+  const blocage = $derived(
+    serveur === null
+      ? t("offers.continue.wait")
+      : !serveur.moyens.includes(API[means])
+        ? t("offers.need.means")
+        : renewAsked && renew === null
+          ? t("offers.need.renew")
+          : pays === ""
+            ? t("offers.need.country")
+            : !waiver
+              ? t("offers.need.waiver")
+              : null,
+  );
+  let busy = $state(false);
+  let erreur = $state<ErreurCommande | "stockage" | null>(null);
+  let going = $state(false);
+
+  async function payer(): Promise<void> {
+    if (chosen === null || blocage !== null || busy) return;
+    busy = true;
+    erreur = null;
+    try {
+      const idb = idbDuNavigateur();
+      if (idb === null) {
+        erreur = "stockage";
+        return;
+      }
+      const jours = billing === "month" ? 30 : 365;
+      const g = { id: nouvelId(), pass: tirerPass(), offre: chosen, jours, renouvelle, moyen: API[means], enAttente: true, cree: Date.now() } as const;
+      try {
+        await garder(idb, g);
+      } catch {
+        erreur = "stockage";
+        return;
+      }
+      const r = await commander(g.pass, { offre: chosen, jours, renouvelle, moyen: API[means], pays, renonciation: waiver });
+      if ("url" in r) {
+        going = true;
+        location.assign(r.url);
+        return;
+      }
+      await oublier(idb, g.id).catch(() => {});
+      erreur = r.erreur;
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 <div class="co" data-checkout>
@@ -69,6 +155,7 @@
             <ul class="dt num">
               {#each details(x).slice(1) as d (d.k)}<li><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></li>{/each}
             </ul>
+            {#if x !== "free"}<p class="soon" data-soon-calls>{appels(x)}</p>{/if}
             {#if x !== "free"}
               {@const tier = x}
               <label class="pick">
@@ -115,6 +202,25 @@
         {/each}
       </fieldset>
       <p class="note">{t("offers.means.note")}</p>
+      {#if renewAsked}
+        <p class="sub">{t("offers.renew.label")}</p>
+        <fieldset class="means" data-renew>
+          <legend class="sr-only">{t("offers.renew.label")}</legend>
+          {#each [["once", "offers.renew.once"], ["auto", "offers.renew.auto"]] as const as [v, k] (v)}
+            <label class={["mn", { on: renew === v }]}>
+              <input type="radio" name="{uid}-renew" value={v} bind:group={renew} />
+              <span class="mt">{t(k)}</span>
+              <span class="ms">{t(`${k}.sub`)}</span>
+            </label>
+          {/each}
+        </fieldset>
+      {/if}
+      <label class="field" for="{uid}-pays">{t("offers.country.label")}</label>
+      <select id="{uid}-pays" class="pays" bind:value={pays} aria-describedby="{uid}-pays-note" data-pays>
+        <option value="">{t("offers.country.pick")}</option>
+        {#each regions as r (r.c)}<option value={r.c}>{r.n}</option>{/each}
+      </select>
+      <p id="{uid}-pays-note" class="note">{t("offers.country.note")}</p>
     </section>
 
     <section class="blk" aria-labelledby="{uid}-s3">
@@ -133,8 +239,18 @@
           <div><dt>{t("offers.summary.total")}</dt><dd class="tot num">{eur(price(chosen))} <span>{per}</span></dd></div>
         </dl>
         <p class="sn">{means === "crypto" ? t("offers.summary.crypto") : billing === "month" ? t("offers.summary.month") : t("offers.summary.year")}</p>
-        <button type="button" class="go" disabled aria-describedby="{uid}-wait">{t("offers.continue")}</button>
-        <p id="{uid}-wait" class="wait" data-wait>{t("offers.continue.wait")}</p>
+        <label class="waiver">
+          <input type="checkbox" bind:checked={waiver} data-waiver />
+          <span>{t("offers.waiver")}</span>
+        </label>
+        <p class="wait">{t("offers.device")} <a href={href("/conditions")}>{t("offers.terms")}</a></p>
+        <button type="button" class="go" disabled={blocage !== null || busy || going} aria-describedby="{uid}-wait" onclick={payer} data-pay>
+          {going ? t("offers.going", { who }) : t("offers.continue", { who })}
+        </button>
+        {#if erreur}
+          <p class="err" role="alert" data-pay-error>{t(`offers.err.${erreur}`)}</p>
+        {/if}
+        <p id="{uid}-wait" class="wait" data-wait>{blocage ?? ""}</p>
       </section>
     {:else}
       <div class="sum empty">
@@ -486,5 +602,57 @@
     background: transparent;
     outline: 1px dashed rgb(150 175 255 / 0.25);
     outline-offset: -1px;
+  }
+  .soon {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--fs-micro);
+  }
+  .field {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .pays {
+    min-height: 48px;
+    max-width: 30rem;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+  }
+  .pays:focus-visible,
+  .waiver:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .waiver {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    color: var(--text-2);
+    font-size: var(--fs-small);
+    cursor: pointer;
+  }
+  .waiver input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    accent-color: var(--accent);
+  }
+  .go:not(:disabled) {
+    background: var(--accent);
+    color: var(--on-accent);
+    cursor: pointer;
+  }
+  .err {
+    margin: 0;
+    color: var(--danger);
+    font-size: var(--fs-small);
+  }
+  .wait a {
+    color: inherit;
   }
 </style>

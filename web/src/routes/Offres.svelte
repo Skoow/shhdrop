@@ -2,16 +2,21 @@
   // Offres (page à part, pages séparées) : refaite le 16 novembre (décision du propriétaire) :
   // une seule présentation (plus de cartes de prix puis d'un tableau qui redisait la même chose),
   // choix de la facturation et de l'offre, récapitulatif (ui/OffersCheckout.svelte).
+  // Retour du prestataire de paiement (/offres/retour, conception du paiement §2 point 5) : même
+  // page, l'état du paiement à la place du choix des offres (rendu au navigateur seulement).
   import { t } from "../i18n/i18n.svelte";
   import OffersCheckout from "../ui/OffersCheckout.svelte";
+  import OffersReturn from "../ui/OffersReturn.svelte";
+
+  const retour = typeof location !== "undefined" && /\/offres\/retour\/?$/.test(location.pathname);
 </script>
 
 <article class="offers" aria-labelledby="offers-title">
   <header class="hd">
-    <h1 id="offers-title" class="title" tabindex="-1" data-large-title>{t("offers.title")}</h1>
-    <p class="lede">{t("offers.lede")}</p>
+    <h1 id="offers-title" class="title" tabindex="-1" data-large-title>{retour ? t("offers.ret.title") : t("offers.title")}</h1>
+    {#if !retour}<p class="lede">{t("offers.lede")}</p>{/if}
   </header>
-  <OffersCheckout />
+  {#if retour}<OffersReturn />{:else}<OffersCheckout />{/if}
 </article>
 
 <style>

@@ -57,6 +57,11 @@ type Config struct {
 	ComptesMax int
 	// SMTP : envoi des codes par e-mail (obligatoire avec SHH_COMPTES=1).
 	SMTP SMTP
+	// Paiement (SHH_PAIEMENT=1, conception du paiement §10) : vente de Plus et Pro. Désactivé
+	// par défaut (aucune route, aucun fichier, aucun appel sortant) ; exige SHH_ORIGIN, SHH_TVA
+	// et au moins un prestataire complet (Pay).
+	Paiement bool
+	Pay      Paiement
 }
 
 // SMTP : fournisseur d'envoi (conception §8.1). Port 465 (TLS implicite, défaut) ou 587
@@ -153,6 +158,9 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SHH_SALONS=1 exige SHH_ORIGIN (origine publique du site, ex. https://shhgone.com)")
 	}
 	if err := comptesFromEnv(&c); err != nil {
+		return Config{}, err
+	}
+	if err := paiementFromEnv(&c); err != nil {
 		return Config{}, err
 	}
 	if c.Capacity, err = capacityFromEnv(memLimit(), nofile()); err != nil {

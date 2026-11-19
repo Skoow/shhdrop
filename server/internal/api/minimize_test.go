@@ -33,13 +33,20 @@ var salonHeaders = []string{"X-Shh-Membre", "X-Shh-Piece", "X-Shh-Access-New"}
 // gardé ni recopié : le serveur n'en garde que SHA-256.
 var compteHeaders = []string{"X-Shh-Session"}
 
+// paiementHeaders : pass au porteur et en-têtes de signature des prestataires (conception du
+// paiement §4, §5.2), lus seulement dans handlers_paiement.go, qui copie les seconds dans un
+// en-tête neuf donné au prestataire ; le pass n'est jamais gardé (seule son empreinte Q l'est).
+var paiementHeaders = []string{"X-Shh-Pass", "Stripe-Signature", "Paypal-Auth-Algo", "Paypal-Cert-Url", "Paypal-Transmission-Id",
+	"Paypal-Transmission-Sig", "Paypal-Transmission-Time", "X-Nowpayments-Sig"}
+
 // headerAllowed : en-tête name lisible dans le fichier path (readHeaders partout,
 // salonHeaders dans handlers_salon*.go seulement, compteHeaders dans handlers_compte.go
 // seulement).
 func headerAllowed(path, name string) bool {
 	return slices.Contains(readHeaders, name) ||
 		slices.Contains(salonHeaders, name) && strings.HasPrefix(filepath.Base(path), "handlers_salon") ||
-		slices.Contains(compteHeaders, name) && filepath.Base(path) == "handlers_compte.go"
+		slices.Contains(compteHeaders, name) && filepath.Base(path) == "handlers_compte.go" ||
+		slices.Contains(paiementHeaders, name) && filepath.Base(path) == "handlers_paiement.go"
 }
 
 // wsHeaders : poignée de main du WebSocket du salon (plan C-2 Task 10, spec §39.3.1
