@@ -82,7 +82,12 @@ export type Profil = { pseudo: string; photo: Uint8Array | null; langue: string;
 
 /** Entrée d'une liste du coffre privé ; son contenu est fixé au lot 11 (historique). */
 export type EntreePrivee = { id: string } & Record<string, unknown>;
-export type CoffrePrive = { salons: EntreePrivee[]; recus: EntreePrivee[]; rejoints: EntreePrivee[]; envois: EntreePrivee[] };
+/**
+ * `pass` (conception du paiement §6.2, DP-8) : pass des offres payantes, dans le coffre PRIVÉ
+ * (ouvert par le mot de passe seulement, jamais par le séquestre du profil) ; écrit seulement s'il
+ * en existe (un coffre sans pass garde exactement sa forme d'avant, vecteurs compte.json).
+ */
+export type CoffrePrive = { salons: EntreePrivee[]; recus: EntreePrivee[]; rejoints: EntreePrivee[]; envois: EntreePrivee[]; pass?: EntreePrivee[] };
 const LISTES = ["salons", "recus", "rejoints", "envois"] as const;
 
 export const priveVide = (): CoffrePrive => ({ salons: [], recus: [], rejoints: [], envois: [] });
@@ -160,13 +165,16 @@ function liste(v: unknown): EntreePrivee[] {
 }
 
 export function priveEnJson(p: CoffrePrive): Bytes {
-  return enc({ v: 1, salons: liste(p.salons), recus: liste(p.recus), rejoints: liste(p.rejoints), envois: liste(p.envois) });
+  const o: Record<string, unknown> = { v: 1, salons: liste(p.salons), recus: liste(p.recus), rejoints: liste(p.rejoints), envois: liste(p.envois) };
+  if (p.pass !== undefined && p.pass.length > 0) o.pass = liste(p.pass);
+  return enc(o);
 }
 
 export function priveDeJson(b: Uint8Array): CoffrePrive {
   const o = lireJson(b);
   const out = priveVide();
   for (const k of LISTES) out[k] = liste(o[k]);
+  if (o.pass !== undefined) out.pass = liste(o.pass);
   return out;
 }
 
