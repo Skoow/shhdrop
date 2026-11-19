@@ -170,8 +170,6 @@
 </main>
 
 <footer class={["foot", { busy }]} data-foot>
-  <!-- Couture en points vers le pied (19 novembre, 3), comme entre les sections de l'accueil. -->
-  <div class="seam" aria-hidden="true"></div>
   <div class="wrap foot-in">
     {#if busy}
       <!-- Envoi en cours : raison lisible des liens et réglages désactivés. -->
@@ -365,9 +363,13 @@
      grain de l'aurore passe dessous), marque à gauche au même bord intérieur que l'en-tête,
      colonnes hiérarchisées, liens JAMAIS soulignés (retours UI8) : survol et focus par la couleur,
      anneau de focus au clavier. */
+  /* Pied de page (19 novembre, 4) : un panneau aux coins hauts arrondis, un peu plus clair que la
+     page, comme le panneau crème de l'accueil ; fin filet menthe en haut. */
   .foot {
-    --sb: 11 13 18;
     position: relative;
+    border-start-start-radius: clamp(28px, 4vw, 56px);
+    border-start-end-radius: clamp(28px, 4vw, 56px);
+    overflow: hidden;
     /* Son propre fond seulement (décision du propriétaire du 16 novembre) : le fond de la page
        (aurore, trame) ne se mélange plus à son papier peint ; la lueur et les pictos restent. */
     z-index: 1;
@@ -376,8 +378,8 @@
     padding-block: var(--sp-6) calc(var(--sp-4) + env(safe-area-inset-bottom));
     background:
       radial-gradient(60% 120% at 12% 0%, rgb(95 227 181 / 0.07), transparent 70%),
-      radial-gradient(50% 90% at 88% 100%, rgb(85 150 248 / 0.05), transparent 70%),
-      linear-gradient(to bottom, transparent, rgb(7 8 12 / 0.55))
+      radial-gradient(50% 90% at 88% 100%, rgb(95 227 181 / 0.04), transparent 70%),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.025), rgb(7 8 12 / 0.55))
       var(--bg);
   }
   .foot::before {

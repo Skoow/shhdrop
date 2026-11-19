@@ -44,7 +44,6 @@
   };
   let { compact = false, children, onfiles, active = true, onpick, onmake }: Props = $props();
   // Onglet caché : les boucles d'ambiance de l'accueil (titre en trame, panneau chiffré) s'arrêtent.
-  let tabHidden = $state(typeof document !== "undefined" && document.hidden);
 
   // « puis plus rien. » effacé vers la dernière lettre (proposition G du 16 novembre) : affiché
   // d'emblée dans cet état, sans entrée ni extinction animée (décision du propriétaire du
@@ -79,6 +78,15 @@
   });
 
   const nLetters = $derived(words.reduce((n, w) => n + w.letters.length, 0));
+  /**
+   * État figé de chaque lettre de « plus rien. » (propriétaire, 19 novembre, 4 : plus d'animation,
+   * le titre reste effacé) : du début à la fin, points blancs serrés, points blancs, points menthe,
+   * puis points qui s'envolent (maquette « La trame »). Calculé sur la position, toute langue.
+   */
+  const stage = (k: number) => {
+    const f = nLetters > 1 ? k / (nLetters - 1) : 1;
+    return f < 0.12 ? "s1" : f < 0.45 ? "s2" : f < 0.78 ? "s3" : "s4";
+  };
 
   // Accroche coupée autour des mots mis en avant (sans HTML dans les textes).
   const lede = $derived.by(() => {
@@ -126,7 +134,6 @@
   }
 </script>
 
-<svelte:document onvisibilitychange={() => (tabHidden = document.hidden)} />
 
 <svelte:window
   ondragenter={dragenter}
@@ -137,7 +144,7 @@
   onkeydown={(e) => e.key === "Escape" && over && close()}
 />
 
-<div class={["home", { compact, still: tabHidden }]}>
+<div class={["home", { compact }]}>
   <section class="hero" aria-labelledby="hero-title">
     {#if compact}
       <!-- Page d'envoi (retours du propriétaire du 17 novembre) : un titre pour les lecteurs
@@ -149,9 +156,9 @@
           <h1 id="hero-title" tabindex="-1">
             <!-- K8 : phrase entière pour les lecteurs d'écran, copie animée cachée. -->
             <span class="sr-only">{t("hero.title")}</span>
-            <span class="words" aria-hidden="true" data-ambient style:--n={nLetters}>
+            <span class="words" aria-hidden="true">
               {#each words as { w, hl, br, letters }, i (i)}{#if br}<br />{/if}<span class={["w", { hl }]}
-                  >{#if letters.length}{#each letters as { c, k }, j (j)}<span class="l" data-c={c} style:--k={k}><span class="g">{c}</span></span>{/each}{:else}{w}{/if}</span
+                  >{#if letters.length}{#each letters as { c, k }, j (j)}<span class="l {stage(k)}" data-c={c}><span class="g">{c}</span></span>{/each}{:else}{w}{/if}</span
                 >{" "}{/each}
             </span>
           </h1>
@@ -243,8 +250,8 @@
     inset: -80px 0 0;
     pointer-events: none;
     background:
-      radial-gradient(38% 46% at 74% 42%, rgb(51 102 255 / 0.16), transparent 70%),
-      radial-gradient(30% 40% at 62% 62%, rgb(95 227 181 / 0.09), transparent 70%);
+      radial-gradient(38% 46% at 74% 42%, rgb(95 227 181 / 0.08), transparent 70%),
+      radial-gradient(30% 40% at 62% 62%, rgb(95 227 181 / 0.05), transparent 70%);
   }
   /* Les points du titre s'envolent vers la droite : jamais de défilement horizontal. */
   .home:not(.compact) .hero {
@@ -272,6 +279,8 @@
     min-width: 0;
     text-wrap: balance;
     view-transition-name: hero-title;
+    /* Les points de « n. » partent vers la droite : coupés au bord du titre, jamais hors de l'écran. */
+    overflow-x: clip;
   }
   h1:focus {
     outline: none;
@@ -297,10 +306,10 @@
     max-width: 44rem;
     padding: var(--sp-3);
     border-radius: var(--r-2xl);
-    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)), rgb(16 22 38 / 0.86);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)), rgb(17 20 27 / 0.9);
     box-shadow:
-      inset 0 0 0 1px rgb(150 175 255 / 0.18),
-      0 24px 60px -30px rgb(51 102 255 / 0.55);
+      inset 0 0 0 1px rgb(233 236 242 / 0.12),
+      0 24px 60px -30px rgb(0 0 0 / 0.7);
   }
   .drop {
     display: grid;
@@ -359,24 +368,24 @@
     padding: 0 var(--sp-6);
     border: 0;
     border-radius: var(--r-lg);
-    background: var(--sig-blue);
-    color: #fff;
+    background: var(--accent);
+    color: var(--on-accent);
     font: inherit;
     font-size: 1.0625rem;
     font-weight: 650;
     cursor: pointer;
-    box-shadow: 0 12px 30px -12px rgb(51 102 255 / 0.8);
+    box-shadow: 0 12px 30px -14px rgb(95 227 181 / 0.7);
     transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
   }
   .pick:hover {
-    background: var(--sig-blue-hover);
+    background: var(--accent-hover, #7eebc4);
   }
   .pick:active {
     transform: scale(0.98);
   }
   .pick:focus-visible,
   .mk:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--text);
     outline-offset: 3px;
   }
   /* Toujours trois colonnes : Photo ou vidéo, Vocal, Salon côte à côte (19 novembre, 3). */
@@ -397,7 +406,7 @@
     border: 0;
     border-radius: var(--r-lg);
     background: rgb(255 255 255 / 0.05);
-    box-shadow: inset 0 0 0 1px rgb(150 175 255 / 0.14);
+    box-shadow: inset 0 0 0 1px rgb(233 236 242 / 0.1);
     color: var(--text);
     font: inherit;
     font-size: var(--fs-small);
@@ -484,9 +493,6 @@
     border-radius: 4px;
     background: rgb(95 227 181 / 0.14);
     box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.35);
-    color: var(--accent);
-  }
-  .w.hl {
     color: var(--accent);
   }
   
@@ -581,132 +587,66 @@
     margin-inline: auto;
   }
 
-  /* « puis plus rien. » (maquette « La trame », version 1 ; propriétaire, 19 novembre, 2) : en
-     vague depuis la fin de la ligne, chaque lettre se change en trame de points blancs, vire au
-     menthe, puis se défait en points qui s'envolent vers la droite et s'éteignent ; la ligne
-     reste vide un instant puis revient. Les points sont des masques CSS (aucune image) ; les deux
-     copies volantes (::before, ::after) reprennent la lettre (data-c). Boucle de 11 s, lisible
-     plus de la moitié du temps. Mouvement réduit : lettres pleines menthe, rien ne bouge. */
-  @property --r {
-    syntax: "<length>";
-    inherits: false;
-    initial-value: 4px;
-  }
+  /* « plus rien. » figé dans son effacement (propriétaire, 19 novembre, 4 : aucune animation) :
+     trame de points de plus en plus fine, blanche puis menthe ; les deux dernières lettres partent
+     en points vers la droite (deux copies de la lettre, data-c, hors du masque). Masques CSS seuls. */
   .l {
     position: relative;
     display: inline-block;
   }
-  @media (prefers-reduced-motion: no-preference) {
-    .w.hl {
-      color: var(--text);
-    }
-    .l {
-      --d: calc((var(--n, 15) - var(--k, 0)) * 170ms);
-    }
-    /* La lettre (masquée) et ses points volants (hors du masque, sinon ils seraient coupés). */
+  .g {
+    display: inline-block;
+    --r: 4px;
+    -webkit-mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.7px));
+    mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.7px));
+    -webkit-mask-size: 5px 5px;
+    mask-size: 5px 5px;
+  }
+  .s1 .g {
+    --r: 2.5px;
+  }
+  .s2 .g {
+    --r: 1.95px;
+  }
+  .s3 .g {
+    --r: 1.8px;
+    color: var(--accent);
+  }
+  .s4 .g {
+    --r: 1.25px;
+    color: var(--accent);
+    opacity: 0.55;
+  }
+  .s4::before,
+  .s4::after {
+    content: attr(data-c);
+    position: absolute;
+    inset: 0;
+    color: var(--accent);
+    pointer-events: none;
+    -webkit-mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
+    mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
+    -webkit-mask-size: 8px 7px;
+    mask-size: 8px 7px;
+    transform: translate(0.3em, -0.08em);
+    opacity: 0.8;
+  }
+  .s4::after {
+    -webkit-mask-size: 11px 9px;
+    mask-size: 11px 9px;
+    -webkit-mask-position: 4px 3px;
+    mask-position: 4px 3px;
+    transform: translate(0.7em, 0.1em);
+    opacity: 0.45;
+  }
+  @media (forced-colors: active) {
     .g {
-      display: inline-block;
-      -webkit-mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.7px));
-      mask-image: radial-gradient(circle, #000 var(--r), transparent calc(var(--r) + 0.7px));
-      -webkit-mask-size: 5px 5px;
-      mask-size: 5px 5px;
-      animation: dots 11s linear infinite;
-      animation-delay: var(--d);
+      -webkit-mask-image: none;
+      mask-image: none;
     }
-    .l::before,
-    .l::after {
-      content: attr(data-c);
-      position: absolute;
-      inset: 0;
-      color: var(--accent);
-      opacity: 0;
-      pointer-events: none;
-      -webkit-mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
-      mask-image: radial-gradient(circle, #000 1.2px, transparent 1.9px);
-      -webkit-mask-size: 8px 7px;
-      mask-size: 8px 7px;
-      animation: fly 11s cubic-bezier(0.3, 0, 0.6, 1) infinite;
-      animation-delay: var(--d);
-    }
-    .l::after {
-      -webkit-mask-size: 11px 9px;
-      mask-size: 11px 9px;
-      -webkit-mask-position: 4px 3px;
-      mask-position: 4px 3px;
-      animation-name: fly2;
-    }
-    .still .g,
-    .still .l::before,
-    .still .l::after {
-      animation-play-state: paused;
-    }
-  }
-  /* Lettre : pleine → trame blanche → trame menthe → s'efface (ses points s'envolent) → revient. */
-  @keyframes dots {
-    0%,
-    40% {
-      --r: 4px;
-      color: var(--text);
-      opacity: 1;
-    }
-    47% {
-      --r: 1.9px;
-      color: var(--text);
-      opacity: 1;
-    }
-    53% {
-      --r: 1.9px;
-      color: var(--accent);
-      opacity: 1;
-    }
-    60% {
-      --r: 1.2px;
-      color: var(--accent);
-      opacity: 0;
-    }
-    88% {
-      --r: 1.2px;
-      color: var(--text);
-      opacity: 0;
-    }
-    96%,
-    100% {
-      --r: 4px;
-      color: var(--text);
-      opacity: 1;
-    }
-  }
-  /* Points qui s'envolent : deux nuées, l'une plus loin et plus haut que l'autre. */
-  @keyframes fly {
-    0%,
-    54% {
-      opacity: 0;
-      transform: none;
-    }
-    57% {
-      opacity: 0.95;
-      transform: translate(0.06em, 0);
-    }
-    70%,
-    100% {
-      opacity: 0;
-      transform: translate(0.42em, -0.12em);
-    }
-  }
-  @keyframes fly2 {
-    0%,
-    55% {
-      opacity: 0;
-      transform: none;
-    }
-    59% {
-      opacity: 0.8;
-      transform: translate(0.1em, 0.02em);
-    }
-    74%,
-    100% {
-      opacity: 0;
-      transform: translate(1em, 0.14em);
+    .s4::before,
+    .s4::after {
+      display: none;
     }
   }
   /* Téléphone et tablette : titre, phrase, cadre puis assurances, centrés. */

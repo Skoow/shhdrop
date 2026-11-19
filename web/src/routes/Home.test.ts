@@ -127,7 +127,8 @@ describe("Home (UI §9.1)", () => {
     // effacement en trame de points.
     const letters = [...copy.querySelectorAll<HTMLElement>(".l")];
     expect(letters.map((l) => l.textContent).join("")).toBe("plusrien.");
-    expect(letters.map((l) => Number(l.style.getPropertyValue("--k")))).toEqual(letters.map((_, i) => i));
+    // Figé (19 novembre, 4) : « p » en trame serrée, « lus » blanc, « rie » menthe, « n. » qui s'envole.
+    expect(letters.map((l) => [...l.classList].find((c) => /^s\d$/.test(c)))).toEqual(["s1", "s2", "s2", "s2", "s3", "s3", "s3", "s4", "s4"]);
   });
 
   it("plus d'entrée animée (18 novembre : accueil écrit au build, affiché avant le script)", () => {

@@ -110,10 +110,11 @@ test.describe("fr-FR", () => {
     // Le texte réservé aux lecteurs d'écran (.sr-only, 1 px, sur une ligne) aussi. Les sections en
     // bande (.band, .sect) débordent exprès par leur décor (couture et halo d'un bord à l'autre de l'écran,
     // 19 novembre, 2 ; coupés par #app) : leur contenu, lui, est vérifié. Les dessins SVG (mis à
-    // l'échelle, sans texte de page) n'entrent pas dans cette mesure.
+    // l'échelle, sans texte de page) et la copie décorative du titre (.words, ses points qui partent
+    // vers la droite, coupés par le titre) n'entrent pas dans cette mesure.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg") && !e.matches(".band, .sect, .home"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".band, .soft, .panel, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );
@@ -349,9 +350,9 @@ test.describe("fr-FR", () => {
         }
         return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...new Set(v)].sort().join(",")]));
       });
-    // Haut de page : le titre en trame tourne ; l'infographie (dans « Comment ça marche » depuis le
-    // 19 novembre) tourne quand elle est à l'écran et s'arrête hors écran.
-    await expect.poll(async () => (await state()).other).toBe("running");
+    // Haut de page : plus rien ne boucle (titre figé, 19 novembre, 4) ; l'infographie (sa section,
+    // sous « Comment ça marche ») tourne quand elle est à l'écran et s'arrête hors écran.
+    await expect.poll(async () => (await state()).other).toBeUndefined();
     const demo = page.locator("[data-demo]");
     await demo.evaluate((e) => e.scrollIntoView({ block: "center" }));
     await expect.poll(async () => (await state()).demo).toBe("running");

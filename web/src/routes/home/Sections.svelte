@@ -22,8 +22,8 @@
 </script>
 
 <script lang="ts">
-  // Accueil, sous le héros (refonte du 19 novembre, 3, maquette « La trame ») : chaque section a son
-  // propre fond (.sect, ui/base.css) et sa couture en points. « Comment ça marche » : trois
+  // Accueil, sous le héros (refonte du 19 novembre, 3 et 4, maquette « La trame ») : sections sombres
+  // sur le fond de la page (.soft) et un panneau crème arrondi (.panel, ui/base.css). « Comment ça marche » : trois
   // illustrations fixes (document, document en trame fermé à clé, document qui part en points),
   // aucune animation (l'infographie du héros suffit). « Pensé pour la confidentialité » : fond
   // crème, titre à gauche, liste à droite. « Offres » : les trois cartes.
@@ -43,7 +43,7 @@
   const PAGE = "M0 0H92L124 32V160H0Z";
 </script>
 
-<section class="sec how sect" style:--sb="11 13 16" id="comment" aria-labelledby="how-title">
+<section class="sec how soft" id="comment" aria-labelledby="how-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
@@ -86,7 +86,7 @@
 
 <!-- L'animation en grand (propriétaire, 19 novembre, 3) : la scène et le journal (deux lignes) à
      gauche, les étapes cochées au fil de l'animation à droite, « étape n sur 7 » et la pause en haut. -->
-<section class="sec demo-sec sect" style:--sb="13 19 38" aria-labelledby="demo-title">
+<section class="sec demo-sec soft" aria-labelledby="demo-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="demo-title">{t("demo.title")}</h2>
     <p>{t("home.demo.lede")}</p>
@@ -94,7 +94,7 @@
   <SecureDemo labelledby="demo-title" />
 </section>
 
-<section class="sec priv sect" style:--sb="235 230 220" aria-labelledby="priv-title">
+<section class="sec priv panel" aria-labelledby="priv-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="priv-title" tabindex="-1">{t("home.priv.title")}</h2>
     <p>{t("home.priv.lede")}</p>
@@ -128,7 +128,7 @@
   </figure>
 </section>
 
-<section class="sec offers sect" style:--sb="11 13 16" aria-labelledby="offers-title">
+<section class="sec offers soft" aria-labelledby="offers-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="offers-title">{t("home.offers.title")}</h2>
     <p>{t("home.offers.lede")}</p>
@@ -263,6 +263,8 @@
   .priv {
     --ink: #0c0e12;
     color: var(--ink);
+    /* Le texte garde sa marge dans le panneau (à 12 px des bords de l'écran). */
+    padding-inline: clamp(16px, 3vw, 48px);
   }
   /* Trame claire à droite, très légère. */
   .priv::before {
@@ -311,6 +313,11 @@
     width: 28px;
     height: 28px;
     color: var(--ink);
+  }
+  .prow h3,
+  .prow p {
+    overflow-wrap: break-word;
+    min-width: 0;
   }
   .prow p {
     margin: 0;

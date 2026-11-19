@@ -347,17 +347,16 @@
     min-width: 0;
     grid-template-columns: minmax(0, 1fr);
     --mint: var(--accent);
-    --vio: var(--sig-blue);
     position: relative;
     display: grid;
     grid-template-rows: auto auto auto;
     overflow: hidden;
     border-radius: 22px;
     background:
-      radial-gradient(120% 80% at 50% 0%, rgb(61 109 255 / 0.12), transparent 60%),
-      linear-gradient(180deg, rgb(16 23 44 / 0.92), rgb(9 13 27 / 0.94));
+      radial-gradient(120% 80% at 50% 0%, rgb(95 227 181 / 0.06), transparent 60%),
+      linear-gradient(180deg, rgb(20 23 30 / 0.94), rgb(12 14 19 / 0.96));
     box-shadow:
-      inset 0 0 0 1px rgb(150 175 255 / 0.14),
+      inset 0 0 0 1px rgb(233 236 242 / 0.14),
       inset 0 1px 0 rgb(255 255 255 / 0.06),
       0 40px 80px -40px rgb(0 0 0 / 0.9),
       0 0 0 1px rgb(0 0 0 / 0.4);
@@ -369,7 +368,7 @@
     gap: 12px;
     min-height: 48px;
     padding: 2px 4px 2px 16px;
-    border-bottom: 1px solid rgb(150 175 255 / 0.1);
+    border-bottom: 1px solid rgb(233 236 242 / 0.1);
     background: rgb(255 255 255 / 0.02);
   }
   .bar-t {
@@ -413,7 +412,7 @@
   .dev,
   .srv {
     fill: rgb(255 255 255 / 0.03);
-    stroke: rgb(150 175 255 / 0.22);
+    stroke: rgb(233 236 242 / 0.22);
     stroke-width: 1;
   }
   .srv {
@@ -469,11 +468,11 @@
   }
   .notch,
   .home-bar {
-    fill: rgb(150 175 255 / 0.25);
+    fill: rgb(233 236 242 / 0.25);
   }
   .slots rect {
     fill: rgb(255 255 255 / 0.02);
-    stroke: rgb(150 175 255 / 0.18);
+    stroke: rgb(233 236 242 / 0.18);
     stroke-width: 0.8;
     stroke-dasharray: 2 2;
   }
@@ -486,7 +485,7 @@
   .wait rect,
   .wait path {
     fill: none;
-    stroke: rgb(150 175 255 / 0.45);
+    stroke: rgb(233 236 242 / 0.45);
     stroke-width: 1.4;
     stroke-linecap: round;
   }
@@ -661,8 +660,8 @@
     }
   }
   .kchip rect {
-    fill: rgb(61 109 255 / 0.16);
-    stroke: rgb(120 155 255 / 0.55);
+    fill: rgb(233 236 242 / 0.08);
+    stroke: rgb(233 236 242 / 0.45);
   }
   .kchip.pw rect {
     fill: rgb(95 227 181 / 0.12);
@@ -688,11 +687,11 @@
 
   .cloak {
     fill: #1a2442;
-    stroke: rgb(150 175 255 / 0.25);
+    stroke: rgb(233 236 242 / 0.25);
   }
   .cowl {
     fill: #222e52;
-    stroke: rgb(150 175 255 / 0.3);
+    stroke: rgb(233 236 242 / 0.3);
   }
   .face {
     fill: #070b16;
@@ -771,7 +770,7 @@
     padding: 10px 16px 12px;
     overflow: hidden;
     list-style: none;
-    border-top: 1px solid rgb(150 175 255 / 0.1);
+    border-top: 1px solid rgb(233 236 242 / 0.1);
     background:
       repeating-linear-gradient(180deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 3px),
       rgb(3 9 8 / 0.7);
@@ -803,7 +802,7 @@
     text-shadow: none;
   }
   .li-ic {
-    color: #5596f8;
+    color: var(--text-3);
     font-weight: 700;
   }
   .li-t {
@@ -907,7 +906,7 @@
     grid-template-columns: 20px minmax(0, 1fr);
     column-gap: 14px;
     padding: 12px 14px;
-    border-block-end: 1px solid rgb(150 175 255 / 0.1);
+    border-block-end: 1px solid rgb(233 236 242 / 0.1);
     border-radius: 10px;
     transition: background-color var(--dur-base) var(--ease-out);
   }
@@ -915,7 +914,7 @@
     border-block-end: 0;
   }
   .steps li.now {
-    background: rgb(150 175 255 / 0.07);
+    background: rgb(233 236 242 / 0.07);
   }
   .ck {
     grid-row: 1 / span 2;
