@@ -35,10 +35,13 @@ func NouveauClient() *Client {
 			return http.ErrUseLastResponse
 		},
 		Transport: &http.Transport{
-			Proxy:                 nil, // aucune variable HTTPS_PROXY : la sortie est fixée par le déploiement
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          8,
-			IdleConnTimeout:       60 * time.Second,
+			Proxy:             nil, // aucune variable HTTPS_PROXY : la sortie est fixée par le déploiement
+			ForceAttemptHTTP2: true,
+			// Une connexion par appel : en production, chaque connexion passe par un relais de
+			// sortie qui la coupe au bout de 60 s (deploy/compose.yaml) ; une connexion gardée
+			// ouverte pourrait être coupée au milieu d'un POST (création de paiement). Le
+			// volume d'appels est faible : une poignée de main TLS par appel suffit.
+			DisableKeepAlives:     true,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ResponseHeaderTimeout: delaiAppel,
 		},

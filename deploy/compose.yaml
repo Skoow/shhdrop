@@ -22,6 +22,10 @@
 # SMTP (même image, « shhcheck relais ») est sur ce réseau interne ET sur le réseau « sortie » ;
 # il recopie chaque connexion du serveur vers le seul SHH_SMTP_HOST:465, sans le laisser
 # choisir. Le serveur n'a donc AUCUNE route vers Internet, même compte activé (README §12).
+# Paiement activé seulement (SHH_PAIEMENT: "1", ci-dessous) : un relais par prestataire
+# configuré (172.30.53.4 Stripe, .5 PayPal, .6 NOWPayments, profils « paiement-… »), même modèle
+# que le relais SMTP, vers le seul hôte de l'API du prestataire, port 443 (README §13 ;
+# conception du paiement §4, S1). Rien d'autre n'est joignable, même paiement activé.
 #
 # Secrets du compte : fichiers de <SHH_DATA_ROOT>/secrets, montés en lecture seule dans
 # /run/secrets, hors de /data (jamais sauvegardés avec la base, jamais en variable
@@ -112,6 +116,27 @@ services:
       SHH_SMTP_USER: ${SHH_SMTP_USER:-}
       SHH_SMTP_PASSWORD_FILE: /run/secrets/shh_smtp_mdp
       SHH_MAIL_FROM: ${SHH_MAIL_FROM:-}
+      # Paiement des offres Plus et Pro (conception du paiement, docs/superpowers/specs/
+      # 2026-11-19-paiement-design.md) : DÉSACTIVÉ tant que le propriétaire n'a pas fourni ce
+      # que liste son §13 (comptes des prestataires, régime de TVA, mentions des notes de
+      # vente). Activé ("1") : deploy.sh démarre le relais de chaque prestataire dont les
+      # secrets sont dans secrets/ (README §13) et refuse d'installer sans SHH_TVA ni secrets
+      # bien réglés. Comme SHH_COMPTES : seulement ici (fichier relu, commité), jamais dans .env.
+      SHH_PAIEMENT: "0"
+      # "1" : bacs à sable des prestataires (clés d'essai) ; choisit aussi l'hôte des relais.
+      SHH_PAIEMENT_ESSAI: "0"
+      SHH_TVA: ${SHH_TVA:-}
+      SHH_STRIPE_TAXE: ${SHH_STRIPE_TAXE:-}
+      # Chemins et identifiants posés par deploy.sh d'après les fichiers de secrets/ (vides :
+      # prestataire absent). Aucune valeur de secret : des chemins …_FILE seulement.
+      SHH_STRIPE_CLE_FILE: ${SHH_STRIPE_CLE_FILE:-}
+      SHH_STRIPE_WEBHOOK_FILE: ${SHH_STRIPE_WEBHOOK_FILE:-}
+      SHH_PAYPAL_CLIENT_ID: ${SHH_PAYPAL_CLIENT_ID:-}
+      SHH_PAYPAL_SECRET_FILE: ${SHH_PAYPAL_SECRET_FILE:-}
+      SHH_PAYPAL_WEBHOOK_ID: ${SHH_PAYPAL_WEBHOOK_ID:-}
+      SHH_PAYPAL_PLANS: ${SHH_PAYPAL_PLANS:-}
+      SHH_NOWPAYMENTS_CLE_FILE: ${SHH_NOWPAYMENTS_CLE_FILE:-}
+      SHH_NOWPAYMENTS_IPN_FILE: ${SHH_NOWPAYMENTS_IPN_FILE:-}
     networks:
       interne:
         ipv4_address: 172.30.53.2
@@ -119,6 +144,11 @@ services:
     # SHH_SMTP_HOST : une ligne inoffensive (nom réservé .invalid).
     extra_hosts:
       - "${SHH_SMTP_HOST:-smtp.invalid}:172.30.53.3"
+      # API des prestataires de paiement : chacune désigne son relais (hôte de production ou de
+      # bac à sable, choisi par deploy.sh d'après SHH_PAIEMENT_ESSAI). Relais arrêté : rien.
+      - "${SHH_HOTE_STRIPE:-api.stripe.com}:172.30.53.4"
+      - "${SHH_HOTE_PAYPAL:-api-m.paypal.com}:172.30.53.5"
+      - "${SHH_HOTE_NOWPAYMENTS:-api.nowpayments.io}:172.30.53.6"
     volumes:
       # Sous-dossier du volume chiffré, jamais créé par Docker : si le volume n'est pas
       # déverrouillé et monté, le conteneur ne démarre pas, au lieu d'écrire sur le disque
@@ -192,6 +222,95 @@ services:
     logging:
       driver: none
 
+  # Relais des prestataires de paiement (profils « paiement-stripe », « paiement-paypal »,
+  # « paiement-nowpayments », posés par deploy.sh pour chaque prestataire configuré, paiement
+  # activé). Même binaire et mêmes règles que le relais SMTP : une seule cible, l'hôte de l'API
+  # sur 443, TLS de bout en bout (certificat vérifié par le serveur pour ce nom) ; 16 connexions
+  # à la fois, 60 s chacune au plus (le serveur ouvre une connexion par appel, délai 20 s).
+  relais-stripe:
+    image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
+    profiles: ["paiement-stripe"]
+    restart: unless-stopped
+    entrypoint: ["/shhcheck"]
+    command: ["relais", "172.30.53.4:443", "${SHH_HOTE_STRIPE:-api.stripe.com}:443", "16"]
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    ulimits:
+      core: 0
+      nofile: 1024
+    pids_limit: 64
+    mem_limit: 64m
+    memswap_limit: 64m
+    cpus: 0.25
+    environment:
+      GOMEMLIMIT: 48MiB
+    networks:
+      interne:
+        ipv4_address: 172.30.53.4
+      sortie: {}
+    logging:
+      driver: none
+
+  relais-paypal:
+    image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
+    profiles: ["paiement-paypal"]
+    restart: unless-stopped
+    entrypoint: ["/shhcheck"]
+    command: ["relais", "172.30.53.5:443", "${SHH_HOTE_PAYPAL:-api-m.paypal.com}:443", "16"]
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    ulimits:
+      core: 0
+      nofile: 1024
+    pids_limit: 64
+    mem_limit: 64m
+    memswap_limit: 64m
+    cpus: 0.25
+    environment:
+      GOMEMLIMIT: 48MiB
+    networks:
+      interne:
+        ipv4_address: 172.30.53.5
+      sortie: {}
+    logging:
+      driver: none
+
+  relais-nowpayments:
+    image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
+    profiles: ["paiement-nowpayments"]
+    restart: unless-stopped
+    entrypoint: ["/shhcheck"]
+    command: ["relais", "172.30.53.6:443", "${SHH_HOTE_NOWPAYMENTS:-api.nowpayments.io}:443", "16"]
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    ulimits:
+      core: 0
+      nofile: 1024
+    pids_limit: 64
+    mem_limit: 64m
+    memswap_limit: 64m
+    cpus: 0.25
+    environment:
+      GOMEMLIMIT: 48MiB
+    networks:
+      interne:
+        ipv4_address: 172.30.53.6
+      sortie: {}
+    logging:
+      driver: none
+
   caddy:
     # Caddy 2.11.9 officiel (2.10 au minimum pour x25519mlkem768), épinglé par empreinte,
     # relevée le 10 novembre 2026. Changer l'étiquette ET l'empreinte ensemble, puis
@@ -244,15 +363,16 @@ services:
 
 networks:
   interne:
-    # Aucune sortie vers Internet depuis le serveur Go, même compte activé : il ne joint que
-    # le relais SMTP (172.30.53.3), sur ce réseau.
+    # Aucune sortie vers Internet depuis le serveur Go, même compte ou paiement activé : il ne
+    # joint que les relais (172.30.53.3 SMTP, .4 à .6 prestataires de paiement), sur ce réseau.
+    # /29 : .1 passerelle (Caddy, sur la machine), .2 serveur, .3 à .6 relais ; plus de place.
     internal: true
     ipam:
       config:
         - subnet: 172.30.53.0/29
           gateway: 172.30.53.1
-  # Sortie du seul relais SMTP (réseau créé seulement avec le profil « comptes »). Aucun autre
-  # conteneur n'y est ; aucun port publié.
+  # Sortie des seuls relais (réseau créé seulement avec le profil « comptes » ou un profil
+  # « paiement-… »). Ni le serveur ni Caddy n'y sont ; aucun port publié.
   sortie:
     ipam:
       config:
