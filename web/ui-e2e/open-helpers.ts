@@ -36,7 +36,7 @@ export type Sent = { link: string; password: string; manage: string };
 export async function sendShare(
   page: Page,
   url: string,
-  o: { text?: string; files?: (string | { name: string; mimeType: string; buffer: Buffer })[]; opens?: number; download?: boolean; isMobile?: boolean; clean?: boolean } = {},
+  o: { text?: string; files?: (string | { name: string; mimeType: string; buffer: Buffer })[]; opens?: number; download?: boolean; isMobile?: boolean; clean?: boolean; title?: string } = {},
 ): Promise<Sent> {
   await page.goto(url);
   if (o.text !== undefined) await addText(page, o.text);
@@ -47,12 +47,14 @@ export async function sendShare(
     // Rien n'est nettoyé sans le balai (12 novembre) : « Tout nettoyer » pour l'éprouver.
     if (o.clean) await cleanAll(page);
   }
-  if (o.opens !== undefined || o.download === false) {
+  if (o.opens !== undefined || o.download === false || o.title !== undefined) {
     let opts = page.locator(".side");
     if (o.isMobile) {
       await page.getByRole("button", { name: /^Options · / }).click();
       opts = page.getByRole("dialog", { name: "Options" });
     }
+    // Nom du partage (19 novembre) : premier champ des options.
+    if (o.title !== undefined) await opts.getByLabel("Nom du partage (facultatif)").fill(o.title);
     if (o.opens !== undefined) {
       // Contrôle segmenté : au clavier, comme une personne (flèches depuis le choix courant).
       const group = opts.getByRole("radiogroup", { name: "Ouvertures" });
@@ -100,11 +102,14 @@ export async function freshPage(browser: Browser, opts: Parameters<Browser["newC
 export const unlockButton = (page: Page) => page.getByRole("button", { name: /^(Déverrouiller|Déchiffrement)/ });
 export const pwField = (page: Page) => page.getByLabel("Mot de passe", { exact: true });
 
-/** Saisit le mot de passe et déverrouille ; attend l'écran de contenu. */
+/**
+ * Saisit le mot de passe et déverrouille ; attend l'écran de contenu (titré « Contenu », ou du nom
+ * du partage, précédé de « Contenu, » pour les lecteurs d'écran : 19 novembre).
+ */
 export async function unlock(page: Page, password: string): Promise<void> {
   await pwField(page).fill(password);
   await unlockButton(page).click();
-  await expect(page.getByRole("heading", { name: "Contenu", exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /^Contenu(, .+)?$/ })).toBeVisible({ timeout: 30_000 });
 }
 
 /** Animations finies (entrées, dissolution) : contraste et captures stables. */

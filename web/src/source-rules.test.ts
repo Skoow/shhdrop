@@ -164,7 +164,8 @@ describe("règles de sources", () => {
   });
   // Conception compte §21.7, §21.8 (plan, lot 11) : exception écrite, une entrée reçue ou de salon
   // garde son lien (`link`, K_lien) ; un envoi jamais (cleanEntry, history/store.test.ts). Toujours
-  // aucun mot de passe, nom d'élément ni contenu : la liste des champs reste fermée.
+  // aucun mot de passe, nom d'élément ni contenu : la liste des champs reste fermée. Seul ajout du
+  // 19 novembre : `label` d'un envoi porte le titre du partage (manifeste), pas un nom d'élément.
   it("historique : liste fermée des champs de HistoryEntry (lien seulement pour un reçu ou un salon), aucun mot de passe ni nom", () => {
     const store = files.find((f) => f.rel === "history/store.ts")!;
     const type = store.text.match(/export type HistoryEntry = \{([\s\S]*?)\n\};/)![1]!;

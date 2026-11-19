@@ -266,6 +266,11 @@ export type CreateOpts = api.Net & {
   /** Durée de garde dans le coffre, obligatoire avec rights « coffre » et seulement avec lui. */
   keepTtlH?: KeepTtl;
   /**
+   * Nom du partage (19 novembre), facultatif : dans le manifeste chiffré, nettoyé par le moteur
+   * (cleanTitle) ; « titre_trop_long » au-delà de TITLE_MAX points de code après nettoyage.
+   */
+  title?: string;
+  /**
    * Résout le défi (objet renvoyé par GET /api/captcha, sans shown_at ni fallback). Doit
    * s'arrêter lui-même sur `signal` (Worker) ; createShare n'attend plus sa réponse après
    * une annulation.
@@ -394,7 +399,7 @@ export async function createShare(
   origin: string,
   items: Item[],
   o: CreateOpts,
-): Promise<{ link: string; manage: string; expiresInS: number }> {
+): Promise<{ link: string; manage: string; expiresInS: number; title?: string }> {
   checkOrigin(origin);
   if (!(TTL_HOURS as readonly number[]).includes(o.ttlHours)) throw new Error("duree_invalide");
   if (!Number.isInteger(o.maxOpens) || o.maxOpens < 1 || o.maxOpens > MAX_OPENS) throw new Error("ouvertures_invalides");

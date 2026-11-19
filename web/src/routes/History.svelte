@@ -13,6 +13,7 @@
     clearHistory,
     destroyFromHistory,
     forgetShare,
+    renameShare,
     loadHistory,
     refreshAll,
     refreshShare,
@@ -159,6 +160,7 @@
             onrefresh={async () => void (await refreshShare(e.id))}
             ondestroy={() => destroyFromHistory(e.id)}
             onremove={() => void forgetShare(e.id)}
+            onrename={async (title) => (await renameShare(e.id, title)) !== null}
           />
         {/each}
       </ul>

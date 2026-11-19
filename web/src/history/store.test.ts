@@ -344,3 +344,31 @@ describe("historique de l'appareil : quatre sortes (lot 11)", () => {
     expect(u).toMatchObject({ sorte: "recu", origine: "local", link: LINK, manage: "", state: "gone" });
   });
 });
+
+// Nom du partage (demande du propriétaire du 19 novembre) : `label` d'un envoi, chiffré au repos
+// comme le reste de l'entrée, renommable sur l'appareil.
+describe("historique : titre d'un envoi", () => {
+  it("gardé chiffré (aucun octet en clair sur disque), relu, renommé ; 80 points de code au plus, aucune commande", async () => {
+    const idb = fakeIndexedDB();
+    const h = (await openHistory({ backend: idbBackend(idb), now: () => T0 }))!;
+    const NAME = "Résultats d'analyse Dupont 😀";
+    const e = await h.add(fresh({ label: NAME }));
+    expect(e.label).toBe(NAME);
+    const raw = dump(idb.raw());
+    expect(raw).not.toContain("Dupont");
+    expect(raw).not.toContain(Buffer.from("Dupont").toString("hex"));
+    expect(raw).not.toContain("label");
+    const h2 = (await openHistory({ backend: idbBackend(idb), now: () => T0 }))!;
+    expect((await h2.get(e.id))!.label).toBe(NAME);
+    const r = await h2.update(e.id, { label: "Autre nom" });
+    expect(r!.label).toBe("Autre nom");
+    expect(dump(idb.raw())).not.toContain("Autre nom");
+    // 80 points de code (ici 160 unités UTF-16) : accepté ; 81 : refusé ; commandes refusées.
+    expect((await h2.update(e.id, { label: "😀".repeat(80) }))!.label).toBe("😀".repeat(80));
+    await expect(h2.update(e.id, { label: "a".repeat(81) })).rejects.toThrow();
+    for (const bad of ["a\u0000b", "a\nb", "a\u007fb", "a\u0085b", "a\u009fb"]) await expect(h2.update(e.id, { label: bad })).rejects.toThrow();
+    await expect(h2.add(fresh({ manage: MANAGE2, label: "x".repeat(81) }))).rejects.toThrow();
+    // Une entrée sans titre se relit sans titre.
+    expect((await h2.add(fresh({ manage: MANAGE2 }))).label).toBe("");
+  });
+});

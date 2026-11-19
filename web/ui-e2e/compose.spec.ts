@@ -251,8 +251,11 @@ test.describe("fr-FR", () => {
     // ni champ, ni « Générer un autre » avant l'envoi.
     await expect(opts.getByRole("button", { name: "Générer un autre" })).toHaveCount(0);
     await expect(opts.getByRole("heading", { name: "Mot de passe", exact: true })).toHaveCount(0);
-    // D41-15 : aucune saisie possible, nulle part (ordinateur et feuille du téléphone).
-    await expect(opts.locator("input[type=text], input[type=password], input:not([type])")).toHaveCount(0);
+    // D41-15 : aucune saisie de mot de passe, nulle part (ordinateur et feuille du téléphone) ;
+    // seul champ de texte : le nom du partage (19 novembre).
+    await expect(opts.locator("input[type=password]")).toHaveCount(0);
+    await expect(opts.locator("input[type=text], input:not([type])")).toHaveCount(1);
+    await expect(opts.getByLabel("Nom du partage (facultatif)")).toBeVisible();
     expect(await page.locator("form").count()).toBe(0);
     expect(await axe(page)).toEqual([]);
     if (isMobile) await page.keyboard.press("Escape");

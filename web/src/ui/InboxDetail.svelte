@@ -25,8 +25,10 @@
     onrefresh: () => Promise<void>;
     ondestroy: () => Promise<boolean>;
     onremove: () => void;
+    /** Renommer un envoi sur cet appareil (19 novembre). */
+    onrename?: (title: string) => Promise<boolean>;
   };
-  let { entry, now, info = {}, split = true, onback, onrefresh, ondestroy, onremove }: Props = $props();
+  let { entry, now, info = {}, split = true, onback, onrefresh, ondestroy, onremove, onrename }: Props = $props();
   const lang = $derived(getLang());
   const uid = $props.id();
 
@@ -64,7 +66,7 @@
 
   {#if entry.sorte === "envoi"}
     <ul class="one" role="list">
-      <ShareCard {entry} {now} {info} {onrefresh} {ondestroy} {onremove} />
+      <ShareCard {entry} {now} {info} {onrefresh} {ondestroy} {onremove} {onrename} />
     </ul>
   {:else}
     <div class="card">

@@ -6,7 +6,7 @@
   // `compact` : feuille du téléphone, une ligne d'aide au plus par réglage.
   // Choix payants : plus aucun ici (décision du propriétaire du 11 novembre, audit M17) ; une
   // seule ligne discrète dans l'en-tête du composeur ouvre la feuille d'information.
-  import { MAX_OPENS, PW_TRIES, TTL_HOURS } from "../index";
+  import { MAX_OPENS, PW_TRIES, TITLE_MAX, TTL_HOURS } from "../index";
   import type { Options } from "../flows/options.svelte";
   import { formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
@@ -14,6 +14,7 @@
   import Segmented from "../ui/Segmented.svelte";
   import Stepper from "../ui/Stepper.svelte";
   import Switch from "../ui/Switch.svelte";
+  import TextField from "../ui/TextField.svelte";
 
   type Props = {
     options: Options;
@@ -65,6 +66,24 @@
 {:else}
 <section class={["opts", { compact, dense: part === "controls" }]} aria-labelledby={compact ? undefined : "opts-title"} aria-label={compact ? t("options.title") : undefined}>
   {#if !compact}<h2 id="opts-title" class="h">{t("options.title")}</h2>{/if}
+
+  <!-- Nom du partage (demande du propriétaire, 19 novembre) : facultatif, dans le manifeste
+       chiffré ; le destinataire le voit en titre, l'historique le garde. -->
+  <div class="block" data-share-name>
+    <TextField
+      label={t("options.name.label")}
+      bind:value={() => options.title, (v) => (options.title = v)}
+      placeholder={t("options.name.placeholder")}
+      hint={t("options.name.hint")}
+      error={options.titleTooLong ? t("options.name.tooLong", { max: TITLE_MAX }) : undefined}
+      maxlength={TITLE_MAX}
+      autocomplete="off"
+      {...{ autocorrect: "off" } as Record<string, string>}
+      spellcheck={false}
+      translate="no"
+      enterkeyhint="done"
+    />
+  </div>
 
   <div class="block">
     {#if part === "all"}{@render summary()}{/if}

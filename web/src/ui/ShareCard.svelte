@@ -1,6 +1,7 @@
 <script lang="ts">
   // Carte d'un partage de l'historique (UI §9.6.3) : état (mot + icône), création locale,
-  // ouvertures, échéance, taille, nombre d'éléments ; jamais un nom d'élément (spec §33).
+  // ouvertures, échéance, taille, nombre d'éléments, titre du partage (19 novembre, renommable
+  // ici seulement) ; jamais un nom d'élément (spec §33).
   // Données locales seulement ; ouvertures et état relus du serveur sur demande (Actualiser,
   // Détails), par le parent. `compact` : accueil (une ligne de mesures).
   import { formatAgo, formatBytes, formatClock, formatDayTime, formatDuration } from "../i18n/format";
@@ -12,10 +13,12 @@
   import Button from "./Button.svelte";
   import { copyText } from "./clipboard";
   import DestroyReceipt from "./DestroyReceipt.svelte";
-  import { ChevronDown, Copy, RefreshCw, Trash2, X } from "./Icon";
+  import { ChevronDown, Copy, Pencil, RefreshCw, Trash2, X } from "./Icon";
   import InlineConfirm from "./InlineConfirm.svelte";
   import { reducedMotion } from "./motion";
   import StateChip from "./StateChip.svelte";
+  import TextField from "./TextField.svelte";
+  import { TITLE_MAX } from "../limits";
 
   type Props = {
     entry: HistoryEntry;
@@ -26,8 +29,10 @@
     onrefresh: () => Promise<void>;
     ondestroy: () => Promise<boolean>;
     onremove: () => void;
+    /** Renommer sur cet appareil (titre du partage) ; absent : pas de renommage ici. */
+    onrename?: (title: string) => Promise<boolean>;
   };
-  let { entry, now, compact = false, info = {}, onrefresh, ondestroy, onremove }: Props = $props();
+  let { entry, now, compact = false, info = {}, onrefresh, ondestroy, onremove, onrename }: Props = $props();
   const lang = $derived(getLang());
   const uid = $props.id();
 
@@ -71,6 +76,28 @@
     // Carte ouverte : une relecture (au plus une fois toutes les 5 min, après une gigue).
     if (open && active) void onrefresh();
   }
+  // ---------- Renommer (19 novembre) : sur cet appareil seulement ----------
+  let renaming = $state(false);
+  let draft = $state("");
+  let renameError = $state(false);
+  let renameField: HTMLInputElement | undefined = $state();
+  function startRename() {
+    draft = entry.label;
+    renameError = false;
+    renaming = true;
+    queueMicrotask(() => renameField?.focus());
+  }
+  async function saveRename() {
+    if (!onrename) return;
+    renameError = false;
+    if (!(await onrename(draft))) {
+      renameError = true;
+      return;
+    }
+    renaming = false;
+    announce(t("hist.rename.done"));
+  }
+
   async function destroy() {
     const ok = await ondestroy();
     if (!ok) return;
@@ -84,7 +111,9 @@
   }
 </script>
 
-<li class={["card", { compact, ended: !active }]} bind:this={el} aria-labelledby="{uid}-s {uid}-c" data-share-card data-state={shown}>
+<li class={["card", { compact, ended: !active }]} bind:this={el} aria-labelledby="{entry.label ? `${uid}-n ` : ""}{uid}-s {uid}-c" data-share-card data-state={shown}>
+  <!-- Titre du partage : texte de l'expéditeur (ou renommé ici), en texte brut, isolé (bdi). -->
+  {#if entry.label}<p class="name" id="{uid}-n" data-share-title><bdi>{entry.label}</bdi></p>{/if}
   <div class="hd">
     <StateChip id="{uid}-s" state={shown} destroyedHere={entry.destroyedHere} />
     <p class="created" id="{uid}-c"><time datetime={new Date(entry.createdAt).toISOString()}>{created}</time></p>
@@ -167,6 +196,33 @@
         <p class="sub">{t("hist.autoremove")}</p>
       {/if}
       <p class="sub">{t("hist.nolink")}</p>
+      {#if onrename && entry.sorte === "envoi"}
+        {#if renaming}
+          <form class="rename" data-rename onsubmit={(e) => { e.preventDefault(); void saveRename(); }}>
+            <TextField
+              label={t("hist.rename.label")}
+              bind:value={draft}
+              bind:el={renameField}
+              hint={t("hist.rename.hint")}
+              error={renameError ? t("hist.rename.error") : undefined}
+              maxlength={TITLE_MAX}
+              autocomplete="off"
+              spellcheck={false}
+              translate="no"
+              enterkeyhint="done"
+            />
+            <div class="row">
+              <Button variant="ghost" dense onpress={() => void (renaming = false)}>{t("common.cancel")}</Button>
+              <Button variant="secondary" dense onpress={() => void saveRename()}>{t("hist.rename.save")}</Button>
+            </div>
+          </form>
+        {:else}
+          <Button variant="ghost" dense onpress={startRename}>
+            {#snippet icon()}<Pencil size={18} strokeWidth={1.75} />{/snippet}
+            {t("hist.rename")}
+          </Button>
+        {/if}
+      {/if}
     </div>
   {:else if active}
     <p class="sub num seen" data-seen>{seen}</p>
@@ -193,6 +249,16 @@
   }
   .card.ended {
     opacity: 0.78;
+  }
+  .name {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .rename {
+    display: grid;
+    gap: var(--sp-2);
   }
   .hd {
     display: flex;

@@ -13,6 +13,8 @@ const TEXT = "MOT-REPERE-NAVIGATEUR-5d1e : le code de la porte est 4471";
 // Aucune fenêtre de 8 caractères du nom ne doit exister dans un en-tête ordinaire : « navigate »
 // (Sec-Fetch-Mode, envoyé par WebKit) donnait un faux positif sur « GET / » (CI du 10 novembre).
 const NAME = "nom-repere-fureteur-a83f.pdf";
+// Nom du partage (19 novembre) : saisi dans les options, chiffré dans le manifeste.
+const TITLE = "titre-repere-fureteur-6c1d Dossier";
 const CONTENT = "CONTENU-REPERE-NAVIGATEUR-0c6b ".repeat(4000);
 const windows = (label: string, s: string) => Array.from({ length: s.length - 7 }, (_, i) => needle(`${label}[${i}]`, s.slice(i, i + 8)));
 
@@ -42,6 +44,11 @@ test.describe("fr-FR", () => {
     const chooser = openFilePicker(page);
     await (await chooser).setFiles({ name: NAME, mimeType: "application/octet-stream", buffer: Buffer.from(CONTENT) });
     await expect(page.locator("[data-row]")).toHaveCount(2);
+    // Nom du partage : colonne des options (ordinateur) ou feuille « Options » (téléphone).
+    const nameField = () => page.getByLabel("Nom du partage (facultatif)").filter({ visible: true });
+    if ((await nameField().count()) === 0) await page.getByRole("button", { name: /^Options · / }).click();
+    await nameField().fill(TITLE);
+    if (await page.getByRole("dialog", { name: "Options" }).isVisible()) await page.keyboard.press("Escape");
     await sendButton(page).click();
     await expect(readyHeading(page)).toBeVisible({ timeout: 60_000 });
 
@@ -57,6 +64,7 @@ test.describe("fr-FR", () => {
     const needles: Needle[] = [
       ...windows("texte", TEXT),
       ...windows("nom", NAME.replace(/\.pdf$/, "")),
+      ...windows("nom du partage", TITLE),
       needle("contenu", "CONTENU-REPERE-NAVIGATEUR-0c6b"),
       needle("mot de passe", password),
       needle("K_lien", kLien as Uint8Array<ArrayBuffer>),
@@ -87,6 +95,8 @@ test.describe("fr-FR", () => {
     await page.getByLabel("Mot de passe", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Déverrouiller" }).click();
     await expect(page.locator('li.row[data-kind="note"]')).toBeVisible({ timeout: 30_000 });
+    // Le nom a fait l'aller-retour chiffré : titre de la page de contenu.
+    await expect(page.getByRole("heading", { level: 1 }).locator("bdi")).toHaveText(TITLE);
     await page.getByRole("button", { name: `Télécharger ${NAME}` }).click();
     await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, unknown>).__closed)).toBe(true);
     for (const route of ["GET /api/shares/meta", "POST /api/shares/unlock", "GET /api/shares/segments/0"])

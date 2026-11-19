@@ -58,6 +58,8 @@ import { startServer, type TestServer } from "./server";
 
 const MARKER = "MOT-REPERE-7f3a";
 const NAME = "nom-repere-91c2.pdf";
+// Nom du partage (19 novembre) : dans le manifeste chiffré seulement.
+const TITLE = "titre-repere-5d0e Dossier Dupont";
 const PASSWORD = "Rp4#Wx8?T%Q"; // repère de la forme générée (D41-15 : plus de mot de passe saisi)
 const MIB = 1048576;
 const GENERATED = generatePassword();
@@ -103,7 +105,7 @@ describe("le serveur ne voit rien", () => {
         { kind: "file", name: NAME, mime: "application/pdf", data: fileData },
       ],
       // Droits « coffre » + durée de garde : écrits dans le manifeste chiffré, jamais en clair.
-      { ttlHours: 1, maxOpens: 2, password: PASSWORD, rights: "coffre", keepTtlH: 12, solveCaptcha: solveAltcha, fetch },
+      { ttlHours: 1, maxOpens: 2, password: PASSWORD, rights: "coffre", keepTtlH: 12, title: TITLE, solveCaptcha: solveAltcha, fetch },
     );
     const p = await parseLink(r.link);
     if (p.kind !== "s") throw new Error("lien de partage attendu");
@@ -130,6 +132,7 @@ describe("le serveur ne voit rien", () => {
     expect(o.manifest.items[0]!.text).toBe(`texte ${MARKER} texte`);
     expect(o.manifest.items[1]!.name).toBe(NAME);
     expect([o.manifest.rights, o.manifest.keep_ttl_h]).toEqual(["coffre", 12]);
+    expect(o.manifest.title).toBe(TITLE);
     expect(Buffer.from(await o.item(1)).equals(Buffer.from(fileData))).toBe(true);
     await o.done();
     const st = log.length;
@@ -198,6 +201,8 @@ describe("le serveur ne voit rien", () => {
       needle("id du client (signalé)", id2),
       needle("texte repère", MARKER),
       needle("nom repère", NAME),
+      needle("nom du partage", TITLE),
+      ...windows("nom du partage", TITLE),
       needle("mot de passe repère", PASSWORD),
     ];
     keysOnDisk = [needle("kAcces", kAcces), needle("kAcces (signalé)", kAcces2), needle("kPreuve", kPreuve), needle("sGestion", sGestion)];

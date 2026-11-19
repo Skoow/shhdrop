@@ -9,7 +9,7 @@
   import { tick, untrack } from "svelte";
   import { navigate } from "../../app/router.svelte";
   import { t, type Key } from "../../i18n/i18n.svelte";
-  import { destroyFromHistory, forgetShare, loadHistory, refreshShare, shares } from "../../history/live.svelte";
+  import { destroyFromHistory, forgetShare, loadHistory, refreshShare, renameShare, shares } from "../../history/live.svelte";
   import { effectiveState, endOf, type HistoryEntry } from "../../history/store";
   import { formatBytes } from "../../i18n/format";
   import { getLang } from "../../i18n/i18n.svelte";
@@ -198,6 +198,7 @@
           onrefresh={async () => void (await refreshShare(selected.id))}
           ondestroy={() => destroyFromHistory(selected.id)}
           onremove={() => void remove(selected)}
+          onrename={async (title) => (await renameShare(selected.id, title)) !== null}
         />
       {/key}
     {:else if shares.all.length > 0}

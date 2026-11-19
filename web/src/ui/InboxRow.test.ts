@@ -95,6 +95,12 @@ describe("InboxRow", () => {
     expect(a.li.querySelector("[data-sent]")).not.toBeNull();
     unmount(c!);
     document.body.innerHTML = "";
+    // Titre du partage (19 novembre) : à la place du nombre d'éléments, en texte brut (bdi).
+    const t = render(entry({ sorte: "envoi", link: "", format: "", manage: "https://x.example/#m" + "m".repeat(43), itemsCount: 3, maxOpens: 1, label: "<b>Contrat</b>" }));
+    expect(t.li.querySelector("bdi")!.textContent).toBe("<b>Contrat</b>");
+    expect(t.li.querySelector("b")).toBeNull();
+    unmount(c!);
+    document.body.innerHTML = "";
     const b = render(entry({ sorte: "salon_cree", link: "https://x.example/#c" + "r".repeat(43), label: "Équipe", format: "", itemsCount: 0, sizeBytes: 0, createdAt: new Date(2026, 10, 14, 10, 5).getTime() }));
     expect(b.li.querySelector("bdi")!.textContent).toBe("Équipe · créé le 14 nov.");
     expect(b.text).toContain("Créé par vous");

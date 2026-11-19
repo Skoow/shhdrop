@@ -7,7 +7,7 @@
 // plus de réglage automatique) ; un fichier ajouté part tel quel (« Original ») tant que la
 // personne ne le nettoie pas (`clean`, balai ou « Tout nettoyer », après confirmation). Échec,
 // format non pris en charge : l'élément part sans clic, marqué « Non nettoyé » avec sa raison.
-import { CONTENT_MAX, DATA_SEGMENTS, MANIFEST_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, cleanName, isRiskyName, segmentsNeeded, type Item } from "../index";
+import { CONTENT_MAX, DATA_SEGMENTS, MANIFEST_MAX, MAX_ITEMS, NAME_MAX, TEXT_MAX, TITLE_MAX, cleanName, isRiskyName, segmentsNeeded, type Item } from "../index";
 import { isCleanFailure, isUnsupportedFormat, manifestClean, type ItemCleanState } from "../media/clean-label";
 import { AV_FORMATS, DOC_FORMATS, IMAGE_FORMATS, detectFormat, type Format } from "../media/format";
 import { stripMetadata, type CleanFamily, type StripResult } from "../media/strip";
@@ -513,13 +513,15 @@ export function createComposer(deps: ComposeDeps = {}) {
   // positions à leur plus grand nombre de chiffres, droit le plus long. Au-delà de
   // MANIFEST_MAX, sealFinal refuserait (« manifeste_trop_gros ») : on bloque avant. Chaque
   // fichier porte sa graine `k` (43 caractères, spec §41.14) et son nettoyage (valeur la plus
-  // longue, D41-35).
+  // longue, D41-35). Nom du partage (19 novembre) : compté à sa plus grande taille (TITLE_MAX
+  // caractères de 4 octets), qu'il soit saisi ou non.
   const manifestBytes = $derived(
     new TextEncoder().encode(
       JSON.stringify({
         v: 2,
         rights: "enregistrer",
         keep_ttl_h: 24,
+        title: "\u{1F600}".repeat(TITLE_MAX),
         items: items.map((i) =>
           i.kind === "text"
             ? { kind: "text", name: cleanName(i.base), mime: i.mime, size: CONTENT_MAX, offset: CONTENT_MAX, k: "k".repeat(43) }
