@@ -38,13 +38,69 @@ pub const MAX_SAFE: u64 = (1 << 53) - 1;
 const MAGIC: &[u8; 4] = b"SHH2";
 const VERSION: u8 = 2;
 
-/// Palier canonique : le plus petit palier de capacité ≥ fin des données + 4 + MANIFEST_MAX.
+/// Paliers payants en morceaux (spec §38.8.1, décisions du 17 novembre ; conception du paiement
+/// §11) : 5 et 10 Gio (Plus et Pro), 20 et 30 Gio (Pro), chacun plus le morceau du manifeste.
+/// Un partage payant a la même forme qu'un partage gratuit : seul le palier change.
+pub const PAID_BUCKETS: [u32; 4] = [81_921, 163_841, 327_681, 491_521];
+
+/// Formule d'un partage (le `tier` du serveur : 0 gratuit, 1 Plus, 2 Pro). Elle ne change que le
+/// plus grand palier permis ; aucune sécurité de plus ni de moins (spec §38.9.0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Palier {
+    Gratuit,
+    Plus,
+    Pro,
+}
+
+impl Palier {
+    /// 0 gratuit, 1 Plus, 2 Pro ; sinon `None`.
+    pub const fn de(n: u8) -> Option<Self> {
+        match n {
+            0 => Some(Self::Gratuit),
+            1 => Some(Self::Plus),
+            2 => Some(Self::Pro),
+            _ => None,
+        }
+    }
+    /// Plus grand palier permis.
+    pub const fn max_bucket(self) -> u32 {
+        match self {
+            Self::Gratuit => BUCKETS[BUCKETS.len() - 1],
+            Self::Plus => PAID_BUCKETS[1],
+            Self::Pro => PAID_BUCKETS[3],
+        }
+    }
+    /// Octets de données au plus : 2, 10 ou 30 Gio exactement.
+    pub const fn content_max(self) -> u64 {
+        self.max_bucket() as u64 * CHUNK as u64 - TAIL
+    }
+}
+
+/// Tout palier connu (gratuit ou payant), dans l'ordre croissant.
+pub fn all_buckets() -> impl Iterator<Item = u32> {
+    BUCKETS.into_iter().chain(PAID_BUCKETS)
+}
+
+/// Palier connu (gratuit ou payant) : un lecteur accepte les deux.
+pub fn is_bucket(b: u32) -> bool {
+    all_buckets().any(|x| x == b)
+}
+
+/// Palier canonique : le plus petit palier de capacité ≥ fin des données + 4 + MANIFEST_MAX,
+/// parmi les paliers gratuits (inchangé depuis la v2 : vecteurs figés).
 pub fn bucket_for(data_end: u64) -> Result<u32> {
+    bucket_for_palier(data_end, Palier::Gratuit)
+}
+
+/// Palier canonique d'une formule : le plus petit palier connu qui contient les données, au plus
+/// `p.max_bucket()`. Le même pour toutes les formules qui le permettent : le lecteur le vérifie
+/// sans connaître la formule (`bucket_for_palier(…, Pro)`).
+pub fn bucket_for_palier(data_end: u64, p: Palier) -> Result<u32> {
     if data_end > MAX_SAFE {
         return Err(Error::TailleNonSure);
     }
-    BUCKETS
-        .into_iter()
+    all_buckets()
+        .filter(|&b| b <= p.max_bucket())
         .find(|&b| data_end + TAIL <= u64::from(b) * CHUNK as u64)
         .ok_or(Error::TropGros)
 }

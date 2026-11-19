@@ -21,10 +21,20 @@ import (
 )
 
 const (
-	CreatesPer64   = 10
-	CreatesPer48   = 30
-	BytesPer64     = 6 << 30  // 6 Gio utiles par jour : trois partages pleins (spec §24, §41.2)
-	BytesPer48     = 12 << 30 // 12 Gio utiles par jour et par /48 (anti-saturation du disque)
+	CreatesPer64 = 10
+	CreatesPer48 = 30
+	BytesPer64   = 6 << 30  // 6 Gio utiles par jour : trois partages pleins (spec §24, §41.2)
+	BytesPer48   = 12 << 30 // 12 Gio utiles par jour et par /48 (anti-saturation du disque)
+	// Partages payants (spec §38.6, conception du paiement §11) : octets utiles par jour, à part
+	// des quotas gratuits (un jeton par partage borne déjà leur nombre) : Plus 40 Gio par
+	// connexion et 80 par /48, Pro 100 et 200. Ils ne comptent pas dans les créations du jour.
+	PaidBytesPlus64 = 40 << 30
+	PaidBytesPlus48 = 80 << 30
+	PaidBytesPro64  = 100 << 30
+	PaidBytesPro48  = 200 << 30
+	// PaidUploadLife : vie d'un envoi payant non finalisé (24 h au-delà de 2 Gio, spec §41.2),
+	// arrondie au quart d'heure comme UploadLife.
+	PaidUploadLife = 24*time.Hour + 15*time.Minute
 	RequestsPerMin = 60
 	// SegmentsPerMin : requêtes de segments à jeton valide par minute et par connexion,
 	// compteur à part ; valeur par défaut, réglable (SetSegmentsPerMin, SHH_SEGMENTS_PER_MIN).
@@ -99,10 +109,14 @@ type Limiter struct {
 	count48 map[string]int
 	bytes64 map[string]int64
 	bytes48 map[string]int64
-	minute  int64 // minute courante (minutes depuis 1970)
-	req     map[string]int
-	seg     map[string]int
-	seg48   map[string]int
+	// Octets utiles du jour des partages payants (Plus et Pro, comptés ensemble ; plafonds selon
+	// la formule de l'envoi).
+	paid64 map[string]int64
+	paid48 map[string]int64
+	minute int64 // minute courante (minutes depuis 1970)
+	req    map[string]int
+	seg    map[string]int
+	seg48  map[string]int
 	// Salon : créations du jour, entrées de l'heure, trames de la minute.
 	salon64 map[string]int
 	salon48 map[string]int
@@ -110,8 +124,8 @@ type Limiter struct {
 	join64  map[string]int
 	join48  map[string]int
 	// Paiement (conception du paiement §8) : commandes de l'heure.
-	paie64 map[string]int
-	paie48 map[string]int
+	paie64  map[string]int
+	paie48  map[string]int
 	frame64 map[string]int
 	frame48 map[string]int
 	// Envois en cours (BeginUpload → FinishUpload / CancelUpload / AbandonUpload) : id →
@@ -192,6 +206,27 @@ type upload struct {
 	born     int64 // création (secondes Unix), en mémoire seulement : borne le report à minuit
 	old      bool  // créé la veille : ses clés sont celles du secret de la veille
 	piece    bool  // pièce jointe du salon (BeginPiece) : jamais comptée comme création
+	tier     int   // 0 gratuit, 1 Plus, 2 Pro (BeginPaidUpload)
+}
+
+// life : vie maximale de l'envoi (secondes).
+func (u upload) life() int64 {
+	if u.tier > 0 {
+		return int64(PaidUploadLife / time.Second)
+	}
+	return int64(UploadLife / time.Second)
+}
+
+// octets : compteurs d'octets du jour de l'envoi et leurs plafonds (gratuits, ou payants selon la
+// formule).
+func (l *Limiter) octets(u upload) (m64, m48 map[string]int64, max64, max48 int64) {
+	switch u.tier {
+	case 1:
+		return l.paid64, l.paid48, PaidBytesPlus64, PaidBytesPlus48
+	case 2:
+		return l.paid64, l.paid48, PaidBytesPro64, PaidBytesPro48
+	}
+	return l.bytes64, l.bytes48, l.bytes64Max, l.bytes48Max
 }
 
 func New(now func() time.Time) *Limiter {
@@ -226,7 +261,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		// envoi déjà reporté une fois est plus vieux qu'UploadLife : jamais reporté deux fois.
 		keep := map[string]upload{}
 		for id, u := range l.uploads {
-			if !u.old && u.born+int64(UploadLife/time.Second) > t {
+			if !u.old && u.born+u.life() > t {
 				keep[id] = u
 			}
 		}
@@ -243,6 +278,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.count48 = map[string]int{}
 		l.bytes64 = map[string]int64{}
 		l.bytes48 = map[string]int64{}
+		l.paid64, l.paid48 = map[string]int64{}, map[string]int64{}
 		l.req = map[string]int{}
 		l.seg = map[string]int{}
 		l.seg48 = map[string]int{}
@@ -266,15 +302,16 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		for id, u := range keep {
 			u.old = true
 			l.uploads[id] = u
-			if !u.piece {
+			if !u.piece && u.tier == 0 {
 				l.count64[u.k64]++
 				l.count48[u.k48]++
 			}
-			l.bytes64[u.k64] += u.counted()
-			l.bytes48[u.k48] += u.counted()
+			m64, m48, _, _ := l.octets(u)
+			m64[u.k64] += u.counted()
+			m48[u.k48] += u.counted()
 			l.pend64[u.k64]++
 			l.pend48[u.k48]++
-			l.prevUntil = max(l.prevUntil, u.born+int64(UploadLife/time.Second))
+			l.prevUntil = max(l.prevUntil, u.born+u.life())
 		}
 	}
 	// Envois de la veille jamais terminés (fin non signalée) : oubliés d'office, et le secret
@@ -321,6 +358,8 @@ func (l *Limiter) forgetKeyLocked(k string) {
 	delete(l.count48, k)
 	delete(l.bytes64, k)
 	delete(l.bytes48, k)
+	delete(l.paid64, k)
+	delete(l.paid48, k)
 	delete(l.pend64, k)
 	delete(l.pend48, k)
 	delete(l.aband64, k)
@@ -400,7 +439,17 @@ var (
 // jusqu'à minuit UTC (quotas du jour) ou 60 s (envois en cours). Les envois de la veille
 // encore en cours de la même adresse comptent aussi (clés de la veille, o64 et o48).
 func (l *Limiter) BeginUpload(ip netip.Addr, id string, bytes int64) (retryAfter time.Duration, err error) {
-	return l.begin(ip, id, bytes, false)
+	return l.begin(ip, id, bytes, false, 0)
+}
+
+// BeginPaidUpload : BeginUpload d'un partage payant (tier 1 Plus, 2 Pro ; jeton déjà vérifié) :
+// octets comptés aux quotas payants du jour, pas aux créations gratuites ; envois en cours et
+// octets abandonnés comme un partage gratuit ; vie de PaidUploadLife.
+func (l *Limiter) BeginPaidUpload(ip netip.Addr, id string, bytes int64, tier int) (retryAfter time.Duration, err error) {
+	if tier != 1 && tier != 2 {
+		return 0, ErrQuota
+	}
+	return l.begin(ip, id, bytes, false, tier)
 }
 
 // BeginPiece : BeginUpload pour une pièce jointe du salon (plan C-2 Task 13, décision du
@@ -409,10 +458,10 @@ func (l *Limiter) BeginUpload(ip netip.Addr, id string, bytes int64) (retryAfter
 // comme pour un partage. Le nombre de pièces est borné par le salon (120 par heure et par
 // siège).
 func (l *Limiter) BeginPiece(ip netip.Addr, id string, bytes int64) (retryAfter time.Duration, err error) {
-	return l.begin(ip, id, bytes, true)
+	return l.begin(ip, id, bytes, true, 0)
 }
 
-func (l *Limiter) begin(ip netip.Addr, id string, bytes int64, piece bool) (retryAfter time.Duration, err error) {
+func (l *Limiter) begin(ip netip.Addr, id string, bytes int64, piece bool, tier int) (retryAfter time.Duration, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
@@ -424,10 +473,12 @@ func (l *Limiter) begin(ip netip.Addr, id string, bytes int64, piece bool) (retr
 		o64, o48 = keys(l.prev, ip)
 	}
 	untilMidnight := time.Unix((l.day+1)*day, 0).Sub(now)
-	creations := !piece && (l.count64[k64]+l.count64[o64] >= CreatesPer64 || l.count48[k48]+l.count48[o48] >= CreatesPer48)
+	creee := !piece && tier == 0 // une création gratuite (un partage payant a son jeton)
+	creations := creee && (l.count64[k64]+l.count64[o64] >= CreatesPer64 || l.count48[k48]+l.count48[o48] >= CreatesPer48)
+	m64, m48, max64, max48 := l.octets(upload{tier: tier})
 	switch {
 	case bytes < 0 || creations ||
-		bytes > l.bytes64Max-l.bytes64[k64]-l.bytes64[o64] || bytes > l.bytes48Max-l.bytes48[k48]-l.bytes48[o48] ||
+		bytes > max64-m64[k64]-m64[o64] || bytes > max48-m48[k48]-m48[o48] ||
 		l.aband64[k64]+l.aband64[o64] >= AbandonedPer64 || l.aband48[k48]+l.aband48[o48] >= AbandonedPer48:
 		return untilMidnight, ErrQuota
 	}
@@ -435,26 +486,26 @@ func (l *Limiter) begin(ip netip.Addr, id string, bytes int64, piece bool) (retr
 	// 256 bits, une vraie collision est impossible). Elle coûte une création du quota,
 	// comme une création réussie (revue K1, I2), et ne touche pas l'envoi existant.
 	if _, dup := l.uploads[id]; dup {
-		if !piece {
+		if creee {
 			l.count64[k64]++
 			l.count48[k48]++
 		}
-		l.bytes64[k64] += bytes
-		l.bytes48[k48] += bytes
+		m64[k64] += bytes
+		m48[k48] += bytes
 		return 0, ErrDuplicate
 	}
 	if l.pend64[k64]+l.pend64[o64] >= PendingPer64 || l.pend48[k48]+l.pend48[o48] >= PendingPer48 {
 		return min(pendingRetry, untilMidnight), ErrQuota
 	}
-	if !piece {
+	if creee {
 		l.count64[k64]++
 		l.count48[k48]++
 	}
-	l.bytes64[k64] += bytes
-	l.bytes48[k48] += bytes
+	m64[k64] += bytes
+	m48[k48] += bytes
 	l.pend64[k64]++
 	l.pend48[k48]++
-	l.uploads[id] = upload{k64: k64, k48: k48, bytes: bytes, born: now.Unix(), piece: piece}
+	l.uploads[id] = upload{k64: k64, k48: k48, bytes: bytes, born: now.Unix(), piece: piece, tier: tier}
 	return 0, nil
 }
 
@@ -470,14 +521,16 @@ func (l *Limiter) endLocked(id string, refund, abandoned bool, finisher *netip.A
 	delete(l.uploads, id)
 	decr(l.pend64, u.k64)
 	decr(l.pend48, u.k48)
+	m64, m48, _, _ := l.octets(u)
+	creee := !u.piece && u.tier == 0
 	if refund {
 		// La création et la réservation non remplie sont rendues ; les octets reçus, jamais.
-		if !u.piece {
+		if creee {
 			decr(l.count64, u.k64)
 			decr(l.count48, u.k48)
 		}
-		l.bytes64[u.k64] -= u.counted() - u.paid()
-		l.bytes48[u.k48] -= u.counted() - u.paid()
+		m64[u.k64] -= u.counted() - u.paid()
+		m48[u.k48] -= u.counted() - u.paid()
 	}
 	if u.old && finisher != nil {
 		// Envoi de la veille finalisé aujourd'hui (audit M5, décision du propriétaire du
@@ -485,19 +538,19 @@ func (l *Limiter) endLocked(id string, refund, abandoned bool, finisher *netip.A
 		// oubliée, à la clé du jour de l'adresse qui le finalise. Sans cela, il sortait de
 		// tout quota à minuit (10 Gio au lieu de 6 dans la journée). Aucune adresse gardée :
 		// la clé du jour est recalculée ici, comme à chaque requête.
-		if !u.piece {
+		if creee {
 			decr(l.count64, u.k64)
 			decr(l.count48, u.k48)
 		}
-		l.bytes64[u.k64] -= u.counted()
-		l.bytes48[u.k48] -= u.counted()
+		m64[u.k64] -= u.counted()
+		m48[u.k48] -= u.counted()
 		k64, k48 := l.keyLocked(*finisher)
-		if !u.piece {
+		if creee {
 			l.count64[k64]++
 			l.count48[k48]++
 		}
-		l.bytes64[k64] += u.counted()
-		l.bytes48[k48] += u.counted()
+		m64[k64] += u.counted()
+		m48[k48] += u.counted()
 	}
 	if abandoned {
 		l.aband64[u.k64] += u.counted()
@@ -525,11 +578,12 @@ func (u upload) counted() int64 { return max(u.bytes, u.paid()) }
 // debitLocked ajoute d au compte de u (d ≤ 0 : rend) ; refuse un débit au-delà du jour.
 func (l *Limiter) debitLocked(id string, u upload, next upload, now time.Time) (time.Duration, error) {
 	d := next.counted() - u.counted()
-	if d > 0 && (d > l.bytes64Max-l.bytes64[u.k64] || d > l.bytes48Max-l.bytes48[u.k48]) {
+	m64, m48, max64, max48 := l.octets(u)
+	if d > 0 && (d > max64-m64[u.k64] || d > max48-m48[u.k48]) {
 		return time.Unix((l.day+1)*day, 0).Sub(now), ErrQuota
 	}
-	l.bytes64[u.k64] += d
-	l.bytes48[u.k48] += d
+	m64[u.k64] += d
+	m48[u.k48] += d
 	l.uploads[id] = next
 	return 0, nil
 }

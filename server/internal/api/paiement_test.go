@@ -52,7 +52,7 @@ func newEnvPaiement(t *testing.T) envPaiement {
 	}
 	t.Cleanup(func() { db.Close() })
 	p := &prestTest{url: "https://checkout.stripe.com/c/pay/cs_test_1"}
-	s, err := paiement.NewService(paiement.Config{DB: db, Now: e.clk.Now, Origine: "https://shhgone.test", Regime: paiement.OSS,
+	s, err := paiement.NewService(paiement.Config{DB: db, Now: e.clk.Now, Origine: "https://shhgone.test", Regime: paiement.OSS, Emetteur: "shhgone.test",
 		Prestataires: []paiement.Prestataire{p}})
 	if err != nil {
 		t.Fatal(err)

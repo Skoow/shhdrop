@@ -2,9 +2,74 @@ package limits
 
 import (
 	"fmt"
+	"net/netip"
 	"testing"
 	"time"
 )
+
+// TestPartagesPayants : quotas à part (Plus 40 Gio par jour et par connexion, Pro 100), aucune
+// création gratuite prise, vie de 24 h 15 (report à minuit compris).
+func TestPartagesPayants(t *testing.T) {
+	now := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	l := newLim(&now)
+	a := ip("2001:db8:5:1::1")
+	if _, err := l.BeginPaidUpload(a, "p1", 30<<30, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Receive("p1", 30<<30+ManifestChunk); err != nil {
+		t.Fatal(err)
+	}
+	l.FinishUpload("p1", a)
+	// 10 Gio de plus en Plus : 40 atteints ; au-delà : refus.
+	if _, err := l.BeginPaidUpload(a, "p2", 10<<30, 1); err != nil {
+		t.Fatal(err)
+	}
+	l.FinishUpload("p2", a)
+	if _, err := l.BeginPaidUpload(a, "p3", 1<<20, 1); err != ErrQuota {
+		t.Fatal("au-delà de 40 Gio en Plus", err)
+	}
+	// Pro : 100 Gio par jour (60 de plus ici).
+	if _, err := l.BeginPaidUpload(a, "p4", 60<<30, 2); err != nil {
+		t.Fatal(err)
+	}
+	l.FinishUpload("p4", a)
+	if _, err := l.BeginPaidUpload(a, "p5", 1<<20, 2); err != ErrQuota {
+		t.Fatal("au-delà de 100 Gio en Pro", err)
+	}
+	// Les quotas gratuits sont intacts : 10 créations, 6 Gio.
+	if l.count64[l.mustKey64(a)] != 0 {
+		t.Fatal("création gratuite prise par un partage payant")
+	}
+	if _, err := l.BeginUpload(a, "g1", 6<<30); err != nil {
+		t.Fatal("quota gratuit pris par les partages payants", err)
+	}
+	l.CancelUpload("g1")
+	if _, err := l.BeginPaidUpload(a, "x", 1, 3); err != ErrQuota {
+		t.Fatal("formule inconnue")
+	}
+	// Envoi payant de 20 h, à cheval sur minuit : toujours compté le lendemain.
+	b := ip("2001:db8:6:1::1")
+	now = time.Date(2026, 11, 20, 23, 0, 0, 0, time.UTC)
+	if _, err := l.BeginPaidUpload(b, "long", 1<<30, 1); err != nil {
+		t.Fatal(err)
+	}
+	now = time.Date(2026, 11, 21, 18, 0, 0, 0, time.UTC)
+	if _, err := l.Receive("long", 1<<20); err != nil {
+		t.Fatal("envoi payant oublié avant 24 h", err)
+	}
+	now = time.Date(2026, 11, 22, 0, 30, 0, 0, time.UTC)
+	if _, err := l.Receive("long", 1<<20); err != ErrQuota {
+		t.Fatal("envoi payant gardé au-delà de 24 h 15", err)
+	}
+	if PaidUploadLife != 24*time.Hour+15*time.Minute || PaidBytesPlus64 != 40<<30 || PaidBytesPro48 != 200<<30 {
+		t.Fatal("constantes")
+	}
+}
+
+func (l *Limiter) mustKey64(a netip.Addr) string {
+	k, _ := l.Key(a)
+	return k
+}
 
 // TestAllowCommandeHeure : commandes de paiement, 10 par heure par connexion, 30 par /48
 // (conception du paiement §8), fenêtre fixe UTC.

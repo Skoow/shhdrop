@@ -113,6 +113,8 @@ type Config struct {
 	Origine      string // SHH_ORIGIN
 	Regime       Regime
 	Prestataires []Prestataire
+	// Emetteur : issuer_name des jetons anonymes (hôte de SHH_ORIGIN) ; vide : pas de jetons.
+	Emetteur string
 }
 
 // Service : commandes, pass et droits (conception §2, §5).
@@ -122,6 +124,7 @@ type Service struct {
 	origine string
 	regime  Regime
 	prest   [4]Prestataire // indexé par Moyen
+	jetons  *Jetons
 }
 
 // NewService : au moins un prestataire, chacun une seule fois.
@@ -130,6 +133,9 @@ func NewService(c Config) (*Service, error) {
 		return nil, errors.New("paiement : configuration incomplète")
 	}
 	s := &Service{db: c.DB, now: c.Now, origine: c.Origine, regime: c.Regime}
+	if c.Emetteur != "" {
+		s.jetons = NouveauxJetons(c.DB, c.Now, c.Emetteur)
+	}
 	for _, p := range c.Prestataires {
 		m := p.Moyen()
 		if m < Carte || m > Crypto || s.prest[m] != nil {
@@ -139,6 +145,9 @@ func NewService(c Config) (*Service, error) {
 	}
 	return s, nil
 }
+
+// Jetons : émission et dépense des jetons anonymes (nil sans Emetteur).
+func (s *Service) Jetons() *Jetons { return s.jetons }
 
 // Moyens proposés, dans l'ordre carte, PayPal, crypto.
 func (s *Service) Moyens() []Moyen {

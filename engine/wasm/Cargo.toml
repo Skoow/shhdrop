@@ -11,7 +11,7 @@ publish.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-shhdrop-core = { path = "../core", features = ["empreinte"] }
+shhdrop-core = { path = "../core", features = ["empreinte", "jetons"] }
 # Versions exactes, publiées ensemble : wasm-bindgen-cli 0.2.130 exige wasm-bindgen 0.2.130,
 # js-sys 0.3.107 et wasm-bindgen-futures 0.4.80 (même dépôt, même version de publication).
 wasm-bindgen = "=0.2.130"
@@ -19,3 +19,9 @@ wasm-bindgen = "=0.2.130"
 js-sys = "=0.3.107"
 wasm-bindgen-futures = "=0.4.80"
 zeroize = { version = "1.9", default-features = false, features = ["alloc"] }
+# Jetons anonymes (shhdrop-core, fonction « jetons ») : le générateur de blind-rsa-signatures tire son
+# aléa par getrandom, qui lit crypto.getRandomValues dans le navigateur (WebCrypto, comme le reste du
+# site) ; même version exacte que le salon.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "=0.4.3", default-features = false, features = ["wasm_js"] }
+

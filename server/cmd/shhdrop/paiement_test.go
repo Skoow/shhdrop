@@ -127,7 +127,7 @@ func TestAdminPaiementRevoquer(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO commandes VALUES(?,?,1,30,1,1,2,NULL,0,86400000)`, id[:], q); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO passes VALUES(?,1,0,8640000000,30,0,0)`, q); err != nil {
+	if _, err := db.Exec(`INSERT INTO passes(q, offre, debut_jour, fin_jour, jetons, recharge_jour, revoque) VALUES(?,1,0,8640000000,30,0,0)`, q); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

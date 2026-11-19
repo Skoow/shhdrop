@@ -53,8 +53,8 @@ const (
 	maxAttempts  = 5
 	uploadWindow = 6 * 3600 // secondes (spec §24, §41.2 : 6 h, comme le jeton d'envoi)
 	purgeWindow  = 6 * 3600 // durée d'un jeton de téléchargement (spec §24, §41.2 : 6 h)
-	// emptySweep : un envoi sans segment est effacé dès upload_deadline − emptySweep (sweepCond).
-	emptySweep = uploadWindow - 300
+	// emptyAfter : un envoi sans segment est effacé 5 min après sa création (sweepCond).
+	emptyAfter = 300
 	// stallSweep : un envoi commencé sans nouveau segment depuis 15 min est effacé.
 	stallSweep = 900
 )
@@ -71,6 +71,9 @@ type CreateReq struct {
 	// la réserve de stockage des nouveaux venus lui est fermée (StorageLimit). Posé par la
 	// couche HTTP, jamais lu du client.
 	Returning bool
+	// Tier : formule fixée par un jeton anonyme dépensé (couche HTTP) ; 0 sans jeton. Gardé en
+	// mémoire avec l'envoi (tier.go), jamais en base.
+	Tier Tier
 }
 
 // StorageReserve : 1/StorageReserve de StorageMax n'est ouvert qu'aux nouveaux venus (audit
@@ -258,6 +261,9 @@ type upload struct {
 	deadline, progress int64
 	recv               int64
 	top                int
+	// tier et window : formule de l'envoi et sa fenêtre d'envoi (secondes), en mémoire seulement.
+	tier   Tier
+	window int64
 	// dirty : octets écrits depuis la dernière synchronisation de fond ; syncing : une
 	// synchronisation de fond est en cours (rapport de performance A12).
 	dirty   int64
@@ -309,6 +315,16 @@ func (s *Service) setUpload(id string, u upload) {
 	}
 	s.mem.up[id] = u
 }
+
+// tierOf : formule de l'envoi id (Gratuit s'il est inconnu de la mémoire).
+func (s *Service) tierOf(id string) Tier {
+	s.mem.mu.Lock()
+	defer s.mem.mu.Unlock()
+	return s.mem.up[id].tier
+}
+
+// TierOf : formule d'un envoi en cours (couche HTTP : durée du jeton d'envoi).
+func (s *Service) TierOf(id string) Tier { return s.tierOf(id) }
 
 func (s *Service) touchUpload(id string, now int64) {
 	s.mem.mu.Lock()
@@ -384,7 +400,7 @@ func (s *Service) uploadDue(id string, now int64) bool {
 	defer s.mem.mu.Unlock()
 	u, ok := s.mem.up[id]
 	return !ok || u.deadline <= now ||
-		(u.progress == 0 && u.deadline-emptySweep <= now) ||
+		(u.progress == 0 && u.deadline-u.window+emptyAfter <= now) ||
 		(u.progress != 0 && u.progress+stallSweep <= now)
 }
 
@@ -528,7 +544,7 @@ func Validate(r CreateReq) error {
 
 // validCreate : Validate sans le plafond du palier (tests de grands paliers, create).
 func validCreate(r CreateReq) error {
-	if !validID(r.ID) || !validBucket(r.Bucket) || len(r.AccessV) != 32 || len(r.ManageV) != 32 ||
+	if !validID(r.ID) || !r.Tier.Valid() || !bucketAllowed(r.Bucket, r.Tier) || len(r.AccessV) != 32 || len(r.ManageV) != 32 ||
 		!notEmptyHash(r.AccessV, r.ManageV) {
 		return ErrBadRequest
 	}
@@ -545,14 +561,18 @@ const MaxOpens = 5
 
 // ValidateFinalize vérifie les champs d'une finalisation qui ne dépendent pas du palier
 // (le bourrage est vérifié par Finalize, contre le palier du partage).
-func ValidateFinalize(r FinalizeReq) error {
-	if !validTTL(r.TTLHours) || r.MaxOpens < 1 || r.MaxOpens > MaxOpens ||
+func ValidateFinalize(r FinalizeReq) error { return ValidateFinalizeTier(r, Gratuit) }
+
+// ValidateFinalizeTier : ValidateFinalize pour la formule t (durées, ouvertures et palier
+// permis par t).
+func ValidateFinalizeTier(r FinalizeReq, t Tier) error {
+	if !t.TTLAllowed(r.TTLHours) || r.MaxOpens < 1 || r.MaxOpens > t.MaxOpensOf() ||
 		r.KdfOps != kdfOps || r.KdfMem != kdfMem ||
 		len(r.Salt) != 16 || len(r.ProofV) != 32 || len(r.Envelope) != EnvelopeLen || !notEmptyHash(r.ProofV) {
 		return ErrBadRequest
 	}
 	draft := r.Bucket != 0
-	if draft && (!validBucket(r.Bucket) || len(r.Header) != Header || len(r.Tail) != ChunkCT || r.FillFrom != 0 || r.FillTo != 0 || !validVoid(r.Void, r.Bucket)) ||
+	if draft && (!bucketAllowed(r.Bucket, t) || len(r.Header) != Header || len(r.Tail) != ChunkCT || r.FillFrom != 0 || r.FillTo != 0 || !validVoid(r.Void, r.Bucket)) ||
 		!draft && (r.Header != nil || r.Tail != nil || r.Void != nil) {
 		return ErrBadRequest
 	}
@@ -631,7 +651,7 @@ func (s *Service) create(r CreateReq, valid func(CreateReq) error) (string, int,
 	}
 	// proof_v, salt, kdf_*, max_opens et envelope restent NULL jusqu'à Finalize ; aucune date
 	// en base (l'échéance de l'envoi vit en mémoire, spec §36 S12).
-	s.setUpload(id, upload{deadline: ceil15(s.now() + uploadWindow)})
+	s.setUpload(id, upload{deadline: ceil15(s.now() + r.Tier.UploadWindow()), tier: r.Tier, window: r.Tier.UploadWindow()})
 	_, err = s.DB.Exec(`INSERT INTO shares(id,state,bucket,opens_left,segments_mask,access_v,manage_v)
 		VALUES(?,'uploading',?,0,?,?,?)`,
 		id, r.Bucket, make([]byte, (segs+7)/8), r.AccessV, r.ManageV)
@@ -714,7 +734,7 @@ func (s *Service) Finalize(id string, r FinalizeReq) (time.Duration, error) {
 	if !validID(id) {
 		return 0, ErrNotFound
 	}
-	if err := ValidateFinalize(r); err != nil {
+	if err := ValidateFinalizeTier(r, s.tierOf(id)); err != nil {
 		return 0, err
 	}
 	if !s.claimFinalize(id) {

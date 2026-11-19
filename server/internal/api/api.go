@@ -250,6 +250,9 @@ type server struct {
 	reports reportCounter
 	// usage : compteurs d'usage (un entier chacun, sans clé), lus par le tableau de bord.
 	usage *usage.Counters
+	// jetons : jetons anonymes des partages payants (SHH_PAIEMENT=1), sinon nil : un en-tête
+	// PrivateToken est alors refusé (400).
+	jetons *paiement.Jetons
 }
 
 // reportCounter : signalements de l'heure en cours, un seul entier sans identifiant, remis à
@@ -379,6 +382,7 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 		compteAPI{server: s, c: sal.Comptes}.routes(api)
 	}
 	if sal.Paiement != nil {
+		s.jetons = sal.Paiement.Jetons()
 		paiementAPI{server: s, p: sal.Paiement}.routes(api)
 	}
 	api.HandleFunc("/api/", notFoundAPI)

@@ -111,6 +111,25 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	// Partage payant (conception du paiement §7, §11) : jeton anonyme dépensé ici, formule lue
+	// dans sa clé ; rien ne relie le partage au jeton ni au pass. Rendu si la création échoue.
+	tier, jeton, err := s.jetonDeCreation(r)
+	if err != nil {
+		fail(w, errBadRequest)
+		return
+	}
+	req.Tier = tier
+	if share.Validate(req) != nil {
+		s.rendreJeton(jeton)
+		fail(w, errBadRequest)
+		return
+	}
+	ok := false
+	defer func() {
+		if !ok {
+			s.rendreJeton(jeton)
+		}
+	}()
 	// Quotas en capacité utile (données du palier, sans le morceau du manifeste), réservés ici et débités à la
 	// finalisation ; 2 envois non finalisés à la fois ; octets abandonnés (spec §29.5).
 	//
@@ -122,7 +141,13 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	// Réserve de stockage des nouveaux venus (audit D2) : lu avant que BeginUpload ne compte
 	// cette création.
 	req.Returning = !s.lim.Newcomer(ip)
-	switch retry, err := s.lim.BeginUpload(ip, req.ID, share.ContentBytes(b.Bucket)); {
+	begin := func() (time.Duration, error) { return s.lim.BeginUpload(ip, req.ID, share.ContentBytes(b.Bucket)) }
+	if tier != share.Gratuit {
+		begin = func() (time.Duration, error) {
+			return s.lim.BeginPaidUpload(ip, req.ID, share.ContentBytes(b.Bucket), int(tier))
+		}
+	}
+	switch retry, err := begin(); {
 	case errors.Is(err, limits.ErrDuplicate): // id interne de 128 bits déjà en cours : impossible
 		fail(w, errors.New("id interne en double"))
 		return
@@ -142,12 +167,15 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	ok = true
 	s.cap.RecordCreate(ip)
 	s.usage.PartageCree()
+	// Jeton d'envoi : 6 h, 24 h pour un partage payant (fenêtre d'envoi de la formule).
+	ttl := time.Duration(tier.UploadWindow()) * time.Second
 	writeJSON(w, http.StatusCreated, struct {
 		Token    string `json:"upload_token"`
 		Segments int    `json:"segments"`
-	}{s.sig.Issue(token.Upload, id, 0, s.svc.Now().Add(uploadTTL)), segs})
+	}{s.sig.Issue(token.Upload, id, 0, s.svc.Now().Add(ttl)), segs})
 }
 
 // checkToken : jeton Bearer du type attendu ; rend l'id interne qu'il désigne (signé par le

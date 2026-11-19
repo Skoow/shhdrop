@@ -1,0 +1,648 @@
+{
+  "bucket_for": [
+    {
+      "bucket": 1,
+      "data_end": 0,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 1,
+      "data_end": 0,
+      "palier": "plus"
+    },
+    {
+      "bucket": 1,
+      "data_end": 0,
+      "palier": "pro"
+    },
+    {
+      "bucket": 16,
+      "data_end": 1,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 16,
+      "data_end": 1,
+      "palier": "plus"
+    },
+    {
+      "bucket": 16,
+      "data_end": 1,
+      "palier": "pro"
+    },
+    {
+      "bucket": 16,
+      "data_end": 983040,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 16,
+      "data_end": 983040,
+      "palier": "plus"
+    },
+    {
+      "bucket": 16,
+      "data_end": 983040,
+      "palier": "pro"
+    },
+    {
+      "bucket": 80,
+      "data_end": 983041,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 80,
+      "data_end": 983041,
+      "palier": "plus"
+    },
+    {
+      "bucket": 80,
+      "data_end": 983041,
+      "palier": "pro"
+    },
+    {
+      "bucket": 80,
+      "data_end": 5177344,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 80,
+      "data_end": 5177344,
+      "palier": "plus"
+    },
+    {
+      "bucket": 80,
+      "data_end": 5177344,
+      "palier": "pro"
+    },
+    {
+      "bucket": 160,
+      "data_end": 5177345,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 160,
+      "data_end": 5177345,
+      "palier": "plus"
+    },
+    {
+      "bucket": 160,
+      "data_end": 5177345,
+      "palier": "pro"
+    },
+    {
+      "bucket": 160,
+      "data_end": 10420224,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 160,
+      "data_end": 10420224,
+      "palier": "plus"
+    },
+    {
+      "bucket": 160,
+      "data_end": 10420224,
+      "palier": "pro"
+    },
+    {
+      "bucket": 400,
+      "data_end": 10420225,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 400,
+      "data_end": 10420225,
+      "palier": "plus"
+    },
+    {
+      "bucket": 400,
+      "data_end": 10420225,
+      "palier": "pro"
+    },
+    {
+      "bucket": 400,
+      "data_end": 26148864,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 400,
+      "data_end": 26148864,
+      "palier": "plus"
+    },
+    {
+      "bucket": 400,
+      "data_end": 26148864,
+      "palier": "pro"
+    },
+    {
+      "bucket": 800,
+      "data_end": 26148865,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 800,
+      "data_end": 26148865,
+      "palier": "plus"
+    },
+    {
+      "bucket": 800,
+      "data_end": 26148865,
+      "palier": "pro"
+    },
+    {
+      "bucket": 800,
+      "data_end": 52363264,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 800,
+      "data_end": 52363264,
+      "palier": "plus"
+    },
+    {
+      "bucket": 800,
+      "data_end": 52363264,
+      "palier": "pro"
+    },
+    {
+      "bucket": 1600,
+      "data_end": 52363265,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 1600,
+      "data_end": 52363265,
+      "palier": "plus"
+    },
+    {
+      "bucket": 1600,
+      "data_end": 52363265,
+      "palier": "pro"
+    },
+    {
+      "bucket": 1600,
+      "data_end": 104792064,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 1600,
+      "data_end": 104792064,
+      "palier": "plus"
+    },
+    {
+      "bucket": 1600,
+      "data_end": 104792064,
+      "palier": "pro"
+    },
+    {
+      "bucket": 4000,
+      "data_end": 104792065,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 4000,
+      "data_end": 104792065,
+      "palier": "plus"
+    },
+    {
+      "bucket": 4000,
+      "data_end": 104792065,
+      "palier": "pro"
+    },
+    {
+      "bucket": 4000,
+      "data_end": 262078464,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 4000,
+      "data_end": 262078464,
+      "palier": "plus"
+    },
+    {
+      "bucket": 4000,
+      "data_end": 262078464,
+      "palier": "pro"
+    },
+    {
+      "bucket": 8000,
+      "data_end": 262078465,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 8000,
+      "data_end": 262078465,
+      "palier": "plus"
+    },
+    {
+      "bucket": 8000,
+      "data_end": 262078465,
+      "palier": "pro"
+    },
+    {
+      "bucket": 8000,
+      "data_end": 524222464,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 8000,
+      "data_end": 524222464,
+      "palier": "plus"
+    },
+    {
+      "bucket": 8000,
+      "data_end": 524222464,
+      "palier": "pro"
+    },
+    {
+      "bucket": 16385,
+      "data_end": 524222465,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 16385,
+      "data_end": 524222465,
+      "palier": "plus"
+    },
+    {
+      "bucket": 16385,
+      "data_end": 524222465,
+      "palier": "pro"
+    },
+    {
+      "bucket": 16385,
+      "data_end": 1073741824,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 16385,
+      "data_end": 1073741824,
+      "palier": "plus"
+    },
+    {
+      "bucket": 16385,
+      "data_end": 1073741824,
+      "palier": "pro"
+    },
+    {
+      "bucket": 32769,
+      "data_end": 1073741825,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 32769,
+      "data_end": 1073741825,
+      "palier": "plus"
+    },
+    {
+      "bucket": 32769,
+      "data_end": 1073741825,
+      "palier": "pro"
+    },
+    {
+      "bucket": 32769,
+      "data_end": 2147483648,
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 32769,
+      "data_end": 2147483648,
+      "palier": "plus"
+    },
+    {
+      "bucket": 32769,
+      "data_end": 2147483648,
+      "palier": "pro"
+    },
+    {
+      "data_end": 2147483649,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 81921,
+      "data_end": 2147483649,
+      "palier": "plus"
+    },
+    {
+      "bucket": 81921,
+      "data_end": 2147483649,
+      "palier": "pro"
+    },
+    {
+      "data_end": 5368709120,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 81921,
+      "data_end": 5368709120,
+      "palier": "plus"
+    },
+    {
+      "bucket": 81921,
+      "data_end": 5368709120,
+      "palier": "pro"
+    },
+    {
+      "data_end": 5368709121,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 163841,
+      "data_end": 5368709121,
+      "palier": "plus"
+    },
+    {
+      "bucket": 163841,
+      "data_end": 5368709121,
+      "palier": "pro"
+    },
+    {
+      "data_end": 10737418240,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "bucket": 163841,
+      "data_end": 10737418240,
+      "palier": "plus"
+    },
+    {
+      "bucket": 163841,
+      "data_end": 10737418240,
+      "palier": "pro"
+    },
+    {
+      "data_end": 10737418241,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "data_end": 10737418241,
+      "error": "trop_gros",
+      "palier": "plus"
+    },
+    {
+      "bucket": 327681,
+      "data_end": 10737418241,
+      "palier": "pro"
+    },
+    {
+      "data_end": 21474836480,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "data_end": 21474836480,
+      "error": "trop_gros",
+      "palier": "plus"
+    },
+    {
+      "bucket": 327681,
+      "data_end": 21474836480,
+      "palier": "pro"
+    },
+    {
+      "data_end": 21474836481,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "data_end": 21474836481,
+      "error": "trop_gros",
+      "palier": "plus"
+    },
+    {
+      "bucket": 491521,
+      "data_end": 21474836481,
+      "palier": "pro"
+    },
+    {
+      "data_end": 32212254720,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "data_end": 32212254720,
+      "error": "trop_gros",
+      "palier": "plus"
+    },
+    {
+      "bucket": 491521,
+      "data_end": 32212254720,
+      "palier": "pro"
+    },
+    {
+      "data_end": 32212254721,
+      "error": "trop_gros",
+      "palier": "gratuit"
+    },
+    {
+      "data_end": 32212254721,
+      "error": "trop_gros",
+      "palier": "plus"
+    },
+    {
+      "data_end": 32212254721,
+      "error": "trop_gros",
+      "palier": "pro"
+    }
+  ],
+  "description": "Paliers payants (spec §38.8.1, conception du paiement §11) : paliers connus, plus grand palier de chaque formule, palier canonique et réservation par formule. Calculé par un outil indépendant (Python) ; rejoué par le moteur Rust (tests/paliers.rs) et le serveur Go (internal/share).",
+  "paid_buckets": [
+    81921,
+    163841,
+    327681,
+    491521
+  ],
+  "paliers": {
+    "gratuit": {
+      "content_max": 2147483648,
+      "data_segments": 512,
+      "max_bucket": 32769,
+      "tier": 0
+    },
+    "plus": {
+      "content_max": 10737418240,
+      "data_segments": 2560,
+      "max_bucket": 163841,
+      "tier": 1
+    },
+    "pro": {
+      "content_max": 32212254720,
+      "data_segments": 7680,
+      "max_bucket": 491521,
+      "tier": 2
+    }
+  },
+  "reservation_for": [
+    {
+      "bucket": 1,
+      "palier": "gratuit",
+      "used": 0
+    },
+    {
+      "bucket": 1,
+      "palier": "plus",
+      "used": 0
+    },
+    {
+      "bucket": 1,
+      "palier": "pro",
+      "used": 0
+    },
+    {
+      "bucket": 80,
+      "palier": "gratuit",
+      "used": 1
+    },
+    {
+      "bucket": 80,
+      "palier": "plus",
+      "used": 1
+    },
+    {
+      "bucket": 80,
+      "palier": "pro",
+      "used": 1
+    },
+    {
+      "bucket": 160,
+      "palier": "gratuit",
+      "used": 2
+    },
+    {
+      "bucket": 160,
+      "palier": "plus",
+      "used": 2
+    },
+    {
+      "bucket": 160,
+      "palier": "pro",
+      "used": 2
+    },
+    {
+      "bucket": 32769,
+      "palier": "gratuit",
+      "used": 512
+    },
+    {
+      "bucket": 32769,
+      "palier": "plus",
+      "used": 512
+    },
+    {
+      "bucket": 32769,
+      "palier": "pro",
+      "used": 512
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 513
+    },
+    {
+      "bucket": 81921,
+      "palier": "plus",
+      "used": 513
+    },
+    {
+      "bucket": 81921,
+      "palier": "pro",
+      "used": 513
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 1280
+    },
+    {
+      "bucket": 81921,
+      "palier": "plus",
+      "used": 1280
+    },
+    {
+      "bucket": 81921,
+      "palier": "pro",
+      "used": 1280
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 2560
+    },
+    {
+      "bucket": 163841,
+      "palier": "plus",
+      "used": 2560
+    },
+    {
+      "bucket": 163841,
+      "palier": "pro",
+      "used": 2560
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 2561
+    },
+    {
+      "error": "trop_gros",
+      "palier": "plus",
+      "used": 2561
+    },
+    {
+      "bucket": 327681,
+      "palier": "pro",
+      "used": 2561
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 5120
+    },
+    {
+      "error": "trop_gros",
+      "palier": "plus",
+      "used": 5120
+    },
+    {
+      "bucket": 327681,
+      "palier": "pro",
+      "used": 5120
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 7680
+    },
+    {
+      "error": "trop_gros",
+      "palier": "plus",
+      "used": 7680
+    },
+    {
+      "bucket": 491521,
+      "palier": "pro",
+      "used": 7680
+    },
+    {
+      "error": "trop_gros",
+      "palier": "gratuit",
+      "used": 7681
+    },
+    {
+      "error": "trop_gros",
+      "palier": "plus",
+      "used": 7681
+    },
+    {
+      "error": "trop_gros",
+      "palier": "pro",
+      "used": 7681
+    }
+  ]
+}

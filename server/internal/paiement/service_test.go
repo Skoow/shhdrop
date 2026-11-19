@@ -446,9 +446,10 @@ func TestSchemaPaiements(t *testing.T) {
 		}
 		got = append(got, tb+"."+col)
 	}
-	want := "commandes.id commandes.q commandes.offre commandes.jours commandes.renouvelle commandes.moyen commandes.etat " +
-		"commandes.abonnement commandes.cree_jour commandes.garde_jour passes.q passes.offre passes.debut_jour passes.fin_jour " +
-		"passes.jetons passes.recharge_jour passes.revoque refs.r refs.commande refs.jour"
+	want := "cles_jetons.jour cles_jetons.offre cles_jetons.sk " +
+		"commandes.id commandes.q commandes.offre commandes.jours commandes.renouvelle commandes.moyen commandes.etat " +
+		"commandes.abonnement commandes.cree_jour commandes.garde_jour depenses.h depenses.jour passes.q passes.offre passes.debut_jour passes.fin_jour " +
+		"passes.jetons passes.recharge_jour passes.revoque passes.emis_jour passes.emis_n refs.r refs.commande refs.jour"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("schéma :\n%s\nattendu :\n%s", strings.Join(got, " "), want)
 	}
@@ -482,5 +483,39 @@ func TestNewServiceRefus(t *testing.T) {
 		if _, err := NewService(c); err == nil {
 			t.Errorf("%+v accepté", c)
 		}
+	}
+}
+
+// TestMigrationV1 : une base de la version 1 (sans jetons) est migrée à l'ouverture, ses pass
+// gardés.
+func TestMigrationV1(t *testing.T) {
+	chemin := filepath.Join(t.TempDir(), "p.db")
+	db, err := sql.Open("sqlite", "file:"+chemin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v1 := strings.NewReplacer(`,
+  emis_jour INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_jour)='integer' AND emis_jour >= 0 AND emis_jour % 86400 = 0),
+  emis_n INTEGER NOT NULL DEFAULT 0 CHECK(typeof(emis_n)='integer' AND emis_n >= 0)) WITHOUT ROWID;`, ") WITHOUT ROWID;").Replace(schemaPaiements)
+	if strings.Contains(v1, "emis_n") {
+		t.Fatal("schéma v1 mal reconstitué")
+	}
+	if _, err := db.Exec(v1); err != nil {
+		t.Fatal(err)
+	}
+	db.Exec(`INSERT INTO passes VALUES(?,1,0,86400,30,0,0)`, make([]byte, 32))
+	db.Exec(`PRAGMA user_version=1`)
+	db.Close()
+	db, err = OuvrirBase(chemin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var n, emis int
+	db.QueryRow(`SELECT count(*), sum(emis_n) FROM passes`).Scan(&n, &emis)
+	var v int
+	db.QueryRow(`PRAGMA user_version`).Scan(&v)
+	if n != 1 || emis != 0 || v != 2 {
+		t.Fatal(n, emis, v)
 	}
 }

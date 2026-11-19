@@ -23,8 +23,8 @@ use crate::elements::ELEMENT_AD;
 use crate::envelope::ContentKeys;
 use crate::error::{Error, Result};
 use crate::format::{
-    BUCKETS, CHUNK, CHUNK_CT, HEADER, MANIFEST_MAX, PREVIEW_MAX, SEG_CHUNKS, TEXT_MAX, bucket_for,
-    header, nonce, segment_size,
+    CHUNK, CHUNK_CT, HEADER, MANIFEST_MAX, PREVIEW_MAX, Palier, SEG_CHUNKS, TEXT_MAX,
+    bucket_for_palier, header, is_bucket, nonce, segment_size,
 };
 use crate::kdf::hkdf;
 use crate::manifest::{self, Kind, Manifest};
@@ -195,7 +195,7 @@ impl<P: Platform, S: Segments> Reader<P, S> {
     /// viennent de `content_keys_checked` (engagement déjà vérifié contre R) et ne servent qu'à
     /// l'ouverture (le manifeste) : le lecteur ne garde que les clés des éléments.
     pub async fn open(p: &Rc<P>, src: S, bucket: u32, keys: &ContentKeys<P>) -> Result<Self> {
-        if !BUCKETS.contains(&bucket) {
+        if !is_bucket(bucket) {
             return Err(Error::PaquetCorrompu);
         }
         let src = Source {
@@ -240,7 +240,7 @@ impl<P: Platform, S: Segments> Reader<P, S> {
             .map(|e| e.offset + e.size)
             .max()
             .unwrap_or(0);
-        if bucket_for(data_end).ok() != Some(bucket) {
+        if bucket_for_palier(data_end, Palier::Pro).ok() != Some(bucket) {
             return Err(Error::PaquetCorrompu);
         }
 

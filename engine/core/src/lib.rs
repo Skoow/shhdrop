@@ -9,6 +9,8 @@ pub mod encoding;
 pub mod envelope;
 mod error;
 pub mod format;
+#[cfg(feature = "jetons")]
+pub mod jetons;
 pub mod kdf;
 mod keys;
 pub mod link;
