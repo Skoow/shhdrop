@@ -1,6 +1,6 @@
 <script lang="ts">
   // Réglages du salon (plan C-5) : règle d'effacement (tout participant, v3 §5), puis pour le
-  // créateur : places, renouvellement (le salon peut raccourcir : dit avant de confirmer, §14.7),
+  // créateur : places, renouvellement, nouvelle invitation (exigence 24, étapes (a) puis (d) à (h)), (le salon peut raccourcir : dit avant de confirmer, §14.7),
   // destruction ; pour un membre : destruction si le salon le permet ; pour tous : « Quitter »,
   // « Quitter et signaler » (spec §39.5).
   import { t, getLang } from "../../i18n/i18n.svelte";
@@ -12,6 +12,8 @@
   import Stepper from "../../ui/Stepper.svelte";
   import Button from "../../ui/Button.svelte";
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
+  import CopyField from "../../ui/CopyField.svelte";
+  import QrCode from "../../ui/QrCode.svelte";
 
   const vue = S.vue;
   const lang = $derived(getLang());
@@ -71,7 +73,30 @@
         message = erreur(await S.renouveler(duree));
       }}
     />
+    <InlineConfirm
+      label={t("salon.invitation.nouvelle")}
+      message={t("salon.invitation.confirm")}
+      confirmLabel={t("salon.invitation.nouvelle")}
+      kind="warn"
+      triggerVariant="secondary"
+      onconfirm={async () => {
+        message = erreur(await S.exclureSiege());
+      }}
+    />
     {#if message}<p class="note" role="status">{message}</p>{/if}
+  </section>
+{/if}
+
+{#if vue.createur && vue.nouvelleInvitation}
+  <!-- Nouvelle invitation (§39.13) : affichée ici, jamais placée dans la barre d'adresse. -->
+  <section class="bloc" aria-labelledby="invitation-t">
+    <h2 id="invitation-t">{t("salon.invitation.titre")}</h2>
+    <p class="note">{t("salon.invitation.note")}</p>
+    <CopyField label={t("salon.ready.link")} value={vue.nouvelleInvitation.lien} />
+    <div class="qr"><QrCode text={vue.nouvelleInvitation.lien} label={t("salon.ready.link")} /></div>
+    <CopyField label={t("salon.ready.password")} value={vue.nouvelleInvitation.mdp} whole />
+    <p class="note">{t("salon.ready.password.hint")}</p>
+    <div><Button variant="ghost" dense onpress={() => (vue.nouvelleInvitation = null)}>{t("salon.invitation.masquer")}</Button></div>
   </section>
 {/if}
 
@@ -129,6 +154,10 @@
     margin: 0;
     color: var(--text-2);
     font-size: 0.875rem;
+  }
+  .qr {
+    justify-self: start;
+    max-width: 220px;
   }
   .fin {
     justify-items: start;

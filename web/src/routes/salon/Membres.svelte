@@ -1,11 +1,12 @@
 <script lang="ts">
   // Participants (spec §39.5, v3 §14.1) : couleur, pseudonyme (jamais la couleur seule), « vous »,
   // créateur, en ligne ou dernière connexion (heure de cet appareil, à la minute), puis « Quitter
-  // le salon ». Codes de vérification, exclusion et réglages : plan C-5.
+  // le salon ». Codes de vérification, exclusion (créateur) et réglages : plan C-5.
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatClock } from "../../i18n/format";
   import * as S from "../../salon/salon.svelte";
   import Gestion from "./Gestion.svelte";
+  import InlineConfirm from "../../ui/InlineConfirm.svelte";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -22,6 +23,13 @@
     void vue.rev;
     for (const s of conv.presents) if (conv.avatars.get(s)) void S.avatarDe(s);
   });
+
+  // Exclusion (spec §39.5, v3 exigences 24, 25 et 29) : réservée au créateur, jamais sur lui-même.
+  let exclusion = $state("");
+  async function exclureMembre(siege: number, qui: string): Promise<void> {
+    const e = await S.exclureSiege(siege);
+    exclusion = e === null ? t("salon.exclure.fait", { nom: qui }) : t("salon.gestion.err.generique");
+  }
 
   function nom(s: number): string {
     const n = conv.nom(s);
@@ -51,6 +59,9 @@
         <span class="nom"><bdi>{l.nom}</bdi>{#if l.s === conv.moi}{" "}({t("salon.room.you")}){/if}{#if l.s === conv.createurSiege}{" · "}{t("salon.room.creator")}{/if}</span>
         <span class="vu">{l.vu}</span>
         {#if l.aAvatar && l.s !== conv.moi}<button type="button" class="masquer" aria-pressed={S.masques.has(l.s)} onclick={() => (S.masques.has(l.s) ? S.masques.delete(l.s) : S.masques.add(l.s))}>{t("salon.avatar.masquer")}</button>{/if}
+        {#if vue.createur && l.s !== conv.moi}
+          <InlineConfirm dense label={t("salon.exclure")} triggerName={t("salon.exclure.nom", { nom: l.nom })} message={t("salon.exclure.confirm", { nom: l.nom })} confirmLabel={t("salon.exclure")} kind="danger" triggerVariant="ghost" onconfirm={() => exclureMembre(l.s, l.nom)} />
+        {/if}
         {#if l.code}
           <details class="code">
             <summary>{t("salon.code.voir", { nom: l.nom })}{#if l.verifie}{" · "}{t("salon.code.verifie")}{/if}</summary>
@@ -64,6 +75,7 @@
     </li>
   {/each}
 </ul>
+{#if exclusion}<p class="note" role="status">{exclusion}</p>{/if}
 <section class="codes" aria-label={t("salon.code.titre")}>
   <p class="note">{t("salon.code.inciter")}</p>
   <p class="note">{t("salon.code.createur")}</p>

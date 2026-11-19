@@ -18,7 +18,11 @@ export type Sorte = "texte" | "reponse";
 /** État d'un de nos messages : en attente du moteur ou du serveur, accepté, refusé. */
 export type EtatEnvoi = "envoi" | "envoye" | "echec";
 
+/** Nom et couleur de l'ancien occupant d'un siège libéré, figés à son départ. */
+export type Fige = { pseudo: string | null; couleur: number };
+
 export type Bulle = {
+  fige?: Fige;
   k: "bulle";
   /** Clé stable (identifiant en hexadécimal, ou « l<n> » avant le chiffrement). */
   cle: string;
@@ -60,11 +64,12 @@ export type PieceInfo = {
   progres: number | null;
 };
 
-export type Systeme =
+export type Systeme = { fige?: Fige } & (
   | { k: "sys"; cle: string; quoi: "arrivee" | "depart" | "retour" | "exclusion" | "code" | "createur"; siege: number }
   | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string }
   | { k: "sys"; cle: string; quoi: "regle"; siege: number; regle: Regle }
-  | { k: "sys"; cle: string; quoi: "renouvellement" | "invitation"; siege: number };
+  | { k: "sys"; cle: string; quoi: "renouvellement" | "invitation"; siege: number }
+);
 
 export type Element = Bulle | Systeme;
 type SansCle<T> = T extends unknown ? Omit<T, "cle"> : never;
@@ -114,6 +119,26 @@ export class Conversation {
   nom(siege: number): { pseudo: string | null; numero: number } {
     return { pseudo: this.profils.get(siege)?.pseudo ?? null, numero: siege + 1 };
   }
+
+  // Le serveur redonne un siège libéré (départ, exclusion) au prochain arrivant : les messages et
+  // lignes de l'ancien occupant gardent SON nom et SA couleur, figés à son départ, jamais ceux du
+  // suivant (sinon un message serait attribué à quelqu'un d'autre). Gardé sur l'élément lui-même :
+  // l'écran en fait des copies.
+  /** Nom de l'auteur d'un élément du fil (figé si son siège a été libéré depuis). */
+  nomDe(e: Element): { pseudo: string | null; numero: number } {
+    return e.fige ? { pseudo: e.fige.pseudo, numero: e.siege + 1 } : this.nom(e.siege);
+  }
+  couleurDe(e: Element): number {
+    return e.fige?.couleur ?? this.couleur(e.siege);
+  }
+  #liberer(siege: number): void {
+    const f: Fige = { pseudo: this.profils.get(siege)?.pseudo ?? null, couleur: this.couleur(siege) };
+    for (const e of this.elements) if (e.siege === siege && !e.fige) e.fige = f;
+    this.profils.delete(siege);
+    this.avatars.delete(siege);
+    this.presence.delete(siege);
+    this.verifies.delete(siege);
+  }
   couleur(siege: number): number {
     return this.profils.get(siege)?.couleur ?? siege % COULEURS;
   }
@@ -154,6 +179,7 @@ export class Conversation {
   }
   depart(siege: number, exclusion = false): void {
     if (this.presents.delete(siege) || exclusion) this.#sys({ k: "sys", quoi: exclusion ? "exclusion" : "depart", siege });
+    this.#liberer(siege);
     this.ecrit.delete(siege);
     this.#change();
   }

@@ -110,6 +110,25 @@ describe("conversation", () => {
     c.groupe({ ajoutes: [0], retires: [0], createurRevenu: true, membres: [0, 1, 2] });
     expect(c.elements.map((e) => (e.k === "sys" ? `${e.quoi}:${e.siege}` : "b"))).toEqual(["arrivee:2", "retour:2", "code:2", "createur:0", "retour:0"]);
   });
+  it("siège libéré puis redonné : l'ancien occupant garde son nom et sa couleur dans le fil", () => {
+    const c = conv(0);
+    c.message(5, 1, 3, env(1, { k: "profil", pseudo: "Hugo", couleur: 4, avatar: null }));
+    c.message(6, 1, 3, env(2, { k: "texte", x: "de Hugo" }));
+    c.depart(1, true);
+    c.arrivee(1);
+    c.groupe({ ajoutes: [1], retires: [], createurRevenu: false, membres: [0, 1, 2] });
+    // Avant le profil du nouveau : « Participant 2 », jamais « Hugo ».
+    expect(c.nom(1)).toEqual({ pseudo: null, numero: 2 });
+    c.message(9, 1, 3, env(3, { k: "profil", pseudo: "Inès", couleur: 6, avatar: null }));
+    c.message(10, 1, 3, env(4, { k: "texte", x: "de Inès" }));
+    const [hugo, ines] = bulles(c);
+    expect([c.nomDe(hugo!).pseudo, c.couleurDe(hugo!)]).toEqual(["Hugo", 4]);
+    expect([c.nomDe(ines!).pseudo, c.couleurDe(ines!)]).toEqual(["Inès", 6]);
+    const sys = c.elements.filter((e) => e.k === "sys");
+    expect(sys.map((e) => `${e.quoi}:${c.nomDe(e).pseudo}`)).toEqual(["exclusion:Hugo", "arrivee:Inès"]);
+    // Aucun « Hugo s'appelle maintenant Inès ».
+    expect(sys.some((e) => e.quoi === "pseudo")).toBe(false);
+  });
   it("règle d'effacement (C-5) : défaut 5 min, la plus récente en ordre seq gagne, ligne affichée", () => {
     const c = conv(0);
     expect(c.regle).toBe(2);

@@ -40,6 +40,11 @@
     const n = conv.nom(siege);
     return n.pseudo ?? t("salon.room.participant", { n: n.numero });
   }
+  /** Auteur d'un élément du fil : nom figé si son siège a été redonné depuis. */
+  function nomDe(e: Element): string {
+    const n = conv.nomDe(e);
+    return n.pseudo ?? t("salon.room.participant", { n: n.numero });
+  }
 
   let texte = $state("");
   let saisie: HTMLTextAreaElement | undefined = $state();
@@ -260,13 +265,13 @@
     if (!b.cite) return null;
     const o = conv.bulle(b.cite);
     if (!o || o.retire) return { nom: "", texte: t("salon.room.quote.gone") };
-    return { nom: nom(o.siege), texte: o.texte };
+    return { nom: nomDe(o), texte: o.texte };
   }
   function ligne(e: Extract<Element, { k: "sys" }>): string {
     if (e.quoi === "pseudo") return t("salon.room.sys.pseudo", { avant: e.avant, apres: e.apres });
     if (e.quoi === "createur") return t("salon.room.sys.createur");
-    if (e.quoi === "regle") return t("salon.room.sys.regle", { nom: nom(e.siege), regle: t(`salon.regle.${e.regle as 1 | 2 | 3}`) });
-    return t(`salon.room.sys.${e.quoi}`, { nom: nom(e.siege) });
+    if (e.quoi === "regle") return t("salon.room.sys.regle", { nom: nomDe(e), regle: t(`salon.regle.${e.regle as 1 | 2 | 3}`) });
+    return t(`salon.room.sys.${e.quoi}`, { nom: nomDe(e) });
   }
   const attente = $derived(vue.attenteDepuis === null ? "" : maintenant - vue.attenteDepuis > 30_000 ? t("salon.room.wait.long") : maintenant - vue.attenteDepuis > 2_000 ? t("salon.room.wait.short") : "");
   const large = typeof matchMedia === "function" && matchMedia("(min-width: 1100px)").matches;
@@ -303,9 +308,9 @@
           {#if e.k === "sys"}
             <li class="sys">{ligne(e)}</li>
           {:else}
-            <li class={["msg", { moi: e.moi }, `c${conv.couleur(e.siege)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
+            <li class={["msg", { moi: e.moi }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
               <div class="bulle">
-                {#if !e.moi}<span class="auteur">{nom(e.siege)}</span>{/if}
+                {#if !e.moi}<span class="auteur">{nomDe(e)}</span>{/if}
                 {#if e.retire}
                   <p class="retire">{t("salon.room.retracted")}</p>
                 {:else}
@@ -359,7 +364,7 @@
         {#if ecrivent.length === 1}{t("salon.room.typing.un", { nom: nom(ecrivent[0]!) })}{:else if ecrivent.length > 1}{t("salon.room.typing.plusieurs")}{/if}
       </p>
       {#if nonLus > 0 && !enBas}
-        <button type="button" class="bas" aria-label={t("salon.room.down")} onclick={() => aller(true)}>↓ <span>{t("salon.room.unread", { n: nonLus })}</span></button>
+        <button type="button" class="bas" aria-label={`${t("salon.room.unread", { n: nonLus })} · ${t("salon.room.down")}`} onclick={() => aller(true)}><span aria-hidden="true">↓ </span><span>{t("salon.room.unread", { n: nonLus })}</span></button>
       {/if}
 
       <div class="saisie">
@@ -378,7 +383,7 @@
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
         {#if reponse}
           <div class="contexte">
-            <span>{t("salon.room.reply.to", { nom: nom(reponse.siege) })}</span>
+            <span>{t("salon.room.reply.to", { nom: nomDe(reponse) })}</span>
             <button type="button" aria-label={t("salon.room.reply.cancel")} onclick={() => (reponse = null)}>✕</button>
           </div>
         {/if}

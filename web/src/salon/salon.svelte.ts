@@ -764,7 +764,6 @@ export async function detruire(signaler = false): Promise<boolean> {
   }
 }
 
-/** « Quitter et signaler » (spec §39.5) : le serveur fait partir le membre et compte le signalement. */
 /**
  * Créateur : exclut `siege` (ou change seulement l'invitation) ; la nouvelle invitation est
  * affichée et, si le salon est dans l'historique, gardée comme l'ancienne (lien de gestion
@@ -789,6 +788,7 @@ export async function exclureSiege(siege?: number): Promise<string | null> {
   }
 }
 
+/** « Quitter et signaler » (spec §39.5) : le serveur fait partir le membre et compte le signalement. */
 export async function quitterEtSignaler(): Promise<boolean> {
   const x = s;
   if (!x?.client) return false;
