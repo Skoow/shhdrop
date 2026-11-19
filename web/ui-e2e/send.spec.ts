@@ -109,7 +109,7 @@ test.describe("fr-FR", () => {
 
     // Envoi en cours : aucune coche « Envoyé » avant l'accusé du dernier segment.
     await expect(page.getByRole("heading", { name: "Chiffrement et envoi" })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/^Bloc \d \/ 3$/)).toBeVisible({ timeout: 30_000 }); // la note est un élément (D41-37)
+    await expect(page.getByText(/^Blocs reçus par le serveur\s: \d \/ 3$/)).toBeVisible({ timeout: 30_000 }); // la note est un élément (D41-37)
     await expect(stepItem(page, "Envoyé")).toHaveCount(0);
     await expect(page.locator(".stats")).toHaveCSS("font-variant-numeric", "tabular-nums");
     await page.waitForTimeout(300);
@@ -270,7 +270,7 @@ test.describe("fr-FR", () => {
     await page.goto(shh.origin + "/");
     await addFile(page, "doc.bin", 10 * MIB);
     await sendButton(page).click();
-    await expect(page.getByText(/^Bloc \d+ \/ \d+$/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/^Blocs reçus par le serveur\s: \d+ \/ \d+$/)).toBeVisible({ timeout: 30_000 });
     expect(await armed(page)).toBe(true);
     expect(m.link()).toBeDefined();
     // Événement `pagehide` (celui que le navigateur envoie à la fermeture) : l'envoi est annulé et
@@ -424,7 +424,7 @@ test.describe("captures 390", () => {
     await addFile(page, "releve-annuel.bin", 9 * MIB);
     await sendButton(page).click();
     // Note, photo, vidéo : un segment chacune ; relevé : 3 (spec §41.14, D41-37).
-    await expect(page.getByText(/^Bloc \d \/ 6$/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/^Blocs reçus par le serveur\s: \d \/ 6$/)).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(800);
     await capture(page, "seal-progress-390");
     expect(await noHScroll(page)).toBe(true);
