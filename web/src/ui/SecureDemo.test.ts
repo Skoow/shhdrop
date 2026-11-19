@@ -52,7 +52,7 @@ describe("SecureDemo", () => {
     expect(items[1]).toContain("Chiffré dans votre appareil");
     expect(items[3]).toContain("ni nom de fichier, ni mot de passe, ni adresse IP");
     expect(items[4]).toContain("Le mot de passe ne part jamais");
-    expect(items[6]).toContain("Puis plus rien");
+    expect(items[6]).toContain("Tout s'efface");
     const svg = root().querySelector("svg")!;
     expect(svg.closest('[aria-hidden="true"]')).not.toBeNull();
     // Nom du groupe : le titre de l'infographie.

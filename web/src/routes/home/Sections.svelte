@@ -1,5 +1,5 @@
 <script module lang="ts">
-  // Nuée de points de l'illustration « Partagez, puis plus rien » : positions tirées une fois, à
+  // Nuée de points de l'illustration « Partagez » : positions tirées une fois, à
   // graine fixe (même dessin au build et dans la page), plus clairsemées vers la droite.
   function cloud() {
     let s = 0x5eed;
@@ -23,7 +23,7 @@
 
 <script lang="ts">
   // Accueil, sous le héros (refonte du 19 novembre, 3 et 4, maquette « La trame ») : sections sombres
-  // sur le fond de la page (.soft) et un panneau crème arrondi (.panel, ui/base.css). « Comment ça marche » : trois
+  // sur le fond de la page (.soft) et plaques en relief à texture (.slab, ui/base.css). « Comment ça marche » : trois
   // illustrations fixes (document, document en trame fermé à clé, document qui part en points),
   // aucune animation (l'infographie du héros suffit). « Pensé pour la confidentialité » : fond
   // crème, titre à gauche, liste à droite. « Offres » : les trois cartes.
@@ -43,7 +43,7 @@
   const PAGE = "M0 0H92L124 32V160H0Z";
 </script>
 
-<section class="sec how soft" id="comment" aria-labelledby="how-title">
+<section class="sec how slab dots" id="comment" aria-labelledby="how-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="how-title" tabindex="-1">{t("home.how.title")}</h2>
     <p>{t("home.how.lede")}</p>
@@ -94,7 +94,7 @@
   <SecureDemo labelledby="demo-title" />
 </section>
 
-<section class="sec priv panel" aria-labelledby="priv-title">
+<section class="sec priv slab pictos" aria-labelledby="priv-title">
   <div class="head rv" {@attach reveal}>
     <h2 id="priv-title" tabindex="-1">{t("home.priv.title")}</h2>
     <p>{t("home.priv.lede")}</p>
@@ -118,11 +118,12 @@
   </ul>
   <!-- Le lien en deux (propriétaire, 19 novembre, 3 ; remplace la décision du 16 novembre de ne plus
        le montrer ici) : l'adresse va au serveur ; tout ce qui suit le « # » reste dans le navigateur.
-       Exemple, jamais une vraie clé. -->
+       Exemple de la longueur réelle (43 caractères : la clé de 32 octets en base64url), jamais une
+       vraie clé. -->
   <figure class="link rv" data-key-note {@attach reveal}>
     <div class="lk" aria-hidden="true">
       <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">shhgone.com/s</span></span>
-      <span class="lk-b"><span class="lk-l"><KeyRound size={13} strokeWidth={2} />{t("home.key.browser")}</span><span class="lk-v num">#Kq7mXw2Rt9</span></span>
+      <span class="lk-b"><span class="lk-l"><KeyRound size={13} strokeWidth={2} />{t("home.key.browser")}</span><span class="lk-v num">#Kq7mXw2Rt9pLz4VbN8cYe1HsJ6uFa3DgQo5WtM0rEiA</span></span>
     </div>
     <figcaption>{t("home.key.note")}</figcaption>
   </figure>
@@ -259,23 +260,9 @@
     }
   }
 
-  /* ---------- Confidentialité : fond crème, texte foncé (maquette « La trame ») ---------- */
-  .priv {
-    --ink: #0c0e12;
-    color: var(--ink);
-    /* Le texte garde sa marge dans le panneau (à 12 px des bords de l'écran). */
-    padding-inline: clamp(16px, 3vw, 48px);
-  }
-  /* Trame claire à droite, très légère. */
-  .priv::before {
-    background:
-      radial-gradient(circle, rgb(12 14 18 / 0.06) 1.6px, transparent 2.2px) 0 0 / 10px 10px,
-      rgb(var(--sb));
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
+  /* ---------- Confidentialité : plaque en relief aux pictos (19 novembre, 5) ---------- */
   .priv .head p {
-    color: #3d4250;
+    color: #aab6d3;
   }
   .plist {
     display: grid;
@@ -288,10 +275,10 @@
   .prow {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr);
-    border-block-start: 1px solid rgb(12 14 18 / 0.14);
+    border-block-start: 1px solid rgb(233 236 242 / 0.08);
     gap: var(--sp-4);
     padding-block: var(--sp-5);
-    border-block-end: 1px solid rgb(12 14 18 / 0.14);
+    border-block-end: 1px solid rgb(233 236 242 / 0.08);
   }
   .box {
     display: grid;
@@ -300,11 +287,11 @@
     height: 22px;
     margin-block-start: 3px;
     border-radius: 6px;
-    box-shadow: inset 0 0 0 1.5px rgb(12 14 18 / 0.4);
-    color: #0c0e12;
+    box-shadow: inset 0 0 0 1.5px rgb(233 236 242 / 0.35);
+    color: var(--on-accent);
   }
   .box.on {
-    background: #2fbf8d;
+    background: var(--accent);
     box-shadow: none;
   }
   .tile-ic {
@@ -312,7 +299,7 @@
     place-items: center;
     width: 28px;
     height: 28px;
-    color: var(--ink);
+    color: var(--text-2);
   }
   .prow h3,
   .prow p {
@@ -321,14 +308,15 @@
   }
   .prow p {
     margin: 0;
-    color: #3d4250;
+    color: #aab6d3;
     line-height: 1.55;
   }
   .pill {
     display: inline-block;
     padding: 1px 8px;
     border-radius: var(--r-pill);
-    box-shadow: inset 0 0 0 1px rgb(12 14 18 / 0.4);
+    background: rgb(95 227 181 / 0.1);
+    color: var(--accent);
     font-family: var(--font-mono);
     font-size: 0.6875rem;
     font-weight: 600;
@@ -340,10 +328,10 @@
     gap: var(--sp-2);
     min-height: 44px;
     margin-block-start: var(--sp-2);
-    color: var(--ink);
+    color: var(--accent);
     font-weight: 650;
     text-decoration: underline;
-    text-decoration-thickness: 2px;
+    text-decoration-thickness: 1px;
     text-underline-offset: 6px;
   }
   .more :global(svg) {
@@ -353,11 +341,11 @@
     transform: translateX(4px);
   }
   .more:focus-visible {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--accent);
     outline-offset: 3px;
     border-radius: 6px;
   }
-  /* Le lien en deux : sombre sur le crème, la clé en menthe. */
+  /* Le lien en deux : l'adresse, puis la clé en menthe. */
   .link {
     display: grid;
     gap: var(--sp-3);
@@ -366,10 +354,10 @@
   }
   .lk {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     border-radius: var(--r-xl);
-    background: #12151c;
-    box-shadow: 0 24px 50px -30px rgb(12 14 18 / 0.6);
+    background: rgb(7 9 13 / 0.7);
+    box-shadow: inset 0 0 0 1px rgb(233 236 242 / 0.08);
     overflow: hidden;
   }
   .lk-a,
@@ -397,7 +385,7 @@
   }
   .lk-v {
     font-family: var(--font-mono);
-    font-size: clamp(1rem, 0.8rem + 0.9vw, 1.5rem);
+    font-size: clamp(0.9375rem, 0.75rem + 0.6vw, 1.25rem);
     color: #c9d1e6;
     overflow-wrap: anywhere;
   }
@@ -407,7 +395,7 @@
   }
   .link figcaption {
     max-width: 60ch;
-    color: #3d4250;
+    color: #8f9cbd;
     font-size: var(--fs-small);
     line-height: 1.55;
   }
@@ -447,11 +435,8 @@
     }
   }
   @media (forced-colors: active) {
-    .priv,
-    .priv .head p,
-    .prow p,
     .more {
-      color: CanvasText;
+      color: LinkText;
     }
   }
 </style>

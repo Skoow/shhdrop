@@ -114,7 +114,7 @@ test.describe("fr-FR", () => {
     // vers la droite, coupés par le titre) n'entrent pas dans cette mesure.
     const overflow = await page.evaluate(() =>
       [document.querySelector(".home")!, ...document.querySelectorAll(".home > *, .home section *")]
-        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".band, .soft, .panel, .home"))
+        .filter((e) => getComputedStyle(e).overflowX === "visible" && !e.closest(".tile, .sr-only, svg, .words") && !e.matches(".band, .soft, .slab, .home"))
         .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0)
         .map((e) => `${e.tagName}.${(e as HTMLElement).className} ${e.scrollWidth} > ${e.clientWidth}`),
     );

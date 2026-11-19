@@ -11,7 +11,7 @@
 
 <!-- Fond bleu nuit et trame à gauche (maquette « La trame », 19 novembre, 3) ; titre à gauche,
      questions à droite sur ordinateur. -->
-<section class="faq soft" aria-labelledby="faq-title">
+<section class="faq slab fine" aria-labelledby="faq-title">
   <h2 id="faq-title" class="rv" {@attach reveal}>{t("home.faq.title")}</h2>
   <div class="qa">
     {#each qs as k (k)}
@@ -30,14 +30,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-6);
     padding-block: 112px 120px;
-  }
-  /* Trame de points légère à gauche, qui s'efface vers la droite (sur le fond de la page). */
-  .faq::before {
-    background:
-      radial-gradient(50% 260px at 50% 0, rgb(95 227 181 / 0.06), transparent 75%),
-      radial-gradient(circle, rgb(233 236 242 / 0.07) 1.3px, transparent 1.9px) 0 0 / 9px 9px;
-    -webkit-mask-image: linear-gradient(90deg, #000, transparent 55%);
-    mask-image: linear-gradient(90deg, #000, transparent 55%);
   }
   details {
     scroll-margin-top: 96px;
