@@ -101,3 +101,9 @@ Rôles (repris du client de test `web/e2e/salon-client.ts`, plus les exigences C
 - [ ] **Step 1 :** test : un compte (inscription par l'interface, faux SMTP), création du salon, lien et mot de passe lus sur « Salon prêt », le créateur entre ; un second contexte de navigateur ouvre le lien, tape le mot de passe, choisit un pseudonyme, entre ; échange de messages dans les deux sens, réaction, réponse, modification, retrait, « écrit », coches « vu », présence ; puis recherche, dans le dossier de données et les sorties du serveur, des textes, pseudonymes, mot de passe, lien et clés : aucun.
 - [ ] **Step 2 :** chromium-desktop et chromium-mobile verts.
 - [ ] **Step 3 :** `npm test`, `npm run check`, `npm run test:e2e`, `build:demo` + `check-dist --demo`, `go vet`, `go test -race` ; commit.
+
+## État (19 novembre)
+
+Faits et testés : Tasks 1 à 7 (protocole, routes, client de production, fil, routes et entrées, écrans, Playwright à deux navigateurs contre le vrai serveur avec « le serveur ne voit rien » étendu au salon par l'interface ; chromium-desktop et chromium-mobile). Point 9 changé : le renouvellement MLS est fait par chaque membre après 100 de ses trames ou 1 h (le compteur de générations d'OpenMLS est celui de chaque expéditeur), pas seulement par le plus petit siège. Point 10 : son et silencieux non faits.
+
+Restes : preuve de membre (point 5) ; séparateur « Nouveaux messages » (seul le bouton « Aller aux derniers messages » avec le nombre de non-lus existe) ; texte de plus de 2 000 caractères proposé en fichier `.txt` (l'écran le refuse avec son message) ; WebKit non lancé (comme `compte.spec.ts`).

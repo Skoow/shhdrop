@@ -33,3 +33,15 @@
 
 ### Task 5 : exclusion et nouvelle invitation (si fait)
 - [ ] test de bout en bout : exclusion, retrait, rotation, refondation ; l'exclu ne lit plus rien ; l'ancienne invitation n'ouvre plus rien ; la nouvelle fait entrer.
+
+## État (19 novembre)
+
+Faits et testés : Tasks 1 à 4 (renouvellement de bout en bout, `web/e2e/salon-ui.test.ts` ; règle, codes et destruction par l'interface, `web/ui-e2e/salon.spec.ts` ; fil, `conversation.test.ts`).
+
+Restes, avec leur raison :
+- **Task 5, exclusion et nouvelle invitation (exigences 24, 25, 29 ; §39.13)** : non faite (rotation, refondation chez chacun, nouvelle invitation et nouvelle preuve, réécriture des clés du client). Le bouton « Exclure » n'est pas proposé : un retrait MLS seul laisserait l'exclu lire l'enveloppe (C-P1). À faire avant l'ouverture publique.
+- **Exigence 27** (alerte « X est encore dans le groupe chiffré ») : non faite.
+- **Son et silencieux (§14.4)** : non faits (point 5).
+- **Recoller le lien de gestion seul (`#s`)** : ignoré pour l'instant (le retour du créateur passe par l'historique local, point 6).
+- **Créateur délogé** : « Reprendre la main ici » rouvre le lien d'invitation ; « Détruire le salon » depuis l'écran de fin n'est pas proposé (le jeton de gestion est déjà effacé ; la destruction reste possible depuis « Salon » après être revenu).
+
