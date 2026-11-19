@@ -69,7 +69,8 @@ describe("création puis ouverture (texte, image 300 Kio, fichier 5 Mio)", () =>
     const o = await openShare(r.link, PW, srv().origin, (d, t) => dl.push([d, t]));
     // À l'ouverture : en-tête et manifeste, lus ensemble (A4) ; la note, déchiffrée dès
     // l'ouverture (D41-37), est dans un de ces deux segments, gardés (A3) : aucune lecture de plus.
-    expect(dl).toEqual([[1, 3], [3, 3]]);
+    // Les deux lectures partent ensemble : l'ordre des rappels varie (CI du 18 novembre).
+    expect([...dl].sort((x, y) => x[0] - y[0])).toEqual([[1, 3], [3, 3]]);
     expect(o.manifest.items.map((e) => [e.kind, e.name, e.mime])).toEqual([
       ["text", "", "text/plain"],
       ["file", "photo.jpg", "image/jpeg"],
@@ -80,7 +81,8 @@ describe("création puis ouverture (texte, image 300 Kio, fichier 5 Mio)", () =>
     expect(Buffer.from(await o.item(2)).equals(Buffer.from(fichier))).toBe(true);
     // Segments 0 et 2 repris de l'ouverture (A3) : seul le segment 1 est lu en plus ; chaque
     // segment n'est téléchargé qu'une fois.
-    expect(dl).toEqual([[1, 3], [3, 3], [2, 3]]);
+    expect([...dl.slice(0, 2)].sort((x, y) => x[0] - y[0])).toEqual([[1, 3], [3, 3]]); // lues ensemble
+    expect(dl.slice(2)).toEqual([[2, 3]]);
     await o.done();
     // maxOpens = 1 et téléchargement terminé : partage effacé.
     await expect(fetchMeta(r.link, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
