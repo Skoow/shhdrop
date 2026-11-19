@@ -27,7 +27,7 @@ test("Détruire (dernière ouverture permise) : pied séparé par un filet, conf
   const destroy = page.getByRole("button", { name: "Détruire ce partage", exact: true });
   await expect(destroy).toHaveClass(/ghost/);
   // Texte exact (audit I5 ; D42-22 : retour possible jusqu'à l'échéance, plus de suppression au départ).
-  await expect(page.getByText("Vous êtes la dernière personne à pouvoir ouvrir ce partage\u202f: personne d'autre ne pourra l'ouvrir. En général, vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur. Vous pouvez aussi le détruire maintenant.")).toBeVisible();
+  await expect(page.getByText("Personne d'autre ne pourra ouvrir ce partage. En général, vous pouvez y revenir depuis ce navigateur jusqu'à son échéance, puis il sera effacé du serveur. Vous pouvez aussi le détruire maintenant.")).toBeVisible();
   // Dit aussi en haut de la page (audit I5).
   await expect(page.locator("[data-last-top]")).toHaveText("Dernière ouverture\u202f: personne d'autre ne pourra l'ouvrir. En général, vous pouvez y revenir depuis ce navigateur jusqu'à l'échéance.");
 

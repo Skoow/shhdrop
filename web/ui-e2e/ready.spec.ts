@@ -162,7 +162,7 @@ test.describe("fr-FR", () => {
     await expect(page.getByText("Actif", { exact: true })).toBeVisible();
     await expect(page.locator("[data-deadline] .ends")).toHaveText(/^Se termine le 6\snov\. à 9\sh\s41$/);
     await expect(page.locator("[data-deadline] .left")).toHaveCount(0); // heure de fin seule (audit M16)
-    await expect(page.getByText(/^S'efface tout seul\s: après 1\souverture, ou à cette heure \(12\sh après l'envoi, arrondies au quart d'heure supérieur\)\.$/)).toBeVisible();
+    await expect(page.getByText(/^S'efface tout seul\s: après 1\souverture, ou à cette heure \(12\sh après l'envoi, arrondie au quart d'heure supérieur\)\.$/)).toBeVisible();
     await expect(page.getByText(/disparaît de partout/)).toHaveCount(0);
 
     const p2 = await context.newPage();
@@ -176,7 +176,7 @@ test.describe("fr-FR", () => {
     if (isMobile) await p2.keyboard.press("Escape");
     await sendButton(p2).click();
     await expect(readyHeading(p2)).toBeVisible({ timeout: 60_000 });
-    await expect(p2.getByText(/^S'efface tout seul\s: après 3\souvertures, ou à cette heure \(6\sh après l'envoi, arrondies au quart d'heure supérieur\)\.$/)).toBeVisible();
+    await expect(p2.getByText(/^S'efface tout seul\s: après 3\souvertures, ou à cette heure \(6\sh après l'envoi, arrondie au quart d'heure supérieur\)\.$/)).toBeVisible();
     await expect(p2.locator("[data-deadline] .ends")).toHaveText(/^Se termine le 6\snov\. à 3\sh\s36$/);
     await expect(p2.locator("[data-deadline] .left")).toHaveCount(0);
   });

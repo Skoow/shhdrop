@@ -30,7 +30,7 @@ test("destinataire, dernière ouverture : bulle du cadenas, groupes, « Détruir
   const head = page.locator('[data-group="texte"] .gh');
   expect(await head.evaluate((e) => getComputedStyle(e).borderBottomStyle)).toBe("none");
   // Dernière ouverture : « Détruire ce partage » et sa phrase ; Signaler dans le pied de page seulement (UI7).
-  await expect(page.getByText(/^Vous êtes la dernière personne à pouvoir ouvrir ce partage : personne d'autre ne pourra l'ouvrir\./)).toBeVisible();
+  await expect(page.getByText(/^Personne d'autre ne pourra ouvrir ce partage\./)).toBeVisible();
   await expect(page.getByRole("button", { name: "Détruire ce partage", exact: true })).toBeVisible();
   await expect(page.locator("header.top").getByRole("button", { name: /Signaler/ })).toHaveCount(0);
   await expect(page.locator("footer[data-foot]").getByRole("button", { name: "Signaler ce partage" })).toBeVisible();
@@ -74,7 +74,7 @@ test("Lien prêt : échéance en deux lignes", async ({ page, shh, isMobile }) =
   await expect(dl.locator(".ends")).toHaveText(/^Se termine le \d+\s\S+ à \d+\sh\s\d{2}$/);
   // Heure de fin seule (audit M16) ; l'arrondi est dit dans la phrase.
   await expect(dl.locator(".left")).toHaveCount(0);
-  await expect(page.getByText(/arrondies au quart d'heure supérieur/)).toBeVisible();
+  await expect(page.getByText(/arrondie au quart d'heure supérieur/)).toBeVisible();
   await settle(page);
   await page.screenshot({ path: `${SHOTS}ready-deadline-${w(isMobile)}.png` });
 });

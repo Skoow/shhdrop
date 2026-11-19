@@ -152,7 +152,7 @@ test("M16, M22, I2 : « Lien prêt » : heure de fin seule et arrondi dit ; h1 ;
   await toReady(page, shh.origin);
   await expect(page.locator("h1", { hasText: "Lien prêt" })).toBeVisible();
   await expect(page.locator("[data-deadline] .left")).toHaveCount(0);
-  await expect(page.getByText(/arrondies au quart d'heure supérieur/)).toBeVisible();
+  await expect(page.getByText(/arrondie au quart d'heure supérieur/)).toBeVisible();
   await shot(page, "m16-lien-pret", isMobile);
   // Du bouton Terminé, Tab mène au pied : liens désactivés mais atteignables, avec leur raison.
   await page.getByRole("button", { name: "Terminé" }).focus();

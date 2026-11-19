@@ -325,11 +325,11 @@ test.describe("fr-FR", () => {
     await browse(page, [...PHOTOS.slice(0, 2), f("contrat.pdf")]);
     await removeItem(page, "plage-nuit.jpg");
     await expect(rows(page)).toHaveCount(2);
-    await page.getByRole("group", { name: "plage-nuit.jpg supprimé" }).getByRole("button", { name: "Annuler" }).click();
+    await page.getByRole("group", { name: "Supprimé\u202f: plage-nuit.jpg" }).getByRole("button", { name: "Annuler" }).click();
     await expect(rows(page)).toHaveCount(3);
     await removeItem(page, "contrat.pdf");
     await expect(rows(page)).toHaveCount(2);
-    await page.getByRole("group", { name: "contrat.pdf supprimé" }).getByRole("button", { name: "Annuler" }).click();
+    await page.getByRole("group", { name: "Supprimé\u202f: contrat.pdf" }).getByRole("button", { name: "Annuler" }).click();
     await expect(rows(page)).toHaveCount(3);
     await clearAll(page);
     await expect(page.locator(".dropzone.empty")).toBeVisible(); // page d'envoi vide (D41-37)
