@@ -10,6 +10,7 @@ import { ClientSalon, type EvClient, type WsLike } from "../src/salon/client";
 import { preparer } from "../src/salon/creation";
 import * as api from "../src/salon/api";
 import { envoyerPiece, lirePiece } from "../src/salon/pieces";
+import { exclure } from "../src/salon/exclusion";
 import { solveAltcha } from "./altcha";
 import { startServer, type TestServer } from "./server";
 
@@ -135,14 +136,15 @@ describe("salon : client de production, vrai serveur", () => {
     expect(p.nom).toBe("rapport.pdf");
     const lu = new Uint8Array(await (await lirePiece(net, b!.c.jeton, p)).arrayBuffer());
     expect(lu).toEqual(contenu);
-    // Vocal (défaut signalé, plan C-4) : le plus petit vocal non vide prend le palier 16
-    // (1 048 880 o ; le palier 1 ne garde que le morceau du manifeste) et la réserve d'un siège
-    // neuf est vide : le premier vocal attend environ 4 min de présence. Le serveur le dit (429 et
-    // délai), l'écran aussi (« Doucement »), sans rien envoyer.
-    const e = await envoyerPiece(net, a!.c.jeton, new Blob([new Uint8Array(4000)]), { nom: "vocal.webm", mime: "audio/webm", vocal: true }).catch((x) => x);
-    expect(e).toBeInstanceOf(api.SalonError);
+    // Vocal : le plus petit vocal non vide prend le palier 16 (1 048 880 o) ; la réserve de départ
+    // d'un participant (décision du 19 novembre) le fait passer tout de suite, sans attendre.
+    const voix = new Uint8Array(4000).fill(7);
+    const rv = await envoyerPiece(net, a!.c.jeton, new Blob([voix]), { nom: "vocal.webm", mime: "audio/webm", vocal: true });
+    expect(rv.palier).toBe(16);
+    expect(new Uint8Array(await (await lirePiece(net, b!.c.jeton, rv)).arrayBuffer())).toEqual(voix);
+    // Le second, aussitôt : la réserve est vide, 429 avec le délai (au rythme d'une voix).
+    const e = await envoyerPiece(net, a!.c.jeton, new Blob([voix]), { nom: "vocal.webm", mime: "audio/webm", vocal: true }).catch((x) => x);
     expect(e).toMatchObject({ status: 429, code: "limit" });
-    expect(e.retryS).toBeGreaterThan(200);
   });
 
   it("reconnexion : rattrapage avec `depuis`, ni perte ni doublon", async () => {
@@ -245,6 +247,85 @@ describe("salon : renouvellement (exigence C-3 22)", () => {
     expect(b.c.empreinte(0)).toBe(codeA);
     a.c.envoyer({ k: "texte", x: "après le renouvellement" }, 2);
     await attendre(b, texteRecu("après le renouvellement"), 30_000);
+  });
+});
+
+describe("salon : exclusion et nouvelle invitation (exigences 24, 25)", () => {
+  let srv: TestServer;
+  let eng: SalonEngine;
+  const fermer: ClientSalon[] = [];
+  beforeAll(async () => {
+    srv = await startServer({ salons: true });
+    eng = await loadSalonEngine();
+  });
+  afterAll(async () => {
+    for (const c of fermer) c.fermer();
+    await srv?.dispose();
+  });
+
+  it("le créateur exclut C : C ne reçoit plus rien, le groupe est refondé, l'ancienne invitation est morte, la nouvelle fait entrer", async () => {
+    const net = { origin: srv.origin, fetch: (...x: Parameters<typeof fetch>) => fetch(...x) };
+    const mdp = generatePassword();
+    const p = await preparer(eng, mdp, { ttlHours: 1, maxMembers: 5, membersCanDestroy: false });
+    const cap = await (await fetch(srv.origin + "/api/captcha")).json();
+    const recu = Date.now();
+    const { shown_at, fallback: _f, ...defi } = cap;
+    const pv = await solveAltcha(defi);
+    await dormir(Math.max(0, recu + 3100 - Date.now()));
+    const rc = await fetch(srv.origin + "/api/salons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shh-Access": p.entetes.acces, "X-Shh-Manage": p.entetes.gestion },
+      body: JSON.stringify({ ...p.corps, altcha: (pv as { payload: string }).payload, hp: "", shown_at }),
+    });
+    expect(rc.status).toBe(201);
+    const mk = async (kLien: Uint8Array, o: { cles?: ReturnType<SalonEngine["clesSalon"]>; mdp?: string; sGestion?: Uint8Array; creerGroupe?: boolean }) => {
+      let cles = o.cles;
+      if (!cles) {
+        const acces = eng.cleAcces(kLien);
+        const meta = await api.meta(net, acces.k);
+        const kMdp = await passwordKey(o.mdp!, meta.salt, { ops: meta.kdfOps, mem: meta.kdfMem });
+        cles = eng.clesSalon(kLien, kMdp);
+      }
+      const evs: EvClient[] = [];
+      const garde: { ws?: WsLike } = {};
+      const { client } = await ClientSalon.entrer(deps(srv, eng, garde), { kLien, cles, sGestion: o.sGestion, creerGroupe: o.creerGroupe });
+      client.ecouter((e) => evs.push(e));
+      fermer.push(client);
+      return { c: client, evs, ws: () => garde.ws };
+    };
+    const membres = async (m: Membre, s: number[]) => {
+      const fin = Date.now() + 30_000;
+      while (JSON.stringify(m.c.membres()) !== JSON.stringify(s)) {
+        if (Date.now() > fin) throw new Error(`siège ${m.c.siege} : membres ${JSON.stringify(m.c.membres())}`);
+        await dormir(20);
+      }
+    };
+    const a = await mk(p.kLien, { cles: p.cles, sGestion: p.sGestion, creerGroupe: true });
+    const b = await mk(p.kLien, { mdp });
+    const c = await mk(p.kLien, { mdp });
+    await membres(a, [0, 1, 2]);
+    await membres(c, [0, 1, 2]);
+    const codeB = a.c.empreinte(1);
+    const inv = await exclure(net, eng, a.c, 2);
+    // C : exclu tout de suite (0x05 raison 5 ou 4002), plus rien ensuite.
+    await attendre(c, (e) => e.k === "fin" && e.raison === "exclu");
+    // A et B : rotation reçue, groupe refondé sous les nouvelles clés, sans C.
+    await attendre(a, (e) => e.k === "rotation");
+    await attendre(b, (e) => e.k === "rotation");
+    await membres(a, [0, 1]);
+    await membres(b, [0, 1]);
+    expect(a.c.empreinte(1)).toBe(codeB); // codes gardés à travers la refondation (refonder)
+    a.c.envoyer({ k: "texte", x: "après l'exclusion" }, 2);
+    await attendre(b, texteRecu("après l'exclusion"), 30_000);
+    expect(c.evs.some(texteRecu("après l'exclusion"))).toBe(false);
+    // L'ancienne invitation n'ouvre plus rien (404 identique à un salon inconnu).
+    const ancien = eng.cleAcces(p.kLien);
+    await expect(api.meta(net, ancien.k)).rejects.toMatchObject({ status: 404 });
+    // La nouvelle fait entrer D, ajouté au groupe refondé ; D lit la suite.
+    const d = await mk(inv.kLien, { mdp: inv.mdp });
+    await membres(d, [0, 1, d.c.siege]);
+    b.c.envoyer({ k: "texte", x: "bienvenue D" }, 2);
+    await attendre(d, texteRecu("bienvenue D"), 30_000);
   });
 });
 

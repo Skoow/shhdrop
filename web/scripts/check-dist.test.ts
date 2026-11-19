@@ -311,7 +311,7 @@ describe("check-dist.mjs, production", () => {
     expect(prod(bruit(420_000))).toEqual([]);
     const gros = prod(bruit(440_000));
     expect(gros).toHaveLength(1);
-    expect(gros[0]).toMatch(/^assets\/salon-AbCd1234\.wasm : \d+ octets en brotli, plus que 430 000 \(module du salon\)$/);
+    expect(gros[0]).toMatch(/^assets\/salon-AbCd1234\.wasm : \d+ octets en brotli, plus que 435 000 \(module du salon\)$/);
     // Cité sans son empreinte : refusé comme tout .wasm.
     const d = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const a="/assets/salon-AbCd1234.wasm";' });
     writeFileSync(join(d, "assets/salon-AbCd1234.wasm"), "\0asm");

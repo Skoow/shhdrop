@@ -132,6 +132,14 @@ pub enum Message {
     Vu {
         ids: Vec<IdMessage>,
     },
+    /// Accusé « Ouvert » (salon v3 §14.2, `piece_ouverte`) : pièces affichées dans la visionneuse.
+    PieceOuverte {
+        ids: Vec<IdMessage>,
+    },
+    /// Accusé « Téléchargé » (salon v3 §14.2, `piece_telechargee`) : pièces enregistrées sur l'appareil.
+    PieceTelechargee {
+        ids: Vec<IdMessage>,
+    },
     Regle {
         regle: Regle,
     },
@@ -208,7 +216,10 @@ fn verifier(e: &Enveloppe) -> Result<()> {
                 Err(Error::MessageInvalide)
             }
         }
-        Message::Recu { ids } | Message::Vu { ids } => {
+        Message::Recu { ids }
+        | Message::Vu { ids }
+        | Message::PieceOuverte { ids }
+        | Message::PieceTelechargee { ids } => {
             if (1..=IDS_MAX).contains(&ids.len()) {
                 Ok(())
             } else {
@@ -368,6 +379,14 @@ fn ecrire(w: &mut Plafond, e: &Enveloppe) -> std::io::Result<()> {
         }
         Message::Vu { ids: i } => {
             k(w, "vu")?;
+            ids(w, i)?;
+        }
+        Message::PieceOuverte { ids: i } => {
+            k(w, "piece_ouverte")?;
+            ids(w, i)?;
+        }
+        Message::PieceTelechargee { ids: i } => {
+            k(w, "piece_telechargee")?;
             ids(w, i)?;
         }
         Message::Regle { regle } => {
@@ -628,6 +647,8 @@ fn message(sorte: &str, o: &mut Map<String, Value>) -> Result<Message> {
         "ecrit" => Message::Ecrit,
         "recu" => Message::Recu { ids: liste_ids(o)? },
         "vu" => Message::Vu { ids: liste_ids(o)? },
+        "piece_ouverte" => Message::PieceOuverte { ids: liste_ids(o)? },
+        "piece_telechargee" => Message::PieceTelechargee { ids: liste_ids(o)? },
         "regle" => Message::Regle {
             regle: regle_depuis(entier(o, "regle")?)?,
         },
@@ -701,11 +722,16 @@ pub fn nouvel_id() -> Result<IdMessage> {
     Ok(id)
 }
 
-/// Messages qui ne se rangent pas dans l'historique : « écrit… », accusés de réception et de lecture.
+/// Messages qui ne se rangent pas dans l'historique : « écrit… », accusés de réception, de lecture,
+/// d'ouverture et de téléchargement d'une pièce.
 pub fn est_volatile(m: &Message) -> bool {
     matches!(
         m,
-        Message::Ecrit | Message::Recu { .. } | Message::Vu { .. }
+        Message::Ecrit
+            | Message::Recu { .. }
+            | Message::Vu { .. }
+            | Message::PieceOuverte { .. }
+            | Message::PieceTelechargee { .. }
     )
 }
 
@@ -771,6 +797,10 @@ mod tests {
             Message::Recu { ids: vec![[6; 16]] },
             Message::Vu {
                 ids: (0..50u8).map(|i| [i; 16]).collect(),
+            },
+            Message::PieceOuverte { ids: vec![[7; 16]] },
+            Message::PieceTelechargee {
+                ids: vec![[8; 16], [9; 16]],
             },
             Message::Regle {
                 regle: Regle::CinqMinutes,
@@ -1239,7 +1269,11 @@ mod tests {
         for m in tous() {
             let attendu = matches!(
                 m,
-                Message::Ecrit | Message::Recu { .. } | Message::Vu { .. }
+                Message::Ecrit
+                    | Message::Recu { .. }
+                    | Message::Vu { .. }
+                    | Message::PieceOuverte { .. }
+                    | Message::PieceTelechargee { .. }
             );
             assert_eq!(est_volatile(&m), attendu, "{m:?}");
         }

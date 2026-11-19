@@ -104,6 +104,12 @@ Rôles (repris du client de test `web/e2e/salon-client.ts`, plus les exigences C
 
 ## État (19 novembre)
 
-Faits et testés : Tasks 1 à 7 (protocole, routes, client de production, fil, routes et entrées, écrans, Playwright à deux navigateurs contre le vrai serveur avec « le serveur ne voit rien » étendu au salon par l'interface ; chromium-desktop et chromium-mobile). Point 9 changé : le renouvellement MLS est fait par chaque membre après 100 de ses trames ou 1 h (le compteur de générations d'OpenMLS est celui de chaque expéditeur), pas seulement par le plus petit siège. Point 10 : son et silencieux non faits.
+Faits et testés : Tasks 1 à 7 (protocole, routes, client de production, fil, routes et entrées, écrans, Playwright à deux navigateurs contre le vrai serveur avec « le serveur ne voit rien » étendu au salon par l'interface ; chromium-desktop et chromium-mobile). Point 9 changé : le renouvellement MLS est fait par chaque membre après 100 de ses trames ou 1 h (le compteur de générations d'OpenMLS est celui de chaque expéditeur), pas seulement par le plus petit siège.
 
-Restes : preuve de membre (point 5) ; séparateur « Nouveaux messages » (seul le bouton « Aller aux derniers messages » avec le nombre de non-lus existe) ; texte de plus de 2 000 caractères proposé en fichier `.txt` (l'écran le refuse avec son message) ; WebKit non lancé (comme `compte.spec.ts`).
+Version finale (19 novembre, demande du propriétaire), faits et testés :
+- **Point 5, preuve de membre** : `web/src/salon/preuve.ts` (base `shhdrop-salon`, seule exception écrite de `source-rules.test.ts` dans le salon). *Décision par défaut, à valider :* AES-256-GCM de WebCrypto, clé non extractible tirée par le moteur (HKDF « membre-local » sur Argon2id ‖ K_lien), au lieu de XChaCha20-Poly1305 : le module du salon ne grossit pas. Rechargement : même place, sans page d'explication (`salon.spec.ts`).
+- **Point 10, son et silencieux** : `web/src/salon/son.ts` (+ tests) ; silencieux gardé dans la preuve chiffrée.
+- Séparateur « Nouveaux messages » ; texte trop long proposé en fichier `message.txt` (Playwright).
+- Accessibilité : bouton « non lus » (nom accessible qui commence par le texte visible).
+
+Restes : WebKit non lancé (comme `compte.spec.ts`).

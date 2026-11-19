@@ -18,7 +18,11 @@ export type Sorte = "texte" | "reponse";
 /** État d'un de nos messages : en attente du moteur ou du serveur, accepté, refusé. */
 export type EtatEnvoi = "envoi" | "envoye" | "echec";
 
+/** Nom et couleur de l'ancien occupant d'un siège libéré, figés à son départ. */
+export type Fige = { pseudo: string | null; couleur: number };
+
 export type Bulle = {
+  fige?: Fige;
   k: "bulle";
   /** Clé stable (identifiant en hexadécimal, ou « l<n> » avant le chiffrement). */
   cle: string;
@@ -41,6 +45,9 @@ export type Bulle = {
   attendus: number[];
   recus: number[];
   vus: number[];
+  /** Pièces (v3 §14.2) : sièges qui l'ont ouverte (affichée ou lue) et téléchargée. */
+  ouverts: number[];
+  telecharges: number[];
   /** Réactions : émoji → sièges, dans l'ordre d'arrivée. */
   reactions: { emoji: string; sieges: number[] }[];
   /** Pièce (plan C-4) : fichier, image, vidéo ou vocal ; null pour un texte. */
@@ -60,11 +67,12 @@ export type PieceInfo = {
   progres: number | null;
 };
 
-export type Systeme =
+export type Systeme = { fige?: Fige } & (
   | { k: "sys"; cle: string; quoi: "arrivee" | "depart" | "retour" | "exclusion" | "code" | "createur"; siege: number }
   | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string }
   | { k: "sys"; cle: string; quoi: "regle"; siege: number; regle: Regle }
-  | { k: "sys"; cle: string; quoi: "renouvellement"; siege: number };
+  | { k: "sys"; cle: string; quoi: "renouvellement" | "invitation"; siege: number }
+);
 
 export type Element = Bulle | Systeme;
 type SansCle<T> = T extends unknown ? Omit<T, "cle"> : never;
@@ -74,6 +82,8 @@ export type Presence = { enLigne: boolean; derniereMin: number };
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 const COULEURS = 10;
+/** Exigence 27 : « quelques secondes » d'écart toléré (un Commit de retrait est en route). */
+export const ECART_MS = 8000;
 
 export class Conversation {
   readonly elements: Element[] = [];
@@ -114,6 +124,41 @@ export class Conversation {
   nom(siege: number): { pseudo: string | null; numero: number } {
     return { pseudo: this.profils.get(siege)?.pseudo ?? null, numero: siege + 1 };
   }
+
+  // Le serveur redonne un siège libéré (départ, exclusion) au prochain arrivant : les messages et
+  // lignes de l'ancien occupant gardent SON nom et SA couleur, figés à son départ, jamais ceux du
+  // suivant (sinon un message serait attribué à quelqu'un d'autre). Gardé sur l'élément lui-même :
+  // l'écran en fait des copies.
+  /** Nom de l'auteur d'un élément du fil (figé si son siège a été libéré depuis). */
+  nomDe(e: Element): { pseudo: string | null; numero: number } {
+    return e.fige ? { pseudo: e.fige.pseudo, numero: e.siege + 1 } : this.nom(e.siege);
+  }
+  couleurDe(e: Element): number {
+    return e.fige?.couleur ?? this.couleur(e.siege);
+  }
+  // Écart entre le groupe et le serveur (v3 exigence 27) : un siège encore dans le groupe chiffré
+  // (`membres`) mais absent de la liste du serveur depuis plus de ECART_MS. Le nom gardé est celui
+  // de l'ancien occupant (son profil est oublié à son départ).
+  readonly #ecart = new Map<number, { depuis: number; pseudo: string | null }>();
+  #suivreEcart(): void {
+    for (const s of [...this.#ecart.keys()]) if (!this.membres.includes(s) || this.presents.has(s)) this.#ecart.delete(s);
+    for (const s of this.membres) if (s !== this.moi && !this.presents.has(s) && !this.#ecart.has(s)) this.#ecart.set(s, { depuis: this.maintenant(), pseudo: this.profils.get(s)?.pseudo ?? null });
+  }
+  /** Sièges à signaler « encore dans le groupe chiffré » (plus de ECART_MS d'écart). */
+  encoreDansLeGroupe(): { siege: number; pseudo: string | null; numero: number }[] {
+    const t = this.maintenant();
+    return [...this.#ecart].filter(([, e]) => t - e.depuis > ECART_MS).map(([siege, e]) => ({ siege, pseudo: e.pseudo, numero: siege + 1 }));
+  }
+  #liberer(siege: number): void {
+    // Écart noté AVANT d'oublier le profil : l'alerte garde le nom de l'ancien occupant.
+    this.#suivreEcart();
+    const f: Fige = { pseudo: this.profils.get(siege)?.pseudo ?? null, couleur: this.couleur(siege) };
+    for (const e of this.elements) if (e.siege === siege && !e.fige) e.fige = f;
+    this.profils.delete(siege);
+    this.avatars.delete(siege);
+    this.presence.delete(siege);
+    this.verifies.delete(siege);
+  }
   couleur(siege: number): number {
     return this.profils.get(siege)?.couleur ?? siege % COULEURS;
   }
@@ -146,14 +191,17 @@ export class Conversation {
   liste(sieges: number[], createur: number): void {
     this.presents = new Set(sieges);
     this.createurSiege = createur;
+    this.#suivreEcart();
     this.#change();
   }
   arrivee(siege: number): void {
     this.presents.add(siege);
+    this.#suivreEcart();
     this.#change();
   }
   depart(siege: number, exclusion = false): void {
     if (this.presents.delete(siege) || exclusion) this.#sys({ k: "sys", quoi: exclusion ? "exclusion" : "depart", siege });
+    this.#liberer(siege);
     this.ecrit.delete(siege);
     this.#change();
   }
@@ -165,6 +213,7 @@ export class Conversation {
   /** Commit fusionné : arrivées, départs, reprises (exigence 9), créateur revenu (34). */
   groupe(e: { ajoutes: number[]; retires: number[]; createurRevenu: boolean; membres: number[] }): void {
     this.membres = e.membres;
+    this.#suivreEcart();
     if (e.createurRevenu) this.#sys({ k: "sys", quoi: "createur", siege: this.createurSiege });
     for (const s of e.ajoutes) {
       if (s === this.moi) continue;
@@ -213,6 +262,8 @@ export class Conversation {
       attendus: this.membres.filter((s) => s !== this.moi),
       recus: [],
       vus: [],
+      ouverts: [],
+      telecharges: [],
       reactions: [],
       piece: null,
     };
@@ -299,6 +350,8 @@ export class Conversation {
           attendus: this.membres.filter((s) => s !== siege),
           recus: [],
           vus: [],
+          ouverts: [],
+          telecharges: [],
           reactions: [],
           piece: null,
         };
@@ -333,6 +386,21 @@ export class Conversation {
           if (!b || !b.moi || !b.attendus.includes(siege)) continue;
           if (!b.recus.includes(siege)) b.recus.push(siege);
           if (m.k === "vu" && !b.vus.includes(siege)) b.vus.push(siege);
+        }
+        this.#change();
+        return null;
+      }
+      case "piece_ouverte":
+      case "piece_telechargee": {
+        // Accusés d'une pièce (v3 §14.2) : de nos pièces seulement, d'un lecteur attendu. Ouvrir
+        // ou télécharger vaut aussi « reçu » et « vu ».
+        for (const i of m.ids) {
+          const b = this.#parId.get(hex(i));
+          if (!b || !b.moi || !b.piece || !b.attendus.includes(siege)) continue;
+          const l = m.k === "piece_ouverte" ? b.ouverts : b.telecharges;
+          if (!l.includes(siege)) l.push(siege);
+          if (!b.recus.includes(siege)) b.recus.push(siege);
+          if (!b.vus.includes(siege)) b.vus.push(siege);
         }
         this.#change();
         return null;
@@ -396,6 +464,12 @@ export class Conversation {
   /** Codes de vérification comparés ici (siège → code vérifié), annulés quand le code change (exigences 9, 29). */
   readonly verifies = new Map<number, string>();
 
+  /** Invitation changée (rotation, exigence 24) : ligne chez tous ; les codes restent (refonder). */
+  invitationChangee(): void {
+    this.#sys({ k: "sys", quoi: "invitation", siege: this.createurSiege });
+    this.#change();
+  }
+
   /** Renouvellement (0x10) : tout ce qui est de rang ≤ départ quitte l'écran ; les codes sont à revérifier. */
   renouveler(depart: number): string[] {
     const partis: string[] = [];
@@ -434,6 +508,8 @@ export class Conversation {
       attendus: this.membres.filter((s) => s !== siege),
       recus: [],
       vus: [],
+      ouverts: [],
+      telecharges: [],
       reactions: [],
       piece: null,
     };

@@ -25,8 +25,14 @@ const EN_PROBE = "One link, one password, then nothing.";
  * du texte (~96 Ko). Un fournisseur crypto limité à la suite 0x0001 pourrait le réduire plus tard.
  * 14 novembre 2026 : 429 684 o avec le pseudo du compte (pseudoValide, pseudoReserve), 316 o sous
  * le plafond : la prochaine fonction du salon le dépassera probablement (décision à prendre).
+ * 19 novembre 2026 (version finale du salon, consigne du propriétaire : relever le plafond avec une
+ * justification écrite) : 430 211 o avec les accusés de pièce `piece_ouverte` et
+ * `piece_telechargee` (v3 §14.2 ; deux sortes de message, leurs vecteurs communs). 430 000 → 435 000 :
+ * environ 4,8 Ko de marge pour les corrections, pas pour de nouvelles fonctions ; toute fonction
+ * nouvelle du moteur du salon repasse par une décision (ou par le fournisseur crypto réduit).
+ * La preuve de membre (D41-26) n'ajoute rien au module (HKDF du moteur de partage, AES-GCM de WebCrypto).
  */
-const SALON_BROTLI_MAX = 430_000;
+const SALON_BROTLI_MAX = 435_000;
 
 /**
  * Poids maximal du moteur des partages (assets/engine-*.wasm), en brotli : il est chargé par

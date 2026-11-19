@@ -21,6 +21,12 @@ import { solvePow } from "../captcha/pow";
 import { allEntries, recordShare } from "../history/live.svelte";
 import { b64u } from "../engine/pure";
 import { lireFragment } from "./liens";
+import { exclure } from "./exclusion";
+import * as preuve from "./preuve";
+import { finSilence } from "./son";
+import { createZip, zipName, ZIP_BLOB_MAX_SMALL } from "../zip/store-zip";
+import { cleMembreLocal, indexMembre } from "../engine/index";
+import { KDF_CREATE } from "../engine/pure";
 
 /**
  * Lien de gestion gardé dans l'historique local pour ce lien d'invitation (entrée `salon_cree`,
@@ -34,7 +40,7 @@ async function gestionGardee(kLien: Uint8Array): Promise<Uint8Array<ArrayBuffer>
 }
 import { creerSalon as creerAvecSession, profilPourSalon, CompteError } from "../account/session.svelte";
 
-export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin";
+export type Etape = "vide" | "chargement" | "motdepasse" | "explication" | "pret" | "conversation" | "fin" | "gestion";
 export type ErreurEntree = { code: "bad_password"; essais: number } | { code: "introuvable" | "complet" | "limite" | "reseau" | "serveur" | "indisponible"; retryS?: number };
 
 /** Ce que les écrans lisent (réactif). `rev` change à chaque événement du fil. */
@@ -48,7 +54,13 @@ export const vue = $state({
   createur: false,
   /** Salon prêt (créateur) : lien d'invitation, mot de passe, lien de gestion (affichés, jamais gardés). */
   pret: null as { lien: string; mdp: string; gestion: string } | null,
+  /** Créateur, après une exclusion ou « Nouveau lien d'invitation » : la nouvelle invitation (affichée, jamais gardée en clair). */
+  nouvelleInvitation: null as { lien: string; mdp: string } | null,
+  /** Lien de gestion ouvert seul (« #s… ») : sièges occupés, ou null. */
+  gestionSeule: null as { present: number } | null,
   monPseudo: null as string | null,
+  /** Silencieux (v3 §14.4) : 0 = son actif, -1 = toujours, sinon échéance (ms). Gardé dans la preuve de membre chiffrée. */
+  silence: 0,
   connexion: "connexion" as "connexion" | "ouvert" | "coupe",
   dansLeGroupe: false,
   /** Envoi retenu par le moteur depuis cet instant (exigence 23), ou null. */
@@ -67,9 +79,17 @@ type Session = {
   client?: ClientSalon;
   conv?: Conversation;
   sGestion?: Uint8Array<ArrayBuffer>;
+  /** S_gestion venu d'un lien de gestion collé (pas de l'historique) : abandonné si le serveur le refuse. */
+  gestionColle?: boolean;
+  /** K_lien de l'invitation d'origine, gardé après une rotation pour la preuve de membre. */
+  lienOrigine?: Uint8Array<ArrayBuffer>;
   couleur?: number;
   /** Notre photo pour ce salon (pièce chiffrée, v3 §7.2), annoncée dans notre profil. */
   avatar?: { r: Uint8Array; piece: Uint8Array; palier: number } | null;
+  /** Preuve de membre (D41-26) : index et clé locale (non extractible), tirés de l'invitation d'origine. */
+  preuve?: { index: Uint8Array<ArrayBuffer>; cle: CryptoKey | null; sel: Uint8Array<ArrayBuffer> | null };
+  /** K_maître_s courante (réécrite à chaque rotation) : seulement pour la preuve de membre. */
+  kMaitre?: Uint8Array<ArrayBuffer>;
   stop: (() => void)[];
 };
 let s: Session | undefined;
@@ -98,7 +118,7 @@ export function oublier(): void {
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, monPseudo: null, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
 }
 
 // --- Invité : lien, mot de passe -----------------------------------------------------------------
@@ -118,6 +138,13 @@ export async function ouvrirInvitation(kLien: Uint8Array<ArrayBuffer>): Promise<
   try {
     s.meta = await api.meta(net(), acces.k);
     s.sGestion = await gestionGardee(kLien);
+    // Lien de gestion ouvert juste avant dans cet onglet (« #s » seul, exigence C-3 32).
+    if (!s.sGestion && gestionColle) {
+      s.sGestion = gestionColle.slice();
+      s.gestionColle = true;
+    }
+    const index = await indexMembre(kLien);
+    s.preuve = { index, cle: null, sel: await preuve.lireSel(index) };
     vue.finMs = Date.now() + s.meta.expiresInS * 1000;
     vue.etape = "motdepasse";
   } catch (e) {
@@ -151,12 +178,30 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
     x.cles?.free();
     x.cles = x.eng.clesSalon(x.kLien, kMdp);
     const d = deps(x.eng);
+    // Preuve de membre (D41-26) : même place, même pseudonyme, sans `rejoindre`.
+    if (x.preuve?.sel && (await reprendreParLaPreuve(x, mdp, x.preuve.sel))) return true;
+    x.kMaitre = x.eng.cleMaitre(x.kLien, kMdp) as Uint8Array<ArrayBuffer>;
     // Créateur revenu (exigence C-3 32) : siège 0 avec J_gestion, rôle rendu dès le Commit qui
     // l'ajoute ; il ne fonde pas de groupe (les membres en ligne l'ajoutent ; sinon, groupe orphelin).
     const o = { kLien: x.kLien, cles: x.cles, sGestion: x.sGestion };
-    const entree = await ClientSalon.rejoindre(d, o);
+    let entree;
+    try {
+      entree = await ClientSalon.rejoindre(d, o);
+    } catch (e) {
+      // Lien de gestion collé d'un AUTRE salon : refusé (400) ; on entre comme simple membre.
+      if (!x.gestionColle || !(e instanceof api.SalonError) || e.code !== "bad_request") throw e;
+      x.sGestion?.fill(0);
+      x.sGestion = o.sGestion = undefined;
+      x.gestionColle = false;
+      entree = await ClientSalon.rejoindre(d, o);
+    }
     demarrer(x, ClientSalon.ouvrir(d, o, entree), entree);
     vue.etape = "explication";
+    // Preuve illisible avec le bon mot de passe (paquet abîmé) : effacée ; une neuve est préparée.
+    if (x.preuve) {
+      if (x.preuve.sel) await preuve.effacer(x.preuve.index);
+      void preparerPreuve(x, mdp);
+    }
     return true;
   } catch (e) {
     vue.erreur = erreurEntree(e);
@@ -165,6 +210,67 @@ export async function deverrouiller(mdp: string): Promise<boolean> {
   } finally {
     kMdp?.fill(0);
   }
+}
+
+// --- Lien de gestion seul (« #s… », exigence C-3 32) ------------------------------------------------
+
+/** S_gestion d'un lien de gestion ouvert seul, gardé en mémoire pour l'invitation ouverte ensuite. */
+let gestionColle: Uint8Array<ArrayBuffer> | undefined;
+
+/**
+ * Lien de gestion ouvert seul : il ne fait entrer personne (spec v3 §15.2). La page dit l'état du
+ * salon (sièges occupés, échéance), propose de le détruire, et garde S_gestion EN MÉMOIRE pour
+ * l'invitation ouverte ensuite dans cet onglet (le créateur y retrouve son rôle).
+ */
+export async function ouvrirGestion(sG: Uint8Array<ArrayBuffer>): Promise<void> {
+  oublier();
+  vue.etape = "chargement";
+  const eng = await loadSalonEngine().catch(() => null);
+  if (!eng) {
+    vue.erreur = { code: "reseau" };
+    vue.etape = "vide";
+    return;
+  }
+  const j = eng.jetonGestion(sG);
+  try {
+    const g = await api.gestion(net(), j);
+    oublierGestion();
+    gestionColle = sG.slice();
+    vue.gestionSeule = { present: g.present };
+    vue.finMs = Date.now() + g.expiresInS * 1000;
+    vue.etape = "gestion";
+  } catch (e) {
+    vue.erreur = erreurEntree(e);
+    vue.etape = "vide";
+  } finally {
+    j.fill(0);
+  }
+}
+
+/** « Détruire le salon » depuis le lien de gestion seul. */
+export async function detruireParGestion(): Promise<boolean> {
+  if (!gestionColle) return false;
+  const eng = await loadSalonEngine().catch(() => null);
+  if (!eng) return false;
+  const j = eng.jetonGestion(gestionColle);
+  try {
+    await api.detruire(net(), { jGestion: j });
+    oublierGestion();
+    vue.gestionSeule = null;
+    vue.fin = "detruit";
+    vue.etape = "fin";
+    return true;
+  } catch {
+    return false;
+  } finally {
+    j.fill(0);
+  }
+}
+
+/** Page quittée : le lien de gestion collé est oublié (mis à zéro). */
+export function oublierGestion(): void {
+  gestionColle?.fill(0);
+  gestionColle = undefined;
 }
 
 function deps(eng: SalonEngine) {
@@ -207,7 +313,8 @@ export async function creer(o: { ttlHours: Duree; maxMembers: number; membersCan
     const gestion = lienSalon(origin, "s", p.sGestion, import.meta.env.BASE_URL);
     if (o.garder)
       await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: Date.now() + r.expiresInS * 1000, maxOpens: 0 });
-    s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, stop: [] };
+    s = { eng, kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, kMaitre: p.kMaitre, preuve: { index: await indexMembre(p.kLien), cle: null, sel: null }, stop: [] };
+    void preparerPreuve(s, mdp);
     const d = deps(eng);
     const entree = await ClientSalon.rejoindre(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion });
     demarrer(s, ClientSalon.ouvrir(d, { kLien: p.kLien, cles: p.cles, sGestion: p.sGestion, creerGroupe: true }, entree), entree);
@@ -334,12 +441,17 @@ function surEvenement(x: Session, ev: EvClient): void {
       vue.finMs = Date.now() + ev.secondes * 1000;
       vue.places = ev.places;
       break;
+    case "rotation":
+      conv.invitationChangee();
+      void preuveRotation(x, ev.kMaitre).finally(() => ev.kMaitre.fill(0));
+      break;
     case "renouvellement":
       for (const cle of conv.renouveler(ev.depart)) liberer(cle);
       fichiersOuverts.clear();
       break;
     case "nouvelleEntree":
       conv.moi = ev.siege;
+      ecrirePreuve(x);
       if (vue.monPseudo) envoyerProfil(x);
       break;
     case "fin":
@@ -351,6 +463,9 @@ function surEvenement(x: Session, ev: EvClient): void {
       // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
       // (sauf exclusion : tout disparaît, spec §39.13.1b).
       x.client = undefined;
+      // Place perdue pour de bon (sauf délogé : la place existe encore) : preuve effacée.
+      if (ev.raison !== "remplace" && x.preuve) void preuve.effacer(x.preuve.index);
+      x.kMaitre?.fill(0);
       x.kLien.fill(0);
       x.sGestion?.fill(0);
       if (ev.raison === "exclu") {
@@ -392,6 +507,64 @@ export function verifierPseudo(p: string): { code: "longueur" | "caracteres" | "
 }
 
 /** « Entrer dans le salon » : pseudonyme annoncé (chiffré) aux membres, puis la conversation. */
+/** Clé locale de la preuve (un Argon2id de plus, sel neuf) ; écrite quand le pseudonyme est accepté. */
+async function preparerPreuve(x: Session, mdp: string): Promise<void> {
+  if (!x.preuve) return;
+  const sel = crypto.getRandomValues(new Uint8Array(16));
+  const kArgon = await passwordKey(mdp.normalize("NFC"), sel, KDF_CREATE).catch(() => null);
+  if (!kArgon || s !== x) {
+    kArgon?.fill(0);
+    return;
+  }
+  const cle = await preuve.importerCle(await cleMembreLocal(kArgon, origineLien(x)));
+  kArgon.fill(0);
+  x.preuve.cle = cle;
+  x.preuve.sel = sel;
+  ecrirePreuve(x);
+}
+/** K_lien de l'invitation d'origine (l'index et K_m en viennent, même après une rotation). */
+function origineLien(x: Session): Uint8Array {
+  return x.lienOrigine ?? x.kLien;
+}
+function ecrirePreuve(x: Session): void {
+  const c = x.client;
+  if (!x.preuve?.cle || !x.preuve.sel || !c || !vue.monPseudo || !x.kMaitre) return;
+  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion, silence: vue.silence }, vue.finMs);
+}
+
+/** Mode silencieux (v3 §14.4) : « toujours », 1 h, 8 h, ou null pour réactiver le son. */
+export function silencieux(choix: "toujours" | 1 | 8 | null): void {
+  vue.silence = choix === null ? 0 : finSilence(choix, Date.now());
+  if (s) ecrirePreuve(s);
+}
+/** Rotation reçue (ou faite) : la preuve garde la NOUVELLE K_maître_s (spec §39.13.3). */
+async function preuveRotation(x: Session, kMaitre: Uint8Array): Promise<void> {
+  x.kMaitre?.fill(0);
+  x.kMaitre = kMaitre.slice();
+  ecrirePreuve(x);
+}
+async function reprendreParLaPreuve(x: Session, mdp: string, sel: Uint8Array<ArrayBuffer>): Promise<boolean> {
+  const kArgon = await passwordKey(mdp.normalize("NFC"), sel, KDF_CREATE);
+  const cle = await preuve.importerCle(await cleMembreLocal(kArgon, x.kLien));
+  kArgon.fill(0);
+  const c = await preuve.ouvrir(x.preuve!.index, cle);
+  if (!c) return false;
+  x.preuve!.cle = cle;
+  x.kMaitre = c.kMaitre as Uint8Array<ArrayBuffer>;
+  x.couleur = c.couleur;
+  if (c.sGestion) x.sGestion = c.sGestion as Uint8Array<ArrayBuffer>;
+  const cles = x.eng.clesDepuisMaitre(c.kMaitre);
+  x.cles?.free();
+  x.cles = cles;
+  const client = ClientSalon.reprendre(deps(x.eng), { kLien: x.kLien, cles, jeton: c.jeton, siege: c.siege, sGestion: x.sGestion });
+  demarrer(x, client, { jeton: c.jeton, siege: c.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: Math.max(0, (vue.finMs - Date.now()) / 1000), maxMembers: vue.places, membersCanDestroy: false, budgetLeft: 0 });
+  vue.monPseudo = c.pseudo;
+  vue.silence = c.silence ?? 0;
+  envoyerProfil(x);
+  vue.etape = "conversation";
+  return true;
+}
+
 export function entrer(pseudo: string): boolean {
   const x = s;
   const v = verifierPseudo(pseudo);
@@ -400,6 +573,7 @@ export function entrer(pseudo: string): boolean {
   if (x.conv) x.conv.pseudoRefuse = false;
   envoyerProfil(x);
   vue.etape = "conversation";
+  ecrirePreuve(x);
   return true;
 }
 
@@ -485,6 +659,7 @@ function liberer(cle: string): void {
 function oublierPieces(): void {
   for (const k of Object.keys(pieces.urls)) liberer(k);
   originaux.clear();
+  accusesPiece.clear();
   pieces.aConfirmer = [];
   pieces.erreurs = {};
 }
@@ -603,9 +778,59 @@ export async function enregistrerPiece(b: Bulle): Promise<void> {
     }
     clickDownload(url, nom);
     setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+    accuserPiece(b, "piece_telechargee");
   } catch (e) {
     pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
   }
+}
+
+/**
+ * « Télécharger (N) » (v3 §14.3) : une seule archive .zip faite sur l'appareil (module zip
+ * existant : stockée, sans compression ni métadonnée, noms nettoyés par le moteur puis par
+ * zipName). 200 Mio au plus (l'archive est assemblée en mémoire). Chaque fichier envoie son
+ * accusé « Téléchargé ». Rend null, ou le code d'erreur.
+ */
+export async function telechargerArchive(bs: Bulle[]): Promise<"trop_gros" | "lecture" | "indisponible" | null> {
+  const x = s;
+  if (!x?.client || bs.length === 0) return "lecture";
+  const choisies = bs.filter((b) => b.piece && !b.retire && (b.piece.ref || originaux.has(b.cle)));
+  if (choisies.reduce((n, b) => n + b.piece!.taille, 0) > ZIP_BLOB_MAX_SMALL) return "trop_gros";
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  const z = createZip({
+    write: async (c) => void parts.push(c.slice()),
+    close: async () => undefined,
+    abort: async () => void (parts.length = 0),
+  });
+  const pris = new Set<string>();
+  try {
+    for (const b of choisies) {
+      const p = b.piece!;
+      const blob = originaux.get(b.cle) ?? (await lirePiece(net(), x.client.jeton, p.ref!));
+      const octets = new Uint8Array(await blob.arrayBuffer());
+      let nom = "fichier";
+      try {
+        nom = x.eng.nettoyerNom(p.nom) || nom;
+      } catch {
+        // nom refusé par le moteur : nom neutre
+      }
+      await z.add(zipName(nom, pris), octets.length, (async function* () {
+        yield octets;
+      })());
+    }
+    await z.finish();
+  } catch (e) {
+    await z.abort().catch(() => undefined);
+    return e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
+  }
+  const url = URL.createObjectURL(new Blob(parts, { type: "application/zip" }));
+  parts.length = 0;
+  clickDownload(url, "salon.zip");
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+  for (const b of choisies) {
+    fichiersOuverts.add(b.cle);
+    accuserPiece(b, "piece_telechargee");
+  }
+  return null;
 }
 
 /** Notre photo pour ce salon (ré-encodée 256 × 256 par ui/avatar.ts) : envoyée chiffrée, puis annoncée. */
@@ -638,12 +863,33 @@ export function reagir(b: Bulle, emoji: string): void {
   x.conv.reagirLocal(b.id, emoji);
 }
 
+/** Message déjà vu sur cet appareil (affiché 1 s, page visible). */
+export function estVu(b: Bulle): boolean {
+  return s?.conv?.vuLe.has(b.cle) === true;
+}
+/** Accusés de pièce déjà envoyés (clé de bulle + sorte) : une fois chacun. */
+const accusesPiece = new Set<string>();
+/**
+ * Accusé « Ouvert » ou « Téléchargé » d'une pièce reçue (v3 §14.2). Décision par défaut, à valider :
+ * « Ouvert » = contenu affiché ou lu dans l'application (image affichée dans un message vu, vocal ou
+ * vidéo lancés) ; le site n'a pas de visionneuse de documents (seulement « Enregistrer »).
+ */
+export function accuserPiece(b: Bulle, sorte: "piece_ouverte" | "piece_telechargee"): void {
+  const x = s;
+  if (!x?.client || b.moi || !b.id || !b.piece) return;
+  const k = `${b.cle}:${sorte}`;
+  if (accusesPiece.has(k)) return;
+  accusesPiece.add(k);
+  x.client.accuser(sorte, [hexOctets(b.id)]);
+}
+
 /** Message affiché 1 s, page visible : accusé « vu » (chiffré) et, règles 1 à 3, lecture au serveur. */
 export function vu(b: Bulle): void {
   const x = s;
   if (!x?.client || b.moi || !b.id) return;
   x.conv?.marquerVu(b.cle, Date.now());
   x.client.accuser("vu", [hexOctets(b.id)]);
+  if (b.piece?.sorte === "image" && pieces.urls[b.cle]) accuserPiece(b, "piece_ouverte");
   if (b.regle !== 0 && b.seq !== null) x.client.lu(b.seq);
 }
 
@@ -678,6 +924,30 @@ export async function detruire(signaler = false): Promise<boolean> {
     return false;
   } finally {
     j?.fill(0);
+  }
+}
+
+/**
+ * Créateur : exclut `siege` (ou change seulement l'invitation) ; la nouvelle invitation est
+ * affichée et, si le salon est dans l'historique, gardée comme l'ancienne (lien de gestion
+ * inchangé). Rend le code d'erreur, ou null.
+ */
+export async function exclureSiege(siege?: number): Promise<string | null> {
+  const x = s;
+  if (!x?.client || !x.sGestion) return "forbidden";
+  try {
+    const inv = await exclure(net(), x.eng, x.client, siege);
+    const lien = lienSalon(location.origin, "c", inv.kLien, import.meta.env.BASE_URL);
+    vue.nouvelleInvitation = { lien, mdp: inv.mdp };
+    if (await gestionGardee(x.kLien).catch(() => undefined)) {
+      const gestion = lienSalon(location.origin, "s", x.sGestion, import.meta.env.BASE_URL);
+      await recordShare({ sorte: "salon_cree", manage: gestion, link: lien, label: "", createdAt: Date.now(), sizeBytes: 0, itemsCount: 0, expiresAt: vue.finMs, maxOpens: 0 });
+    }
+    x.lienOrigine ??= x.kLien;
+    x.kLien = inv.kLien;
+    return null;
+  } catch (e) {
+    return e instanceof api.SalonError ? e.code : "reseau";
   }
 }
 

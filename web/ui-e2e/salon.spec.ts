@@ -38,7 +38,7 @@ const test = base.extend<{ smtp: FauxSMTP }, { site: string }>({
 test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
 // WebKit : comme compte.spec.ts (Chromium seulement pour l'instant).
 test.skip(({ browserName }) => browserName !== "chromium", "salon.spec.ts : Chromium (comme compte.spec.ts)");
-test.setTimeout(240_000);
+test.setTimeout(420_000); // parcours long : rechargement, exclusion, troisième navigateur
 
 const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
 const bouton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
@@ -113,6 +113,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   const erreursB: string[] = [];
   pageB.on("pageerror", (e) => erreursB.push(e.message));
   pageB.on("console", (m) => /Refused to|Content Security Policy/.test(m.text()) && erreursB.push(m.text()));
+  let ctxC: BrowserContext | undefined;
   try {
     await pageB.goto(lien);
     await expect(titre(pageB, "Salon de discussion")).toBeVisible();
@@ -191,11 +192,48 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     const dl = await telechargement;
     expect(dl.suggestedFilename()).toBe(nomDoc);
     expect(readFileSync((await dl.path())!, "utf8")).toBe(contenuDoc);
-    // Écran « Fichiers » : les deux pièces, du plus récent au plus ancien.
+    // Accusés de pièce (v3 §14.2) chez l'expéditrice : document « Téléchargé », photo « Ouvert ».
+    await expect(fil(page).locator("li").filter({ hasText: nomDoc }).locator(".accuses")).toHaveText("Téléchargé", { timeout: 30_000 });
+    await expect(fil(page).locator("li").filter({ hasText: `photo-${r}.jpg` }).locator(".accuses")).toHaveText("Ouvert", { timeout: 30_000 });
+    // Texte trop long (§39.5) : refusé, proposé en fichier « message.txt », reçu chez A.
+    const long = `Très long ${r} `.repeat(150);
+    await saisie(pageB).fill(long);
+    await zone(pageB).getByRole("button", { name: "Envoyer", exact: true }).click();
+    await expect(pageB.getByText("Ce texte est trop long pour un message", { exact: false })).toBeVisible();
+    await bouton(pageB, "Envoyer en fichier .txt").click();
+    await expect(fil(page).getByText("message.txt", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(saisie(pageB)).toHaveValue("");
+    // Silencieux (v3 §14.4) : 1 h, puis son réactivé.
+    await bouton(page, "Mettre en silencieux").click();
+    await bouton(page, "Pendant 1\u202fh").click();
+    await expect(bouton(page, "Réactiver le son")).toBeVisible();
+    await bouton(page, "Réactiver le son").click();
+    await expect(bouton(page, "Mettre en silencieux")).toBeVisible();
+    // Écran « Fichiers » : les pièces, du plus récent au plus ancien.
     await bouton(pageB, "Fichiers").click();
     await expect(pageB.getByRole("dialog").getByText(nomDoc, { exact: true })).toBeVisible();
     await capture(pageB, "salon-fichiers");
+    // Sélection multiple (v3 §14.3) : une archive .zip faite sur l'appareil, sans compression.
+    const dlg = pageB.getByRole("dialog");
+    await dlg.getByRole("button", { name: "Tout sélectionner", exact: true }).click();
+    const zipDl = pageB.waitForEvent("download");
+    await dlg.getByRole("button", { name: "Télécharger (3)", exact: true }).click();
+    const archive = await zipDl;
+    expect(archive.suggestedFilename()).toBe("salon.zip");
+    const octetsZip = readFileSync((await archive.path())!);
+    expect([...octetsZip.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(octetsZip.includes(Buffer.from(contenuDoc))).toBe(true); // stocké : octets tels quels
+    expect(octetsZip.includes(Buffer.from(nomDoc))).toBe(true);
     await pageB.keyboard.press("Escape");
+    // Album (v3 §14.3) : deux photos envoyées ensemble, en grille chez B ; chacune reste un message.
+    await zone(page).locator('input[type="file"]').setInputFiles([
+      { name: `album-1-${r}.jpg`, mimeType: "image/jpeg", buffer: image },
+      { name: `album-2-${r}.jpg`, mimeType: "image/jpeg", buffer: image },
+    ]);
+    await expect(fil(pageB).locator("li.msg.album img.img")).toHaveCount(2, { timeout: 60_000 });
+    await expect(fil(pageB).locator("li.msg.album .auteur")).toHaveCount(1);
+    await fil(pageB).locator("li.msg.album").last().scrollIntoViewIfNeeded();
+    await capture(pageB, "salon-album");
 
     // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
     await capture(page, "salon-conversation");
@@ -221,8 +259,62 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     expect(await axe(pageB)).toEqual([]);
     expect(erreursB).toEqual([]);
 
-    // --- Le serveur ne voit rien (test bloquant, étendu au salon par l'interface) -------------------
     const cle = (l: string) => l.slice(l.lastIndexOf("#") + 2);
+    // --- Preuve de membre (D41-26) : B recharge, rouvre le lien, retrouve SA place ------------------
+    await pageB.reload();
+    await pageB.goto(lien);
+    await champ(pageB, "Mot de passe du salon").fill(mdp);
+    await bouton(pageB, "Continuer").click();
+    await expect(fil(pageB)).toBeVisible({ timeout: 60_000 });
+    await expect(titre(pageB, "Un salon qui s'efface")).toHaveCount(0); // pas d'explication ni de pseudonyme à redonner
+    const t4 = `Après rechargement ${r}`;
+    await envoyer(pageB, t4);
+    await expect(bulle(page, t4)).toContainText(pseudoB, { timeout: 30_000 });
+    // Même place : une seule arrivée de B chez A, pas de « Participant 3 ».
+    await expect(fil(page).getByText(`${pseudoB} a rejoint le salon`)).toHaveCount(1);
+    await expect(page.getByText("Participant 3")).toHaveCount(0);
+
+    // --- Exclusion (exigences 24, 25, 29) : B exclu, nouvelle invitation, C entre et lit ---------------
+    // Participants : panneau sur ordinateur, feuille (souvent encore ouverte) sur téléphone.
+    const exclureB = page.getByRole("button", { name: `Exclure ${pseudoB}`, exact: true });
+    if (!(await exclureB.isVisible())) await bouton(page, "Participants").click();
+    await exclureB.click();
+    await page.getByRole("button", { name: "Exclure", exact: true }).last().click(); // confirmation
+    await expect(titre(pageB, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    await expect(pageB.getByText("Vous avez été exclu de ce salon.")).toBeVisible();
+    await expect(page.getByText(`${pseudoB} a été exclu.`, { exact: false })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "Nouvelle invitation" })).toBeVisible();
+    const invit = page.locator("section").filter({ has: page.getByRole("heading", { name: "Nouvelle invitation" }) });
+    const lien2 = (await invit.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
+    const mdp2 = (await invit.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
+    expect(lien2).toMatch(/\/salon#c[A-Za-z0-9_-]{43}$/);
+    expect(lien2).not.toBe(lien);
+    expect(mdp2).not.toBe(mdp);
+    await capture(page, "salon-nouvelle-invitation");
+    expect(await axe(page)).toEqual([]);
+    await expect(fil(page).getByText("L'invitation a changé", { exact: false })).toBeVisible({ timeout: 30_000 });
+    // L'exclu, avec l'ancien lien et l'ancien mot de passe : plus rien.
+    await pageB.goto(lien);
+    await expect(pageB.getByText("Ce salon n'existe plus, ou ce lien n'est plus valable.")).toBeVisible({ timeout: 30_000 });
+    ctxC = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
+    const pageC = await ctxC.newPage();
+    const pseudoC = `Inès${r.slice(0, 3)}`;
+    await pageC.goto(lien2);
+    await champ(pageC, "Mot de passe du salon").fill(mdp2);
+    await bouton(pageC, "Continuer").click();
+    await expect(titre(pageC, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
+    await champ(pageC, "Pseudonyme pour ce salon").fill(pseudoC);
+    await bouton(pageC, "Entrer dans le salon").click();
+    await expect(fil(pageC)).toBeVisible();
+    const t5 = `Après exclusion ${r}`;
+    await expect(fil(page).getByText(`${pseudoC} a rejoint le salon`)).toBeVisible({ timeout: 60_000 });
+    // Siège de B redonné à C : la ligne d’exclusion garde le nom de B.
+    await expect(fil(page).getByText(`${pseudoB} a été exclu du salon`)).toBeVisible();
+    if (await page.getByRole("dialog", { name: "Participants" }).isVisible()) await page.keyboard.press("Escape");
+    await envoyer(page, t5);
+    await expect(fil(pageC).locator("p.texte").getByText(t5, { exact: true })).toBeVisible({ timeout: 30_000 });
+
+    // --- Le serveur ne voit rien (test bloquant, étendu au salon par l'interface) -------------------
     const reperes = [
       needle("texte 1", t1),
       needle("texte 1 modifié", t1b),
@@ -234,7 +326,14 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
       needle("début de la photo (après l'en-tête JPEG)", new Uint8Array(image.subarray(200, 264))),
       needle("pseudo A", pseudoA),
       needle("pseudo B", pseudoB),
+      needle("pseudo C", pseudoC),
       needle("mot de passe du salon", mdp),
+      needle("nouveau mot de passe", mdp2),
+      needle("nouvelle clé du lien (base64url)", cle(lien2)),
+      needle("nouvelle clé du lien (octets)", new Uint8Array(Buffer.from(cle(lien2), "base64url"))),
+      needle("texte après rechargement", t4),
+      needle("texte après exclusion", t5),
+      needle("texte long envoyé en .txt", long.slice(0, 60)),
       needle("clé du lien (base64url)", cle(lien)),
       needle("lien de gestion (base64url)", cle(gestion)),
       needle("clé du lien (octets)", new Uint8Array(Buffer.from(cle(lien), "base64url"))),
@@ -242,12 +341,26 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     ];
     const dir = shh.server.dataDir;
     expect(scanDir(dir, reperes)).toEqual([]);
-    // Destruction par la créatrice : écran de fin chez l'invité, puis plus rien sur le disque.
-    await page.getByRole("button", { name: "Détruire le salon" }).first().click();
-    await page.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
-    await expect(titre(pageB, "Fin du salon")).toBeVisible({ timeout: 30_000 });
-    await expect(pageB.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible();
-    await capture(pageB, "salon-fin");
+    // Destruction par le lien de gestion ouvert SEUL (exigence C-3 32), dans un autre navigateur :
+    // il ne fait entrer personne, dit l'état du salon, détruit. Fin chez A et C, plus rien sur le disque.
+    const ctxD: BrowserContext = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
+    try {
+      const pageD = await ctxD.newPage();
+      await pageD.goto(gestion);
+      await expect(titre(pageD, "Lien de gestion")).toBeVisible({ timeout: 30_000 });
+      expect(pageD.url()).toBe(shh.origin + "/salon");
+      await expect(pageD.getByText("Personnes dans le salon\u202f: 2", { exact: false })).toBeVisible();
+      await expect(fil(pageD)).toHaveCount(0);
+      expect(await axe(pageD)).toEqual([]);
+      await bouton(pageD, "Détruire le salon").first().click();
+      await pageD.getByRole("button", { name: "Détruire le salon" }).last().click(); // confirmation
+      await expect(titre(pageD, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    } finally {
+      await ctxD.close();
+    }
+    await expect(titre(pageC, "Fin du salon")).toBeVisible({ timeout: 30_000 });
+    await expect(pageC.getByText("Ce salon a été détruit.", { exact: false })).toBeVisible();
+    await capture(pageC, "salon-fin");
     await expect(titre(page, "Fin du salon")).toBeVisible({ timeout: 30_000 });
     expect(scanDir(dir, reperes)).toEqual([]);
     await shh.server.stop();
@@ -256,6 +369,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     expect(findIn(shh.server.stdout(), reperes)).toEqual([]);
     expect(findIn(shh.server.stderr(), reperes)).toEqual([]);
   } finally {
+    await ctxC?.close();
     await ctxB.close();
   }
 });

@@ -212,7 +212,12 @@ func TestReserveVocale(t *testing.T) {
 	if VocalOctetsParSeconde != 4000 || VocalReserveMax != 14400000 {
 		t.Fatal("constantes")
 	}
-	// Sans WebSocket ouvert, la réserve ne se remplit pas.
+	// Réserve de départ (19 novembre) : un premier vocal de palier 16 passe tout de suite, sans
+	// présence ; ensuite, sans WebSocket ouvert, la réserve ne se remplit pas.
+	if got := b.reserveDe(mb); got != VocalReserveDepart || VocalReserveDepart != share.TotalSize(16) {
+		t.Fatal("réserve de départ :", got)
+	}
+	b.creerPiece(t, mb, 16, true)
 	b.h.avancer(time.Hour)
 	if _, err := b.m.CreerPiece(mb, 1, true); !isAttente(err, 17*time.Second) {
 		t.Fatal("vocal sans présence :", err)
@@ -268,12 +273,12 @@ func TestReserveVocaleOccupant(t *testing.T) {
 	fin := b.connecte(t, mb)
 	b.h.avancer(time.Minute)
 	fin()
-	if b.reserveDe(mb) != 240000 {
+	if b.reserveDe(mb) != VocalReserveDepart+240000 {
 		t.Fatal("réserve", b.reserveDe(mb))
 	}
 	b.depart(mb.salon, mb.siege)
 	_, mb2 := b.entrerMembre(t, c, false)
-	if mb2.siege != mb.siege || b.reserveDe(mb2) != 0 {
+	if mb2.siege != mb.siege || b.reserveDe(mb2) != VocalReserveDepart {
 		t.Fatal("nouvel occupant :", mb2.siege, b.reserveDe(mb2))
 	}
 }

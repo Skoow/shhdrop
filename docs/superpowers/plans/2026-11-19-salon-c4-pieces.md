@@ -42,6 +42,10 @@
 
 Faits et testés : Tasks 1 à 4 (`web/src/salon/pieces.test.ts` : conteneurs de 0 à 4 Mio relus octet pour octet ; `web/e2e/salon-ui.test.ts` : pièce liée à sa trame, relue par l'autre membre ; `web/ui-e2e/salon.spec.ts` : image affichée et document enregistré chez l'invité, rien chez le serveur). Le module des partages passe de 150 086 à 150 859 octets en brotli (plafond 156 000).
 
-**Défaut trouvé (moyenne, exploitation), non corrigé, à trancher par le propriétaire :** le plus petit vocal non vide prend le palier 16 (1 048 880 octets ; le palier 1 ne garde que le morceau du manifeste) et la réserve vocale d'un siège neuf est vide : le premier vocal attend environ 4 min 22 s de présence (429 avec le délai ; l'écran dit « Doucement : réessayez dans… »). Corrections possibles : réserve initiale d'un palier 16 pour chaque nouvel occupant (serveur, `reserveVocale`, test `TestReserveVocale` à revoir), ou paliers vocaux plus fins (format du moteur). Le test de bout en bout constate le délai (`retryS > 200`).
+Version finale (19 novembre), faits et testés :
+- **Premier vocal** (défaut du 19 novembre, corrigé par décision du propriétaire) : réserve de départ d'un palier 16 (1 048 880 octets) pour chaque occupant (`server/internal/salon/pieces.go`, `TestReserveVocale`, `TestReserveVocaleOccupant`, `TestQuotasPieces`) ; le premier vocal part tout de suite, le second attend (429), `web/e2e/salon-ui.test.ts`.
+- **Point 4, coches « Ouvert » et « Téléchargé »** : sortes `piece_ouverte` et `piece_telechargee` dans le moteur, vecteurs communs, `make test-engine` vert ; affichées chez l'expéditeur (Playwright). *Décision par défaut, à valider :* « Ouvert » = image affichée dans un message vu, vocal ou vidéo lancés.
+- **Point 5, albums et archive** : albums en grille (mise en page seule) ; « Tout sélectionner » et « Télécharger (N) » dans « Fichiers », une archive `.zip` stockée faite sur l'appareil (200 Mio au plus), chaque fichier accusé « Téléchargé ».
+- Plafond brotli du module du salon relevé à 435 000 octets (430 211 mesurés ; justification dans `check-dist.mjs`).
 
-Restes : coches « Ouvert » et « Téléchargé » des documents (point 4, sortes du moteur à ajouter), albums et téléchargement groupé en archive (point 5), lecture d'une vidéo de plus de 16 Mo sans tout charger en mémoire.
+Restes : mode sélection par appui long dans la conversation (seulement dans « Fichiers ») ; lecture d'une vidéo de plus de 16 Mo sans tout charger en mémoire ; fiche « Infos » avec l'heure de chaque accusé.

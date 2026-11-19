@@ -68,6 +68,21 @@ describe("conversation", () => {
     expect(c.coche(b)).toBe("vu");
     expect(b.vus).toEqual([2, 1]);
   });
+  it("accusés de pièce (v3 §14.2) : ouvert et téléchargé, de nos pièces, d'un lecteur attendu ; valent « vu »", () => {
+    const c = conv(0);
+    c.pieceEnvoi(-1, { nom: "a.pdf", mime: "application/pdf", taille: 9, sorte: "fichier", dureeMs: null });
+    c.rattacher(-1, 1);
+    c.chiffre(1, id(7));
+    const b = bulles(c)[0]!;
+    c.message(20, 1, 3, env(30, { k: "piece_ouverte", ids: [id(7)] }));
+    c.message(21, 2, 3, env(31, { k: "piece_telechargee", ids: [id(7)] }));
+    c.message(22, 5, 3, env(32, { k: "piece_telechargee", ids: [id(7)] })); // siège non attendu : ignoré
+    expect([b.ouverts, b.telecharges, b.vus]).toEqual([[1], [2], [1, 2]]);
+    // Un texte (pas une pièce) : ignoré.
+    c.message(23, 1, 3, env(2, { k: "texte", x: "x" }));
+    c.message(24, 0, 3, env(33, { k: "piece_ouverte", ids: [id(2)] }));
+    expect(bulles(c)[1]!.ouverts).toEqual([]);
+  });
   it("réponse : citation par identifiant ; efface (0x0E) retire la bulle", () => {
     const c = conv();
     c.message(5, 1, 3, env(1, { k: "texte", x: "a" }));
@@ -109,6 +124,38 @@ describe("conversation", () => {
     c.groupe({ ajoutes: [2], retires: [2], createurRevenu: false, membres: [0, 1, 2] });
     c.groupe({ ajoutes: [0], retires: [0], createurRevenu: true, membres: [0, 1, 2] });
     expect(c.elements.map((e) => (e.k === "sys" ? `${e.quoi}:${e.siege}` : "b"))).toEqual(["arrivee:2", "retour:2", "code:2", "createur:0", "retour:0"]);
+  });
+  it("siège libéré puis redonné : l'ancien occupant garde son nom et sa couleur dans le fil", () => {
+    const c = conv(0);
+    c.message(5, 1, 3, env(1, { k: "profil", pseudo: "Hugo", couleur: 4, avatar: null }));
+    c.message(6, 1, 3, env(2, { k: "texte", x: "de Hugo" }));
+    c.depart(1, true);
+    c.arrivee(1);
+    c.groupe({ ajoutes: [1], retires: [], createurRevenu: false, membres: [0, 1, 2] });
+    // Avant le profil du nouveau : « Participant 2 », jamais « Hugo ».
+    expect(c.nom(1)).toEqual({ pseudo: null, numero: 2 });
+    c.message(9, 1, 3, env(3, { k: "profil", pseudo: "Inès", couleur: 6, avatar: null }));
+    c.message(10, 1, 3, env(4, { k: "texte", x: "de Inès" }));
+    const [hugo, ines] = bulles(c);
+    expect([c.nomDe(hugo!).pseudo, c.couleurDe(hugo!)]).toEqual(["Hugo", 4]);
+    expect([c.nomDe(ines!).pseudo, c.couleurDe(ines!)]).toEqual(["Inès", 6]);
+    const sys = c.elements.filter((e) => e.k === "sys");
+    expect(sys.map((e) => `${e.quoi}:${c.nomDe(e).pseudo}`)).toEqual(["exclusion:Hugo", "arrivee:Inès"]);
+    // Aucun « Hugo s'appelle maintenant Inès ».
+    expect(sys.some((e) => e.quoi === "pseudo")).toBe(false);
+  });
+  it("écart groupe / serveur (exigence 27) : signalé après quelques secondes, avec le nom de l'ancien occupant", () => {
+    const t = { v: 1000 };
+    const c = conv(0, t);
+    c.message(5, 2, 3, env(1, { k: "profil", pseudo: "Zoé", couleur: 2, avatar: null }));
+    c.depart(2);
+    // Le serveur dit le siège 2 parti, le groupe le contient encore.
+    expect(c.encoreDansLeGroupe()).toEqual([]);
+    t.v += 8001;
+    expect(c.encoreDansLeGroupe()).toEqual([{ siege: 2, pseudo: "Zoé", numero: 3 }]);
+    // Le Commit de retrait arrive : plus d'alerte.
+    c.groupe({ ajoutes: [], retires: [2], createurRevenu: false, membres: [0, 1] });
+    expect(c.encoreDansLeGroupe()).toEqual([]);
   });
   it("règle d'effacement (C-5) : défaut 5 min, la plus récente en ordre seq gagne, ligne affichée", () => {
     const c = conv(0);

@@ -297,8 +297,10 @@ func TestQuotasPieces(t *testing.T) {
 	e.srv.lim.CancelUpload(sonde)
 	e.pieceCreee(t, j[0], 1, false)
 	expect(t, e.creerPieceHTTP(j[0], 1, false), 429, "")
-	// Vocaux : sans présence, refus (429 limit) ; WebSocket ouvert 40 s (160 000 o) : deux
-	// vocaux du palier 1 passent alors que les deux envois de fichiers sont pris.
+	// Vocaux : la réserve de départ (19 novembre, un palier 16) fait passer un premier vocal
+	// sans présence ; ensuite, sans présence, refus (429 limit) ; WebSocket ouvert 40 s
+	// (160 000 o) : deux vocaux du palier 1 passent alors que les deux envois de fichiers sont pris.
+	expect(t, e.creerPieceHTTP(j[0], 16, true), 201, "")
 	w = e.creerPieceHTTP(j[0], 1, true)
 	expect(t, w, 429, "")
 	c := b.entrer(t, j[0])

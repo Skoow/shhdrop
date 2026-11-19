@@ -38,10 +38,13 @@
 
 Faits et testés : Tasks 1 à 4 (renouvellement de bout en bout, `web/e2e/salon-ui.test.ts` ; règle, codes et destruction par l'interface, `web/ui-e2e/salon.spec.ts` ; fil, `conversation.test.ts`).
 
-Restes, avec leur raison :
-- **Task 5, exclusion et nouvelle invitation (exigences 24, 25, 29 ; §39.13)** : non faite (rotation, refondation chez chacun, nouvelle invitation et nouvelle preuve, réécriture des clés du client). Le bouton « Exclure » n'est pas proposé : un retrait MLS seul laisserait l'exclu lire l'enveloppe (C-P1). À faire avant l'ouverture publique.
-- **Exigence 27** (alerte « X est encore dans le groupe chiffré ») : non faite.
-- **Son et silencieux (§14.4)** : non faits (point 5).
-- **Recoller le lien de gestion seul (`#s`)** : ignoré pour l'instant (le retour du créateur passe par l'historique local, point 6).
-- **Créateur délogé** : « Reprendre la main ici » rouvre le lien d'invitation ; « Détruire le salon » depuis l'écran de fin n'est pas proposé (le jeton de gestion est déjà effacé ; la destruction reste possible depuis « Salon » après être revenu).
+Version finale (19 novembre), faits et testés :
+- **Task 5, exclusion et nouvelle invitation** (exigences 24, 25, 29 ; §39.13) : `web/src/salon/exclusion.ts`, rotation dans `client.ts` (préparée, envoyée à l'écho du Commit, renvoyée sur `rotationARenvoyer`, adoptée par chacun : refondation, identités et codes gardés). Bouton « Exclure {nom} » du créateur, « Nouveau lien d'invitation », nouvelle invitation affichée. Tests : `web/e2e/salon-ui.test.ts` (3 membres, exclusion, ancienne invitation refusée, un nouveau entre et lit) ; `salon.spec.ts` (exclusion par l'interface, ancien lien refusé, troisième navigateur avec la nouvelle invitation).
+- **Défaut corrigé (haute, exactitude)** : siège redonné par le serveur au prochain arrivant, les messages de l'ancien occupant prenaient le nom du nouveau (et « X s'appelle maintenant Y » apparaissait). Nom et couleur figés au départ (`conversation.test.ts`, `salon.spec.ts`).
+- **Exigence 27** : alerte « X est encore dans le groupe chiffré » après 8 s d'écart (*par défaut*).
+- **Lien de gestion ouvert seul** (`#s`) : état du salon, « Détruire le salon », S_gestion gardé en mémoire pour l'invitation ouverte ensuite dans l'onglet (repli en simple membre si le serveur le refuse). Playwright : destruction depuis un autre navigateur.
 
+Restes, avec leur raison :
+- **Coller le lien de gestion dans la conversation** (exigence 32, créateur revenu sans `S_gestion`) : pas d'écran ; il faut quitter puis ouvrir le lien de gestion puis l'invitation dans le même onglet.
+- **Créateur délogé** : « Détruire le salon » depuis l'écran de fin n'est pas proposé (le jeton de gestion est déjà effacé) ; le lien de gestion seul le permet.
+- **« Effacer l'historique »** n'efface pas encore les preuves de membre (base à part, effacées à la fin du salon, à « Quitter » et à l'exclusion).

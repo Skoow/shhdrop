@@ -20,6 +20,7 @@
   import Fichiers from "./Fichiers.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
   import { Mic, Paperclip } from "../../ui/Icon";
+  import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
 
   const vue = S.vue;
   const conv = S.conversation()!;
@@ -30,6 +31,28 @@
     void vue.rev;
     return conv.elements.map((e) => (e.k === "bulle" ? { ...e, reactions: e.reactions.map((r) => ({ ...r })) } : { ...e }));
   });
+  // Albums (v3 §14.3) : photos envoyées ensemble (même auteur, à la suite, à moins d'une minute
+  // d'écart) affichées en grille. Chaque photo reste un message à part (accusés, réactions,
+  // retrait, effacement) : seule la mise en page change. Calculé sur l'appareil.
+  const albums = $derived.by(() => {
+    const dans = new Map<string, "debut" | "suite">();
+    let run: Bulle[] = [];
+    const clore = () => {
+      if (run.length >= 2) run.forEach((b, i) => dans.set(b.cle, i === 0 ? "debut" : "suite"));
+      run = [];
+    };
+    for (const e of elements) {
+      const img = e.k === "bulle" && !e.retire && e.piece?.sorte === "image" ? e : null;
+      const prec = run.at(-1);
+      if (img && prec && prec.siege === img.siege && prec.moi === img.moi && img.heureMs - prec.heureMs <= 60_000) run.push(img);
+      else {
+        clore();
+        if (img) run.push(img);
+      }
+    }
+    clore();
+    return dans;
+  });
   let maintenant = $state(Date.now());
   const ecrivent = $derived((void vue.rev, void maintenant, conv.ecrivent()));
   const enLigne = $derived((void vue.rev, [...conv.presents].filter((s) => conv.presence.get(s)?.enLigne).length));
@@ -38,6 +61,11 @@
 
   function nom(siege: number): string {
     const n = conv.nom(siege);
+    return n.pseudo ?? t("salon.room.participant", { n: n.numero });
+  }
+  /** Auteur d'un élément du fil : nom figé si son siège a été redonné depuis. */
+  function nomDe(e: Element): string {
+    const n = conv.nomDe(e);
     return n.pseudo ?? t("salon.room.participant", { n: n.numero });
   }
 
@@ -82,6 +110,7 @@
     document.getElementById(`m-${cle}`)?.scrollIntoView({ block: "center" });
   }
   function echec(code: string): string {
+    if (code === "trop_grand") return t("salon.room.toolong.json");
     if (code.startsWith("limite:")) return t("salon.piece.err.limite", { duree: formatDuration(Number(code.slice(7)), lang) });
     if (code === "budget") return t("salon.piece.err.budget");
     if (code === "vocal_trop_long" || code === "trop_gros") return t(`salon.piece.err.${code}`);
@@ -96,8 +125,23 @@
 
   // --- Envoi -----------------------------------------------------------------------------------
 
+  /** Texte refusé car trop long : proposé en fichier « message.txt » (§39.5, v3 §4.1). */
+  let tropLong = $state<string | null>(null);
+  function enFichier(x: string): void {
+    tropLong = null;
+    erreur = "";
+    texte = "";
+    void S.envoyerFichiers([new File([x], "message.txt", { type: "text/plain" })]);
+  }
+  /** Silencieux (v3 §14.4) : choix ouvert (toujours, 1 h, 8 h). */
+  let choixSilence = $state(false);
+  const silencieux = $derived(vue.silence === SILENCE_TOUJOURS || vue.silence > maintenant);
+  // Écart groupe / serveur (exigence 27).
+  const fantomes = $derived((void vue.rev, void maintenant, conv.encoreDansLeGroupe()));
+
   function envoyer(): void {
     erreur = "";
+    tropLong = null;
     const brut = texte;
     if (brut.trim() === "") return;
     try {
@@ -106,6 +150,7 @@
     } catch (e) {
       const m = (e as Error).message;
       erreur = m === "texte_trop_long" ? t("salon.room.toolong") : t("salon.room.invalid");
+      tropLong = m === "texte_trop_long" && !edition ? brut : null;
       return;
     }
     texte = "";
@@ -222,6 +267,10 @@
   }
   let vusAnnonce = untrack(() => conv.elements.length);
   let rafale: { n: number; t: number } = { n: 0, t: 0 };
+  /** Dernier son joué (ms) : au plus un toutes les 2 s (v3 §14.4). */
+  let dernierSon = 0;
+  /** Séparateur « Nouveaux messages » (v3 §14 point 6) : avant le premier message non lu. */
+  let separateur = $state<string | null>(null);
   $effect(() => {
     const n = elements.length;
     untrack(() => {
@@ -236,7 +285,15 @@
       rafale.n += nouveaux.length;
       if (rafale.n > 3) announce(t("salon.room.announce.many", { n: rafale.n }));
       else for (const b of nouveaux) announce(t("salon.room.announce", { nom: nom(b.siege), texte: b.texte }));
-      if (!enBas || document.visibilityState !== "visible") nonLus += nouveaux.length;
+      const visible = document.visibilityState === "visible";
+      if (!enBas || !visible) {
+        if (nonLus === 0) separateur = nouveaux[0]!.cle;
+        nonLus += nouveaux.length;
+      }
+      if (doitSonner({ n: nouveaux.length, silence: vue.silence, maintenant: tps, dernier: dernierSon, visible, enBas })) {
+        dernierSon = tps;
+        jouer();
+      }
       void tick().then(() => aller());
     });
   });
@@ -260,13 +317,13 @@
     if (!b.cite) return null;
     const o = conv.bulle(b.cite);
     if (!o || o.retire) return { nom: "", texte: t("salon.room.quote.gone") };
-    return { nom: nom(o.siege), texte: o.texte };
+    return { nom: nomDe(o), texte: o.texte };
   }
   function ligne(e: Extract<Element, { k: "sys" }>): string {
     if (e.quoi === "pseudo") return t("salon.room.sys.pseudo", { avant: e.avant, apres: e.apres });
     if (e.quoi === "createur") return t("salon.room.sys.createur");
-    if (e.quoi === "regle") return t("salon.room.sys.regle", { nom: nom(e.siege), regle: t(`salon.regle.${e.regle as 1 | 2 | 3}`) });
-    return t(`salon.room.sys.${e.quoi}`, { nom: nom(e.siege) });
+    if (e.quoi === "regle") return t("salon.room.sys.regle", { nom: nomDe(e), regle: t(`salon.regle.${e.regle as 1 | 2 | 3}`) });
+    return t(`salon.room.sys.${e.quoi}`, { nom: nomDe(e) });
   }
   const attente = $derived(vue.attenteDepuis === null ? "" : maintenant - vue.attenteDepuis > 30_000 ? t("salon.room.wait.long") : maintenant - vue.attenteDepuis > 2_000 ? t("salon.room.wait.short") : "");
   const large = typeof matchMedia === "function" && matchMedia("(min-width: 1100px)").matches;
@@ -284,6 +341,13 @@
       </p>
     </div>
     <div class="boutons">
+      {#if silencieux}
+        <Button variant="secondary" dense onpress={() => S.silencieux(null)}>{t("salon.son.reactiver")}</Button>
+      {:else}
+        <Button variant="secondary" dense aria-expanded={choixSilence} onpress={() => {
+            choixSilence = !choixSilence;
+          }}>{t("salon.son.silence")}</Button>
+      {/if}
       <Button variant="secondary" dense onpress={() => {
           fichiers = true;
         }}>{t("salon.files.title")}</Button>
@@ -297,15 +361,28 @@
     <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
       {#if vue.connexion === "coupe"}<p class="bandeau" role="status">{t("salon.room.reconnect")}</p>{/if}
       {#if !vue.dansLeGroupe}<p class="bandeau" role="status">{t("salon.room.waitgroup")}</p>{/if}
+      {#if choixSilence && !silencieux}
+        <div class="silence" role="group" aria-label={t("salon.son.silence")}>
+          {#each [["toujours", "salon.son.toujours"], [1, "salon.son.1h"], [8, "salon.son.8h"]] as const as [c, cle] (c)}
+            <Button variant="secondary" dense onpress={() => {
+                S.silencieux(c);
+                choixSilence = false;
+              }}>{t(cle)}</Button>
+          {/each}
+        </div>
+      {/if}
+      {#each fantomes as f (f.siege)}<p class="bandeau alerte" role="alert">{t("salon.room.fantome", { nom: f.pseudo ?? t("salon.room.participant", { n: f.numero }) })}</p>{/each}
       <div role="log" aria-live="off" bind:this={fil}>
       <ol class="fil">
         {#each elements as e (e.cle)}
+          {#if e.cle === separateur}<li class="sys nouveaux">{t("salon.room.nouveaux")}</li>{/if}
           {#if e.k === "sys"}
             <li class="sys">{ligne(e)}</li>
           {:else}
-            <li class={["msg", { moi: e.moi }, `c${conv.couleur(e.siege)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
+            {@const al = albums.get(e.cle)}
+            <li class={["msg", { moi: e.moi, album: al !== undefined }, `c${conv.couleurDe(e)}`]} id="m-{e.cle}" data-id={e.id ?? undefined} use:surveiller={e}>
               <div class="bulle">
-                {#if !e.moi}<span class="auteur">{nom(e.siege)}</span>{/if}
+                {#if !e.moi && al !== "suite"}<span class="auteur">{nomDe(e)}</span>{/if}
                 {#if e.retire}
                   <p class="retire">{t("salon.room.retracted")}</p>
                 {:else}
@@ -319,7 +396,8 @@
                       ></p>
                   {/if}
                 {/if}
-                {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>{/if}
+                {#if e.etat === "echec" && e.echec}<p class="err" role="status">{echec(e.echec)}</p>
+                  {#if e.echec === "trop_grand" && !e.piece && e.texte}<Button variant="secondary" dense onpress={() => enFichier(e.texte)}>{t("salon.room.toolong.txt")}</Button>{/if}{/if}
                 <p class="meta">
                   <time>{formatClock(e.heureMs, lang)}</time>
                   {#if e.modifie && !e.retire}<span>· {t("salon.room.edited")}</span>{/if}
@@ -359,7 +437,7 @@
         {#if ecrivent.length === 1}{t("salon.room.typing.un", { nom: nom(ecrivent[0]!) })}{:else if ecrivent.length > 1}{t("salon.room.typing.plusieurs")}{/if}
       </p>
       {#if nonLus > 0 && !enBas}
-        <button type="button" class="bas" aria-label={t("salon.room.down")} onclick={() => aller(true)}>↓ <span>{t("salon.room.unread", { n: nonLus })}</span></button>
+        <button type="button" class="bas" aria-label={`${t("salon.room.unread", { n: nonLus })} · ${t("salon.room.down")}`} onclick={() => aller(true)}><span aria-hidden="true">↓ </span><span>{t("salon.room.unread", { n: nonLus })}</span></button>
       {/if}
 
       <div class="saisie">
@@ -376,9 +454,12 @@
           </div>
         {/if}
         {#if erreur}<p class="err" role="alert">{erreur}</p>{/if}
+        {#if tropLong}<Button variant="secondary" dense onpress={() => {
+            if (tropLong) enFichier(tropLong);
+          }}>{t("salon.room.toolong.txt")}</Button>{/if}
         {#if reponse}
           <div class="contexte">
-            <span>{t("salon.room.reply.to", { nom: nom(reponse.siege) })}</span>
+            <span>{t("salon.room.reply.to", { nom: nomDe(reponse) })}</span>
             <button type="button" aria-label={t("salon.room.reply.cancel")} onclick={() => (reponse = null)}>✕</button>
           </div>
         {/if}
@@ -519,8 +600,40 @@
     margin: 0;
     padding: var(--sp-3) 0;
     display: grid;
+    /* Albums : jusqu'à 4 photos par rangée (2 sur téléphone) ; tout le reste prend la rangée. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--sp-2);
     min-height: 40vh;
+  }
+  .fil > :global(li) {
+    grid-column: 1 / -1;
+  }
+  .fil > .msg.album {
+    grid-column: auto;
+  }
+  .album :global(.img) {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+  @media (max-width: 600px) {
+    .fil {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .silence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .alerte {
+    color: var(--warn, var(--text));
+  }
+  .nouveaux {
+    justify-self: stretch;
+    border-top: 1px solid var(--line-strong);
+    padding-top: var(--sp-1);
+    color: var(--accent);
   }
   .sys {
     justify-self: center;

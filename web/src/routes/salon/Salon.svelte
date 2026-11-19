@@ -7,7 +7,8 @@
   import { formatDuration } from "../../i18n/format";
   import { navigate } from "../../app/router.svelte";
   import { lireFragment } from "../../salon/liens";
-  import { vue, ouvrirInvitation, deverrouiller, oublier, reveiller } from "../../salon/salon.svelte";
+  import { vue, ouvrirInvitation, ouvrirGestion, detruireParGestion, oublierGestion, deverrouiller, oublier, reveiller } from "../../salon/salon.svelte";
+  import InlineConfirm from "../../ui/InlineConfirm.svelte";
   import Cadre from "../compte/Cadre.svelte";
   import TextField from "../../ui/TextField.svelte";
   import Button from "../../ui/Button.svelte";
@@ -26,7 +27,7 @@
     const f = lireFragment(location.hash);
     if (location.hash !== "") history.replaceState(null, "", location.pathname);
     if (f?.sorte === "c") void ouvrirInvitation(f.cle).finally(() => f.cle.fill(0));
-    else f?.cle.fill(0); // « #s » (lien de gestion) : plan C-5
+    else if (f?.sorte === "s") void ouvrirGestion(f.cle).finally(() => f.cle.fill(0));
   }
 
   onMount(() => {
@@ -50,7 +51,10 @@
     return () => window.removeEventListener("beforeunload", garde);
   });
   // Page quittée (navigation interne) : tout est oublié.
-  $effect(() => () => oublier());
+  $effect(() => () => {
+    oublier();
+    oublierGestion();
+  });
 
   async function continuer(): Promise<void> {
     if (mdp === "") {
@@ -114,6 +118,14 @@
     <p class="note" role="status">{fin()}</p>
     {#if vue.lienReprise}<div class="actions"><Button onpress={() => location.assign(vue.lienReprise!)}>{t("salon.end.reprendre")}</Button></div>{/if}
     <div class="actions"><Button variant="secondary" onpress={() => navigate("/")}>{t("salon.end.home")}</Button></div>
+  </Cadre>
+{:else if vue.etape === "gestion" && vue.gestionSeule}
+  <!-- Lien de gestion ouvert seul : il ne fait entrer personne (v3 §15.2, exigence C-3 32). -->
+  <Cadre titre={t("salon.gestionseule.title")} sous={t("salon.gestionseule.sub", { n: vue.gestionSeule.present, duree: formatDuration(reste, lang, { coarse: true }) })}>
+    <p class="note">{t("salon.gestionseule.entrer")}</p>
+    <div class="actions">
+      <InlineConfirm label={t("salon.gestion.detruire")} message={t("salon.gestion.detruire.confirm")} confirmLabel={t("salon.gestion.detruire")} kind="danger" triggerVariant="danger" onconfirm={async () => void (await detruireParGestion())} />
+    </div>
   </Cadre>
 {:else if vue.etape === "chargement"}
   <Cadre titre={t("salon.join.title")}><p class="note" aria-busy="true">…</p></Cadre>

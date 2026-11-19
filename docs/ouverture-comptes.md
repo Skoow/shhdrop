@@ -32,7 +32,10 @@ Source : `docs/superpowers/specs/2026-11-14-compte-email-design.md`, §20 et §2
 
 ## 3. Ce qui manque encore dans le produit
 
-- **Les écrans du salon** (plans C-3 à C-5) : aujourd'hui, un compte **ne sert qu'à créer des salons** (« Un compte gratuit sert seulement à créer des salons »). Le serveur refuse d'ailleurs `SHH_COMPTES=1` sans `SHH_SALONS=1`. Ouvrir les comptes avant le salon donnerait un compte sans usage visible. Ordre recommandé : salon d'abord, comptes ensuite.
+- **Le salon** (plans C-3 à C-5) : **codé et testé** au 19 novembre (création, entrée, conversation, pièces, vocaux, règles d'effacement, codes, exclusion avec nouvelle invitation, preuve de membre, destruction ; « le serveur ne voit rien » étendu au salon). Avant l'ouverture publique, il reste :
+  - les décisions prises par défaut à valider (spécification du salon v3, §16 : preuve de membre en AES-GCM de WebCrypto, sens de « Ouvert », silencieux gardé dans la preuve, délai de l'alerte d'écart, albums) ;
+  - un passage sous WebKit (Safari, iPhone) du parcours `web/ui-e2e/salon.spec.ts` ;
+  - les restes listés dans les plans C-4 et C-5 (lien de gestion collé dans la conversation, vidéo de plus de 16 Mo, fiche « Infos ») : aucun ne bloque l'usage, à trancher.
 - **Jetons anonymes (Privacy Pass)** et paiement Plus/Pro : le coffre du compte prévoit le pass Plus, mais la vente n'est pas codée.
 
 ## 4. À préparer techniquement (vous, avec `deploy/README.md` §12)

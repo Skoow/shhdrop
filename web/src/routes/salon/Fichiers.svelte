@@ -9,6 +9,7 @@
   import type { Bulle } from "../../salon/conversation";
   import Segmented from "../../ui/Segmented.svelte";
   import Button from "../../ui/Button.svelte";
+  import { SvelteSet } from "svelte/reactivity";
 
   let { onvoir }: { onvoir: (cle: string) => void } = $props();
   const vue = S.vue;
@@ -19,6 +20,20 @@
   let membre = $state<number | -1>(-1);
   const filtres = $derived((["tout", "image", "video", "fichier", "vocal"] as const).map((v) => ({ value: v, label: t(`salon.files.f.${v}` as Key) })));
   const nom = (s: number) => conv.nom(s).pseudo ?? t("salon.room.participant", { n: s + 1 });
+  /** Auteur d'une pièce : nom figé si son siège a été redonné depuis. */
+  const auteur = (b: Bulle) => conv.nomDe(b).pseudo ?? t("salon.room.participant", { n: b.siege + 1 });
+  // Sélection multiple (v3 §14.3) : « Tout sélectionner », « Télécharger (N) » en une archive .zip.
+  const choix = new SvelteSet<string>();
+  let enCours = $state(false);
+  let message = $state("");
+  async function telecharger(): Promise<void> {
+    enCours = true;
+    message = "";
+    const e = await S.telechargerArchive(liste.filter((b) => choix.has(b.cle)));
+    enCours = false;
+    if (e === null) choix.clear();
+    else message = t(e === "trop_gros" ? "salon.files.zip.gros" : e === "indisponible" ? "salon.piece.err.indisponible" : "salon.piece.err.lecture");
+  }
   const membres = $derived((void vue.rev, [{ value: -1, label: t("salon.files.tous") }, ...[...conv.presents].sort((a, b) => a - b).map((s) => ({ value: s, label: nom(s) }))]));
   const liste = $derived.by(() => {
     void vue.rev;
@@ -43,13 +58,22 @@
   {#if liste.length === 0}
     <p class="vide">{t("salon.files.vide")}</p>
   {:else}
+    <div class="selection">
+      <Button variant="ghost" dense onpress={() => {
+          if (choix.size === liste.length) choix.clear();
+          else for (const b of liste) choix.add(b.cle);
+        }}>{choix.size === liste.length ? t("salon.files.aucun") : t("salon.files.tout")}</Button>
+      <Button variant="secondary" dense disabled={choix.size === 0 || enCours} onpress={telecharger}>{t("salon.files.zip", { n: choix.size })}</Button>
+    </div>
+    {#if message}<p class="vide" role="status">{message}</p>{/if}
     <ul class="liste">
       {#each liste as b (b.cle)}
         <li>
+          <input type="checkbox" class="coche" checked={choix.has(b.cle)} aria-label={t("salon.files.choisir", { nom: nomFichier(b) })} onchange={(e) => (e.currentTarget.checked ? choix.add(b.cle) : choix.delete(b.cle))} />
           {#if b.piece!.sorte === "image" && S.pieces.urls[b.cle]}<img src={S.pieces.urls[b.cle]} alt="" class="vign" />{/if}
           <div class="info">
             <bdi class="n">{nomFichier(b)}</bdi>
-            <span class="m">{nom(b.siege)} · {formatClock(b.heureMs, lang)} · {formatBytes(b.piece!.taille, lang)}{#if !b.moi && !S.fichiersOuverts.has(b.cle)} · <strong>{t("salon.files.nouveau")}</strong>{/if}</span>
+            <span class="m">{auteur(b)} · {formatClock(b.heureMs, lang)} · {formatBytes(b.piece!.taille, lang)}{#if !b.moi && !S.fichiersOuverts.has(b.cle)} · <strong>{t("salon.files.nouveau")}</strong>{/if}</span>
           </div>
           <div class="acts">
             <Button variant="ghost" dense onpress={() => (S.fichiersOuverts.add(b.cle), S.enregistrerPiece(b))}>{t("salon.piece.enregistrer")}</Button>
@@ -81,6 +105,16 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
+  }
+  .selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .coche {
+    width: 24px;
+    height: 24px;
+    accent-color: var(--accent);
   }
   .vign {
     width: 56px;

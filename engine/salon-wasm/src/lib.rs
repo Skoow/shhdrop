@@ -60,6 +60,9 @@ export type Message =
   | { k: "ecrit" }
   | { k: "recu"; ids: Uint8Array[] }
   | { k: "vu"; ids: Uint8Array[] }
+  /** Accusés « Ouvert » et « Téléchargé » d'une pièce (salon v3 §14.2). */
+  | { k: "piece_ouverte"; ids: Uint8Array[] }
+  | { k: "piece_telechargee"; ids: Uint8Array[] }
   | { k: "regle"; regle: Regle }
   | { k: "profil"; pseudo: string; couleur: number; avatar: { r: Uint8Array; piece: Uint8Array; palier: number } | null }
   | { k: "depart" }
@@ -276,6 +279,12 @@ fn lire_message(m: &JsValue) -> Option<Message> {
         "vu" => Message::Vu {
             ids: ids(&get(m, "ids"))?,
         },
+        "piece_ouverte" => Message::PieceOuverte {
+            ids: ids(&get(m, "ids"))?,
+        },
+        "piece_telechargee" => Message::PieceTelechargee {
+            ids: ids(&get(m, "ids"))?,
+        },
         "regle" => Message::Regle {
             regle: regle_de(&get(m, "regle"))?,
         },
@@ -392,13 +401,17 @@ fn message_js(m: &Message) -> Object {
             set(&o, "cible", id_js(cible));
         }
         Message::Ecrit => k(&o, "ecrit"),
-        Message::Recu { ids } | Message::Vu { ids } => {
+        Message::Recu { ids }
+        | Message::Vu { ids }
+        | Message::PieceOuverte { ids }
+        | Message::PieceTelechargee { ids } => {
             k(
                 &o,
-                if matches!(m, Message::Recu { .. }) {
-                    "recu"
-                } else {
-                    "vu"
+                match m {
+                    Message::Recu { .. } => "recu",
+                    Message::Vu { .. } => "vu",
+                    Message::PieceOuverte { .. } => "piece_ouverte",
+                    _ => "piece_telechargee",
                 },
             );
             set(&o, "ids", ids.iter().map(|i| id_js(i)).collect::<Array>());
