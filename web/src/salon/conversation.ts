@@ -50,6 +50,7 @@ export type Systeme =
   | { k: "sys"; cle: string; quoi: "pseudo"; siege: number; avant: string; apres: string };
 
 export type Element = Bulle | Systeme;
+type SansCle<T> = T extends unknown ? Omit<T, "cle"> : never;
 
 export type Profil = { pseudo: string | null; couleur: number; seq: number };
 export type Presence = { enLigne: boolean; derniereMin: number };
@@ -119,7 +120,7 @@ export class Conversation {
     return false;
   }
 
-  #sys(e: Omit<Systeme, "cle">): void {
+  #sys(e: SansCle<Systeme>): void {
     this.elements.push({ ...e, cle: `s${++this.#n}` } as Systeme);
   }
 
@@ -344,6 +345,19 @@ export class Conversation {
     }
     b.reactions = b.reactions.filter((r) => r.sieges.length > 0);
     this.#change();
+  }
+
+  /**
+   * Notre profil, appliqué chez nous (l'écho de notre propre message n'est pas relu par le
+   * moteur) : rang inconnu tant que le serveur ne l'a pas accepté (`seq` absent : après tous les
+   * autres), puis le rang de notre trame (`0x0F`), pour la même règle d'unicité que chez les autres.
+   */
+  monProfil(pseudo: string, couleur: number, seq = Number.MAX_SAFE_INTEGER): void {
+    const avant = this.profils.get(this.moi);
+    if (avant && avant.seq < seq && avant.pseudo === pseudo) return;
+    this.profils.delete(this.moi);
+    this.#profil(seq, this.moi, pseudo, couleur);
+    if (avant?.pseudo && avant.pseudo !== pseudo && this.profils.get(this.moi)?.pseudo === pseudo) this.#sys({ k: "sys", quoi: "pseudo", siege: this.moi, avant: avant.pseudo, apres: pseudo });
   }
 
   #profil(seq: number, siege: number, pseudo: string, couleur: number): void {

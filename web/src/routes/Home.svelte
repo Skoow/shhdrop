@@ -187,10 +187,11 @@
           <div class="mk3">
             <button type="button" class="mk" data-make="media" onclick={() => onmake?.("media")}><Camera size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.media.t")}</span></button>
             <button type="button" class="mk" data-make="vocal" onclick={() => onmake?.("vocal")}><Mic size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.share.vocal.t")}</span></button>
-            <button type="button" class="mk soon" data-make="room" aria-describedby="hero-room-soon" onclick={() => onmake?.("room")}
-              ><MessagesSquare size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.room")}</span><span class="pill">{t("foot.soon")}</span></button
+            <!-- Salon (plan C-3) : création avec __SALONS__ ; « bientôt » sinon (démo, site sans compte). -->
+            <button type="button" class={["mk", { soon: !__SALONS__ }]} data-make="room" aria-describedby={__SALONS__ ? undefined : "hero-room-soon"} onclick={() => onmake?.("room")}
+              ><MessagesSquare size={22} strokeWidth={1.9} aria-hidden="true" /><span>{t("nav.room")}</span>{#if !__SALONS__}<span class="pill">{t("foot.soon")}</span>{/if}</button
             >
-            <span id="hero-room-soon" class="sr-only">{t("tabs.soon.chat")}</span>
+            {#if !__SALONS__}<span id="hero-room-soon" class="sr-only">{t("tabs.soon.chat")}</span>{/if}
           </div>
         </div>
       </div>

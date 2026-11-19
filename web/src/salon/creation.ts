@@ -41,7 +41,7 @@ export async function preparer(eng: SalonEngine, motDePasse: string, o: { ttlHou
     const cles = eng.clesSalon(kLien, kMdp);
     const acces = eng.cleAcces(kLien);
     const j = eng.jetonGestion(sGestion);
-    const entetes = { acces: b64u(acces.k), gestion: b64u(j as Uint8Array<ArrayBuffer>) };
+    const entetes = { acces: b64u(acces.k as Uint8Array<ArrayBuffer>), gestion: b64u(j as Uint8Array<ArrayBuffer>) };
     acces.k.fill(0);
     acces.v.fill(0);
     j.fill(0);

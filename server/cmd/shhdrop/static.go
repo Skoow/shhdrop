@@ -37,7 +37,7 @@ import (
 //
 // comptes (SHH_COMPTES=1) : les pages du compte (compteRoutes) répondent 200 aussi ; sans le
 // compte, 404 comme toute page inconnue.
-func staticHandler(dir string, comptes bool) (http.Handler, error) {
+func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return nil, fmt.Errorf("SHH_STATIC_DIR %s : %w", dir, err)
@@ -74,7 +74,7 @@ func staticHandler(dir string, comptes bool) (http.Handler, error) {
 			}
 		}
 		if errors.Is(err, fs.ErrNotExist) && !strings.Contains(path.Base(name), ".") && !isDir(fsys, name) {
-			if !appRoutes[r.URL.Path] && !(comptes && compteRoutes[r.URL.Path]) {
+			if !appRoutes[r.URL.Path] && !(comptes && compteRoutes[r.URL.Path]) && !(salons && salonRoutes[r.URL.Path]) {
 				status = http.StatusNotFound
 			}
 			// app.html (18 novembre) : la page de l'application sans l'accueil écrit au build
@@ -223,6 +223,14 @@ var pageFiles = map[string]string{
 	"/signaler":         "signaler.html",
 	// Liens de partage et de gestion sous « /s » (16 novembre) : page d'ouverture seule.
 	"/s": "s.html",
+}
+
+// salonRoutes : pages du salon (table SALON_PATHS de web/src/app/router.svelte.ts, plan C-3),
+// servies en 200 seulement avec SHH_SALONS=1 et SHH_COMPTES=1 (le site n'a les écrans du salon
+// qu'avec le compte : créer un salon l'exige). Aucun secret dans le chemin (lien « #c… »).
+var salonRoutes = map[string]bool{
+	"/salon":         true,
+	"/salon/nouveau": true,
 }
 
 var compteRoutes = map[string]bool{

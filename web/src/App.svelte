@@ -25,6 +25,9 @@
   // faux par défaut et dans la démo). Sans lui, match() ne rend jamais ces routes et le greffon
   // shh-comptes remplace ce module par pages.off.ts : rien du compte dans le site (check-dist.mjs).
   import { Accueil, Connexion, Inscription, Oubli, Parametres, Profil, connecte, ecouterAutresOnglets, restaurer, seDeconnecter, supprime, verifierAuRetour } from "./routes/compte/pages";
+  // Écrans du salon (plan C-3) : seulement si __SALONS__ (site avec compte, hors démo) ; sans lui,
+  // le greffon shh-salons remplace ce module par pages.off.ts (aucun écran, aucun client).
+  import { Salon, SalonNouveau } from "./routes/salon/pages";
 
   // UI §9 : vérifié une fois, avant toute route. Sans ces capacités, aucune route ne démarre
   // (ni lecture du lien, ni requête).
@@ -75,6 +78,8 @@
       moveToLinkPage(location);
       return;
     }
+    // Salon : la page lit elle-même le « #c… » (invitation) puis le retire de la barre.
+    if (router.current.name === "salon") return;
     if (location.hash !== "" && !inApp()) scrubHere();
   }
   $effect(() => {
@@ -164,6 +169,10 @@
     <!-- /compte et /compte/profil sans session : la connexion (conception §12.4) ; /compte/connexion
          avec session : la même page dit « connecté ». -->
     <Connexion />
+  {:else if router.current.name === "salon"}
+    <Salon />
+  {:else if router.current.name === "salonnouveau"}
+    <SalonNouveau />
   {:else if PAGE_ROUTES.has(router.current.name)}
     <!-- Pages d'information : leur propre fichier HTML (pages séparées, 16 novembre). Le serveur
          le sert déjà à cette adresse ; si ce script arrive quand même ici (ancien serveur), il

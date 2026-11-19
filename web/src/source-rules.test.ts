@@ -162,6 +162,21 @@ describe("règles de sources", () => {
   });
   // Spec §41.4 : exception écrite, l'octroi d'ouverture de l'onglet (session/open-grant.ts),
   // et plus tard le salon (chat/session.ts, §39.13.3). Nulle part ailleurs.
+  // Salon (plan C-3) : une seule couche réseau par sorte. Requêtes HTTP du salon seulement dans
+  // salon/api.ts (la création avec session : account/api.ts) ; le WebSocket du salon seulement dans
+  // salon/client.ts, nulle part ailleurs dans le site ; aucun stockage navigateur dans salon/.
+  it("salon : fetch seulement dans salon/api.ts, WebSocket seulement dans salon/client.ts (et salon.svelte.ts qui le crée)", () => {
+    expect(offenders(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|EventSource/, (r) => r.startsWith("salon/") && r !== "salon/api.ts" && r !== "salon/source.ts" && r !== "salon/source.verified.ts")).toEqual([]);
+    expect(offenders(/\bnew\s+WebSocket\b/, (r) => r !== "salon/salon.svelte.ts")).toEqual([]);
+    expect(offenders(/\bWebSocket\b/, (r) => !r.startsWith("salon/"))).toEqual([]);
+    expect(offenders(/localStorage|sessionStorage|indexedDB|document\.cookie/, (r) => r.startsWith("salon/") || r.startsWith("routes/salon/"))).toEqual([]);
+  });
+  // Exigence C-3 33 (spec salon v3 §15.2) : S_gestion n'est jamais montré au serveur, seulement
+  // J_gestion (jetonGestion) ; aucun en-tête X-Shh-Manage n'est écrit hors de salon/api.ts et account/api.ts.
+  it("salon : X-Shh-Manage du salon écrit seulement par salon/api.ts et account/api.ts", () => {
+    expect(offenders(/["']X-Shh-Manage["']\s*:/, (r) => r.startsWith("salon/") && r !== "salon/api.ts")).toEqual([]);
+    expect(offenders(/X-Shh-Manage/, (r) => r.startsWith("routes/salon/"))).toEqual([]);
+  });
   it("sessionStorage seulement dans session/open-grant.ts (et chat/session.ts)", () =>
     expect(offenders(/sessionStorage/, (r) => r !== "session/open-grant.ts" && r !== "chat/session.ts")).toEqual([]));
   it("pas de console.log", () => expect(offenders(/console\.log/)).toEqual([]));

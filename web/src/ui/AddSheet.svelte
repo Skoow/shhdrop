@@ -33,10 +33,10 @@
   <ul>
     {#each actions as a (a.id)}
       <li>
-        <button type="button" class={["row", a.id]} data-add={a.id} aria-disabled={a.id === "room" ? "true" : undefined} onclick={() => pick(a.id, a.live)}>
+        <button type="button" class={["row", a.id]} data-add={a.id} aria-disabled={a.id === "room" && !__SALONS__ ? "true" : undefined} onclick={() => pick(a.id, a.live)}>
           <span class="ic"><AddIcon id={a.id} /></span>
           <span class="tx">
-            <span class="lb">{t(`add.${a.id}`)}{#if a.id === "room"}<span class="soon">{t("foot.soon")}</span>{/if}</span>
+            <span class="lb">{t(`add.${a.id}`)}{#if a.id === "room" && !__SALONS__}<span class="soon">{t("foot.soon")}</span>{/if}</span>
             <span class="sb">{sub(a)}</span>
           </span>
           <span class="chev" aria-hidden="true"><ChevronDown size={18} strokeWidth={1.9} /></span>

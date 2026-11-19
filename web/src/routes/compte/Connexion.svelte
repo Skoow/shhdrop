@@ -134,7 +134,7 @@
       <Banner kind="warn">{t("account.banned", { date: jourLong(banni.date), motif: t(MOTIFS[(banni.motif ?? 10) - 1] ?? "report.cat.10") })}</Banner>
     {/if}
     <div class="actions">
-      <Button onpress={() => navigate("/")}>{t("account.continue")}</Button>
+      <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>
       <Button variant="secondary" onpress={deconnecter}>{t("account.logout")}</Button>
     </div>
   {:else if vue === "form"}

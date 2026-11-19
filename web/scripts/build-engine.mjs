@@ -25,10 +25,9 @@
 // feraient passer à wasm-bindgen un ancien .wasm resté dans engine/target.
 //
 // SHH_ENGINE_PREBUILT=1 : pkg/ a déjà été construit par la même commande dans une autre étape
-// (image Docker : étape Rust, deploy/Dockerfile) ; le script vérifie seulement sa présence. Le
-// module du salon n'y est pas encore (aucune page du site ne l'importe) : quand une page
-// l'importera, le build échouera sans lui (import introuvable) tant que deploy/Dockerfile ne le
-// construit pas.
+// (image Docker : étape Rust, deploy/Dockerfile) ; le script vérifie seulement la présence des
+// deux dossiers (moteur des partages et module du salon, que l'image construit aussi depuis le
+// plan C-3, exigence C-3 2).
 //
 // Usage : node scripts/build-engine.mjs (npm run build:engine).
 import { execFileSync } from "node:child_process";
@@ -55,7 +54,11 @@ function run(cmd, args, cwd, env = process.env) {
 }
 
 if (process.env.SHH_ENGINE_PREBUILT === "1") {
-  const missing = FILES.filter((f) => !existsSync(join(out, f)));
+  const salon = join(web, "src", "salon", "pkg");
+  const missing = [
+    ...FILES.filter((f) => !existsSync(join(out, f))),
+    ...["shhdrop_salon_wasm.js", "shhdrop_salon_wasm.d.ts", "shhdrop_salon_wasm_bg.wasm", "shhdrop_salon_wasm_bg.wasm.d.ts"].filter((f) => !existsSync(join(salon, f))).map((f) => `salon/pkg/${f}`),
+  ];
   if (missing.length) throw new Error(`SHH_ENGINE_PREBUILT=1 mais pkg/ incomplet : ${missing.join(", ")}`);
   console.log("build-engine : moteur déjà construit (SHH_ENGINE_PREBUILT=1)");
   process.exit(0);

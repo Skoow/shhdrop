@@ -47,7 +47,7 @@ export type Horloge = {
 export type Deps = {
   net: api.Net;
   eng: SalonEngine;
-  /** WebSocket vers `url` (navigateur : `new WebSocket(url)`). */
+  /** WebSocket vers `url` (navigateur : celui de la page, créé par salon.svelte.ts). */
   ouvrirWS(url: string): WsLike;
   horloge?: Horloge;
   /** Octets aléatoires (ping). */
@@ -166,12 +166,23 @@ export class ClientSalon {
    * WebSocket. `cles` reste au client (libéré par `fermer`). Rend aussi l'entrée du serveur.
    */
   static async entrer(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; sGestion?: Uint8Array; creerGroupe?: boolean }): Promise<{ client: ClientSalon; entree: api.Entree }> {
+    const entree = await ClientSalon.rejoindre(deps, o);
+    return { client: ClientSalon.ouvrir(deps, o, entree), entree };
+  }
+
+  /** `rejoindre` seul (le mot de passe est vérifié, une place est prise) ; `ouvrir` ensuite. */
+  static async rejoindre(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; sGestion?: Uint8Array }): Promise<api.Entree> {
     const entree = await ClientSalon.#rejoindre(deps, o.kLien, o.cles, o.sGestion);
     if ((o.sGestion !== undefined) !== (entree.siege === 0)) throw new Error("reponse_invalide");
+    return entree;
+  }
+
+  /** État MLS et WebSocket d'une entrée déjà faite (`rejoindre`). */
+  static ouvrir(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; sGestion?: Uint8Array; creerGroupe?: boolean }, entree: api.Entree): ClientSalon {
     const c = new ClientSalon(deps, o.cles, o.kLien, o.sGestion, entree);
     c.#salon = deps.eng.Salon.creer(entree.siege, entree.nonce, o.cles, o.creerGroupe === true, o.sGestion);
     c.#connecter(BigInt(entree.seq));
-    return { client: c, entree };
+    return c;
   }
 
   static async #rejoindre(deps: Deps, kLien: Uint8Array, cles: ClesSalon, sGestion: Uint8Array | undefined): Promise<api.Entree> {
@@ -194,7 +205,11 @@ export class ClientSalon {
     return () => this.#ecouteurs.delete(f);
   }
 
+  /** Membres du groupe au dernier événement `membres` émis (différence à l'écho de notre Commit). */
+  #membresVus: number[] = [];
+
   #emettre(e: EvClient): void {
+    if (e.k === "membres") this.#membresVus = e.membres;
     for (const f of [...this.#ecouteurs]) f(e);
   }
 
@@ -484,7 +499,12 @@ export class ClientSalon {
       case "commitAccepte":
         this.#commitMs = this.#deps.horloge.maintenant();
         if (ev.welcome) this.#mettre(ev.welcome, { volatile: false });
-        this.#emettre({ k: "membres", ajoutes: [], retires: [], createurRevenu: ev.createurRevenu, membres: this.membres() });
+        {
+          // Notre Commit fusionné : arrivées et départs tirés de la différence des membres.
+          const apres = this.membres();
+          const avant = this.#membresVus;
+          this.#emettre({ k: "membres", ajoutes: apres.filter((s) => !avant.includes(s)), retires: avant.filter((s) => !apres.includes(s)), createurRevenu: ev.createurRevenu, membres: apres });
+        }
         this.#ajouterEnAttente();
         this.#retirerPartis();
         this.#vider();
@@ -506,7 +526,8 @@ export class ClientSalon {
         this.#orphelin?.();
         this.#orphelin = undefined;
         this.#emettre({ k: "groupe", dansLeGroupe: true });
-        this.#emettre({ k: "membres", ajoutes: this.membres(), retires: [], createurRevenu: false, membres: this.membres() });
+        // Notre entrée : les membres déjà là ne sont pas des « arrivées » (aucune ligne « a rejoint »).
+        this.#emettre({ k: "membres", ajoutes: [], retires: [], createurRevenu: false, membres: this.membres() });
         for (const r of ev.rejoues) {
           const rg = this.#regles.get(r.seq) ?? { regle: 0 as Regle, recuMs: 0 };
           if ("erreur" in r) this.#erreurTrame(r.seq, -1, r.erreur, rg.regle);
@@ -651,9 +672,11 @@ export class ClientSalon {
    * Message à envoyer : rendu dans la boîte, chiffré dès que le moteur le permet (exigence 23).
    * Rend son numéro local ; la suite arrive en événements `chiffre`, `accepte`, `echec`.
    */
-  envoyer(message: Message, regle: Regle, piece?: Uint8Array): number {
+  envoyer(message: Message, regle: Regle, piece?: Uint8Array, avant?: (local: number) => void): number {
     const local = ++this.#local;
     this.#boite.push({ local, e: { heureMs: this.#deps.horloge.maintenant(), regle, message }, piece, depuis: this.#deps.horloge.maintenant() });
+    // L'appelant affiche le message (numéro local) avant les événements `chiffre` et `accepte`.
+    avant?.(local);
     this.#vider();
     return local;
   }

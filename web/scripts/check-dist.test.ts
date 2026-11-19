@@ -92,6 +92,8 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site(noS), false, false, ["securite.html"])).toContain("s.html : page d'ouverture absente");
     expect(checkDist(site({ ...ok, "s.html": S("") }), false, false, ["securite.html"])).toContain("s.html : sans « noindex »");
     expect(checkDist(site({ ...ok, "s.html": S(undefined, "index-a.js"), "assets/index-a.js": "1" }), false, false, ["securite.html"])).toContain("s.html : charge le script de l'application d'envoi");
+    // Exigence C-3 1 : la page d'ouverture ne charge pas le module du salon.
+    expect(checkDist(site({ ...ok, "assets/s-a.js": 'const s="/assets/salon-x.wasm";' }), false, false, ["securite.html"]).join("\n")).toMatch(/s\.html : assets\/s-a\.js charge le module du salon/);
   });
 
   it("A7 : police ou image hors de assets/ ou sans empreinte → refus (pas de cache long)", () => {

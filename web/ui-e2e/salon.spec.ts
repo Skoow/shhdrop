@@ -1,0 +1,208 @@
+// Salon de bout en bout PAR L'INTERFACE (plan C-3, Task 7) : vrai binaire Go avec SHH_SALONS=1 et
+// SHH_COMPTES=1 (créer un salon exige un compte, D42-26), site construit avec SHH_SITE_COMPTES=1
+// (web/dist-comptes, comptes-site.ts), faux SMTP sur la boucle locale (e2e/smtp.ts). Deux
+// navigateurs : la créatrice (inscription, création, salon prêt, entrée) et un invité (lien,
+// mot de passe, page d'explication, pseudonyme), qui échangent de vrais messages chiffrés par
+// MLS : texte, lien, réponse, réaction, modification, retrait, « écrit », coches « vu ».
+// Puis le test bloquant « le serveur ne voit rien » étendu au salon par l'interface : aucun
+// texte de message, pseudonyme, mot de passe, clé du lien ni de gestion dans le dossier de
+// données (base, WAL, conversations, pièces) ni dans les sorties du serveur.
+import { randomBytes } from "node:crypto";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
+import { findIn, needle, scanDir } from "../e2e/scan";
+import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
+import { siteComptes } from "./comptes-site";
+import { axe, capture, expect, test as base } from "./fixtures";
+
+const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
+const SMTP_MDP = "SmtpUiSecretVq4nRw";
+
+const test = base.extend<{ smtp: FauxSMTP }, { site: string }>({
+  site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
+  smtp: async ({}, use) => {
+    const smtp = await demarrerSMTP();
+    try {
+      await use(smtp);
+    } finally {
+      await smtp.fermer();
+    }
+  },
+  shhServer: async ({ smtp, site }, use) =>
+    use({ comptes: { cle: new Uint8Array(randomBytes(32)), smtpPort: smtp.port, smtpMdp: SMTP_MDP, from: FROM }, env: { SHH_STATIC_DIR: site } }),
+});
+
+test.use({ locale: "fr-FR", timezoneId: "Europe/Paris" });
+// WebKit : comme compte.spec.ts (Chromium seulement pour l'instant).
+test.skip(({ browserName }) => browserName !== "chromium", "salon.spec.ts : Chromium (comme compte.spec.ts)");
+test.setTimeout(240_000);
+
+const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
+const bouton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
+const titre = (page: Page, name: string) => page.getByRole("heading", { level: 1, name, exact: true });
+const fil = (page: Page) => page.getByRole("log");
+const saisie = (page: Page) => page.getByLabel("Message", { exact: true });
+const zone = (page: Page) => page.getByRole("region", { name: "Conversation", exact: true });
+
+/** Inscription complète par l'interface (adresse, mot de passe, pseudo, code reçu), suite « salon ». */
+async function inscrire(page: Page, origin: string, smtp: FauxSMTP, email: string, mdp: string, pseudo: string): Promise<void> {
+  await page.goto(origin + "/compte/inscription?suite=salon");
+  await expect(titre(page, "Créer un compte")).toBeVisible();
+  await champ(page, "Adresse e-mail").fill(email);
+  await champ(page, "Mot de passe").fill(mdp);
+  await champ(page, "Pseudo").fill(pseudo);
+  await page.getByLabel("J'ai au moins 15 ans et j'accepte les conditions d'utilisation").check();
+  await bouton(page, "Recevoir un code").click();
+  const code = codeDuCourriel(await smtp.attendre(1)).code;
+  await champ(page, "Code reçu par e-mail").fill(code);
+  await bouton(page, "Créer le compte").click();
+  await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
+}
+
+async function envoyer(page: Page, texte: string): Promise<void> {
+  await saisie(page).fill(texte);
+  await zone(page).getByRole("button", { name: "Envoyer", exact: true }).click();
+  await expect(fil(page).locator("p.texte").getByText(texte, { exact: true })).toBeVisible();
+}
+
+/** Bulle d'un message par son texte (élément de liste du fil). */
+const bulle = (page: Page, texte: string) => fil(page).locator("li").filter({ has: page.locator("p.texte", { hasText: texte }) });
+
+test("deux navigateurs : création avec un compte, invitation, messages chiffrés, et le serveur ne voit rien", async ({ page, shh, smtp, browser }, info) => {
+  const r = randomBytes(4).toString("hex");
+  const email = `Salon.${r}@exemple.org`;
+  const mdpCompte = `MdpCompteSalon-${r}`;
+  const pseudoA = `Léa${r.slice(0, 4)}`;
+  const pseudoB = `Hugo${r.slice(4, 8)}`;
+
+  // --- Créatrice : compte, création, salon prêt -----------------------------------------------------
+  await inscrire(page, shh.origin, smtp, email, mdpCompte, pseudoA);
+  await bouton(page, "Continuer").click();
+  await expect(titre(page, "Créer un salon")).toBeVisible();
+  await capture(page, "salon-nouveau");
+  expect(await axe(page)).toEqual([]);
+  await expect(page).toHaveURL(/\/salon\/nouveau$/);
+  // Compte récent : 4 places au plus (conception du compte §11) ; « Ouvert » les prend toutes.
+  await expect(page.getByText("Ouvert, 4 au plus")).toBeVisible();
+  await bouton(page, "Créer le salon").click();
+  await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
+  await capture(page, "salon-pret");
+  expect(await axe(page)).toEqual([]);
+  // Lien et mot de passe affichés (jamais dans la barre d'adresse).
+  const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
+  const mdp = (await page.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
+  expect(lien).toMatch(new RegExp(`^${shh.origin.replace(/[.]/g, "\\.")}/salon#c[A-Za-z0-9_-]{43}$`));
+  expect(mdp).toMatch(/^.{11}$/);
+  expect(page.url()).not.toContain("#");
+  await bouton(page, "Afficher le lien de gestion").click();
+  const gestion = (await page.locator(".cf").filter({ hasText: "Lien de gestion" }).locator(".val").textContent())!.trim();
+  expect(gestion).toMatch(/\/salon#s[A-Za-z0-9_-]{43}$/);
+  await bouton(page, "Entrer dans le salon").click();
+  await expect(titre(page, "Un salon qui s'efface")).toBeVisible();
+  // Pseudo du compte proposé (réglage « Proposer mon pseudo et ma photo », actif par défaut).
+  await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue(pseudoA);
+  await bouton(page, "Entrer dans le salon").click();
+  await expect(fil(page)).toBeVisible();
+
+  // --- Invité : autre navigateur, lien, mot de passe, explication, pseudonyme ------------------------
+  const ctxB: BrowserContext = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
+  const pageB = await ctxB.newPage();
+  const erreursB: string[] = [];
+  pageB.on("pageerror", (e) => erreursB.push(e.message));
+  pageB.on("console", (m) => /Refused to|Content Security Policy/.test(m.text()) && erreursB.push(m.text()));
+  try {
+    await pageB.goto(lien);
+    await expect(titre(pageB, "Salon de discussion")).toBeVisible();
+    expect(pageB.url()).toBe(shh.origin + "/salon"); // « # » retiré de la barre
+    await champ(pageB, "Mot de passe du salon").fill("mauvais-mdp");
+    await bouton(pageB, "Continuer").click();
+    await expect(pageB.getByText(/Mot de passe incorrect\. Essais restants/)).toBeVisible({ timeout: 30_000 });
+    await champ(pageB, "Mot de passe du salon").fill(mdp);
+    await bouton(pageB, "Continuer").click();
+    await expect(titre(pageB, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
+    await capture(pageB, "salon-explication");
+    expect(await axe(pageB)).toEqual([]);
+    await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoA);
+    // Unicité : le pseudonyme de la créatrice est déjà pris (dès que son profil est arrivé).
+    await expect(pageB.getByText("Déjà pris dans ce salon.")).toBeVisible({ timeout: 30_000 });
+    await champ(pageB, "Pseudonyme pour ce salon").fill(pseudoB);
+    await bouton(pageB, "Entrer dans le salon").click();
+    await expect(fil(pageB)).toBeVisible();
+
+    // --- Échanges -----------------------------------------------------------------------------------
+    const t1 = `Bonjour depuis A ${r}`;
+    await envoyer(page, t1);
+    await expect(fil(pageB).locator("p.texte").getByText(t1, { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(bulle(pageB, t1)).toContainText(pseudoA);
+    const t2 = `Réponse de B ${r} https://exemple.org/page`;
+    await saisie(pageB).fill("en train…");
+    await expect(page.getByText(`${pseudoB} écrit…`)).toBeVisible({ timeout: 15_000 });
+    await saisie(pageB).fill("");
+    // Réponse citée.
+    await bulle(pageB, t1).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(pageB, t1).getByRole("button", { name: "Répondre" }).click();
+    await expect(pageB.getByText(`Réponse à ${pseudoA}`)).toBeVisible();
+    await envoyer(pageB, t2);
+    const chezA = bulle(page, `Réponse de B ${r}`);
+    await expect(chezA).toBeVisible({ timeout: 30_000 });
+    await expect(chezA.locator("blockquote")).toContainText(t1);
+    // Lien https cliquable, sans aperçu, sans référent.
+    const a = chezA.getByRole("link", { name: "https://exemple.org/page" });
+    await expect(a).toHaveAttribute("rel", "noopener noreferrer");
+    await expect(a).toHaveAttribute("referrerpolicy", "no-referrer");
+    // Coches : « Vu » chez A quand B a vu le message (accusés groupés, 2,5 s).
+    await expect(bulle(page, t1).locator(".coche")).toHaveText("· Vu", { timeout: 30_000 });
+    // Réaction.
+    await bulle(page, `Réponse de B ${r}`).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(page, `Réponse de B ${r}`).getByRole("button", { name: "Réagir 👍" }).click();
+    await expect(bulle(pageB, `Réponse de B ${r}`).locator(".reactions")).toContainText("👍 1", { timeout: 30_000 });
+    // Modification (auteur seulement), puis retrait pour tous.
+    await bulle(page, t1).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(page, t1).getByRole("button", { name: "Modifier" }).click();
+    const t1b = `Bonjour corrigé ${r}`;
+    await saisie(page).fill(t1b);
+    await zone(page).getByRole("button", { name: "Envoyer", exact: true }).click();
+    await expect(fil(pageB).locator("p.texte").getByText(t1b, { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(bulle(pageB, t1b)).toContainText("modifié");
+    const t3 = `À retirer ${r}`;
+    await envoyer(page, t3);
+    await expect(fil(pageB).locator("p.texte").getByText(t3, { exact: true })).toBeVisible({ timeout: 30_000 });
+    await bulle(page, t3).getByRole("button", { name: "Actions du message" }).click();
+    await bulle(page, t3).getByRole("button", { name: "Retirer pour tous" }).click();
+    await page.getByRole("button", { name: "Retirer pour tous" }).last().click(); // confirmation
+    await expect(fil(pageB).locator("p.texte").getByText(t3, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+    await expect(fil(pageB).getByText("Message retiré").first()).toBeVisible();
+    // Captures (preuve) et audit d'accessibilité (WCAG 2.1 A et AA) des écrans du salon.
+    await capture(page, "salon-conversation");
+    await capture(pageB, "salon-conversation-invite");
+    expect(await axe(page)).toEqual([]);
+    // Participants : en ligne, pseudonymes, « vous ».
+    if (!(await page.getByRole("complementary", { name: "Participants" }).isVisible())) await bouton(page, "Participants").click();
+    await expect(page.getByText(pseudoB, { exact: true }).last()).toBeVisible();
+    expect(erreursB).toEqual([]);
+
+    // --- Le serveur ne voit rien (test bloquant, étendu au salon par l'interface) -------------------
+    const cle = (l: string) => l.slice(l.lastIndexOf("#") + 2);
+    const reperes = [
+      needle("texte 1", t1),
+      needle("texte 1 modifié", t1b),
+      needle("texte 2", `Réponse de B ${r}`),
+      needle("texte retiré", t3),
+      needle("pseudo A", pseudoA),
+      needle("pseudo B", pseudoB),
+      needle("mot de passe du salon", mdp),
+      needle("clé du lien (base64url)", cle(lien)),
+      needle("lien de gestion (base64url)", cle(gestion)),
+      needle("clé du lien (octets)", new Uint8Array(Buffer.from(cle(lien), "base64url"))),
+      needle("secret de gestion (octets)", new Uint8Array(Buffer.from(cle(gestion), "base64url"))),
+    ];
+    const dir = shh.server.dataDir;
+    expect(scanDir(dir, reperes)).toEqual([]);
+    await shh.server.stop();
+    expect(scanDir(dir, reperes)).toEqual([]);
+    expect(findIn(shh.server.stdout(), [needle("témoin", "SHH_LISTENING")])).toEqual(["témoin"]);
+    expect(findIn(shh.server.stdout(), reperes)).toEqual([]);
+    expect(findIn(shh.server.stderr(), reperes)).toEqual([]);
+  } finally {
+    await ctxB.close();
+  }
+});

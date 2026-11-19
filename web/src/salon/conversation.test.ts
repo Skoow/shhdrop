@@ -91,6 +91,18 @@ describe("conversation", () => {
     expect(c.elements.at(-1)).toMatchObject({ k: "sys", quoi: "pseudo", siege: 1, avant: "Leo", apres: "Léa" });
     expect(c.couleurLibre()).toBe(0);
   });
+  it("notre profil : appliqué chez nous, puis au rang de notre trame ; perdu contre un rang antérieur", () => {
+    const c = conv(0);
+    c.monProfil("Ana", 3);
+    expect(c.nom(0).pseudo).toBe("Ana");
+    expect(c.couleur(0)).toBe(3);
+    c.message(4, 1, 3, env(1, { k: "profil", pseudo: "ANA", couleur: 1, avatar: null }));
+    expect(c.nom(1).pseudo).toBe("ANA");
+    // Notre trame a pris le rang 9 : celle du siège 1 (rang 4) garde le pseudonyme.
+    c.monProfil("Ana", 3, 9);
+    expect(c.nom(0).pseudo).toBeNull();
+    expect(c.pseudoRefuse).toBe(true);
+  });
   it("groupe : arrivée, retour (code changé), créateur revenu sans « code changé »", () => {
     const c = conv(1);
     c.groupe({ ajoutes: [2], retires: [], createurRevenu: false, membres: [0, 1, 2] });

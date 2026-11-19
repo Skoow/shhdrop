@@ -170,8 +170,11 @@
 
   /** Une action d'ajout ; `live` faux : la galerie du système (appel synchrone, même geste). */
   function addAct(id: AddId, live = sheetActions.find((a) => a.id === id)?.live ?? false) {
-    if (id === "room") say(t("tabs.soon.chat")); // Salon : bientôt (spec §39), rien à ouvrir
-    else if (id === "note") openEditor(null, "");
+    // Salon (plan C-3) : sa page de création ; « bientôt » sans __SALONS__ (démo, site sans compte).
+    if (id === "room") {
+      if (__SALONS__) return navigate("/salon/nouveau");
+      say(t("tabs.soon.chat"));
+    } else if (id === "note") openEditor(null, "");
     else if (id === "files") filesIn?.click();
     else if (id === "voice") voiceOpen = true;
     else if (live) capOpen = true;
@@ -313,6 +316,7 @@
   // lancé (caméra, enregistreur) ; Salon (bientôt) : sa tuile est mise en avant, et dit « bientôt ».
   function make(g: "media" | "vocal" | "room") {
     if (g === "room") {
+      if (__SALONS__) return navigate("/salon/nouveau");
       chrome.spot = "make";
       say(t("tabs.soon.chat"));
     } else chrome.pending = g;
@@ -616,11 +620,18 @@
       {#each rowActions as a (a.id)}
         {#if a.id === "room"}
           <!-- Salon, avec les autres actions (17 novembre) : pas encore construit, désactivé avec sa raison. -->
-          <button type="button" class="mk room" data-add="room" aria-disabled="true" aria-describedby="room-soon-row" onclick={() => addAct("room")}>
-            <AddIcon id="room" size={22} />
-            <span>{t("compose.row.room")}</span><span class="soon">{t("foot.soon")}</span>
-          </button>
-          <span id="room-soon-row" class="sr-only">{t("tabs.soon.chat")}</span>
+          {#if __SALONS__}
+            <button type="button" class="mk room" data-add="room" onclick={() => addAct("room")}>
+              <AddIcon id="room" size={22} />
+              <span>{t("compose.row.room")}</span>
+            </button>
+          {:else}
+            <button type="button" class="mk room" data-add="room" aria-disabled="true" aria-describedby="room-soon-row" onclick={() => addAct("room")}>
+              <AddIcon id="room" size={22} />
+              <span>{t("compose.row.room")}</span><span class="soon">{t("foot.soon")}</span>
+            </button>
+            <span id="room-soon-row" class="sr-only">{t("tabs.soon.chat")}</span>
+          {/if}
         {:else}
           <button type="button" class="mk" data-add={a.id} onclick={() => addAct(a.id, a.live)}>
             <AddIcon id={a.id} size={22} />

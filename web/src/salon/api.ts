@@ -1,6 +1,6 @@
 // Routes JSON du salon (serveur : server/internal/api/handlers_salon.go ; « Protocole » du plan
 // C-2). Seul fichier du salon qui fait des requêtes HTTP (source-rules.test.ts) ; la création
-// avec session passe par account/api.ts (seul fichier qui écrit X-Shh-Session). Règles :
+// avec session passe par account/api.ts (seul fichier qui écrit l'en-tête de session). Règles :
 // - secrets en en-tête seulement, en base64url sans bourrage : X-Shh-Access (K_accès_s),
 //   X-Shh-Manage (J_gestion = jetonGestion(S_gestion), JAMAIS S_gestion : spec salon v3 §15.2),
 //   X-Shh-Membre (jeton de membre) ; rien dans l'adresse ;

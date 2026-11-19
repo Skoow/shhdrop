@@ -44,6 +44,18 @@ export const INFO_PATHS: Readonly<Record<string, InfoRoute>> = {
 
 /** Pages du compte (plan du compte, lot 10), seulement si __COMPTES__ : chemin → route. */
 export type CompteRoute = "compte" | "inscription" | "connexion" | "oubli" | "profil";
+
+/**
+ * Pages du salon (plan C-3), seulement si __SALONS__ (site avec compte, hors démo) : « /salon »
+ * (lien d'invitation « #c… », salon prêt, conversation ; aucun secret dans le chemin) et
+ * « /salon/nouveau » (création, compte exigé). Relue par TestAppRoutesMatchClientRouter
+ * (server/cmd/shhdrop), comparée à salonRoutes, servies en 200 avec SHH_SALONS=1 et SHH_COMPTES=1.
+ */
+export type SalonRoute = "salon" | "salonnouveau";
+const SALON_PATHS: Readonly<Record<string, SalonRoute>> = {
+  "/salon": "salon",
+  "/salon/nouveau": "salonnouveau",
+};
 // Relue par TestAppRoutesMatchClientRouter (server/cmd/shhdrop) et comparée à compteRoutes du
 // serveur, qui ne les sert en 200 qu'avec SHH_COMPTES=1 (sinon 404, comme toute page inconnue).
 const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
@@ -56,7 +68,7 @@ const COMPTE_PATHS: Readonly<Record<string, CompteRoute>> = {
 
 export type Route = {
   /** envoyer : page d'envoi (composeur, même vide), où mène « Commencer » (retours DROP). */
-  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | CompteRoute | "notfound";
+  name: "home" | "envoyer" | "envois" | "telechargements" | "open" | "manage" | InfoRoute | "offres" | CompteRoute | SalonRoute | "notfound";
 };
 
 /**
@@ -68,7 +80,7 @@ export function suite(search: string): "salon" | null {
   return search === "?suite=salon" ? "salon" : null;
 }
 
-export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false, comptes: boolean = __COMPTES__): Route {
+export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false, comptes: boolean = __COMPTES__, salons: boolean = __SALONS__): Route {
   const prefix = base.endsWith("/") ? base.slice(0, -1) : base; // "" ou "/shhdrop"
   let p = pathname;
   if (prefix !== "") {
@@ -102,6 +114,9 @@ export function match(pathname: string, hash = "", base: string = import.meta.en
   // Pages du compte : sans __COMPTES__ (défaut, démo), la même 404 qu'une adresse inconnue.
   const compte = comptes && Object.hasOwn(COMPTE_PATHS, p) ? COMPTE_PATHS[p] : undefined;
   if (compte !== undefined) return { name: compte };
+  // Salon (plan C-3) : sans __SALONS__ (démo, site sans compte), la même 404.
+  const salon = salons && Object.hasOwn(SALON_PATHS, p) ? SALON_PATHS[p] : undefined;
+  if (salon !== undefined) return { name: salon };
   // « /s/ » reste réservé aux futurs liens universels (spec §16) : aucune route aujourd'hui.
   return { name: "notfound" };
 }

@@ -35,9 +35,9 @@ build() { # $1 : dossier absolu de la copie (même disposition que le dépôt : 
   # et sa colle JavaScript). Le greffon shh-engine (vite.config.ts) en émet le .wasm dans dist/assets (déjà compté ci-dessus) ; ces
   # empreintes nomment en plus la sortie brute de wasm-bindgen si les deux builds diffèrent.
   (cd "$1/web/src/engine" && find pkg -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
-  # Module du salon (web/src/salon/pkg) : aucune page du site ne l'importe encore, il n'est donc
-  # pas dans dist/ ; ses empreintes sont comptées ici, préfixées « salon/pkg/ » (le job
-  # repro-docker de la CI ne compare que « ./ » et « pkg/ », l'image ne le construit pas encore).
+  # Module du salon (web/src/salon/pkg) : ses empreintes sont comptées ici, préfixées
+  # « salon/pkg/ » ; le job repro-docker de la CI les compare à celles de l'image, qui le construit
+  # depuis le plan C-3 (exigence C-3 2).
   (cd "$1/web/src" && find salon/pkg -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
 }
 
