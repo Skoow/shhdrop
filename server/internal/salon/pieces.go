@@ -47,6 +47,12 @@ const (
 	VocalOctetsParSeconde = 4000
 	// VocalReserveMax : réserve vocale d'un siège au plus (1 h de présence).
 	VocalReserveMax int64 = 14400000
+	// VocalReserveDepart : réserve vocale d'un nouvel occupant (décision du propriétaire du 19
+	// novembre) : un palier 16 (1 048 880 o), celui du plus petit vocal non vide (le palier 1 ne
+	// garde que le morceau du manifeste). Sans elle, le premier vocal attendait 4 min 22 s de
+	// présence. Borne anti-abus : les arrivées d'un salon sont plafonnées à 5 × max_members (au
+	// plus 50 × 1 Mo de vocaux d'avance par salon) ; une reprise garde la réserve du siège.
+	VocalReserveDepart int64 = 1048880
 	// PieceSansLien : pièce finalisée jamais liée à une trame, effacée après ce délai.
 	PieceSansLien = 15 * time.Minute
 	// PieceSansSegment : pièce non finalisée sans segment reçu depuis ce délai, effacée.

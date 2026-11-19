@@ -146,13 +146,14 @@ func (r *reserveVocale) prendre(now time.Time, n int64) time.Duration {
 // rendre : n octets rendus (création refusée après prendre), au plus VocalReserveMax.
 func (r *reserveVocale) rendre(n int64) { r.octets = min(VocalReserveMax, r.octets+n) }
 
-// nouvelleLimite : seaux pleins.
+// nouvelleLimite : seaux pleins, réserve vocale de départ (VocalReserveDepart).
 func nouvelleLimite() limiteSiege {
 	return limiteSiege{
 		cadence:  seau{jetons: rafaleSiege, cap: rafaleSiege, parSeconde: cadenceSeconde},
 		horaire:  seau{jetons: horaireMax, cap: horaireMax, parSeconde: horaireParHeure / 3600},
 		volatile: seau{jetons: rafaleVolatile, cap: rafaleVolatile, parSeconde: volatileSeconde},
 		pieces:   seau{jetons: PiecesParHeure, cap: PiecesParHeure, parSeconde: PiecesParHeure / 3600.0},
+		vocal:    reserveVocale{octets: VocalReserveDepart},
 	}
 }
 

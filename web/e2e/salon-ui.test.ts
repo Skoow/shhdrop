@@ -135,14 +135,15 @@ describe("salon : client de production, vrai serveur", () => {
     expect(p.nom).toBe("rapport.pdf");
     const lu = new Uint8Array(await (await lirePiece(net, b!.c.jeton, p)).arrayBuffer());
     expect(lu).toEqual(contenu);
-    // Vocal (défaut signalé, plan C-4) : le plus petit vocal non vide prend le palier 16
-    // (1 048 880 o ; le palier 1 ne garde que le morceau du manifeste) et la réserve d'un siège
-    // neuf est vide : le premier vocal attend environ 4 min de présence. Le serveur le dit (429 et
-    // délai), l'écran aussi (« Doucement »), sans rien envoyer.
-    const e = await envoyerPiece(net, a!.c.jeton, new Blob([new Uint8Array(4000)]), { nom: "vocal.webm", mime: "audio/webm", vocal: true }).catch((x) => x);
-    expect(e).toBeInstanceOf(api.SalonError);
+    // Vocal : le plus petit vocal non vide prend le palier 16 (1 048 880 o) ; la réserve de départ
+    // d'un participant (décision du 19 novembre) le fait passer tout de suite, sans attendre.
+    const voix = new Uint8Array(4000).fill(7);
+    const rv = await envoyerPiece(net, a!.c.jeton, new Blob([voix]), { nom: "vocal.webm", mime: "audio/webm", vocal: true });
+    expect(rv.palier).toBe(16);
+    expect(new Uint8Array(await (await lirePiece(net, b!.c.jeton, rv)).arrayBuffer())).toEqual(voix);
+    // Le second, aussitôt : la réserve est vide, 429 avec le délai (au rythme d'une voix).
+    const e = await envoyerPiece(net, a!.c.jeton, new Blob([voix]), { nom: "vocal.webm", mime: "audio/webm", vocal: true }).catch((x) => x);
     expect(e).toMatchObject({ status: 429, code: "limit" });
-    expect(e.retryS).toBeGreaterThan(200);
   });
 
   it("reconnexion : rattrapage avec `depuis`, ni perte ni doublon", async () => {
