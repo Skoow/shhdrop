@@ -1,8 +1,8 @@
 // Pages bilingues (20 novembre, référencement et stabilité de l'affichage) : l'accueil et les pages
 // d'information ont une version anglaise écrite au build sous « /en » (« /en », « /en/securite »…),
 // la version française gardant son adresse. Sur ces pages, l'adresse décide de la langue ; le
-// serveur y envoie un navigateur anglophone (Accept-Language, server/cmd/shhdrop/static.go), comme
-// la règle « la langue suit le navigateur » (propriétaire, 12 novembre). Ailleurs (envoi, partage,
+// serveur ne lit jamais Accept-Language (spécification §36 S2) : un navigateur anglophone voit un
+// lien « English version » (ui/EnglishLink.svelte) vers la version anglaise. Ailleurs (envoi, partage,
 // compte, salon), la langue suit le navigateur, sans adresse propre. Démo (GitHub Pages) : aucune
 // version écrite, la langue suit le navigateur partout. Aucune donnée dans l'adresse.
 import type { Lang } from "../i18n/format";
