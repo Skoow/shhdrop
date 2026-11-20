@@ -19,7 +19,7 @@
   import PseudoField from "../../ui/PseudoField.svelte";
   import Cadre from "./Cadre.svelte";
   import CarteCompte from "./CarteCompte.svelte";
-  import { codeDe, erreur } from "./erreurs";
+  import { codeDe, erreur, jourLong } from "./erreurs";
 
   let etat = $state.raw<EtatServeur | null>(null);
   // Pseudo provisoire (20 novembre) : le champ est vide et une phrase demande d'en choisir un.
@@ -57,7 +57,9 @@
       await changerPseudo(pseudo);
     } catch (e) {
       const c = codeDe(e);
-      errPseudo = c === "limit" ? t("account.profile.limit") : erreur(e, "parametres").texte;
+      // Prochain changement possible (3 par an au plus, 20 novembre) : date tirée de l'attente.
+      const apres = (e as { retryAfterS?: number }).retryAfterS ?? 0;
+      errPseudo = c === "limit" ? t("account.profile.limit", { date: jourLong(new Date(Date.now() + apres * 1000).toISOString().slice(0, 10)) }) : erreur(e, "parametres").texte;
       announce(errPseudo);
       el?.focus();
       return;

@@ -17,7 +17,7 @@ import * as C from "./session.svelte";
 const MDP = "correct horse battery";
 const CODE = "123456";
 const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
-const profil = (p: Partial<Profil> = {}): Profil => ({ pseudo: "Léa", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null, ...p });
+const profil = (p: Partial<Profil> = {}): Profil => ({ pseudo: "Lea", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null, ...p });
 
 type Compte = { h: Uint8Array; aAuth: string; envMdp: Uint8Array; sProfil: Uint8Array; pCanon: string; coffres: Record<"profil" | "prive", { blob: Uint8Array; gen: number }>; totp: boolean };
 

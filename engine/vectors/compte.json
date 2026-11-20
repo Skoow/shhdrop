@@ -750,25 +750,19 @@
   ],
   "pseudo": [
     {
-      "affiche_hex": "4cc3a961",
       "entree_hex": "4cc3a961",
-      "label": "simple",
-      "p_canon_hex": "6cc3a961",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "simple"
     },
     {
-      "affiche_hex": "4cc38941",
       "entree_hex": "4cc38941",
-      "label": "majuscules",
-      "p_canon_hex": "6cc3a961",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "majuscules"
     },
     {
-      "affiche_hex": "4cc3a961",
       "entree_hex": "4c65cc8161",
-      "label": "decompose",
-      "p_canon_hex": "6cc3a961",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "decompose"
     },
     {
       "entree_hex": "6cc3a92061",
@@ -798,18 +792,14 @@
       "reserve": false
     },
     {
-      "affiche_hex": "efbcacefbca5efbca1",
       "entree_hex": "efbcacefbca5efbca1",
-      "label": "nfkc_pleine_chasse",
-      "p_canon_hex": "6c6561",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "nfkc_pleine_chasse"
     },
     {
-      "affiche_hex": "f09d939bc3a961",
       "entree_hex": "f09d939bc3a961",
-      "label": "nfkc_mathematique",
-      "p_canon_hex": "6cc3a961",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "nfkc_mathematique"
     },
     {
       "affiche_hex": "456d6d61",
@@ -826,53 +816,39 @@
       "reserve": false
     },
     {
-      "affiche_hex": "d09bd0b5d18f",
       "entree_hex": "d09bd0b5d18f",
-      "label": "cyrillique_seul",
-      "p_canon_hex": "d0bb65e1b499",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "cyrillique_seul"
     },
     {
-      "affiche_hex": "d090d38fd196d181d0b5",
       "entree_hex": "d090d38fd196d181d0b5",
-      "label": "sosie_cyrillique_seul",
-      "p_canon_hex": "616c696365",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "sosie_cyrillique_seul"
     },
     {
-      "affiche_hex": "ce95cebbceadcebdceb7",
       "entree_hex": "ce95cebbceadcebdceb7",
-      "label": "grec",
-      "p_canon_hex": "ea9e93cebbea9e93cc81766ecca9",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "grec"
     },
     {
-      "affiche_hex": "e794b0e4b8ade381b2e3828de38197",
       "entree_hex": "e794b0e4b8ade381b2e3828de38197",
-      "label": "han_et_kana",
-      "p_canon_hex": "e794b0e4b8ade381b2e3828de38197",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "han_et_kana"
     },
     {
-      "affiche_hex": "eab980ebafbcec8898",
       "entree_hex": "eab980ebafbcec8898",
-      "label": "hangul",
-      "p_canon_hex": "e18480e4b8a8e18486e18486e4b8a8e18482ec8898",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "hangul"
     },
     {
-      "affiche_hex": "d8b9d984d98a",
       "entree_hex": "d8b9d984d98a",
-      "label": "arabe",
-      "p_canon_hex": "d8b9d984d989",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "arabe"
     },
     {
-      "affiche_hex": "e0a4b9e0a4bfe0a4a8e0a58de0a4a6e0a580",
       "entree_hex": "e0a4b9e0a4bfe0a4a8e0a58de0a4a6e0a580",
-      "label": "devanagari",
-      "p_canon_hex": "e0a4b9e0a6bfe0a4a8e0a58de0a4a6e0a580",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "devanagari"
     },
     {
       "affiche_hex": "3432",
@@ -882,11 +858,9 @@
       "reserve": false
     },
     {
-      "affiche_hex": "4cc3a961",
       "entree_hex": "4ce2808bc3a961e280ae",
-      "label": "invisibles_retires",
-      "p_canon_hex": "6cc3a961",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "invisibles_retires"
     },
     {
       "affiche_hex": "6162",
@@ -903,11 +877,9 @@
       "reserve": false
     },
     {
-      "affiche_hex": "c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87c3a1cc82cc83cc84cc85cc86cc87",
       "entree_hex": "61cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc8761cc81cc82cc83cc84cc85cc86cc87",
-      "label": "p_canon_long",
-      "p_canon_hex": "c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87c3a1cc82cc83cc84cc84cc86cc87",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "p_canon_long"
     },
     {
       "entree_hex": "41",
@@ -936,12 +908,12 @@
     },
     {
       "entree_hex": "d0906c696365",
-      "error": "pseudo_ecritures",
+      "error": "pseudo_caracteres",
       "label": "ecritures_melees"
     },
     {
       "entree_hex": "5461726fe5a4aae9838e",
-      "error": "pseudo_ecritures",
+      "error": "pseudo_caracteres",
       "label": "latin_et_han"
     },
     {
@@ -1018,32 +990,24 @@
       "label": "reserve_espace_et_tiret"
     },
     {
-      "affiche_hex": "4d6f64c3a9726174657572",
       "entree_hex": "4d6f64c3a9726174657572",
-      "label": "reserve_moderateur_accent",
-      "p_canon_hex": "726e6f64c3a9726174657572",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "reserve_moderateur_accent"
     },
     {
-      "affiche_hex": "c3897175697065",
       "entree_hex": "c3897175697065",
-      "label": "reserve_equipe_accent",
-      "p_canon_hex": "c3a97175697065",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "reserve_equipe_accent"
     },
     {
-      "affiche_hex": "53c3a96375726974c3a9",
       "entree_hex": "53c3a96375726974c3a9",
-      "label": "reserve_securite_accent",
-      "p_canon_hex": "73c3a96375726974c3a9",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "reserve_securite_accent"
     },
     {
-      "affiche_hex": "53797374c3a86d65",
       "entree_hex": "53797374c3a86d65",
-      "label": "reserve_systeme_accent",
-      "p_canon_hex": "73797374c3a8726e65",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "reserve_systeme_accent"
     },
     {
       "affiche_hex": "41646d696e32",
@@ -1144,39 +1108,29 @@
       "reserve": true
     },
     {
-      "affiche_hex": "6d6f64c3a9726174657572",
       "entree_hex": "6d6f64c3a9726174657572",
-      "label": "liste_13",
-      "p_canon_hex": "726e6f64c3a9726174657572",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "liste_13"
     },
     {
-      "affiche_hex": "6d6f64c3a9726174696f6e",
       "entree_hex": "6d6f64c3a9726174696f6e",
-      "label": "liste_14",
-      "p_canon_hex": "726e6f64c3a9726174696f6e",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "liste_14"
     },
     {
-      "affiche_hex": "c3a97175697065",
       "entree_hex": "c3a97175697065",
-      "label": "liste_15",
-      "p_canon_hex": "c3a97175697065",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "liste_15"
     },
     {
-      "affiche_hex": "73797374c3a86d65",
       "entree_hex": "73797374c3a86d65",
-      "label": "liste_16",
-      "p_canon_hex": "73797374c3a8726e65",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "liste_16"
     },
     {
-      "affiche_hex": "73c3a96375726974c3a9",
       "entree_hex": "73c3a96375726974c3a9",
-      "label": "liste_17",
-      "p_canon_hex": "73c3a96375726974c3a9",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "liste_17"
     }
   ],
   "sel": [

@@ -514,6 +514,8 @@ export default defineConfig(({ mode, command }) => {
   return {
     plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), jetonsWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
+    // Listes d'adresses jetables du serveur (mêmes fichiers), lues par routes/compte/verifs.ts.
+    server: { fs: { allow: [".", "../server/internal/compte"] } },
     define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)), __SALONS__: JSON.stringify(salonsActifs(demo)) },
     build: {
       outDir: demo ? "dist-demo" : "dist",

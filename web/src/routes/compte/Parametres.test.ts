@@ -143,10 +143,10 @@ describe("Paramètres", () => {
     expect(champ("Mot de passe actuel").getAttribute("autocomplete")).toBe("current-password");
     expect(champ("Nouveau mot de passe").getAttribute("autocomplete")).toBe("new-password");
     saisir("Mot de passe actuel", MDP);
-    saisir("Nouveau mot de passe", "nouveau mot de passe");
+    saisir("Nouveau mot de passe", "Nouveau-mot-de-passe-7");
     await presser("Enregistrer le mot de passe");
     expect(C.confirmerIdentite).toHaveBeenCalledWith(MDP, "", undefined);
-    expect(C.changerMotDePasse).toHaveBeenCalledWith("nouveau mot de passe");
+    expect(C.changerMotDePasse).toHaveBeenCalledWith("Nouveau-mot-de-passe-7");
     expect(texte()).toContain("Mot de passe changé. Vos autres appareils ont été déconnectés.");
     expect(document.querySelectorAll('section[aria-labelledby="sec-mdp"] input')).toHaveLength(0); // rien ne reste dans la page
   });
@@ -158,7 +158,7 @@ describe("Paramètres", () => {
     await presser("Changer le mot de passe");
     saisir("Adresse e-mail", "lea@exemple.fr");
     saisir("Mot de passe actuel", "faux");
-    saisir("Nouveau mot de passe", "nouveau mot de passe");
+    saisir("Nouveau mot de passe", "Nouveau-mot-de-passe-7");
     await presser("Enregistrer le mot de passe");
     expect(C.confirmerIdentite).toHaveBeenCalledWith("faux", "", "lea@exemple.fr");
     expect(texte()).toContain("Adresse ou mot de passe incorrect.");

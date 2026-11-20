@@ -963,41 +963,53 @@ func TestPseudoReserveRefuse(t *testing.T) {
 // §21.5 et relecture des lots 13-14 (décision du propriétaire, 14 novembre) : une faute de
 // frappe se corrige tout de suite ; l'attente (jusqu'au jour UTC suivant) ne court qu'à partir
 // d'un premier changement. L'ancien pseudo est libéré aussitôt.
-func TestPseudoUneFoisPar24h(t *testing.T) {
+// Trois changements par an au plus (20 novembre) : le premier (depuis le pseudo de l'inscription)
+// est libre ; ensuite, PseudoEcart (122 jours) entre deux changements ; le nouveau doit être libre.
+func TestPseudoTroisParAn(t *testing.T) {
 	b := nouveauBanc(t)
 	_, j, d := b.inscrire(t, ipN(1), "lea@exemple.fr", "lea")
 	c, _ := b.s.Session(j)
 	var lim ErrLimit
 	if err := b.s.ChangerPseudo(c, []byte("lae")); err != nil {
-		t.Fatal("première correction, le jour de l'inscription :", err)
+		t.Fatal("premier changement, le jour de l'inscription :", err)
 	}
 	if err := b.s.ChangerPseudo(c, []byte("lea4")); !errors.As(err, &lim) {
 		t.Fatal("deuxième changement le même jour :", err)
 	}
-	if lim.Retry != 14*time.Hour { // inscrit le 14 à 10 h : jusqu'au 15 à 0 h
-		t.Fatal("attente jusqu'au jour suivant :", lim.Retry)
+	// Inscrit le 14 à 10 h : prochain changement le 14 + 122 jours à 0 h.
+	if want := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC).Add(122 * 24 * time.Hour).Sub(time.Date(2026, 11, 14, 10, 0, 0, 0, time.UTC)); lim.Retry != want {
+		t.Fatal("attente :", lim.Retry, "au lieu de", want)
 	}
 	var pj int64
 	if err := b.db.QueryRow(`SELECT pseudo_jour FROM comptes`).Scan(&pj); err != nil || pj != time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC).Unix() {
 		t.Fatal("pseudo_jour après le premier changement", pj, err)
 	}
-	b.clk.Add(14 * time.Hour) // le 15 à 0 h
-	o, err := b.s.Connexion(ipN(1), "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
-	if err != nil {
-		t.Fatal(err)
+	b.clk.Add(121*24*time.Hour + 13*time.Hour) // une heure avant la fin des 122 jours
+	reconnecter := func() Courante {
+		o, err := b.s.Connexion(ipN(1), "lea@exemple.fr", d.AAuth, OptionsSession{}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, _ := b.s.Session(o.Jeton)
+		return c
 	}
-	c, _ = b.s.Session(o.Jeton)
+	c = reconnecter()
+	if err := b.s.ChangerPseudo(c, []byte("lea2")); !errors.As(err, &lim) {
+		t.Fatal("avant 122 jours :", err)
+	}
+	b.clk.Add(time.Hour)
+	c = reconnecter()
 	if err := b.s.ChangerPseudo(c, []byte("connard")); !errors.Is(err, ErrPseudoPris) {
 		t.Fatal(err)
 	}
 	if err := b.s.ChangerPseudo(c, []byte("lea2")); err != nil {
-		t.Fatal(err)
+		t.Fatal("après 122 jours :", err)
 	}
 	if err := b.s.ChangerPseudo(c, []byte("lea3")); !errors.As(err, &lim) {
-		t.Fatal("deux fois le même jour :", err)
+		t.Fatal("deux fois de suite :", err)
 	}
 	b.inscrire(t, ipN(2), "leo@exemple.fr", "lea") // l'ancien est libre
-	b.inscrire(t, ipN(3), "lou@exemple.fr", "lae") // le premier corrigé aussi
+	b.inscrire(t, ipN(3), "lou@exemple.fr", "lae") // le premier aussi
 	if libre, err := b.s.PseudoVerifier(c, []byte("lea2")); err != nil || libre {
 		t.Fatal("le sien n'est pas libre", libre, err)
 	}

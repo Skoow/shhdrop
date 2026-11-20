@@ -64,6 +64,11 @@
   .input.invalid {
     border-color: var(--danger);
   }
+  .input[readonly] {
+    color: var(--text-2);
+    background: rgb(255 255 255 / 0.02);
+    cursor: default;
+  }
   .input:disabled {
     color: var(--text-disabled);
     background: var(--surface-2);

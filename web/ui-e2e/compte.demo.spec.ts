@@ -7,8 +7,8 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const EMAIL = "lea@exemple.fr";
-const MDP = "correct horse battery staple";
-const MDP2 = "tout autre phrase de passe";
+const MDP = "Correct-horse-battery-9";
+const MDP2 = "Tout-autre-phrase-7";
 
 /**
  * Navigation dans l'application, sans rechargement : une session sans « Rester connecté » ne

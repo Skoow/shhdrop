@@ -27,6 +27,8 @@
   import MotDePasse from "./MotDePasse.svelte";
   import { obtenirPreuve, preparerPreuve } from "./preuve";
   import Renvoi from "./Renvoi.svelte";
+  import ReglesMdp from "./ReglesMdp.svelte";
+  import { estJetable, mdpFort, suggestion } from "./verifs";
   import DemoCode from "./DemoCode.svelte";
 
   // Seul paramètre lu dans l'adresse : « ?suite=salon » (suite(), router.svelte.ts).
@@ -43,6 +45,37 @@
   let envoi = $state(false);
   const els: Partial<Record<Champ | "mdp2", HTMLInputElement | undefined>> = $state({});
   const ORDRE: (Champ | "mdp2")[] = ["email", "mdp", "mdp2", "code"];
+
+  // Adresse vérifiée pendant la frappe (20 novembre) : format (moteur), domaine jetable (liste du
+  // serveur, sur l'appareil), faute de frappe probable dans un domaine courant (correction
+  // proposée). 500 ms après la dernière touche ; rien n'est envoyé.
+  let proposee = $state<string | null>(null);
+  let minuterie: ReturnType<typeof setTimeout> | undefined;
+  async function verifierAdresse(v: string) {
+    proposee = null;
+    if (!/@[^@]*\.[^@.]{2,}$/.test(v.trim())) return;
+    const r = await verifierSaisie({ email: v });
+    if (v !== email) return; // une frappe plus récente prend la main
+    if (r.email) {
+      errs = { ...errs, email: erreur(new Error(r.email), "inscription").texte };
+      return;
+    }
+    // Faute de frappe d'abord : « gmial.com » est aussi dans la liste des jetables, la correction
+    // vaut mieux qu'un refus.
+    proposee = suggestion(v);
+    if (proposee) return;
+    if (await estJetable(v)) {
+      if (v === email) errs = { ...errs, email: t("account.err.jetable") };
+    }
+  }
+  function adresseTapee() {
+    errs.email = undefined;
+    proposee = null;
+    clearTimeout(minuterie);
+    const v = email;
+    minuterie = setTimeout(() => void verifierAdresse(v), 500);
+  }
+  $effect(() => () => clearTimeout(minuterie));
 
   /** Pseudo provisoire (« Membre » et 6 chiffres tirés au hasard), à changer dans le profil. */
   function pseudoProvisoire(): string {
@@ -68,6 +101,8 @@
     const r = await verifierSaisie({ email, mdp });
     const e: typeof errs = {};
     for (const [k, v] of Object.entries(r)) e[k as Champ] = erreur(new Error(v), "inscription").texte;
+    if (!e.email && (await estJetable(email))) e.email = t("account.err.jetable");
+    if (!e.mdp && !mdpFort(mdp, email)) e.mdp = t("account.mdp.faible");
     if (!e.mdp && mdp2 !== mdp) e.mdp2 = t("account.password2.err");
     errs = e;
     if (Object.keys(e).length > 0) return focusErreur();
@@ -146,8 +181,15 @@
 
   {#if etape === "saisie"}
     <form novalidate onsubmit={(e) => e.preventDefault()} oninput={preparerPreuve}>
-      <TextField label={t("account.email")} type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" hint={t("account.email.hint")} error={errs.email} bind:value={email} bind:el={els.email} oninput={() => (errs.email = undefined)} />
-      <MotDePasse label={t("account.password")} autocomplete="new-password" hint={t("account.password.hint")} error={errs.mdp} bind:value={mdp} bind:el={els.mdp} oninput={() => (errs.mdp = undefined)} />
+      <TextField label={t("account.email")} type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" error={errs.email} bind:value={email} bind:el={els.email} oninput={adresseTapee} />
+      {#if proposee}
+        <p class="propose" data-propose>
+          {t("account.email.propose")}
+          <button type="button" class="lien-b" onclick={() => ((email = proposee!), (proposee = null))}>{proposee}</button>&#8239;?
+        </p>
+      {/if}
+      <MotDePasse label={t("account.password")} autocomplete="new-password" error={errs.mdp} bind:value={mdp} bind:el={els.mdp} oninput={() => (errs.mdp = undefined)} />
+      <ReglesMdp {mdp} adresse={email} />
       <MotDePasse label={t("account.password2")} autocomplete="new-password" error={errs.mdp2} bind:value={mdp2} bind:el={els.mdp2} oninput={() => (errs.mdp2 = undefined)} />
       <Button type="submit" onpress={recevoir}>{t("account.signup.go")}</Button>
       <!-- Plus de case (20 novembre) : la création vaut acceptation, dite ici avec le lien. -->
@@ -181,6 +223,28 @@
 </Cadre>
 
 <style>
+  .propose {
+    margin: calc(-1 * var(--sp-3)) 0 0;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+  }
+  .lien-b {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .lien-b:hover {
+    color: var(--accent);
+  }
+  .lien-b:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
   .legal {
     margin: calc(-1 * var(--sp-2)) 0 0;
     color: var(--text-2);
@@ -188,10 +252,6 @@
     line-height: 1.5;
     text-align: center;
     text-wrap: pretty;
-  }
-  .lien-t {
-    color: var(--accent);
-    text-underline-offset: 3px;
   }
   .liens-b {
     display: flex;

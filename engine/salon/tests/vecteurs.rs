@@ -1747,9 +1747,10 @@ fn salon_v3() {
         by(&file["pseudo"], "marque_sur_espace_refusee")["error"],
         "pseudo_invalide"
     );
+    // Sosie cyrillique : refusé depuis le 20 novembre (A-Z, a-z, 0-9 seulement).
     assert_eq!(
-        by(&file["pseudo"], "cyrillique_sosie_d_alice")["key_hex"],
-        by(&file["pseudo"], "alice_latin")["key_hex"]
+        by(&file["pseudo"], "cyrillique_sosie_d_alice")["error"],
+        "pseudo_invalide"
     );
     assert_eq!(
         by(&file["trames"]["seal"], "charge_4094_octets_refusee")["seal"]["error"],

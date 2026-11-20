@@ -806,12 +806,12 @@ mod tests {
                 regle: Regle::CinqMinutes,
             },
             Message::Profil {
-                pseudo: "Léa".into(),
+                pseudo: "Lea".into(),
                 couleur: 9,
                 avatar: None,
             },
             Message::Profil {
-                pseudo: "Léa".into(),
+                pseudo: "Lea".into(),
                 couleur: 0,
                 avatar: Some(RefPiece {
                     r: Graine::new([8; 32]),
@@ -947,9 +947,9 @@ mod tests {
         refuse(r#""k":"retrait","cible":"BwcHBwcHBwcHBwcHBwcHBw==""#);
         refuse(r#""k":"retrait","cible":"BwcHBwcHBwcHBwcHBwcHBx""#); // bits de bourrage non nuls
         refuse(r#""k":"reaction","cible":"BwcHBwcHBwcHBwcHBwcHBw""#);
-        refuse(r#""k":"profil","pseudo":"Léa","couleur":1"#);
-        refuse(r#""k":"profil","pseudo":"Léa","couleur":1.0,"avatar":null"#);
-        refuse(r#""k":"profil","pseudo":"Léa","couleur":"1","avatar":null"#);
+        refuse(r#""k":"profil","pseudo":"Lea","couleur":1"#);
+        refuse(r#""k":"profil","pseudo":"Lea","couleur":1.0,"avatar":null"#);
+        refuse(r#""k":"profil","pseudo":"Lea","couleur":"1","avatar":null"#);
         refuse(r#""k":"regle","regle":4"#);
         refuse(r#""k":"regle","regle":-1"#);
         refuse(r#""k":"regle","regle":"1""#);
@@ -1050,7 +1050,7 @@ mod tests {
             "a".repeat(2001)
         ));
         refuse(r#""k":"profil","pseudo":"A","couleur":1,"avatar":null"#);
-        refuse(r#""k":"profil","pseudo":" Léa","couleur":1,"avatar":null"#);
+        refuse(r#""k":"profil","pseudo":" Lea","couleur":1,"avatar":null"#);
         assert_eq!(
             accepte(r#""k":"texte","x":"a\nb""#),
             Message::Texte { x: "a\nb".into() }
@@ -1107,10 +1107,10 @@ mod tests {
             Error::MessageInvalide
         );
         // couleur 0..=9
-        refuse(r#""k":"profil","pseudo":"Léa","couleur":10,"avatar":null"#);
-        refuse(r#""k":"profil","pseudo":"Léa","couleur":-1,"avatar":null"#);
+        refuse(r#""k":"profil","pseudo":"Lea","couleur":10,"avatar":null"#);
+        refuse(r#""k":"profil","pseudo":"Lea","couleur":-1,"avatar":null"#);
         assert!(matches!(
-            accepte(r#""k":"profil","pseudo":"Léa","couleur":9,"avatar":null"#),
+            accepte(r#""k":"profil","pseudo":"Lea","couleur":9,"avatar":null"#),
             Message::Profil { couleur: 9, .. }
         ));
         // avatar : objet exact
@@ -1119,7 +1119,7 @@ mod tests {
         let p = r#""BwcHBwcHBwcHBwcHBwcHBw""#;
         assert!(matches!(
             accepte(&format!(
-                r#""k":"profil","pseudo":"Léa","couleur":1,"avatar":{{"r":"{r}","piece":{p},"palier":160}}"#
+                r#""k":"profil","pseudo":"Lea","couleur":1,"avatar":{{"r":"{r}","piece":{p},"palier":160}}"#
             )),
             Message::Profil {
                 avatar: Some(_),
@@ -1127,13 +1127,13 @@ mod tests {
             }
         ));
         refuse(&format!(
-            r#""k":"profil","pseudo":"Léa","couleur":1,"avatar":{{"r":"{r}","piece":{p}}}"#
+            r#""k":"profil","pseudo":"Lea","couleur":1,"avatar":{{"r":"{r}","piece":{p}}}"#
         ));
         refuse(&format!(
-            r#""k":"profil","pseudo":"Léa","couleur":1,"avatar":{{"r":"{r}","piece":{p},"palier":160,"z":1}}"#
+            r#""k":"profil","pseudo":"Lea","couleur":1,"avatar":{{"r":"{r}","piece":{p},"palier":160,"z":1}}"#
         ));
         refuse(&format!(
-            r#""k":"profil","pseudo":"Léa","couleur":1,"avatar":{{"r":"{r}","piece":{p},"palier":16385}}"#
+            r#""k":"profil","pseudo":"Lea","couleur":1,"avatar":{{"r":"{r}","piece":{p},"palier":16385}}"#
         ));
     }
 

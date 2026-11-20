@@ -23,6 +23,8 @@
   import { obtenirPreuve, preparerPreuve } from "./preuve";
   import Renvoi from "./Renvoi.svelte";
   import DemoCode from "./DemoCode.svelte";
+  import ReglesMdp from "./ReglesMdp.svelte";
+  import { mdpFort } from "./verifs";
 
   let etape = $state<"adresse" | "code" | "attente" | "mdp" | "fini">("adresse");
   let email = $state("");
@@ -108,8 +110,8 @@
     bandeau = null;
     errs = {};
     const r = await verifierSaisie({ email, mdp });
-    if (r.mdp) {
-      errs = { mdp: erreur(new Error(r.mdp), "oubli").texte };
+    if (r.mdp || !mdpFort(mdp, email)) {
+      errs = { mdp: r.mdp ? erreur(new Error(r.mdp), "oubli").texte : t("account.mdp.faible") };
       return focus("mdp");
     }
     envoi = true;
@@ -162,7 +164,8 @@
   {:else if etape === "mdp"}
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <Banner kind="info">{t("account.forgot.keep")}</Banner>
-      <MotDePasse label={t("account.password.new")} autocomplete="new-password" hint={t("account.password.hint")} error={errs.mdp} bind:value={mdp} bind:el={els.mdp} oninput={() => (errs.mdp = undefined)} />
+      <MotDePasse label={t("account.password.new")} autocomplete="new-password" error={errs.mdp} bind:value={mdp} bind:el={els.mdp} oninput={() => (errs.mdp = undefined)} />
+      <ReglesMdp {mdp} adresse={email} />
       <Button type="submit" onpress={changer}>{envoi ? t("account.verifying") : t("account.forgot.submit")}</Button>
     </form>
   {:else}

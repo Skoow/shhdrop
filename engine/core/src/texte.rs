@@ -9,8 +9,8 @@
 //! de tout `Default_Ignorable_Code_Point` (l'apostrophe typographique U+2019 devient `'`) ; 3. NFC ;
 //! 4. toute espace Unicode (`White_Space`) devient U+0020, regroupées et rognées ; 5. 2 à 24
 //! graphèmes (UAX #29), 8 points de code au plus par graphème (contre l'empilement de marques) ;
-//! 6. seulement lettres, chiffres et marques (20 novembre, décision du propriétaire : plus d'espace
-//! ni de `- _ . '`), une marque seulement sur une lettre ou un chiffre ; 7. une seule écriture (UAX #24 : intersection
+//! 6. seulement A-Z, a-z et 0-9 (20 novembre, décision du propriétaire : ni accent, ni autre
+//! écriture, ni espace, ni signe) ; 7. une seule écriture (UAX #24 : intersection
 //! des `Script_Extension` de tous les caractères, **plus strict** que le niveau « Highly
 //! Restrictive » d'UTS #39 ; seuls Han avec hiragana et katakana, avec bopomofo ou avec hangul sont
 //! permis) ; 8. pas d'émoji : blocs de pictogrammes refusés par plages (`est_pictogramme`).
@@ -128,6 +128,11 @@ pub fn pseudo_valide(s: &str) -> Result<String> {
     let n = p.graphemes(true).count();
     if !(PSEUDO_MIN..=PSEUDO_MAX).contains(&n) {
         return Err(Error::PseudoLongueur);
+    }
+    // A-Z, a-z et 0-9 seulement (décision du propriétaire, 20 novembre) : ni accent, ni autre
+    // écriture, ni espace, ni signe. Les contrôles suivants restent, sans effet sur l'ASCII.
+    if !p.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err(Error::PseudoCaracteres);
     }
     let mut a_un_signe = false;
     for g in p.graphemes(true) {

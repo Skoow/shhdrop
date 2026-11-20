@@ -117,7 +117,7 @@ describe("dictionnaires", () => {
     const N = NNBSP;
     const exacts: Record<string, string> = {
       "account.profile.privacy": `Votre pseudo, votre photo et votre abonnement sont chiffrés, mais gardés de façon à pouvoir vous être rendus si vous oubliez votre mot de passe${N}: le service peut donc les lire. Vos liens et la gestion de vos salons ne sont lisibles qu'avec votre mot de passe.`,
-      "account.profile.limit": "Vous pourrez changer de pseudo demain.",
+      "account.profile.limit": "Vous pourrez changer de pseudo le {date} (3\u202ffois par an au plus).",
       "account.card.since": "Membre depuis le {date}",
       "account.card.neuf": `Récent${N}: {salons}${N}salon à la fois, {places}${N}places, {heures}${N}h. Dès le {date}${N}: 3${N}salons, 10${N}places.`,
       "account.card.confirme": `Confirmé${N}: {salons}${N}salons à la fois, {places}${N}places.`,

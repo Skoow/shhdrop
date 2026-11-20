@@ -302,27 +302,25 @@ mod tests {
 
     #[test]
     fn pseudo_regles() {
-        assert_eq!(verifier_pseudo("Léa").unwrap(), "Léa");
-        assert_eq!(verifier_pseudo("Le\u{301}a").unwrap(), "Léa");
-        // Blancs en bord rognés ; lettres et chiffres seulement (20 novembre).
-        assert_eq!(verifier_pseudo("  Léa \u{a0}\t").unwrap(), "Léa");
-        assert_eq!(verifier_pseudo("L\u{200B}éa\u{202E}").unwrap(), "Léa");
-        for ok in [
-            "JeanLuc",
-            "ONeil",
+        // A-Z, a-z et 0-9 seulement (20 novembre) ; blancs en bord rognés, invisibles retirés.
+        assert_eq!(verifier_pseudo("Lea").unwrap(), "Lea");
+        assert_eq!(verifier_pseudo("  Lea \u{a0}\t").unwrap(), "Lea");
+        assert_eq!(verifier_pseudo("L\u{200B}ea\u{202E}").unwrap(), "Lea");
+        for ok in ["JeanLuc", "ONeil", "Zoe42", "42", "ab"] {
+            assert_eq!(verifier_pseudo(ok).unwrap(), ok, "{ok}");
+        }
+        for ko in [
+            "Léa",
+            "Le\u{301}a",
+            "Zoë42",
             "Лея",
             "Ελένη",
             "田中ひろし",
             "김민수",
             "علي",
-            "Zoë42",
-            "𝓛éa",
-            "हिन्दी",
-        ] {
-            assert_eq!(verifier_pseudo(ok).unwrap(), ok, "{ok}");
-        }
-        for ko in [
-            "Léa Dupont",
+            "𝓛ea",
+            "ＬＥＡ",
+            "Lea Dupont",
             "Jean-Luc",
             "O'Neil",
             "x_y.z",
@@ -330,20 +328,13 @@ mod tests {
             "",
             " ",
             "Аlice", /* А cyrillique */
-            "😀Léa",
-            "Léa😀",
-            "Léa\u{1F3FD}",
-            "L\u{20E3}éa",
+            "😀Lea",
+            "Lea😀",
             "Ⓜax",
             "..",
-            "- -",
-            "Léa!",
-            "Léa@x",
+            "Lea!",
+            "Lea@x",
             "a/b",
-            "ab\u{301}\u{301}\u{301}\u{301}\u{301}\u{301}\u{301}\u{301}\u{301}",
-            "\u{301}ab",
-            "ab\u{e000}",
-            "Lea\u{378}",
             "ab#",
             "1\u{FE0F}\u{20E3}x",
         ] {
@@ -358,7 +349,6 @@ mod tests {
             verifier_pseudo(&"a".repeat(25)).unwrap_err(),
             Error::PseudoInvalide
         );
-        assert!(verifier_pseudo("ab").is_ok());
         assert_eq!(
             verifier_pseudo(&"a".repeat(100_000)).unwrap_err(),
             Error::PseudoInvalide
@@ -382,22 +372,15 @@ mod tests {
 
     #[test]
     fn pseudo_cle_unicite() {
-        assert_eq!(cle_unicite("léa"), cle_unicite("Léa"));
-        assert_eq!(cle_unicite("Le\u{301}a"), cle_unicite("Léa"));
+        assert_eq!(cle_unicite("lea"), cle_unicite("LEA"));
         assert_eq!(cle_unicite("Jean-Luc O'Neil_x.y"), "jeanluconeilxy");
         assert_eq!(cle_unicite("ＬＥＡ"), "lea");
-        assert_ne!(cle_unicite("Léa"), cle_unicite("Lea"));
-        // sosies entre écritures (squelette UTS #39) : A, i et e cyrilliques (U+0410, U+0456, U+0435), c (U+0441)
+        // sosies (squelette UTS #39) : la clé reste calculée sur toute entrée, même refusée.
         let latin = cle_unicite("Alice");
         assert_eq!(cle_unicite("\u{410}lice"), latin);
-        assert_eq!(cle_unicite("\u{410}li\u{441}\u{435}"), latin);
-        assert_eq!(cle_unicite("\u{410}l\u{456}c\u{435}"), latin);
         assert_ne!(cle_unicite("Alicia"), latin);
-        // vrai sosie tout cyrillique (pseudonyme valide) : A U+0410, palochka U+04CF, i U+0456, c U+0441, e U+0435
-        let spoof = "\u{410}\u{4CF}\u{456}\u{441}\u{435}";
-        assert_eq!(verifier_pseudo(spoof).unwrap(), spoof);
-        assert_eq!(cle_unicite(spoof), latin);
-        assert!(verifier_pseudo("\u{410}lice").is_err()); // mêlé
+        assert_eq!(cle_unicite("Rn0b1"), cle_unicite("mobl"));
+        assert!(verifier_pseudo("\u{410}lice").is_err());
     }
 
     #[test]
@@ -627,7 +610,8 @@ mod tests {
         ] {
             assert!(verifier_pseudo(ko).is_err(), "{ko:?}");
         }
-        assert_eq!(verifier_pseudo("a\u{301}b").unwrap(), "\u{e1}b");
-        assert!(verifier_pseudo("Zoe\u{308}").is_ok());
+        // Toute marque est refusée depuis le 20 novembre (A-Z, a-z, 0-9).
+        assert!(verifier_pseudo("a\u{301}b").is_err());
+        assert!(verifier_pseudo("Zoe\u{308}").is_err());
     }
 }

@@ -13,6 +13,8 @@
   import Identite from "../Identite.svelte";
   import MotDePasse from "../MotDePasse.svelte";
   import Section from "./Section.svelte";
+  import ReglesMdp from "../ReglesMdp.svelte";
+  import { mdpFort } from "../verifs";
 
   type Props = { etat: EtatServeur | null };
   let { etat }: Props = $props();
@@ -40,6 +42,12 @@
   async function enregistrer() {
     errs = {};
     global = "";
+    // Nouveau mot de passe assez fort (20 novembre) : vérifié avant toute requête.
+    if (!mdpFort(nouveau, email)) {
+      errs = { nouveau: t("account.mdp.faible") };
+      await tick();
+      return els.nouveau?.focus();
+    }
     try {
       await confirmerIdentite(actuel, etat?.totp ? totp : "", demanderEmail ? email : undefined);
     } catch (e) {
@@ -75,7 +83,8 @@
   {#if vue === "saisie"}
     <form class="form" novalidate onsubmit={(e) => e.preventDefault()}>
       <Identite {demanderEmail} totp={!!etat?.totp} bind:email bind:mdp={actuel} bind:code={totp} bind:errs bind:els />
-      <MotDePasse label={t("account.password.new")} autocomplete="new-password" hint={t("account.password.hint")} error={errs.nouveau} bind:value={nouveau} bind:el={els.nouveau} oninput={() => (errs.nouveau = undefined)} />
+      <MotDePasse label={t("account.password.new")} autocomplete="new-password" error={errs.nouveau} bind:value={nouveau} bind:el={els.nouveau} oninput={() => (errs.nouveau = undefined)} />
+      <ReglesMdp mdp={nouveau} adresse={email} />
       <p class="note">{t("account.mdp.others")}</p>
       {#if global}<p class="err" role="alert">{global}</p>{/if}
       <div class="actions">

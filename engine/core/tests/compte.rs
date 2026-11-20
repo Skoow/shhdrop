@@ -368,8 +368,6 @@ enum P {
     Ok(&'static str, &'static str, bool),
     /// Même affichage que l'entrée, non réservé.
     Id(&'static str),
-    /// Accepté (aucune autre vérification ici).
-    Valide,
     /// Accepté et réservé.
     Reserve,
     Err(&'static str),
@@ -378,9 +376,21 @@ enum P {
 fn cas_pseudo() -> Vec<(&'static str, String, P)> {
     let long = "a\u{301}\u{302}\u{303}\u{304}\u{305}\u{306}\u{307}";
     let mut v: Vec<(&'static str, String, P)> = vec![
-        ("simple", "Léa".into(), P::Ok("Léa", "léa", false)),
-        ("majuscules", "LÉA".into(), P::Ok("LÉA", "léa", false)),
-        ("decompose", "Le\u{301}a".into(), P::Ok("Léa", "léa", false)),
+        (
+            "simple",
+            "Léa".into(),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+        ),
+        (
+            "majuscules",
+            "LÉA".into(),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+        ),
+        (
+            "decompose",
+            "Le\u{301}a".into(),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+        ),
         (
             "espace_interieure",
             "lé a".into(),
@@ -409,12 +419,12 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "nfkc_pleine_chasse",
             "ＬＥＡ".into(),
-            P::Ok("ＬＥＡ", "lea", false),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         (
             "nfkc_mathematique",
             "𝓛éa".into(),
-            P::Ok("𝓛éa", "léa", false),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         ("sosie_m_rn", "Emma".into(), P::Ok("Emma", "ernrna", false)),
         (
@@ -422,26 +432,34 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
             "B0b1".into(),
             P::Ok("B0b1", "bobl", false),
         ),
-        ("cyrillique_seul", "Лея".into(), P::Ok("Лея", "лeᴙ", false)),
+        (
+            "cyrillique_seul",
+            "Лея".into(),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
+        ),
         (
             "sosie_cyrillique_seul",
             "\u{410}\u{4CF}\u{456}\u{441}\u{435}".into(),
-            P::Ok("\u{410}\u{4CF}\u{456}\u{441}\u{435}", "alice", false),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         (
             "grec",
             "Ελένη".into(),
-            P::Ok("Ελένη", "ꞓλꞓ\u{301}vn\u{329}", false),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
-        ("han_et_kana", "田中ひろし".into(), P::Id("田中ひろし")),
-        ("hangul", "김민수".into(), P::Id("김민수")),
-        ("arabe", "علي".into(), P::Id("علي")),
-        ("devanagari", "हिन्दी".into(), P::Id("हिन्दी")),
+        (
+            "han_et_kana",
+            "田中ひろし".into(),
+            P::Err("pseudo_caracteres"),
+        ),
+        ("hangul", "김민수".into(), P::Err("pseudo_caracteres")),
+        ("arabe", "علي".into(), P::Err("pseudo_caracteres")),
+        ("devanagari", "हिन्दी".into(), P::Err("pseudo_caracteres")),
         ("chiffres_seuls", "42".into(), P::Id("42")),
         (
             "invisibles_retires",
             "L\u{200B}éa\u{202E}".into(),
-            P::Ok("Léa", "léa", false),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         ("deux_graphemes", "ab".into(), P::Id("ab")),
         (
@@ -455,7 +473,7 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         ),
         // Le plus long p_canon possible en octets pour un graphème de base latine : 24 graphèmes de
         // 8 points de code (lettre + 7 marques), 360 octets UTF-8 (conception : borne côté serveur).
-        ("p_canon_long", long.repeat(24), P::Valide),
+        ("p_canon_long", long.repeat(24), P::Err("pseudo_caracteres")),
         ("un_grapheme", "A".into(), P::Err("pseudo_longueur")),
         ("vide", "".into(), P::Err("pseudo_longueur")),
         ("blancs_seuls", "   ".into(), P::Err("pseudo_longueur")),
@@ -472,12 +490,12 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "ecritures_melees",
             "\u{410}lice".into(),
-            P::Err("pseudo_ecritures"),
+            P::Err("pseudo_caracteres"),
         ),
         (
             "latin_et_han",
             "Taro太郎".into(),
-            P::Err("pseudo_ecritures"),
+            P::Err("pseudo_caracteres"),
         ),
         ("emoji", "Léa😀".into(), P::Err("pseudo_caracteres")),
         (
@@ -540,22 +558,22 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "reserve_moderateur_accent",
             "Modérateur".into(),
-            P::Ok("Modérateur", "rnodérateur", true),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         (
             "reserve_equipe_accent",
             "Équipe".into(),
-            P::Ok("Équipe", "équipe", true),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         (
             "reserve_securite_accent",
             "Sécurité".into(),
-            P::Ok("Sécurité", "sécurité", true),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         (
             "reserve_systeme_accent",
             "Système".into(),
-            P::Ok("Système", "systèrne", true),
+            P::Err("pseudo_caracteres"), /* A-Z, a-z, 0-9 seulement (20 novembre) */
         ),
         (
             "non_reserve_suffixe",
@@ -566,7 +584,13 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
     // Chaque mot de la liste, tel quel.
     for (i, w) in PSEUDOS_RESERVES.iter().enumerate() {
         let label: &'static str = Box::leak(format!("liste_{i:02}").into_boxed_str());
-        v.push((label, (*w).to_string(), P::Reserve));
+        // Mots accentués : refusés avant même la liste (A-Z, a-z, 0-9 seulement, 20 novembre).
+        let want = if w.is_ascii() {
+            P::Reserve
+        } else {
+            P::Err("pseudo_caracteres")
+        };
+        v.push((label, (*w).to_string(), want));
     }
     v
 }
@@ -601,7 +625,6 @@ fn section_pseudo() -> Value {
                 assert_eq!(affiche.as_deref(), Some(a), "{label}");
                 assert_eq!(v["reserve"], false, "{label}");
             }
-            P::Valide => assert!(canon.is_some(), "{label}"),
             P::Reserve => assert_eq!(v["reserve"], true, "{label}"),
             P::Err(e) => assert_eq!(v["error"], e, "{label}"),
         }
@@ -916,10 +939,10 @@ fn vecteurs_pseudo() {
             assert_eq!(got.get(k), c.get(k), "{} : {k}", c["label"]);
         }
     }
-    // p_canon le plus long d'un pseudo à base latine : 336 octets (24 graphèmes de 14 octets),
-    // bien au-delà des 96 octets que le plan prévoyait comme borne du serveur (lot 2).
+    // p_canon le plus long : 24 octets depuis le 20 novembre (A-Z, a-z, 0-9) ; l'entrée de
+    // 24 graphèmes chargés de marques (336 octets de canon avant) est refusée.
     let long = cases.iter().find(|c| c["label"] == "p_canon_long").unwrap();
-    assert_eq!(s(&long["p_canon_hex"]).len() / 2, 336);
+    assert_eq!(long["error"], "pseudo_caracteres");
     // Chaque mot réservé de la liste, et sa forme canonique, sont refusés.
     for r in v["constants"]["reserves"].as_array().unwrap() {
         let canon = utf8_hex(&r["p_canon_hex"]);
@@ -1042,17 +1065,16 @@ fn canon_ne_depend_pas_de_la_variante() {
 
 #[test]
 fn pseudo_canon_identique_pour_variantes() {
-    let c = pseudo_canon("Léa");
-    for v in ["LÉA", "Le\u{301}a", "ＬÉＡ"] {
+    let c = pseudo_canon("Lea");
+    for v in ["LEA", "lEa"] {
         assert_eq!(pseudo_canon(v), c, "{v}");
         assert_eq!(pseudo_canon(&pseudo_valide(v).unwrap()), c, "{v}");
     }
-    // Espaces et ponctuation : refusés à l'affichage (20 novembre), même forme canonique.
-    for v in ["lé a", "L-é.a"] {
-        assert_eq!(pseudo_canon(v), c, "{v}");
+    // Accents, espaces, ponctuation, pleine chasse : refusés à l'affichage (20 novembre).
+    for v in ["Léa", "lé a", "L-e.a", "ＬＥＡ"] {
         assert!(pseudo_valide(v).is_err(), "{v}");
     }
-    assert_ne!(pseudo_canon("Lea"), c);
+    assert_ne!(pseudo_canon("Léa"), c);
 }
 
 #[test]

@@ -28,7 +28,7 @@ type Compte = { email: string; mdp: string; pseudo: string };
 /** Un compte repère par test : adresse, mot de passe et pseudo distincts (rien de réel). */
 function compte(tag: string): Compte {
   const r = randomBytes(4).toString("hex");
-  return { email: `Ui.${tag}${r}@exemple.org`, mdp: `MdpRepereUi-${tag}-${r}`, pseudo: `Zoé${tag}${r.slice(0, 4)}` };
+  return { email: `Ui.${tag}${r}@exemple.org`, mdp: `MdpRepereUi-${tag}-${r}-9`, pseudo: `Zoe${tag}${r.slice(0, 4)}` };
 }
 
 /** Boîte de réception du faux SMTP : chaque code attendu est le message suivant, pour la bonne adresse. */
@@ -337,9 +337,9 @@ test("le serveur ne voit rien : ni adresse, ni mot de passe, ni pseudo en clair 
   test.setTimeout(240_000);
   // Repères sans sous-chaîne commune avec un texte ordinaire (aucun faux positif sur 8 caractères).
   const email = "Ui.ReperMailWq7z+Tag@Exemple.org";
-  const mdp = "MdpRepereUiKx4vTq";
-  const nouveau = "MdpRepereNeufHm3sPj";
-  const pseudo = "ZoéRepèreUiBn5";
+  const mdp = "MdpRepereUi-Kx4vTq";
+  const nouveau = "MdpRepereNeuf-Hm3sPj";
+  const pseudo = "ZoeRepereUiBn5";
   const prochain = horlogeTotp();
   const c: Compte = { email, mdp, pseudo };
 

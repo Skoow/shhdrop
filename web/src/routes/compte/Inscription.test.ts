@@ -17,7 +17,7 @@ vi.mock("./preuve", () => P);
 const { CompteError } = await import("../../account/session.svelte");
 const { default: Inscription } = await import("./Inscription.svelte");
 
-const MDP = "correct horse battery";
+const MDP = "Correct-horse-battery-9";
 async function remplir(o: { email?: string; mdp?: string; mdp2?: string } = {}) {
   await monter(Inscription);
   saisir("Adresse e-mail", o.email ?? "Lea@Exemple.fr");
@@ -54,7 +54,10 @@ describe("Inscription, étape 1", () => {
     expect(champ("Mot de passe").getAttribute("autocomplete")).toBe("new-password");
     expect(champ("Mot de passe").type).toBe("password");
     expect(texte()).toContain(`10${NN}caractères au moins`);
-    expect(texte()).toContain(`C'est votre seul moyen de récupérer le compte${NN}: utilisez une adresse que vous gardez.`);
+    // Plus de phrase sous l'adresse (20 novembre) ; règles du mot de passe affichées, non remplies.
+    expect(texte()).not.toContain("C'est votre seul moyen");
+    expect(document.querySelectorAll("[data-regles-mdp] li")).toHaveLength(6);
+    expect(document.querySelectorAll("[data-regles-mdp] li[data-ok]")).toHaveLength(0);
     // 20 novembre : ni pseudo, ni photo, ni case ; la phrase des 15 ans sous « Créer ».
     expect(texte()).not.toContain("Ajouter une photo");
     expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
@@ -67,6 +70,41 @@ describe("Inscription, étape 1", () => {
     // Le mot de passe s'affiche ou se masque.
     await presser("Afficher le mot de passe");
     expect(champ("Mot de passe").type).toBe("text");
+  });
+
+  it("mot de passe : chaque règle se coche pendant la frappe ; trop faible : refusé avant toute requête", async () => {
+    await monter(Inscription);
+    saisir("Adresse e-mail", "lea@exemple.fr");
+    saisir("Mot de passe", "abc");
+    await attendre();
+    const ok = () => [...document.querySelectorAll("[data-regles-mdp] li[data-ok]")].map((l) => l.getAttribute("data-regle"));
+    expect(ok()).toEqual(["minuscule", "adresse"]);
+    saisir("Mot de passe", "Abcdefghi1-");
+    await attendre();
+    expect(ok()).toEqual(["longueur", "minuscule", "majuscule", "chiffre", "signe", "adresse"]);
+    saisir("Mot de passe", "abcdefghijk");
+    saisir("Confirmer le mot de passe", "abcdefghijk");
+    await presser("Créer");
+    expect(erreurDe("Mot de passe")).toBe(`Mot de passe trop faible${NN}: complétez les points ci-dessous.`);
+    expect(C.inscrire).not.toHaveBeenCalled();
+  });
+
+  it("adresse : domaine jetable dit pendant la frappe ; faute de frappe dans un domaine courant : correction proposée", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await monter(Inscription);
+    saisir("Adresse e-mail", "lea@yopmail.com");
+    await vi.advanceTimersByTimeAsync(600);
+    await attendre(3);
+    expect(erreurDe("Adresse e-mail")).toBe("Les adresses jetables ne sont pas acceptées.");
+    saisir("Adresse e-mail", "lea@gmial.com");
+    await vi.advanceTimersByTimeAsync(600);
+    await attendre(3);
+    const b = document.querySelector<HTMLButtonElement>("[data-propose] button")!;
+    expect(b.textContent).toBe("lea@gmail.com");
+    b.click();
+    await attendre();
+    expect(champ("Adresse e-mail").value).toBe("lea@gmail.com");
+    expect(document.querySelector("[data-propose]")).toBeNull();
   });
 
   it("erreurs exactes reliées aux champs, focus sur le premier ; aucune requête", async () => {

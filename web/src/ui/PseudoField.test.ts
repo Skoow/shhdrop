@@ -39,21 +39,21 @@ describe("PseudoField", () => {
   it("étiquette, indice ; vérification 400 ms après la dernière frappe, une seule fois", async () => {
     const { input, v } = show(async () => "libre");
     expect(document.querySelector("label")!.textContent).toBe("Pseudo");
-    expect(document.body.textContent).toContain("Vu par les membres de vos salons.");
+    expect(document.body.textContent).toContain("Vu par les membres de vos salons, unique parmi les comptes Shhgone.");
     type(input, "Lé");
     await settle(200);
-    type(input, "Léa");
+    type(input, "Lea");
     await settle(399);
     expect(v).not.toHaveBeenCalled();
     await settle(1);
     expect(v).toHaveBeenCalledTimes(1);
-    expect(v).toHaveBeenCalledWith("Léa");
+    expect(v).toHaveBeenCalledWith("Lea");
     expect(status()).toBe("Disponible");
     expect(input.getAttribute("aria-invalid")).toBeNull();
   });
   it("« Déjà pris » : erreur reliée au champ", async () => {
     const { input } = show(async () => "pris");
-    type(input, "Léa");
+    type(input, "Lea");
     await settle(400);
     expect(input.getAttribute("aria-invalid")).toBe("true");
     const ids = input.getAttribute("aria-describedby")!.split(" ");
@@ -73,7 +73,7 @@ describe("PseudoField", () => {
   });
   it("« plus tard » (aucune étape encore) : rien n'est affirmé", async () => {
     const { input } = show(async () => "plus_tard");
-    type(input, "Léa");
+    type(input, "Lea");
     await settle(400);
     expect(status()).toBe("La disponibilité sera vérifiée à l'étape suivante.");
     expect(input.getAttribute("aria-invalid")).toBeNull();
@@ -82,7 +82,7 @@ describe("PseudoField", () => {
     let first!: (v: string) => void;
     let n = 0;
     const { input } = show((p) => (n++ === 0 ? new Promise<string>((r) => (first = r)) : Promise.resolve(p === "Léo" ? "libre" : "pris")));
-    type(input, "Léa");
+    type(input, "Lea");
     await settle(400);
     type(input, "Léo");
     await settle(400);

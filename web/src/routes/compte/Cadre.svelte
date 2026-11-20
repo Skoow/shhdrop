@@ -74,14 +74,34 @@
   .cadre :global(.liens.split) {
     justify-content: space-between;
   }
+  /* Liens en blanc, sans soulignement (propriétaire, 20 novembre) ; menthe au survol et au focus. */
   .cadre :global(.liens a),
-  .cadre :global(a.lien) {
+  .cadre :global(a.lien),
+  .cadre :global(a.lien-t) {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .cadre :global(.liens a:hover),
+  .cadre :global(a.lien:hover),
+  .cadre :global(a.lien-t:hover) {
     color: var(--accent);
-    font-weight: 560;
-    text-underline-offset: 3px;
+  }
+  .cadre :global(.liens a:focus-visible),
+  .cadre :global(a.lien:focus-visible),
+  .cadre :global(a.lien-t:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* Lien dans une phrase : hauteur de la ligne, pas de cible de 44 px qui décale le texte. */
+  .cadre :global(a.lien-t) {
+    display: inline;
+    min-height: 0;
   }
   .cadre :global(.note) {
     margin: 0;

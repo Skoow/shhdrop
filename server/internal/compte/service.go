@@ -575,11 +575,16 @@ func (s *Service) PseudoVerifier(c Courante, pCanon []byte) (bool, error) {
 	return s.pseudoLibre(pCanon)
 }
 
-// ChangerPseudo : une fois par jour UTC, l'attente ne courant qu'à partir d'un premier
-// changement (décision du propriétaire, 14 novembre : une faute de frappe se corrige tout de
-// suite ; pseudo_jour vaut 0 tant que le pseudo n'a jamais changé) ; « Vous pourrez changer de
-// pseudo demain. » ; l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé ou interdit :
-// ErrPseudoPris. Le même pseudo que le sien : rien à faire.
+// PseudoEcart : temps minimal entre deux changements de pseudo (décision du propriétaire,
+// 20 novembre : « 3 fois par an au plus ») ; 122 jours = 365 / 3, arrondi au-dessus : jamais
+// plus de 3 changements sur 12 mois glissants, sans nouvelle colonne (pseudo_jour suffit).
+const PseudoEcart = 122 * jourS
+
+// ChangerPseudo : au plus un changement par PseudoEcart, l'attente ne courant qu'à partir d'un
+// premier changement (décision du propriétaire, 14 novembre : pseudo_jour vaut 0 tant que le
+// pseudo n'a jamais changé ; le premier, depuis le pseudo provisoire de l'inscription, est donc
+// libre) ; l'ancien pseudo est libéré aussitôt (§21.5). Pris, réservé ou interdit : ErrPseudoPris
+// (le nouveau doit toujours être libre). Le même pseudo que le sien : rien à faire.
 func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 	pe, err := s.cles.EmpreintePseudo(pCanon)
 	switch {
@@ -598,8 +603,8 @@ func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 			}
 			return err
 		}
-		if pj >= jourDe(now) {
-			return ErrLimit{jourSuivant(now)}
+		if pj != 0 && jourDe(now) < pj+PseudoEcart {
+			return ErrLimit{time.Unix(pj+PseudoEcart, 0).Sub(now)}
 		}
 		if pe != [32]byte{} && subtle.ConstantTimeCompare(actuel, pe[:]) == 1 {
 			return nil

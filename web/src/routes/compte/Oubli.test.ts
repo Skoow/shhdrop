@@ -14,7 +14,7 @@ vi.mock("./preuve", () => P);
 const { CompteError } = await import("../../account/session.svelte");
 const { default: Oubli } = await import("./Oubli.svelte");
 
-const MDP = "nouveau mot de passe";
+const MDP = "Nouveau-mot-de-passe-7";
 const KEEP = "Votre pseudo, votre photo, votre abonnement et vos salons en cours sont gardés. Les liens et la gestion de salons enregistrés seulement dans votre ancien coffre seront perdus, sauf s'ils sont encore sur un de vos appareils.";
 
 async function jusquAuCode(email = "Lea.Dupont+x@Gmail.com") {

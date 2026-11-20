@@ -18,7 +18,7 @@ const { CompteError, account, REGLAGES_DEFAUT } = S;
 const { default: Profil } = await import("./Profil.svelte");
 
 const ETAT = { creeLe: "2026-11-14", palier: "neuf", confirmeLe: "2026-11-21", limites: { salons: 1, places: 4, heures: 24 }, salonsActifs: 0, totp: false, recupJusqu: null, retraitTotpLe: null, banniJusqu: null, banniMotif: null };
-const PROFIL = { pseudo: "Léa", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null };
+const PROFIL = { pseudo: "Lea", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null };
 
 beforeEach(() => {
   setLang("fr");
@@ -48,7 +48,7 @@ describe("Profil", () => {
   it("titre, avatar (initiale), pseudo actuel, carte « Votre compte » du palier neuf, note de confidentialité exacte, bouton Paramètres", async () => {
     await monter(Profil);
     expect(document.querySelector("h1")!.textContent).toBe("Profil");
-    expect((document.querySelector('input[autocomplete="nickname"]') as HTMLInputElement).value).toBe("Léa");
+    expect((document.querySelector('input[autocomplete="nickname"]') as HTMLInputElement).value).toBe("Lea");
     const t = texte();
     expect(t).toContain("Votre compte");
     expect(t).toContain("Membre depuis le 14 novembre 2026");
@@ -62,7 +62,7 @@ describe("Profil", () => {
     expect(liens).toContainEqual(["Voir les offres", "/offres"]);
     expect(bouton("Paramètres")).toBeTruthy();
     // Indice du pseudo gardé du lot 10 (décision du propriétaire).
-    expect(t).toContain("Vu par les membres de vos salons. Unique parmi les comptes Shhgone.");
+    expect(t).toContain("Vu par les membres de vos salons, unique parmi les comptes Shhgone. 3 changements par an au plus.");
   });
 
   it("palier confirmé ; compte banni : bandeau avec la date et le motif", async () => {
@@ -99,15 +99,15 @@ describe("Profil", () => {
     expect(C.ecrireProfil).not.toHaveBeenCalled();
   });
 
-  it("pseudo : « Disponible » puis enregistré ; « Déjà pris » ; une fois par 24 h : « Vous pourrez changer de pseudo demain. »", async () => {
+  it("pseudo : « Disponible » puis enregistré ; « Déjà pris » ; 3 fois par an : « Vous pourrez changer de pseudo le … »", async () => {
     await monter(Profil);
     const champ = () => document.querySelector('input[autocomplete="nickname"]') as HTMLInputElement;
-    saisir("Pseudo", "Léa B");
+    saisir("Pseudo", "LeaB");
     await apres400();
-    expect(C.pseudoLibre).toHaveBeenCalledWith("Léa B");
+    expect(C.pseudoLibre).toHaveBeenCalledWith("LeaB");
     expect(texte()).toContain("Disponible");
     await presser("Enregistrer");
-    expect(C.changerPseudo).toHaveBeenCalledWith("Léa B");
+    expect(C.changerPseudo).toHaveBeenCalledWith("LeaB");
     expect(texte()).toContain("Pseudo enregistré.");
     C.pseudoLibre.mockResolvedValue(false);
     saisir("Pseudo", "Max");
@@ -116,9 +116,10 @@ describe("Profil", () => {
     C.pseudoLibre.mockResolvedValue(true);
     saisir("Pseudo", "Maxime");
     await apres400();
-    C.changerPseudo.mockRejectedValueOnce(new CompteError(429, "limit", { retryAfterS: 3600 }));
+    C.changerPseudo.mockRejectedValueOnce(new CompteError(429, "limit", { retryAfterS: 122 * 86400 }));
     await presser("Enregistrer");
-    expect(erreurDe("Pseudo")).toBe("Vous pourrez changer de pseudo demain.");
+    // 14 novembre 2026 + 122 jours = 16 mars 2027.
+    expect(erreurDe("Pseudo")).toBe("Vous pourrez changer de pseudo le 16 mars 2027 (3\u202ffois par an au plus).");
     C.changerPseudo.mockRejectedValueOnce(new CompteError(409, "pseudo_pris"));
     await presser("Enregistrer");
     expect(erreurDe("Pseudo")).toBe("Déjà pris");
@@ -129,7 +130,7 @@ describe("Profil", () => {
     account.profil = { ...PROFIL, pseudo: "Membre123456" };
     await monter(Profil);
     expect((document.querySelector("[data-pseudo] input, input[autocomplete='nickname'], input") as HTMLInputElement).value).toBe("");
-    expect(texte()).toContain("Choisissez votre pseudo : il sera vu par les membres de vos salons. Lettres et chiffres seulement.");
+    expect(texte()).toContain("Choisissez votre pseudo : il sera vu par les membres de vos salons. Lettres et chiffres sans accent (A-Z, 0-9).");
   });
 
   it("pseudo inchangé : aucune vérification ni enregistrement", async () => {

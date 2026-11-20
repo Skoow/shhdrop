@@ -28,6 +28,10 @@
   // Compte sans vrai pseudo (pseudo provisoire de l'inscription, 20 novembre) : celui choisi ici
   // devient le pseudo du compte, unique parmi les comptes (vérifié avant d'entrer).
   const premier = __COMPTES__ && untrack(() => pseudoAChoisir());
+  // Avec un compte et son vrai pseudo (20 novembre, propriétaire : un seul pseudo) : le salon
+  // prend le pseudo du compte, non modifiable ici ; il se change dans le profil (3 fois par an).
+  // Pseudo du compte déjà pris dans ce salon (course rare, `refuse`) : le champ se libère.
+  const fige = __COMPTES__ && !premier && !refuse && untrack(() => pseudoPropose()) !== "";
   let envoi = false;
 
   async function go(): Promise<void> {
@@ -76,6 +80,8 @@
       hint={t("salon.intro.pseudo.hint")}
       bind:value={pseudo}
       bind:el={champ}
+      readonly={fige || undefined}
+      aria-readonly={fige ? "true" : undefined}
       autocomplete="off"
       autocapitalize="off"
       spellcheck={false}
@@ -96,6 +102,7 @@
       <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} />
     </div>
     {#if premier}<p class="note" data-pseudo-compte>{t("salon.intro.pseudo.compte")}</p>{/if}
+    {#if fige}<p class="note" data-pseudo-fige>{t("salon.intro.pseudo.fige")}</p>{/if}
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>
     {#if !vue.dansLeGroupe}<p class="note" role="status">{t("salon.intro.wait")}</p>{/if}
   </div>

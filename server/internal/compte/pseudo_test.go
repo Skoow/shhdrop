@@ -70,12 +70,12 @@ func TestPseudoVecteurs(t *testing.T) {
 			t.Errorf("%s : autre clé, même empreinte", p.Label)
 		}
 	}
-	if n < 30 {
+	if n < 20 {
 		t.Fatalf("%d cas valides seulement", n)
 	}
-	// Lot 1 : un p_canon valide peut faire 336 octets (24 graphèmes de 7 points de code) ;
-	// la borne du serveur doit le laisser passer.
-	if plusLong < 300 || plusLong > PseudoCanonMax {
+	// Depuis le 20 novembre (A-Z, a-z, 0-9), un p_canon valide fait au plus 48 octets (24
+	// caractères, « m » devenant « rn ») ; la borne du serveur (PseudoCanonMax) reste plus large.
+	if plusLong < 2 || plusLong > PseudoCanonMax {
 		t.Fatalf("p_canon le plus long des vecteurs : %d octets (borne %d)", plusLong, PseudoCanonMax)
 	}
 }

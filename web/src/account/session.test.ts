@@ -14,7 +14,7 @@ import * as C from "./session.svelte";
 const MDP = "correct horse battery";
 const CODE = "123456";
 const PREUVE = { altcha: "preuve", hp: "", shown_at: "t" };
-const profil = (p: Partial<Profil> = {}): Profil => ({ pseudo: "Léa", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null, ...p });
+const profil = (p: Partial<Profil> = {}): Profil => ({ pseudo: "Lea", photo: null, langue: "fr", reglages: { ...REGLAGES_DEFAUT }, pass: null, ...p });
 
 type Compte = { h: Uint8Array; aAuth: string; envMdp: Uint8Array; sProfil: Uint8Array; pCanon: string; coffres: Record<"profil" | "prive", { blob: Uint8Array; gen: number }>; totp: boolean };
 
@@ -299,15 +299,15 @@ describe("inscription", () => {
   it("le mot de passe ne part jamais ; le compte s'ouvre avec les deux coffres", async () => {
     await inscription();
     expect(C.account.etat).toBe("ouvert");
-    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.profil?.pseudo).toBe("Lea");
     expect(C.account.prive).toEqual({ salons: [], recus: [], rejoints: [], envois: [] });
     const tout = JSON.stringify(srv.requetes);
     expect(tout).not.toContain(MDP);
     expect(tout).not.toContain(b64u(new TextEncoder().encode(MDP)));
     // Le serveur reçoit l'adresse exacte ; le pseudo seulement en p_canon.
     const fin = srv.requetes.find((r) => r.path.endsWith("inscription/fin"))!;
-    expect(fin.body.p_canon).toBe("léa");
-    expect(tout).not.toContain("Léa");
+    expect(fin.body.p_canon).toBe("lea");
+    expect(tout).not.toContain("Lea");
     expect(srv.requetes[0]!.body).toEqual({ email: "lea.dupont@exemple.fr", langue: "fr", ...PREUVE });
   });
 
@@ -318,7 +318,7 @@ describe("inscription", () => {
     expect(b64u(aAuth)).toBe(c.aAuth);
     const kCompte = await ouvrirEnveloppe(kekMdp, c.h, c.envMdp);
     const k = await clesDuCompte(kCompte, c.sProfil);
-    expect(profilDeJson(await ouvrir("profil", k.profil, c.h, c.coffres.profil.blob, 1)).pseudo).toBe("Léa");
+    expect(profilDeJson(await ouvrir("profil", k.profil, c.h, c.coffres.profil.blob, 1)).pseudo).toBe("Lea");
     expect(priveDeJson(await ouvrir("prive", k.prive, c.h, c.coffres.prive.blob, 1)).salons).toEqual([]);
     // Le coffre de profil ne s'ouvre pas avec K_prive (le séquestre n'ouvre que le profil).
     await expect(ouvrir("prive", k.profil, c.h, c.coffres.prive.blob, 1)).rejects.toThrow("coffre_illisible");
@@ -343,22 +343,22 @@ describe("inscription", () => {
 
   it("pseudoLibre : pendant l'inscription par l'étape, ensuite par la session ; réservé : jamais libre, sans requête", async () => {
     await C.inscrire("lea@exemple.fr", "fr", PREUVE);
-    expect(await C.pseudoLibre("Léa")).toBe(true);
+    expect(await C.pseudoLibre("Lea")).toBe(true);
     const n = srv.requetes.length;
     expect(await C.pseudoLibre("Support")).toBe(false);
     expect(srv.requetes.length).toBe(n);
     await C.confirmer(CODE, MDP, profil(), false);
-    expect(await C.pseudoLibre("LÉA")).toBe(false);
+    expect(await C.pseudoLibre("LEA")).toBe(false);
     const last = srv.requetes.at(-1)!;
     expect(last.headers["X-Shh-Session"]).toBeTruthy();
-    expect(last.body).toEqual({ p_canon: "léa" });
+    expect(last.body).toEqual({ p_canon: "lea" });
   });
 });
 
 describe("saisie et état (écrans du lot 10)", () => {
   it("verifierSaisie : erreurs par champ, sans requête, avant tout envoi", async () => {
-    expect(await C.verifierSaisie({ email: "Lea@Exemple.fr", mdp: MDP, pseudo: "Léa" })).toEqual({});
-    expect(await C.verifierSaisie({ email: "pas une adresse", mdp: MDP, pseudo: "Léa" })).toEqual({ email: "adresse_invalide" });
+    expect(await C.verifierSaisie({ email: "Lea@Exemple.fr", mdp: MDP, pseudo: "Lea" })).toEqual({});
+    expect(await C.verifierSaisie({ email: "pas une adresse", mdp: MDP, pseudo: "Lea" })).toEqual({ email: "adresse_invalide" });
     expect(await C.verifierSaisie({ email: "léa@exemple.fr" })).toEqual({ email: "adresse_non_ascii" });
     expect(await C.verifierSaisie({ email: "lea@exemple.fr", mdp: "court" })).toEqual({ mdp: "mdp_court" });
     expect(await C.verifierSaisie({ email: "lea@exemple.fr", mdp: "lea@exemple.fr" })).toEqual({ mdp: "mdp_adresse" });
@@ -366,7 +366,7 @@ describe("saisie et état (écrans du lot 10)", () => {
     expect(await C.verifierSaisie({ email: "lea@exemple.fr", pseudo: "Admin" })).toEqual({ pseudo: "pseudo_reserve" });
     // Adresse invalide : le mot de passe se vérifie quand même (longueur).
     expect(await C.verifierSaisie({ email: "x", mdp: "court" })).toEqual({ email: "adresse_invalide", mdp: "mdp_court" });
-    expect(await C.verifierSaisie({ pseudo: "Léa" })).toEqual({});
+    expect(await C.verifierSaisie({ pseudo: "Lea" })).toEqual({});
     expect(srv.requetes).toEqual([]);
   });
 
@@ -385,7 +385,7 @@ describe("connexion et TOTP", () => {
     srv.comptes.set("leadupont+x@gmail.com", srv.comptes.get("lea.dupont@gmail.com")!); // le vrai serveur compare e_canon
     await C.seConnecter("LeaDupont+x@GMAIL.com", MDP, false);
     expect(C.account.etat).toBe("ouvert");
-    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.profil?.pseudo).toBe("Lea");
   });
 
   it("nom d'appareil : absent de la connexion (K_compte inconnue), posé juste après par sessions/etiquette", async () => {
@@ -441,7 +441,7 @@ describe("coffres", () => {
     await C.ecrireProfil({ langue: "en" });
     expect(c.coffres.profil.gen).toBe(2);
     c.coffres.profil = { blob: old, gen: 1 }; // retour en arrière du serveur
-    await expect(C.ecrireProfil({ pseudo: "Zoé" })).rejects.toThrow("coffre_recule");
+    await expect(C.ecrireProfil({ pseudo: "Zoe" })).rejects.toThrow("coffre_recule");
     expect(C.account.erreur).toBe("coffre_illisible");
   });
 
@@ -476,9 +476,9 @@ describe("coffres", () => {
 
   it("changerPseudo : p_canon envoyé, puis le profil chiffré porte le nouveau pseudo", async () => {
     await inscription();
-    await C.changerPseudo("Zoé");
-    expect(srv.requetes.find((r) => r.path.endsWith("/pseudo"))!.body).toEqual({ p_canon: "zoé" });
-    expect(C.account.profil?.pseudo).toBe("Zoé");
+    await C.changerPseudo("Zoe");
+    expect(srv.requetes.find((r) => r.path.endsWith("/pseudo"))!.body).toEqual({ p_canon: "zoe" });
+    expect(C.account.profil?.pseudo).toBe("Zoe");
     expect(srv.comptes.get("lea.dupont@exemple.fr")!.coffres.profil.gen).toBe(2);
   });
 });
@@ -492,7 +492,7 @@ describe("mot de passe oublié", () => {
     expect(await C.oubli.verifier(CODE, "", false)).toBe("ok");
     await C.oubli.fin("nouveau mot de passe", false);
     expect(C.account.etat).toBe("ouvert");
-    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.profil?.pseudo).toBe("Lea");
     expect(C.account.prive?.salons).toEqual([]);
     expect(srv.comptes.get("lea.dupont@exemple.fr")!.coffres.prive.gen).toBe(3);
     await C.seDeconnecter();
@@ -514,7 +514,7 @@ describe("session et déconnexion", () => {
     expect(C.account.etat).toBe("absent");
     await C.restaurer();
     expect(C.account.etat).toBe("ouvert");
-    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.profil?.pseudo).toBe("Lea");
   });
 
   it("restaurer avec une session échue : base effacée, état absent", async () => {
@@ -612,7 +612,7 @@ describe("paramètres (lot 13)", () => {
     C._oublierMemoire();
     await expect(C.seConnecter("lea.dupont@exemple.fr", MDP, false)).rejects.toMatchObject({ code: "identifiants" });
     await C.seConnecter("lea.dupont@exemple.fr", "nouveau mot de passe", false);
-    expect(C.account.profil?.pseudo).toBe("Léa");
+    expect(C.account.profil?.pseudo).toBe("Lea");
     sansMdp(MDP, "nouveau mot de passe");
   });
 
@@ -685,7 +685,7 @@ describe("paramètres (lot 13)", () => {
     const texte = await C.exporterDonnees();
     const j = JSON.parse(texte);
     expect(j.serveur).toMatchObject({ cree_le: "2026-11-14", anciennete_depuis: "2026-11-14", salons_actifs: 1 });
-    expect(j.profil).toMatchObject({ pseudo: "Léa", photo: b64u(new Uint8Array([1, 2, 3])), langue: "fr" });
+    expect(j.profil).toMatchObject({ pseudo: "Lea", photo: b64u(new Uint8Array([1, 2, 3])), langue: "fr" });
     expect(j.listes.envois).toEqual([{ cree: 1, expire: 2, taille: 10, elements: 1, ouvertures_max: 1 }]);
     expect(j.listes.recus).toEqual([{ cree: 1, expire: 2, taille: 5, elements: 1, format: "pdf" }]);
     for (const x of ["lea.dupont", "exemple.fr", "G".repeat(43), "L".repeat(43), "#m", ...srv.sessions.keys()]) expect(texte).not.toContain(x);

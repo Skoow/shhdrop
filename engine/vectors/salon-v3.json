@@ -2234,15 +2234,14 @@
       "label": "25_graphemes_refuse"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "repeat": {
           "n": 24,
           "unit": "65cc81"
         }
       },
-      "key_hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
-      "label": "24_graphemes_avec_marques",
-      "out_hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9"
+      "label": "24_graphemes_avec_marques"
     },
     {
       "error": "pseudo_invalide",
@@ -2323,12 +2322,11 @@
       "label": "marque_sur_tiret_refusee"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "61cc8162"
       },
-      "key_hex": "c3a162",
-      "label": "marque_sur_lettre",
-      "out_hex": "c3a162"
+      "label": "marque_sur_lettre"
     },
     {
       "error": "pseudo_invalide",
@@ -2338,12 +2336,11 @@
       "label": "neuf_points_par_grapheme_refuse"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "61ccb4ccb4ccb4ccb4ccb4ccb4ccb462"
       },
-      "key_hex": "61ccb4ccb4ccb4ccb4ccb4ccb4ccb462",
-      "label": "huit_points_par_grapheme",
-      "out_hex": "61ccb4ccb4ccb4ccb4ccb4ccb4ccb462"
+      "label": "huit_points_par_grapheme"
     },
     {
       "in": {
@@ -2396,20 +2393,18 @@
       "label": "drapeau_refuse"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "d090d0bbd0b8d181d0b0"
       },
-      "key_hex": "61d0bbe1b48e6361",
-      "label": "cyrillique_seul",
-      "out_hex": "d090d0bbd0b8d181d0b0"
+      "label": "cyrillique_seul"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "ce91cebbcf86ceb1"
       },
-      "key_hex": "61cebbc9b861",
-      "label": "grec_seul",
-      "out_hex": "ce91cebbcf86ceb1"
+      "label": "grec_seul"
     },
     {
       "error": "pseudo_invalide",
@@ -2426,12 +2421,11 @@
       "label": "latin_et_cyrillique_refuse"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "d090d38fd196d181d0b5"
       },
-      "key_hex": "616c696365",
       "label": "cyrillique_sosie_d_alice",
-      "out_hex": "d090d38fd196d181d0b5",
       "same_key_as": "alice"
     },
     {
@@ -2452,21 +2446,19 @@
       "same_key_as": "alice"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "efbca1efbd8cefbd89efbd83efbd85"
       },
-      "key_hex": "616c696365",
       "label": "alice_pleine_chasse",
-      "out_hex": "efbca1efbd8cefbd89efbd83efbd85",
       "same_key_as": "alice"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "4cc3a961"
       },
-      "key_hex": "6cc3a961",
-      "label": "lea_avec_accent",
-      "out_hex": "4cc3a961"
+      "label": "lea_avec_accent"
     },
     {
       "in": {
@@ -2513,36 +2505,32 @@
       "same_key_as": "un"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "e697a5e69cace381b2e38289e3818ce381aa"
       },
-      "key_hex": "e697a5e69cace381b2e38289e3818ce381aa",
-      "label": "han_et_hiragana",
-      "out_hex": "e697a5e69cace381b2e38289e3818ce381aa"
+      "label": "han_et_hiragana"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "e697a5e69cace382abe382bfe382abe3838a"
       },
-      "key_hex": "e697a5e69cace58a9be5a495e58a9be3838a",
-      "label": "han_et_katakana",
-      "out_hex": "e697a5e69cace382abe382bfe382abe3838a"
+      "label": "han_et_katakana"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "ed959ceab880e6bca2e5ad97"
       },
-      "key_hex": "ed9598e18482e18480e383bce18485e6bca2e5ad97",
-      "label": "han_et_hangul",
-      "out_hex": "ed959ceab880e6bca2e5ad97"
+      "label": "han_et_hangul"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "e6bca2e38485e38486"
       },
-      "key_hex": "e6bca2e38485e38486",
-      "label": "han_et_bopomofo",
-      "out_hex": "e6bca2e38485e38486"
+      "label": "han_et_bopomofo"
     },
     {
       "error": "pseudo_invalide",
@@ -2559,12 +2547,11 @@
       "label": "hiragana_et_latin_refuse"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "d985d8b1d8add8a8d8a7"
       },
-      "key_hex": "d985d8b1d8add8a86c",
-      "label": "arabe",
-      "out_hex": "d985d8b1d8add8a8d8a7"
+      "label": "arabe"
     },
     {
       "error": "pseudo_invalide",
@@ -2574,29 +2561,26 @@
       "label": "hebreu_et_latin_refuse"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "e0a4a8e0a4aee0a4b8e0a58de0a4a4e0a587"
       },
-      "key_hex": "e0a4a8e0a4aee0a4b8e0a58de0a4a4f091ada4",
-      "label": "devanagari_avec_voyelle",
-      "out_hex": "e0a4a8e0a4aee0a4b8e0a58de0a4a4e0a587"
+      "label": "devanagari_avec_voyelle"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "e18492e185a1e186abe18480e185b3e186af"
       },
-      "key_hex": "ed9598e18482e18480e383bce18485",
       "label": "hangul_decompose_normalise",
-      "out_hex": "ed959ceab880",
       "same_key_as": "hangul"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "ed959ceab880"
       },
-      "key_hex": "ed9598e18482e18480e383bce18485",
       "label": "hangul_compose",
-      "out_hex": "ed959ceab880",
       "same_key_as": "hangul"
     },
     {

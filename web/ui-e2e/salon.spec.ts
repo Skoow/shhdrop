@@ -77,7 +77,7 @@ const bulle = (page: Page, texte: string) => fil(page).locator("li").filter({ ha
 test("deux navigateurs : création avec un compte, invitation, messages chiffrés, et le serveur ne voit rien", async ({ page, shh, smtp, browser }, info) => {
   const r = randomBytes(4).toString("hex");
   const email = `Salon.${r}@exemple.org`;
-  const mdpCompte = `MdpCompteSalon-${r}`;
+  const mdpCompte = `MdpCompteSalon-${r}-9`;
   // Pseudo du compte : provisoire, tiré à l'inscription (20 novembre).
   const pseudoB = `Hugo${r.slice(4, 8)}`;
 
@@ -113,7 +113,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   await expect(page.locator("[data-pseudo-compte]")).toBeVisible();
   await champ(page, "Pseudonyme pour ce salon").fill("Lea Dupont");
   await bouton(page, "Entrer dans le salon").click();
-  await expect(page.getByText("Lettres et chiffres seulement, sans espace, signe ni émoji.")).toBeVisible();
+  await expect(page.getByText("Lettres et chiffres sans accent seulement (A-Z, 0-9).")).toBeVisible();
   await champ(page, "Pseudonyme pour ce salon").fill(pseudoA);
   await bouton(page, "Entrer dans le salon").click();
   await expect(fil(page)).toBeVisible();
@@ -309,7 +309,7 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
     await expect(pageB.getByText("Ce salon n'existe plus, ou ce lien n'est plus valable.")).toBeVisible({ timeout: 30_000 });
     ctxC = await (browser as Browser).newContext({ ...info.project.use, locale: "fr-FR", timezoneId: "Europe/Paris" });
     const pageC = await ctxC.newPage();
-    const pseudoC = `Inès${r.slice(0, 3)}`;
+    const pseudoC = `Ines${r.slice(0, 3)}`;
     await pageC.goto(lien2);
     await champ(pageC, "Mot de passe du salon").fill(mdp2);
     await bouton(pageC, "Continuer").click();
