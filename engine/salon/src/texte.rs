@@ -304,15 +304,12 @@ mod tests {
     fn pseudo_regles() {
         assert_eq!(verifier_pseudo("Léa").unwrap(), "Léa");
         assert_eq!(verifier_pseudo("Le\u{301}a").unwrap(), "Léa");
-        assert_eq!(
-            verifier_pseudo("  Léa \u{a0} Dupont\t").unwrap(),
-            "Léa Dupont"
-        );
+        // Blancs en bord rognés ; lettres et chiffres seulement (20 novembre).
+        assert_eq!(verifier_pseudo("  Léa \u{a0}\t").unwrap(), "Léa");
         assert_eq!(verifier_pseudo("L\u{200B}éa\u{202E}").unwrap(), "Léa");
         for ok in [
-            "Jean-Luc",
-            "O'Neil",
-            "x_y.z",
+            "JeanLuc",
+            "ONeil",
             "Лея",
             "Ελένη",
             "田中ひろし",
@@ -325,6 +322,10 @@ mod tests {
             assert_eq!(verifier_pseudo(ok).unwrap(), ok, "{ok}");
         }
         for ko in [
+            "Léa Dupont",
+            "Jean-Luc",
+            "O'Neil",
+            "x_y.z",
             "A",
             "",
             " ",
@@ -365,20 +366,18 @@ mod tests {
     }
 
     #[test]
-    fn pseudo_apostrophe_typographique() {
-        assert_eq!(verifier_pseudo("L\u{2019}éa").unwrap(), "L'éa");
-        assert_eq!(verifier_pseudo("O\u{2019}Neil").unwrap(), "O'Neil");
-        assert_eq!(cle_unicite("O\u{2019}Neil"), cle_unicite("O'Neil"));
-        // les autres apostrophes et guillemets restent refusés
+    fn pseudo_apostrophes_refusees() {
+        // Lettres et chiffres seulement (20 novembre) : aucune apostrophe, droite ou typographique.
         for ko in [
+            "L\u{2019}éa",
+            "O\u{2019}Neil",
+            "O'Neil",
             "L\u{2018}éa",
-            "L\u{2032}éa",
-            "L\u{201C}éa",
             "L`éa",
-            "L\u{2BC}éa\u{2BC}\u{2BC}!",
         ] {
             assert!(verifier_pseudo(ko).is_err(), "{ko:?}");
         }
+        assert_eq!(cle_unicite("O\u{2019}Neil"), cle_unicite("ONeil"));
     }
 
     #[test]

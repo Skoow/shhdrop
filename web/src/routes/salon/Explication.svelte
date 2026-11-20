@@ -8,6 +8,7 @@
   import { t, getLang } from "../../i18n/i18n.svelte";
   import { formatDuration } from "../../i18n/format";
   import { vue, entrer, pseudoPropose, photoProposee, choisirAvatar, verifierPseudo, conversation } from "../../salon/salon.svelte";
+  import { changerPseudo, pseudoAChoisir, pseudoLibre, verifierSaisie } from "../../account/session.svelte";
   import AvatarPicker from "../../ui/AvatarPicker.svelte";
   import Cadre from "../compte/Cadre.svelte";
   import TextField from "../../ui/TextField.svelte";
@@ -22,12 +23,33 @@
   const reste = $derived(Math.max(0, (vue.finMs - Date.now()) / 1000));
   const duree = $derived(formatDuration(reste, getLang(), { coarse: true }));
   const verdict = $derived((void vue.rev, verifierPseudo(pseudo)));
-  const erreur = $derived(essaye || pseudo.length > 0 ? ("code" in verdict ? t(`salon.pseudo.err.${verdict.code}`) : "") : "");
+  let errCompte = $state("");
+  const erreur = $derived(errCompte || (essaye || pseudo.length > 0 ? ("code" in verdict ? t(`salon.pseudo.err.${verdict.code}`) : "") : ""));
+  // Compte sans vrai pseudo (pseudo provisoire de l'inscription, 20 novembre) : celui choisi ici
+  // devient le pseudo du compte, unique parmi les comptes (vérifié avant d'entrer).
+  const premier = __COMPTES__ && untrack(() => pseudoAChoisir());
+  let envoi = false;
 
-  function go(): void {
+  async function go(): Promise<void> {
     essaye = true;
-    if (!entrer(pseudo)) champ?.focus();
-    else if (photo) void choisirAvatar(photo);
+    errCompte = "";
+    if (envoi) return;
+    if (premier && !("code" in verdict)) {
+      envoi = true;
+      try {
+        const r = await verifierSaisie({ pseudo });
+        if (r.pseudo) errCompte = t(r.pseudo === "pseudo_reserve" ? "account.err.pseudoReserve" : `salon.pseudo.err.${r.pseudo === "pseudo_longueur" ? "longueur" : r.pseudo === "pseudo_ecritures" ? "ecritures" : "caracteres"}`);
+        else if (!(await pseudoLibre(pseudo))) errCompte = t("account.pseudo.taken");
+      } catch {
+        errCompte = t("salon.pseudo.err.compte");
+      } finally {
+        envoi = false;
+      }
+      if (errCompte) return champ?.focus();
+    }
+    if (!entrer(pseudo)) return champ?.focus();
+    if (photo) void choisirAvatar(photo);
+    if (premier) void changerPseudo(pseudo).catch(() => undefined);
   }
   $effect(() => {
     if (refuse) untrack(() => champ?.focus());
@@ -60,10 +82,11 @@
       maxlength={96}
       enterkeyhint="go"
       error={erreur || undefined}
+      oninput={() => (errCompte = "")}
       onkeydown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          go();
+          void go();
         }
       }}
     />
@@ -72,6 +95,7 @@
       <span class="note">{t("salon.avatar.photo")}</span>
       <AvatarPicker bind:photo initiale={[...pseudo.trim()][0] ?? ""} />
     </div>
+    {#if premier}<p class="note" data-pseudo-compte>{t("salon.intro.pseudo.compte")}</p>{/if}
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>
     {#if !vue.dansLeGroupe}<p class="note" role="status">{t("salon.intro.wait")}</p>{/if}
   </div>

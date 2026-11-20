@@ -771,32 +771,24 @@
       "reserve": false
     },
     {
-      "affiche_hex": "6cc3a92061",
       "entree_hex": "6cc3a92061",
-      "label": "espace_interieure",
-      "p_canon_hex": "6cc3a961",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "espace_interieure"
     },
     {
-      "affiche_hex": "4cc3a961204475706f6e74",
       "entree_hex": "20204cc3a96120c2a0e38080204475706f6e7409",
-      "label": "espaces_regroupees",
-      "p_canon_hex": "6cc3a9616475706f6e74",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "espaces_regroupees"
     },
     {
-      "affiche_hex": "4a65616e2d4c7563204f274e65696c5f782e79",
       "entree_hex": "4a65616e2d4c7563204f274e65696c5f782e79",
-      "label": "ponctuation",
-      "p_canon_hex": "6a65616e6c75636f6e65696c7879",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "ponctuation"
     },
     {
-      "affiche_hex": "4f274e65696c",
       "entree_hex": "4fe280994e65696c",
-      "label": "apostrophe_typographique",
-      "p_canon_hex": "6f6e65696c",
-      "reserve": false
+      "error": "pseudo_caracteres",
+      "label": "apostrophe_typographique"
     },
     {
       "affiche_hex": "4c6561",
@@ -1021,11 +1013,9 @@
       "reserve": true
     },
     {
-      "affiche_hex": "5368682d44726f70",
       "entree_hex": "5368682d44726f70",
-      "label": "reserve_espace_et_tiret",
-      "p_canon_hex": "73686864726f70",
-      "reserve": true
+      "error": "pseudo_caracteres",
+      "label": "reserve_espace_et_tiret"
     },
     {
       "affiche_hex": "4d6f64c3a9726174657572",

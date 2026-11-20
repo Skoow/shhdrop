@@ -2029,7 +2029,6 @@
         "len": 117
       },
       {
-        "encoded_hex": "7b2276223a332c226964223a226f594f4376585264337a4e61316162575131524a5077222c2274223a313730303030303030303030302c2265223a302c226b223a2270726f66696c222c2270736575646f223a225a6fc3a95f3737222c22636f756c657572223a392c22617661746172223a7b2272223a226752683150317373705a66474a486b6c766e44365167655f6a78726c6734624845624c594d5a7646683463222c227069656365223a225831796578494f673569376b626e50624a76336b7751222c2270616c696572223a31367d7d",
         "envelope": {
           "e": 0,
           "id": "a18382bd745ddf335ad5a6d64354493f",
@@ -2045,8 +2044,8 @@
           },
           "t": 1700000000000
         },
-        "label": "profil_avec_avatar",
-        "len": 211
+        "error": "message_invalide",
+        "label": "profil_avec_avatar"
       },
       {
         "envelope": {
@@ -2256,21 +2255,19 @@
       "label": "entree_brute_4097_octets_refusee"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "4ce28099616d69"
       },
-      "key_hex": "6c61726e69",
       "label": "apostrophe_typographique",
-      "out_hex": "4c27616d69",
       "same_key_as": "apostrophe"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "4c27616d69"
       },
-      "key_hex": "6c61726e69",
-      "label": "apostrophe_droite",
-      "out_hex": "4c27616d69",
+      "label": "apostrophe_droite_refusee",
       "same_key_as": "apostrophe"
     },
     {
@@ -2298,12 +2295,11 @@
       "out_hex": "6162"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "20207820c2a0e2808320797a2020"
       },
-      "key_hex": "78797a",
-      "label": "espaces_regroupees_et_rognees",
-      "out_hex": "7820797a"
+      "label": "espaces_regroupees_et_rognees"
     },
     {
       "error": "pseudo_invalide",
@@ -2365,12 +2361,11 @@
       "label": "ponctuation_sans_lettre_refusee"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "612d625f632e642765"
       },
-      "key_hex": "6162636465",
-      "label": "ponctuation_permise",
-      "out_hex": "612d625f632e642765"
+      "label": "ponctuation_refusee"
     },
     {
       "error": "pseudo_invalide",
@@ -2449,12 +2444,11 @@
       "same_key_as": "alice"
     },
     {
+      "error": "pseudo_invalide",
       "in": {
         "hex": "61204c20692d635f65"
       },
-      "key_hex": "616c696365",
-      "label": "alice_espaces_et_majuscules",
-      "out_hex": "61204c20692d635f65",
+      "label": "alice_espaces_refusees",
       "same_key_as": "alice"
     },
     {

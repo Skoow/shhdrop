@@ -300,6 +300,18 @@ async function pseudoCanon(p: string): Promise<{ affiche: string; pCanon: string
  * pseudo_caracteres, pseudo_ecritures, pseudo_reserve). Objet vide : rien à redire. Mêmes règles
  * que confirmer() et oubli.fin() (moteur), dites avant d'envoyer un code.
  */
+/**
+ * Pseudo provisoire tiré à l'inscription (« Membre » ou « Member » et 6 chiffres, 20 novembre) :
+ * le vrai pseudo est demandé à la première entrée dans un salon, ou dans le profil. Personne ne
+ * peut le choisir (verifierSaisie le dit réservé).
+ */
+export const estPseudoProvisoire = (p: string | undefined | null): boolean => !!p && /^(Membre|Member)\d{6}$/u.test(p);
+
+/** Vrai si le compte ouvert a encore son pseudo provisoire. */
+export function pseudoAChoisir(): boolean {
+  return !!ouverte && estPseudoProvisoire(account.profil?.pseudo);
+}
+
 export async function verifierSaisie(s: { email?: string; mdp?: string; pseudo?: string }): Promise<Partial<Record<"email" | "mdp" | "pseudo", string>>> {
   const out: Partial<Record<"email" | "mdp" | "pseudo", string>> = {};
   const code = (e: unknown) => {
@@ -323,6 +335,7 @@ export async function verifierSaisie(s: { email?: string; mdp?: string; pseudo?:
   }
   if (s.pseudo !== undefined) {
     try {
+      if (estPseudoProvisoire(s.pseudo.trim())) throw new Error("pseudo_reserve");
       await pseudoCanon(s.pseudo);
     } catch (e) {
       out.pseudo = code(e);
@@ -538,7 +551,7 @@ export async function creerSalon(entetes: { acces: string; gestion: string }, co
 export function profilPourSalon(): { pseudo: string; photo: Uint8Array | null } | null {
   const p = account.profil;
   if (!ouverte || !p || !p.reglages.proposerProfil) return null;
-  return { pseudo: p.pseudo, photo: p.photo };
+  return { pseudo: estPseudoProvisoire(p.pseudo) ? "" : p.pseudo, photo: p.photo };
 }
 
 // --- Coffres ---------------------------------------------------------------------------------

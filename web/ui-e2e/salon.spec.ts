@@ -82,7 +82,10 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   const pseudoB = `Hugo${r.slice(4, 8)}`;
 
   // --- Créatrice : compte, création, salon prêt -----------------------------------------------------
-  const pseudoA = await inscrire(page, shh.origin, smtp, email, mdpCompte);
+  const provisoire = await inscrire(page, shh.origin, smtp, email, mdpCompte);
+  expect(provisoire).toMatch(/^Membre\d{6}$/);
+  // Vrai pseudo choisi à la première entrée dans un salon (20 novembre) : lettres et chiffres.
+  const pseudoA = `Lea${r.slice(0, 4)}`;
   await bouton(page, "Continuer").click();
   await expect(titre(page, "Créer un salon")).toBeVisible();
   await capture(page, "salon-nouveau");
@@ -105,8 +108,13 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   expect(gestion).toMatch(/\/salon#s[A-Za-z0-9_-]{43}$/);
   await bouton(page, "Entrer dans le salon").click();
   await expect(titre(page, "Un salon qui s'efface")).toBeVisible();
-  // Pseudo du compte proposé (réglage « Proposer mon pseudo et ma photo », actif par défaut).
-  await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue(pseudoA);
+  // Pseudo provisoire : rien de proposé ; le pseudo choisi ici devient celui du compte.
+  await expect(champ(page, "Pseudonyme pour ce salon")).toHaveValue("");
+  await expect(page.locator("[data-pseudo-compte]")).toBeVisible();
+  await champ(page, "Pseudonyme pour ce salon").fill("Lea Dupont");
+  await bouton(page, "Entrer dans le salon").click();
+  await expect(page.getByText("Lettres et chiffres seulement, sans espace, signe ni émoji.")).toBeVisible();
+  await champ(page, "Pseudonyme pour ce salon").fill(pseudoA);
   await bouton(page, "Entrer dans le salon").click();
   await expect(fil(page)).toBeVisible();
 

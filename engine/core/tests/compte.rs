@@ -384,22 +384,22 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "espace_interieure",
             "lé a".into(),
-            P::Ok("lé a", "léa", false),
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
         ),
         (
             "espaces_regroupees",
             "  Léa \u{a0}\u{3000} Dupont\t".into(),
-            P::Ok("Léa Dupont", "léadupont", false),
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
         ),
         (
             "ponctuation",
             "Jean-Luc O'Neil_x.y".into(),
-            P::Ok("Jean-Luc O'Neil_x.y", "jeanluconeilxy", false),
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
         ),
         (
             "apostrophe_typographique",
             "O\u{2019}Neil".into(),
-            P::Ok("O'Neil", "oneil", false),
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
         ),
         (
             "sans_accent_distinct",
@@ -535,7 +535,7 @@ fn cas_pseudo() -> Vec<(&'static str, String, P)> {
         (
             "reserve_espace_et_tiret",
             "Shh-Drop".into(),
-            P::Ok("Shh-Drop", "shhdrop", true),
+            P::Err("pseudo_caracteres"), // lettres et chiffres seulement (20 novembre)
         ),
         (
             "reserve_moderateur_accent",
@@ -1043,9 +1043,14 @@ fn canon_ne_depend_pas_de_la_variante() {
 #[test]
 fn pseudo_canon_identique_pour_variantes() {
     let c = pseudo_canon("Léa");
-    for v in ["LÉA", "lé a", "Le\u{301}a", "L-é.a", "ＬÉＡ"] {
+    for v in ["LÉA", "Le\u{301}a", "ＬÉＡ"] {
         assert_eq!(pseudo_canon(v), c, "{v}");
         assert_eq!(pseudo_canon(&pseudo_valide(v).unwrap()), c, "{v}");
+    }
+    // Espaces et ponctuation : refusés à l'affichage (20 novembre), même forme canonique.
+    for v in ["lé a", "L-é.a"] {
+        assert_eq!(pseudo_canon(v), c, "{v}");
+        assert!(pseudo_valide(v).is_err(), "{v}");
     }
     assert_ne!(pseudo_canon("Lea"), c);
 }

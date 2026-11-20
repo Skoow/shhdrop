@@ -125,6 +125,13 @@ describe("Profil", () => {
     expect(champ().value).toBe("Maxime");
   });
 
+  it("pseudo provisoire de l'inscription (20 novembre) : champ vide et demande de choisir un pseudo", async () => {
+    account.profil = { ...PROFIL, pseudo: "Membre123456" };
+    await monter(Profil);
+    expect((document.querySelector("[data-pseudo] input, input[autocomplete='nickname'], input") as HTMLInputElement).value).toBe("");
+    expect(texte()).toContain("Choisissez votre pseudo : il sera vu par les membres de vos salons. Lettres et chiffres seulement.");
+  });
+
   it("pseudo inchangé : aucune vérification ni enregistrement", async () => {
     await monter(Profil);
     await apres400();
