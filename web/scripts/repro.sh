@@ -26,8 +26,9 @@ trap 'rm -rf "$tmp"' EXIT
 build() { # $1 : dossier absolu de la copie (même disposition que le dépôt : web/ et engine/)
   mkdir -p "$1"
   # Les sources suivies par git, telles qu'elles sont sur le disque ; ni dist, ni node_modules,
-  # ni engine/target, ni web/src/engine/pkg.
-  (cd "$repo" && git ls-files -z -- web engine | tar --null -T - -cf - 2>/dev/null) | tar -xf - -C "$1"
+  # ni engine/target, ni web/src/engine/pkg. Plus les listes de domaines jetables du serveur,
+  # importées par la page d'inscription (web/src/routes/compte/verifs.ts), comme deploy/Dockerfile.
+  (cd "$repo" && git ls-files -z -- web engine server/internal/compte/jetables.txt server/internal/compte/jetables-ajouts.txt | tar --null -T - -cf - 2>/dev/null) | tar -xf - -C "$1"
   ln -s "$web/node_modules" "$1/web/node_modules"
   (cd "$1/web" && npm run build >"$1.log" 2>&1) || { cat "$1.log" >&2; exit 1; }
   (cd "$1/web/dist" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
