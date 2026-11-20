@@ -84,7 +84,7 @@ test("10 membres (scénario de la Task 6) : 9 arrivées et 100 messages en trame
     const t0 = performance.now();
     const cles = S.clesSalon(new Uint8Array(32).fill(1), new Uint8Array(32).fill(2));
     const nonce = (s: number) => Uint8Array.from({ length: 16 }, (_, i) => (i === 0 ? s : 0xa0));
-    const m = [S.Salon.creer(0, nonce(0), cles, true)];
+    const m = [S.Salon.creer(0, nonce(0), cles, true, new Uint8Array(32).fill(0x5a))]; // secret de gestion : créateur seul
     const liste = [{ siege: 0, nonce: nonce(0) }];
     m[0].remplacerAnnonces(0, liste);
     let seq = 0;
@@ -210,7 +210,7 @@ test("croisé natif ↔ WebAssembly : Welcome, Commit et messages du moteur nati
         const env3 = { id: new Uint8Array(16).fill(3), heureMs: 1_700_000_000_003, regle: 0, message: { k: "reaction", cible: new Uint8Array(16).fill(1), emoji: "👍" } };
         const m3 = B.envoyer(k1, env3).trame;
         ok(B.recevoirTrame(k1, m3, 7, 1).type === "ignore", "écho de m3");
-        const C = S.Salon.creer(0, k.n_c, k2, true);
+        const C = S.Salon.creer(0, k.n_c, k2, true, crypto.getRandomValues(new Uint8Array(32))); // secret de gestion du créateur
         C.remplacerAnnonces(0, [{ siege: 0, nonce: k.n_c }]);
         C.annoncer(1, k.n_d);
         const kp_d = C.recevoirTrame(k2, unhex(n1.t_kp_d), 1, 1);

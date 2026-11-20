@@ -28,6 +28,11 @@
     display: inline-flex;
     align-items: center;
     line-height: 0;
+    /* Au-dessus de la cible élargie (44 px) de la pastille cadenas de l'icône, qui déborde à
+       droite jusque sur le bouclier depuis que le nom est sur la 2ᵉ ligne (CI du 20 novembre) :
+       là où les deux cibles se chevauchent, le bouclier gagne ; chaque dessin reste touchable. */
+    position: relative;
+    z-index: 1;
   }
   svg {
     display: block;

@@ -62,7 +62,7 @@
   const createdAt = Date.now();
   let keep = $state(true);
   let keepReady = $state(false);
-  let keepId: string | null = null;
+  let keepId: string | null = $state(null); // lu par data-kept : entrée réellement écrite
   let chain: Promise<void> = Promise.resolve();
   const queue = (fn: () => Promise<void>) => (chain = chain.then(fn).catch(() => undefined));
   async function save() {
@@ -260,7 +260,7 @@
       <!-- « Gérer ce partage » retiré (propriétaire, 19 novembre) : avec l'historique, le partage se
            suit et se supprime depuis « Mes partages ». Sans historique, le lien de gestion est le
            seul moyen de le suivre ou de le supprimer plus tard : il est alors montré ici. -->
-      <div class="keep" data-keep>
+      <div class="keep" data-keep data-kept={keepId ? "" : undefined}>
         {#if keepReady && shares.status === "unavailable"}
           <p class="hint" data-keep-unavailable>{t("ready.keep.unavailable")}</p>
         {:else}

@@ -98,11 +98,20 @@ test("composeur : bouclier de nettoyage avant le nom avec sa bulle, pastille cad
   await expect(fail).toBeVisible();
   await expect(row("archive.zip").locator("[data-clean]")).toHaveCount(0);
   // Bouclier : 15 px, juste AVANT le nom (retours CLEAN2), centré sur le texte ; bouton nommé par sa bulle.
-  const sh = await done.locator("svg").boundingBox();
-  expect(sh!.width).toBeCloseTo(15, 0);
-  const sz = await row("plage-nuit.jpg").locator(".nm").boundingBox();
-  expect(sh!.x + sh!.width).toBeLessThanOrEqual(sz!.x);
-  expect(Math.abs(sh!.y + sh!.height / 2 - (sz!.y + sz!.height / 2))).toBeLessThanOrEqual(1.5);
+  // Bouclier et nom mesurés dans la même image, la ligne immobile (après son entrée animée) :
+  // deux mesures séparées tombaient à des instants différents (CI du 20 novembre).
+  const plage = row("plage-nuit.jpg");
+  // Ligne immobile : deux images de suite avec la même position du nom.
+  await expect
+    .poll(() => plage.evaluate((r) => new Promise<boolean>((res) => { const y = r.querySelector(".nm")!.getBoundingClientRect().y; requestAnimationFrame(() => requestAnimationFrame(() => res(r.querySelector(".nm")!.getBoundingClientRect().y === y))); })), { timeout: 10_000 })
+    .toBe(true);
+  const [sh, sz] = await plage.evaluate((r) => {
+    const box = (e: Element | null) => { const b = e!.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
+    return [box(r.querySelector('[data-clean="nettoye"] svg')), box(r.querySelector(".nm"))];
+  });
+  expect(sh.width).toBeCloseTo(15, 0);
+  expect(sh.x + sh.width).toBeLessThanOrEqual(sz.x);
+  expect(Math.abs(sh.y + sh.height / 2 - (sz.y + sz.height / 2))).toBeLessThanOrEqual(1.5);
   await expect(done.getByRole("button")).toHaveAccessibleName(/^Nettoyé\s: position, appareil et dates retirés, vignette d'aperçu gardée$/);
   await expect(fail.getByRole("button")).toHaveAccessibleName(/^Nettoyage impossible\s: structure du fichier inattendue$/);
   expect(await done.locator(".sh").evaluate((e) => getComputedStyle(e).fill)).not.toBe(await fail.locator(".sh").evaluate((e) => getComputedStyle(e).fill));
@@ -111,6 +120,8 @@ test("composeur : bouclier de nettoyage avant le nom avec sa bulle, pastille cad
   await page.mouse.move(0, 0);
   for (const n of ["plage-nuit.jpg", "abime.jpg", "archive.zip"]) await insideIcon(row(n), "[data-lock] .pill");
   expect(await axe(page)).toEqual([]);
+  // Le bouclier reste atteignable : au point central de sa cible, c'est lui qui reçoit le pointeur.
+  expect(await done.getByRole("button").evaluate((b) => { const r = b.getBoundingClientRect(); return b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
   await openTip(page, done.getByRole("button"), isMobile);
   await expect(page.getByRole("tooltip").filter({ visible: true })).toHaveText(/^Nettoyé\s: position, appareil et dates retirés, vignette d'aperçu gardée$/);
   await page.screenshot({ path: `${SHOTS}composeur-${w(isMobile)}.png` });

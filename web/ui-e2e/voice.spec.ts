@@ -379,3 +379,17 @@ test("destinataire : un vocal s'écoute, jamais téléchargé ; la note se lit e
   expect(await viewer.locator("audio").getAttribute("controlslist")).toBe("nodownload");
   await ctx.close();
 });
+
+test("accueil : « Vocal » mène à la page d'envoi, enregistreur déjà ouvert (geste jamais perdu)", async ({ page, shh }) => {
+  await page.goto(shh.origin + "/");
+  await page.locator('[data-make="vocal"]').click();
+  await expect(page).toHaveURL(/\/envoyer$/);
+  const rec = page.getByRole("dialog", { name: "Enregistrer un vocal" });
+  await expect(rec.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 15_000 });
+  // Fermé puis retour à l'accueil, puis de nouveau « Vocal » : rouvert encore.
+  await rec.getByRole("button", { name: "Fermer" }).click();
+  await expect(rec).toBeHidden();
+  await page.goBack();
+  await page.locator('[data-make="vocal"]').click();
+  await expect(rec.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 15_000 });
+});

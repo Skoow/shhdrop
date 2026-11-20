@@ -105,8 +105,6 @@ for (const late of [false, true]) {
       test.info().annotations.push({ type: "onglet restauré", description: back ? back.url() : "aucun" });
       expect(back, "Chromium restaure l'onglet (constaté le 8 novembre)").toBeDefined();
       if (back) {
-        const nav = await back.evaluate(() => (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type ?? "");
-        test.info().annotations.push({ type: "type de navigation restaurée", description: nav });
         // « / » marqué repart vers « /s » ; rouvert, l'adresse redevient « / » (17 novembre).
         expect(back.url()).toMatch(new RegExp(`^${shh.origin.replace(/\./g, "\\.")}/s?$`));
         if (late) {
@@ -122,6 +120,10 @@ for (const late of [false, true]) {
           test.info().annotations.push({ type: "sessionStorage non écrit par Chromium", description: "restauration sans entrée" });
           await expect(back.getByRole("heading", { name: "Lien incomplet", exact: true })).toBeVisible();
         }
+        // Lu après l'écran final : « / » marqué repart vers « /s » (navigation), une lecture plus
+        // tôt pouvait tomber pendant ce départ (« Execution context was destroyed », CI du 20 novembre).
+        const nav = await back.evaluate(() => (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type ?? "");
+        test.info().annotations.push({ type: "type de navigation restaurée", description: nav });
       }
       await step("fermeture finale", () => ctx.close());
     } finally {

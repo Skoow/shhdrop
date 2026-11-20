@@ -88,6 +88,9 @@ export async function sendShare(
   if (wasOn) {
     await keep.click();
     await expect(keep).toHaveAttribute("aria-checked", "true");
+    // Entrée réellement réécrite (IndexedDB) avant de rendre la main : un onglet fermé aussitôt
+    // la perdait (CI du 20 novembre, return.spec).
+    await expect(page.locator("[data-keep][data-kept]")).toHaveCount(1, { timeout: 10_000 });
   }
   expect(link).toMatch(/#[A-Za-z0-9_-]{43}$/);
   return { link, password, manage };

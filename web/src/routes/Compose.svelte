@@ -297,23 +297,29 @@
     };
   }
   // Barre du haut (refonte du 12 novembre) : les gestes du menu « Partager » passent par ici
-  // tant que ce composeur est monté et actif ; un geste choisi ailleurs (chrome.pending, page
-  // d'envoi) est joué au montage.
+  // tant que ce composeur est monté et actif. Un geste choisi ailleurs (chrome.pending : accueil,
+  // autre page, « ?ajout= ») est joué dès que la page d'envoi est affichée et active, au montage
+  // comme plus tard : l'accueil est rendu par ce même composeur, déjà monté quand on y choisit
+  // « Vocal » ou « Photo ou vidéo » (le geste se perdait).
+  function runGesture(g: AddGesture) {
+    if (!active) return;
+    if (g === "fichiers") addAct("files");
+    else act(g);
+  }
   $effect(() => {
-    const run = (g: AddGesture) => {
-      if (!active) return;
-      if (g === "fichiers") addAct("files");
-      else act(g);
-    };
+    const run = (g: AddGesture) => runGesture(g);
     chrome.add = run;
-    const g = untrack(() => chrome.pending);
-    if (g) {
-      chrome.pending = null;
-      run(g);
-    }
     return () => {
       if (chrome.add === run) chrome.add = null;
     };
+  });
+  $effect(() => {
+    const g = chrome.pending;
+    if (!g || !active || !shown) return;
+    untrack(() => {
+      chrome.pending = null;
+      runGesture(g);
+    });
   });
   // Accueil → page d'envoi (17 novembre) : « Choisir des fichiers » ouvre le sélecteur (même
   // geste) et mène à la page d'envoi, zone de dépôt mise en avant ; « Créer sur place » y mène,

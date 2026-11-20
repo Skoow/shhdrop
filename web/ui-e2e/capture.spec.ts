@@ -293,3 +293,10 @@ for (const keep of [true, false]) {
     expect(await liveTracks(page)).toBe(0);
   });
 }
+
+test("accueil : « Photo ou vidéo » mène à la page d'envoi, caméra déjà ouverte", async ({ page, shh }) => {
+  await page.goto(shh.origin + "/");
+  await page.locator('[data-make="media"]').click();
+  await expect(page).toHaveURL(/\/envoyer$/);
+  await expect(page.getByRole("dialog", { name: "Prendre une photo" })).toBeVisible();
+});
