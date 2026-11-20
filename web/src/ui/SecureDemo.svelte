@@ -7,7 +7,7 @@
   // nom, le mot de passe ni l'adresse IP ; tout est effacé après ouverture ou à l'échéance.
   // Le brouillé est décoratif (decor.ts : générateur à graine fixe, jamais de crypto).
   import { t, type Key } from "../i18n/i18n.svelte";
-  import { Check, FileText, Pause, Play } from "./Icon";
+  import { FileText, Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
   import { PAUSE, STEP_MS, STEPS, TYPE_MS } from "./demo-steps";
 
@@ -140,8 +140,8 @@
 
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
 
-<!-- Disposition du 19 novembre (3) : la scène et le journal à gauche ; la liste des étapes, cochées
-     au fil de l'animation, à droite (dessous sur téléphone) ; « étape n sur 7 » et la pause en haut. -->
+<!-- Disposition du 20 novembre : la scène et le journal, puis l'étape en cours dessous ; « étape n
+     sur 7 » et la pause en haut. -->
 <figure class="fig">
 <div
   bind:this={root}
@@ -317,11 +317,20 @@
   {/if}
   </div>
 </div>
-  <ol class="steps" data-demo-steps>
+  <!-- Sous la scène, seulement l'étape en cours, sans case à cocher (propriétaire, 20 novembre :
+       la liste répétait l'animation, les coches passaient trop vite) ; fondu à chaque étape. La
+       liste entière reste lue par les lecteurs d'écran ; mouvement réduit : elle est affichée
+       (storyboard). -->
+  {#if !reduced}
+    <div class="now-cap" aria-hidden="true" data-demo-now>
+      {#key shown}
+        <p class="cap"><span class="st">{t(`demo.s${shown}.t` as "demo.s1.t")}</span><span class="sd">{t(`demo.s${shown}.d` as "demo.s1.d")}</span></p>
+      {/key}
+    </div>
+  {/if}
+  <ol class={["steps", { "sr-only": !reduced }]} data-demo-steps>
     {#each STEPS as n (n)}
-      {@const done = reduced || n < shown}
-      <li class={{ done, now: !reduced && n === shown }} aria-current={!reduced && n === shown ? "step" : undefined}>
-        <span class="ck" aria-hidden="true">{#if done}<Check size={13} strokeWidth={3} />{/if}</span>
+      <li aria-current={!reduced && n === shown ? "step" : undefined}>
         <span class="st">{t(`demo.s${n}.t` as "demo.s1.t")}</span> <span class="sd">{t(`demo.s${n}.d` as "demo.s1.d")}</span>
       </li>
     {/each}
@@ -850,7 +859,8 @@
     flex: none;
     color: var(--text-3);
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.02em;
   }
   .toggle {
     flex: none;
@@ -881,36 +891,38 @@
     min-width: 0;
     margin: 0;
   }
-  /* La scène à gauche, les étapes à droite (ordinateur) ; les étapes dessous (téléphone). */
+  /* La scène, puis dessous l'étape en cours (20 novembre) ; même disposition partout. */
   .dw {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
-    align-items: start;
+    width: min(100%, 56rem);
+    margin-inline: auto;
   }
-  @media (min-width: 1024px) {
-    .dw {
-      grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
-      gap: 32px;
+  .now-cap {
+    display: grid;
+    min-height: 5.5rem;
+    padding: 18px 22px;
+    border-radius: var(--r-xl);
+    background: rgb(233 236 242 / 0.05);
+    box-shadow: inset 0 0 0 1px rgb(233 236 242 / 0.09);
+    text-align: center;
+  }
+  .cap {
+    grid-area: 1 / 1;
+    display: grid;
+    gap: 6px;
+    align-content: center;
+    margin: 0;
+    animation: cap-in 420ms var(--ease-out) both;
+  }
+  @keyframes cap-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
     }
   }
-  /* Téléphone et tablette (19 novembre, 5) : la liste entière sous la scène répétait l'animation ;
-     seule l'étape en cours s'affiche (« étape n sur 7 » est dans l'en-tête). Les autres restent
-     lues par les lecteurs d'écran ; mouvement réduit : la liste entière (storyboard). */
-  @media (max-width: 1023px) {
-    .dw:not(.board) .steps li:not(.now) {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      margin: -1px;
-      padding: 0;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-      border: 0;
-    }
-  }
-  /* Étapes : cochées au fil de l'animation, l'étape en cours surlignée. */
+  /* Mouvement réduit : la liste entière, sans coche. */
   .steps {
     display: grid;
     margin: 0;
@@ -919,46 +931,28 @@
   }
   .steps li {
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
-    column-gap: 14px;
+    gap: 2px;
     padding: 12px 14px;
     border-block-end: 1px solid rgb(233 236 242 / 0.1);
-    border-radius: 10px;
-    transition: background-color var(--dur-base) var(--ease-out);
   }
   .steps li:last-child {
     border-block-end: 0;
   }
-  .steps li.now {
-    background: rgb(233 236 242 / 0.07);
-  }
-  .ck {
-    grid-row: 1 / span 2;
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    margin-block-start: 1px;
-    border-radius: 5px;
-    box-shadow: inset 0 0 0 1.5px rgb(233 236 242 / 0.45);
-    color: var(--on-accent);
-    transition: background-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-  }
-  .now .ck {
-    box-shadow: inset 0 0 0 1.5px var(--accent);
-  }
-  .done .ck {
-    background: var(--accent);
-    box-shadow: none;
-  }
   .st {
     font-weight: 650;
-    font-size: 0.9375rem;
+    font-size: 1.0625rem;
   }
   .sd {
     color: var(--text-2);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+  .steps .st {
+    font-size: 0.9375rem;
+  }
+  .steps .sd {
     font-size: var(--fs-small);
-    line-height: var(--lh-small);
   }
   .board :global(*) {
     animation: none !important;

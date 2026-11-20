@@ -22,7 +22,7 @@
   import { t, getLang } from "../i18n/i18n.svelte";
   import { CONTENT_MAX, MAX_ITEMS } from "../limits";
   import DropOverlay from "../ui/DropOverlay.svelte";
-  import { Camera, Check, MessagesSquare, Mic, Upload } from "../ui/Icon";
+  import { Camera, MessagesSquare, Mic, Upload } from "../ui/Icon";
   import Vessel from "../ui/Vessel.svelte";
   import ActiveSharesStrip from "../ui/ActiveSharesStrip.svelte";
   import Faq from "./home/Faq.svelte";
@@ -196,7 +196,7 @@
         </div>
       </div>
         <ul class="meta" aria-label={t("home.facts.label")} data-meta>
-          {#each meta as m, i (i)}<li><span class="ck" aria-hidden="true"><Check size={12} strokeWidth={2.6} /></span>{m}</li>{/each}
+          {#each meta as m, i (i)}<li>{m}</li>{/each}
         </ul>
       <!-- L'infographie animée a sa propre section, avec ses étapes (19 novembre, 3) ; le cadre
            d'envoi est à droite du titre (maquette « La trame »). -->
@@ -470,31 +470,41 @@
   }
   /* Tuile « Choisir des fichiers » (16 novembre) : verre sombre, contour en pointillé menthe (une
      zone de dépôt), pastille d'icône menthe, titre et « ou glissez-les ici », flèche. */
+  /* Les trois assurances sur une seule ligne (propriétaire, 20 novembre) : une capsule discrète,
+     séparées par un point menthe ; plus de cases cochées. */
   .meta {
-    display: flex;
+    display: inline-flex;
+    /* Une ligne ; texte très agrandi seulement : retour à la ligne entre deux assurances. */
     flex-wrap: wrap;
-    gap: 8px 20px;
+    justify-content: center;
+    align-items: center;
+    justify-self: start;
+    gap: 0;
+    max-width: 100%;
     margin: var(--sp-1) 0 0;
-    padding: 0;
+    padding: 8px 16px;
+    border-radius: var(--r-pill);
+    background: rgb(95 227 181 / 0.06);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.22);
     list-style: none;
-    color: #8f9cbd;
+    color: #c4cde3;
     font-size: var(--fs-small);
+    font-weight: 550;
+    white-space: nowrap;
   }
   .meta li {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    white-space: nowrap;
   }
-  /* Petites cases cochées (référence du propriétaire, 12 novembre). */
-  .ck {
-    display: grid;
-    place-items: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    background: rgb(95 227 181 / 0.14);
-    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.35);
-    color: var(--accent);
+  .meta li + li::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-inline: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: middle;
+    transform: translateY(-1px);
   }
   
   /* Page d'envoi (retours du 12 novembre) : le titre visible, plus petit, à gauche ; trois
@@ -605,22 +615,22 @@
   }
   /* Plus effacé (19 novembre, 5) : la trame s'affine plus vite, « rie » commence à partir en
      points, « n. » n'est presque plus que poussière. */
+  /* Plus lisible (propriétaire, 20 novembre : « qu'on voie mieux le mot ») : trame plus pleine,
+     menthe franche ; seule la dernière lettre part vraiment en poussière. */
   .s1 .g {
-    --r: 2.2px;
+    --r: 2.6px;
   }
   .s2 .g {
-    --r: 1.55px;
-    opacity: 0.92;
+    --r: 2.3px;
   }
   .s3 .g {
-    --r: 1.25px;
+    --r: 2px;
     color: var(--accent);
-    opacity: 0.75;
   }
   .s4 .g {
-    --r: 0.85px;
+    --r: 1.6px;
     color: var(--accent);
-    opacity: 0.3;
+    opacity: 0.8;
   }
   .s3::before,
   .s4::before,
@@ -637,11 +647,11 @@
   }
   .s3::before {
     transform: translate(0.18em, -0.05em);
-    opacity: 0.45;
+    opacity: 0.25;
   }
   .s4::before {
     transform: translate(0.4em, -0.1em);
-    opacity: 0.7;
+    opacity: 0.45;
   }
   .s4::after {
     -webkit-mask-size: 13px 11px;
@@ -649,7 +659,7 @@
     -webkit-mask-position: 5px 4px;
     mask-position: 5px 4px;
     transform: translate(0.85em, 0.12em);
-    opacity: 0.35;
+    opacity: 0.25;
   }
   @media (forced-colors: active) {
     .g {
@@ -672,21 +682,24 @@
       text-align: center;
     }
     .home:not(.compact) .meta {
-      justify-content: center;
+      justify-self: center;
     }
     .home:not(.compact) .box {
       justify-self: center;
     }
   }
   @media (max-width: 639px) {
-    /* Assurances : une colonne alignée à gauche, centrée dans la page (plus de ligne coupée au
-       hasard, 19 novembre, 5). */
+    /* Assurances : toujours une ligne, le texte suit la largeur de l'écran (320 px compris). */
     .home:not(.compact) .meta {
-      flex-direction: column;
-      align-items: flex-start;
-      justify-self: center;
-      width: fit-content;
-      max-width: 100%;
+      flex-wrap: nowrap;
+      padding: 7px 12px;
+      font-size: min(0.8125rem, 3.05vw);
+      letter-spacing: -0.005em;
+    }
+    .home:not(.compact) .meta li + li::before {
+      width: 4px;
+      height: 4px;
+      margin-inline: 7px;
     }
     .home:not(.compact) .hero {
       gap: var(--sp-4);

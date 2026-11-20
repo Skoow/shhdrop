@@ -12,7 +12,7 @@
 </script>
 
 <article class="offers" aria-labelledby="offers-title">
-  <header class="hd">
+  <header class="hd page-card">
     <h1 id="offers-title" class="title" tabindex="-1" data-large-title>{retour ? t("offers.ret.title") : t("offers.title")}</h1>
     {#if !retour}<p class="lede">{t("offers.lede")}</p>{/if}
   </header>
@@ -27,21 +27,6 @@
     padding-block: var(--sp-5) var(--sp-7);
   }
   .hd {
-    display: grid;
-    gap: var(--sp-3);
-  }
-  .title {
-    margin: 0;
-    font-size: var(--fs-screen);
-    line-height: 1.08;
-    letter-spacing: -0.02em;
-  }
-  .title:focus {
-    outline: none;
-  }
-  .lede {
-    margin: 0;
-    color: var(--text-2);
-    font-size: 1.125rem;
+    margin-block-start: clamp(16px, 3vw, 32px);
   }
 </style>

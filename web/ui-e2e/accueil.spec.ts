@@ -1,6 +1,7 @@
 // Refonte de l'accueil (UI §25, 12 novembre) : barre du haut et ses menus au clavier, bouton
 // « Choisir des fichiers » qui ouvre le sélecteur du composeur, premier écran, infographie
 // (pause, survol, hors écran, mouvement réduit), accessibilité.
+import { STEP_MS } from "../src/ui/demo-steps";
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { axe, expect, test } from "./fixtures";
@@ -90,32 +91,33 @@ test.describe("barre du haut (ordinateur)", () => {
 });
 
 test("infographie : la boucle démarre seule, le bouton pause l'arrête, le survol à la souris aussi ; hors écran, arrêtée", async ({ page, shh }) => {
+  test.setTimeout(90_000); // une étape dure STEP_MS (5,5 s, 20 novembre)
   await page.goto(shh.origin + "/");
   const demo = page.locator("[data-demo]");
   await demo.scrollIntoViewIfNeeded();
   await page.mouse.move(1, 1);
   const s0 = await step(page);
-  await expect.poll(() => step(page), { timeout: 5000 }).not.toBe(s0);
+  await expect.poll(() => step(page), { timeout: STEP_MS + 2500 }).not.toBe(s0);
   await page.locator("[data-demo-toggle]").click();
   await expect(page.locator("[data-demo-toggle]")).toHaveAttribute("aria-label", "Lire l'animation");
   await page.mouse.move(1, 1);
   const frozen = await step(page);
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(STEP_MS + 600);
   expect(await step(page)).toBe(frozen);
   await page.locator("[data-demo-toggle]").click();
   await page.mouse.move(1, 1);
-  await expect.poll(() => step(page), { timeout: 5000 }).not.toBe(frozen);
+  await expect.poll(() => step(page), { timeout: STEP_MS + 2500 }).not.toBe(frozen);
   // Survol de la scène : arrêt.
   await page.locator("[data-demo-view]").hover();
   const held = await step(page);
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(STEP_MS + 600);
   expect(await step(page)).toBe(held);
   // Hors écran : arrêt.
   await page.mouse.move(1, 1);
   await page.locator("footer[data-foot]").scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   const away = await step(page);
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(STEP_MS + 600);
   expect(await step(page)).toBe(away);
   expect(await demo.evaluate((e) => e.classList.contains("paused"))).toBe(true);
 });

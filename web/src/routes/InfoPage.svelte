@@ -41,8 +41,7 @@
 </script>
 
 <article class="info" data-info={name} aria-labelledby="info-title">
-  <header class="hd band">
-    <p class="eyebrow" aria-hidden="true"><span class="dotm"></span>shhgone</p>
+  <header class="hd page-card">
     <h1 id="info-title" class="title" tabindex="-1" data-large-title>{page.title}</h1>
     <p class="lede">{page.lede}</p>
     {#if page.draft}<p class="draft" role="note" data-draft>{t("info.draft")}</p>{/if}
@@ -94,57 +93,9 @@
     margin-inline: auto;
     padding-block: 0 var(--sp-7);
   }
-  /* En-tête : grand titre sur le fond du site, halo et couture en demi-teinte de la teinte bleue
-     (classe .band, ui/base.css), sous laquelle commence la lecture. */
+  /* En-tête : carte de titre commune (.page-card, ui/base.css ; 20 novembre). */
   .hd {
-    display: grid;
-    gap: var(--sp-4);
-    justify-items: start;
-    padding-block: clamp(48px, 8vw, 104px) clamp(64px, 9vw, 112px);
-  }
-  .hd::after {
-    inset-block-start: auto;
-    inset-block-end: -44px;
-  }
-  .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: var(--fs-micro);
-    letter-spacing: 0.08em;
-  }
-  .dotm {
-    width: 7px;
-    height: 7px;
-    border-radius: 2px;
-    background: var(--accent);
-    box-shadow: 0 0 10px rgb(95 227 181 / 0.6);
-  }
-  .title {
-    margin: 0;
-    max-width: 18ch;
-    font-size: clamp(2.25rem, 1.4rem + 3.4vw, 4rem);
-    line-height: 1.02;
-    font-weight: 700;
-    font-stretch: var(--wd-display, 112%);
-    letter-spacing: -0.035em;
-    overflow-wrap: break-word;
-    min-width: 0;
-    text-wrap: balance;
-  }
-  .title:focus {
-    outline: none;
-  }
-  .lede {
-    margin: 0;
-    max-width: 56ch;
-    color: #aab6d3;
-    font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
-    line-height: 1.6;
-    text-wrap: pretty;
+    margin-block-start: clamp(16px, 3vw, 32px);
   }
   .draft {
     margin: 0;

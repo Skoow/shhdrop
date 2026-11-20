@@ -31,7 +31,7 @@
   import { getLang, t, type Key } from "../../i18n/i18n.svelte";
   import { limitParams } from "../../i18n/limit-params";
   import { reveal } from "../../ui/attach";
-  import { ArrowRight, Broom, Check, EyeOff, KeyRound, UserX } from "../../ui/Icon";
+  import { ArrowRight, Broom, EyeOff, KeyRound, UserX } from "../../ui/Icon";
   import OffersStrip from "../../ui/OffersStrip.svelte";
   import SecureDemo from "../../ui/SecureDemo.svelte";
   import TabIcon from "../../ui/TabIcon.svelte";
@@ -110,8 +110,6 @@
   <ul class="plist">
     {#each priv as k, i (k)}
       <li class={["prow", "rv", { soon: k === "room" }]} data-priv-card style:--i="{i * 70}ms" {@attach reveal}>
-        <!-- Case cochée : déjà là ; vide : bientôt (le salon). -->
-        <span class={["box", { on: k !== "room" }]} aria-hidden="true">{#if k !== "room"}<Check size={13} strokeWidth={3} />{/if}</span>
         <span class="tile-ic" aria-hidden="true">
           {#if k === "account"}<UserX size={22} strokeWidth={1.8} />{:else if k === "server"}<EyeOff size={22} strokeWidth={1.8} />{:else if k === "clean"}<Broom size={22} strokeWidth={1.8} />{:else}<TabIcon id="chat" size={22} />{/if}
         </span>
@@ -129,7 +127,7 @@
        vraie clé. -->
   <figure class="link rv" data-key-note {@attach reveal}>
     <div class="lk" aria-hidden="true">
-      <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">shhgone.com/s</span></span>
+      <span class="lk-a"><span class="lk-l">{t("home.key.server")}</span><span class="lk-v num">https://shhgone.com/s</span></span>
       <span class="lk-b"><span class="lk-l"><KeyRound size={13} strokeWidth={2} />{t("home.key.browser")}</span><span class="lk-v num">#Kq7mXw2Rt9pLz4VbN8cYe1HsJ6uFa3DgQo5WtM0rEiA</span></span>
     </div>
     <figcaption>{t("home.key.note")}</figcaption>
@@ -156,12 +154,15 @@
       padding-block: 136px 144px;
     }
   }
+  /* Titres et sous-titres centrés (propriétaire, 20 novembre). */
   .head {
     display: grid;
-    justify-items: start;
+    justify-items: center;
     gap: var(--sp-3);
     max-width: 44rem;
     min-width: 0;
+    margin-inline: auto;
+    text-align: center;
   }
   .head > * {
     max-width: 100%;
@@ -201,7 +202,9 @@
   .steps3 {
     --iw: min(110px, 28vw);
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    /* Deux étapes par ligne au plus, partout (propriétaire, 20 novembre) ; une seule colonne
+       quand le texte est agrandi (9 rem = 288 px à 200 %). */
+    grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 9rem), 40%), 1fr));
     gap: var(--sp-7) var(--sp-5);
     margin: 0;
     padding: 0;
@@ -246,22 +249,19 @@
   }
   @media (min-width: 1024px) {
     .steps3 {
-      --gap: clamp(28px, 3vw, 56px);
-      --iw: clamp(110px, 10vw, 170px);
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: var(--sp-6) var(--gap);
+      --iw: clamp(110px, 9vw, 150px);
+      gap: 64px clamp(48px, 6vw, 112px);
+      width: min(100%, 62rem);
+      margin-inline: auto;
     }
-    /* Pointillé vers l'illustration suivante, à mi-hauteur de la page dessinée. */
-    .st:not(:last-child)::after {
-      content: "";
-      position: absolute;
-      inset-block-start: calc(var(--iw) * 164 / 128 / 2);
-      inset-inline-start: calc(var(--iw) + 20px);
-      inset-inline-end: calc(20px - var(--gap));
-      border-block-start: 3px dotted rgb(235 230 220 / 0.35);
+    /* Colonne d'illustration commune (la plus large, « Ça s'efface ») : textes alignés. */
+    .st {
+      grid-template-columns: calc(var(--iw) * 200 / 128) minmax(0, 1fr);
+      align-items: center;
+      gap: var(--sp-5);
     }
-    .st:nth-child(3)::after {
-      inset-inline-start: calc(var(--iw) + 20px);
+    .ill {
+      justify-self: center;
     }
   }
 
@@ -279,25 +279,11 @@
   }
   .prow {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     border-block-start: 1px solid rgb(233 236 242 / 0.08);
     gap: var(--sp-4);
     padding-block: var(--sp-5);
     border-block-end: 1px solid rgb(233 236 242 / 0.08);
-  }
-  .box {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    margin-block-start: 3px;
-    border-radius: 6px;
-    box-shadow: inset 0 0 0 1.5px rgb(233 236 242 / 0.35);
-    color: var(--on-accent);
-  }
-  .box.on {
-    background: var(--accent);
-    box-shadow: none;
   }
   .tile-ic {
     display: grid;
@@ -415,13 +401,9 @@
     }
   }
   @media (min-width: 1024px) {
-    .priv {
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-      column-gap: clamp(48px, 6vw, 120px);
-      align-items: start;
-    }
-    .link {
-      grid-column: 1 / -1;
+    .plist {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: clamp(48px, 6vw, 112px);
     }
   }
   .demo-sec :global(.fig) {

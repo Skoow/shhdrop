@@ -10,7 +10,7 @@
   import { presence } from "../history/presence.svelte";
   import { t } from "../i18n/i18n.svelte";
   import { announce } from "./announce";
-  import { ChevronRight, Download, LogOut, Menu, MessagesSquare, Plus, Share2, ShieldCheck, SlidersHorizontal, Tag, User, X } from "./Icon";
+  import { ChevronRight, Download, LogOut, MessagesSquare, Plus, Share2, ShieldCheck, SlidersHorizontal, Tag, User } from "./Icon";
   import type { Component } from "svelte";
 
   let { busy = false }: { busy?: boolean } = $props();
@@ -96,7 +96,8 @@
     }}
     data-menu-button
   >
-    {#if open}<X size={24} strokeWidth={2} aria-hidden="true" />{:else}<Menu size={24} strokeWidth={2} aria-hidden="true" />{/if}
+    <!-- Trois traits qui deviennent une croix (propriétaire, 20 novembre). -->
+    <span class="burger" aria-hidden="true"><span></span><span></span><span></span></span>
   </button>
   <!-- Voile sous le menu ouvert (18 novembre) : la page s'assombrit ; un appui dessus ferme. -->
   {#if open}<div class="mm-scrim" aria-hidden="true"></div>{/if}
@@ -216,6 +217,61 @@
     background: transparent;
     color: var(--text);
     cursor: pointer;
+  }
+  /* ☰ → ✕ : le trait du milieu s'efface, les deux autres pivotent vers le centre ; un léger
+     rebond à l'arrivée. Mouvement réduit : la croix apparaît sans transition. */
+  .burger {
+    position: relative;
+    display: block;
+    width: 22px;
+    height: 16px;
+  }
+  .burger span {
+    position: absolute;
+    left: 0;
+    top: calc(50% - 1px);
+    width: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    transition:
+      transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      opacity 200ms var(--ease-out),
+      width 260ms var(--ease-out);
+  }
+  .burger span:nth-child(1) {
+    transform: translateY(-7px);
+  }
+  .burger span:nth-child(2) {
+    width: 70%;
+    left: auto;
+    right: 0;
+  }
+  .burger span:nth-child(3) {
+    transform: translateY(7px);
+  }
+  .mm-b[aria-expanded="true"] .burger span:nth-child(1) {
+    transform: translateY(0) rotate(45deg);
+  }
+  .mm-b[aria-expanded="true"] .burger span:nth-child(2) {
+    opacity: 0;
+    width: 0;
+  }
+  .mm-b[aria-expanded="true"] .burger span:nth-child(3) {
+    transform: translateY(0) rotate(-45deg);
+  }
+  .mm-b[aria-expanded="true"] {
+    color: var(--accent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .burger span {
+      transition: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .burger span {
+      background: ButtonText;
+    }
   }
   .mm-b[aria-disabled="true"] {
     opacity: 0.45;

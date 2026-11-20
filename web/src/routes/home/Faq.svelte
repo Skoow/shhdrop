@@ -34,16 +34,19 @@
   details {
     scroll-margin-top: 96px;
   }
+  /* Titre centré au-dessus des questions (propriétaire, 20 novembre). */
   @media (min-width: 1024px) {
     .faq {
-      grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
-      column-gap: clamp(48px, 6vw, 120px);
-      align-items: start;
       padding-block: 136px 144px;
     }
   }
+  .qa {
+    width: min(100%, 52rem);
+    margin-inline: auto;
+  }
   h2 {
     margin: 0;
+    text-align: center;
     text-wrap: balance;
     min-width: 0;
     overflow-wrap: break-word;
