@@ -10,8 +10,10 @@ import (
 // plus le partage à lui seul. Chaque ouverture vaut une voix, prouvée par son octroi signé
 // (grant.go) et par K_preuve (le mot de passe) ; le partage est effacé pour tous, sans grâce
 // (flux coupés, spec §41.8), quand les voix atteignent la moitié des ouvertures permises
-// (max_opens), arrondie au-dessus : 1 sur 1, 1 sur 2, 2 sur 3, 3 sur 5, 5 sur 10, 10 sur 20.
-// Un seul signalement ne suffit donc plus pour un partage destiné à plusieurs. Limite assumée :
+// (max_opens), arrondie au-dessus, et au moins 2 dès que 2 ouvertures sont permises : 1 sur 1,
+// 2 sur 2, 2 sur 3, 3 sur 5, 5 sur 10, 10 sur 20 (propriétaire, 20 novembre, suite : « 1 sur 2 »
+// laissait un seul destinataire effacer le partage de l'autre). Un seul signalement ne suffit
+// donc jamais pour un partage destiné à plusieurs. Limite assumée :
 // qui a le lien et le mot de passe peut ouvrir lui-même plusieurs fois et voter avec chacune
 // (il pourrait aussi bien prendre toutes les ouvertures).
 //
@@ -26,7 +28,7 @@ var ErrStillOpen = errors.New("d'autres ouvertures restent possibles")
 
 // ReportsNeeded : voix qui effacent un partage de maxOpens ouvertures permises.
 func ReportsNeeded(maxOpens int) int {
-	return max(1, (maxOpens+1)/2)
+	return max(min(2, maxOpens), (maxOpens+1)/2, 1)
 }
 
 type reportBox struct {

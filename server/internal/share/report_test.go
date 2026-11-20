@@ -6,7 +6,7 @@ import (
 )
 
 func TestReportsNeeded(t *testing.T) {
-	for max, want := range map[int]int{0: 1, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 10: 5, 20: 10} {
+	for max, want := range map[int]int{0: 1, 1: 1, 2: 2, 3: 2, 4: 2, 5: 3, 10: 5, 20: 10} {
 		if got := ReportsNeeded(max); got != want {
 			t.Errorf("ReportsNeeded(%d) = %d, attendu %d", max, got, want)
 		}

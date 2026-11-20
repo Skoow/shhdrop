@@ -316,7 +316,9 @@ export function infoPages(base: string, demo: boolean): Plugin {
       server.middlewares.use((req, _res, next) => {
         const p = (req.url ?? "").split("?")[0]!;
         const rest = p.startsWith(base) ? "/" + p.slice(base.length) : p;
-        if ((PAGE_PATHS as readonly string[]).includes(rest.replace(/\.html$/, ""))) req.url = base + "page.html";
+        const sansEn = rest === "/en" ? "/" : rest.startsWith("/en/") ? rest.slice(3) : rest;
+        if ((PAGE_PATHS as readonly string[]).includes(sansEn.replace(/\.html$/, ""))) req.url = base + "page.html";
+        else if (rest === "/en") req.url = base;
         // Liens sous « /s » (16 novembre) : la page d'ouverture et de gestion.
         else if (rest === "/s") req.url = base + "s.html";
         next();
@@ -337,8 +339,8 @@ export function infoPages(base: string, demo: boolean): Plugin {
         const vite = await createServer({ configFile, mode, server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
         try {
           const { renderPage, renderHome, PAGE_FILES } = (await vite.ssrLoadModule("/src/pages/prerender.ts")) as {
-            renderPage: (n: string) => { body: string; title: string; description: string; path: string | undefined };
-            renderHome: () => { body: string; title: string; description: string; path: string | undefined };
+            renderPage: (n: string, lang?: "fr" | "en") => { body: string; title: string; description: string; path: string | undefined };
+            renderHome: (lang?: "fr" | "en") => { body: string; title: string; description: string; path: string | undefined };
             PAGE_FILES: Record<string, string>;
           };
           const clean = (raw: string, file: string) => {
@@ -353,8 +355,26 @@ export function infoPages(base: string, demo: boolean): Plugin {
             if (/\b(?:href|src)="[^"]*\/src\//.test(body)) throw new Error(`pages séparées : ${file} cite encore /src/`);
             return body;
           };
-          const robots = (path: string | undefined) =>
-            demo ? "" : path !== undefined ? `<meta name="robots" content="index, follow" />\n    <link rel="canonical" href="${SITE_ORIGIN}${path}" />\n  ` : `<meta name="robots" content="noindex" />\n  `;
+          // Pages bilingues (20 novembre, app/langues.ts) : hors démo, chaque page indexée a sa
+          // version anglaise « /en… » ; les deux se citent (hreflang fr, en, x-default = fr).
+          const enPath = (path: string) => (path === "/" ? "/en" : "/en" + path);
+          const robots = (path: string | undefined, lang: "fr" | "en" = "fr") =>
+            demo
+              ? ""
+              : path !== undefined
+                ? `<meta name="robots" content="index, follow" />\n    <link rel="canonical" href="${SITE_ORIGIN}${lang === "en" ? enPath(path) : path}" />\n    ` +
+                  `<link rel="alternate" hreflang="fr" href="${SITE_ORIGIN}${path}" />\n    <link rel="alternate" hreflang="en" href="${SITE_ORIGIN}${enPath(path)}" />\n    ` +
+                  `<link rel="alternate" hreflang="x-default" href="${SITE_ORIGIN}${path}" />\n  `
+                : `<meta name="robots" content="noindex" />\n  `;
+          const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+          const inLang = (html: string, lang: "fr" | "en", title: string, description: string) => {
+            const out = html
+              .replace('<html lang="fr"', `<html lang="${lang}"`)
+              .replace(/<title>[^<]*<\/title>/, `<title>${esc(demo ? "Démo · " + title : title)}</title>`)
+              .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, (_m, a: string, b: string) => a + esc(description) + b);
+            if (!out.includes(`<html lang="${lang}"`)) throw new Error("pages séparées : <html lang> introuvable");
+            return out;
+          };
           // Accueil (18 novembre, référencement) : son contenu écrit dans index.html, entre deux
           // repères (le 404, copié d'index.html, les retire : shh-404).
           {
@@ -370,20 +390,29 @@ export function infoPages(base: string, demo: boolean): Plugin {
             const html = readFileSync(indexFile, "utf8");
             if (!html.includes("<!--shh-home-->")) throw new Error("index.html sans repère <!--shh-home-->");
             writeFileSync(indexFile, html.replace("</head>", robots(r.path) + "</head>").replace("<!--shh-home-->", `<!--shh-home-->${body}<!--/shh-home-->`));
+            // Version anglaise de l'accueil : en.html, servie sous « /en » (static.go).
+            if (!demo) {
+              const e = renderHome("en");
+              writeFileSync(
+                join(outDir, "en.html"),
+                inLang(html, "en", e.title, e.description)
+                  .replace("</head>", robots(e.path, "en") + "</head>")
+                  .replace("<!--shh-home-->", `<!--shh-home-->${clean(e.body, "en.html")}<!--/shh-home-->`),
+              );
+            }
           }
-          for (const [name, file] of Object.entries(PAGE_FILES)) {
-            const r = renderPage(name);
-            const body = clean(r.body, file);
-            const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-            const head = robots(r.path);
-            const html = template
-              .replace(/<title>[^<]*<\/title>/, `<title>${esc(demo ? "Démo · " + r.title : r.title)}</title>`)
-              .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, (_m, a: string, b: string) => a + esc(r.description) + b)
-              .replace("</head>", head + "</head>")
-              .replace("<!--shh-page-->", body);
-            if (!html.includes(body)) throw new Error(`pages séparées : ${file} sans contenu`);
-            writeFileSync(join(outDir, file), html);
-          }
+          // Version anglaise : « en-<fichier> » (en-securite.html…), servie sous « /en/<page> ».
+          for (const lang of demo ? (["fr"] as const) : (["fr", "en"] as const))
+            for (const [name, frFile] of Object.entries(PAGE_FILES)) {
+              const file = lang === "en" ? "en-" + frFile : frFile;
+              const r = renderPage(name, lang);
+              const body = clean(r.body, file);
+              const html = inLang(template, lang, r.title, r.description)
+                .replace("</head>", robots(r.path, lang) + "</head>")
+                .replace("<!--shh-page-->", body);
+              if (!html.includes(body)) throw new Error(`pages séparées : ${file} sans contenu`);
+              writeFileSync(join(outDir, file), html);
+            }
         } finally {
           await vite.close();
         }
@@ -518,7 +547,7 @@ export default defineConfig(({ mode, command }) => {
     base: demo ? DEMO_BASE : "/",
     // Listes d'adresses jetables du serveur (mêmes fichiers), lues par routes/compte/verifs.ts.
     server: { fs: { allow: [".", "../server/internal/compte"] } },
-    define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)), __SALONS__: JSON.stringify(salonsActifs(demo)) },
+    define: { __SHH_BUILD__: JSON.stringify(buildId(command)), __COMPTES__: JSON.stringify(comptesActifs(demo)), __SALONS__: JSON.stringify(salonsActifs(demo)), __BILINGUE__: JSON.stringify(!demo) },
     build: {
       outDir: demo ? "dist-demo" : "dist",
       assetsInlineLimit: 0,

@@ -28,7 +28,13 @@ test.describe("français par défaut", () => {
     // Titre par route (scan UX B9) : Sécurité, puis l'accueil.
     await openSecurity(en.page);
     await expect(en.page).toHaveTitle("Security and encryption · Shhgone");
+    // Pages bilingues (20 novembre) : l'adresse donne la langue ; « / » reste en français et
+    // propose « English version » vers « /en ».
+    await expect(en.page).toHaveURL(shh.origin + "/en/securite");
     await en.page.goto(shh.origin + "/");
+    await expect(en.page.locator("html")).toHaveAttribute("lang", "fr");
+    await en.page.locator("[data-english-link]").click();
+    await expect(en.page).toHaveURL(shh.origin + "/en");
     await expect(en.page).toHaveTitle("End-to-end encrypted sharing, no account · Shhgone");
     await en.ctx.close();
     // Accueil : titre descriptif (référencement, retours CLEAN2) ; page d'envoi : « Envoyer ».
@@ -86,9 +92,12 @@ test.describe("français par défaut", () => {
 test.describe("anglais par défaut", () => {
   test.use({ locale: "en-GB" });
 
-  test("langue du navigateur non française → anglais", async ({ page, shh }) => {
-    await page.goto(shh.origin + "/");
+  test("langue du navigateur non française → anglais (page de l'application ; version /en des pages bilingues)", async ({ page, shh }) => {
+    await page.goto(shh.origin + "/envoyer");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await page.goto(shh.origin + "/en");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("[data-english-link]")).toHaveCount(0);
     expect(await axe(page)).toEqual([]);
     await capture(page, "coque-en");
   });

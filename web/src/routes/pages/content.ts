@@ -207,7 +207,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Signalement",
         p: [
-          "Toute personne qui a ouvert un partage peut le signaler, une fois par ouverture. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (arrondie au-dessus : 1 sur 1, 1 sur 2, 2 sur 3, 3 sur 5). Une seule personne ne peut donc pas supprimer un partage destiné à plusieurs. Voir « Signaler un abus ».",
+          "Toute personne qui a ouvert un partage peut le signaler, une fois par ouverture. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (arrondie au-dessus, deux voix au moins dès deux ouvertures : 1 sur 1, 2 sur 2, 2 sur 3, 3 sur 5). Une seule personne ne peut donc pas supprimer un partage destiné à plusieurs. Voir « Signaler un abus ».",
           "Sur décision d'une autorité, ou quand on nous transmet le lien d'un partage manifestement illégal, nous pouvons aussi le supprimer.",
         ],
       },
@@ -290,7 +290,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Ouvrez le partage avec son lien et son mot de passe.",
           "En bas du contenu, choisissez « Signaler ce partage », dites ce qui se passe, puis « Signaler ».",
-          "Chaque ouverture compte pour une voix. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (1 sur 1, 1 sur 2, 2 sur 3, 3 sur 5) : les téléchargements en cours sont coupés, plus aucune ouverture n'est possible. Sinon, votre signalement est compté et le partage reste ouvert aux autres.",
+          "Chaque ouverture compte pour une voix. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (deux voix au moins dès deux ouvertures : 1 sur 1, 2 sur 2, 2 sur 3, 3 sur 5) : les téléchargements en cours sont coupés, plus aucune ouverture n'est possible. Sinon, votre signalement est compté et le partage reste ouvert aux autres.",
         ],
       },
       {
@@ -471,7 +471,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       {
         h: "Reporting",
         p: [
-          "Anyone who opened a share can report it, once per open. The share is deleted for everyone once half of its allowed opens have reported it (rounded up: 1 of 1, 1 of 2, 2 of 3, 3 of 5). One person alone therefore cannot delete a share meant for several people. See “Report abuse”.",
+          "Anyone who opened a share can report it, once per open. The share is deleted for everyone once half of its allowed opens have reported it (rounded up, at least two votes from two opens: 1 of 1, 2 of 2, 2 of 3, 3 of 5). One person alone therefore cannot delete a share meant for several people. See “Report abuse”.",
           "On the decision of an authority, or when we are sent the link to a share that is clearly illegal, we may also delete it.",
         ],
       },
@@ -546,7 +546,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Open the share with its link and password.",
           "Below the content, choose “Report this share”, say what is going on, then “Report”.",
-          "Each open counts as one vote. The share is deleted for everyone once half of its allowed opens have reported it (1 of 1, 1 of 2, 2 of 3, 3 of 5): downloads in progress are cut, no open remains possible. Otherwise your report is counted and the share stays open to the others.",
+          "Each open counts as one vote. The share is deleted for everyone once half of its allowed opens have reported it (at least two votes from two opens: 1 of 1, 2 of 2, 2 of 3, 3 of 5): downloads in progress are cut, no open remains possible. Otherwise your report is counted and the share stays open to the others.",
         ],
       },
       {

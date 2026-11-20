@@ -6,6 +6,7 @@
   import { SOURCE_URL } from "../routes/pages/content";
   import { t } from "../i18n/i18n.svelte";
   import Aurora from "./Aurora.svelte";
+  import EnglishLink from "./EnglishLink.svelte";
   import { ChevronLeft } from "./Icon";
   import LiveRegion from "./LiveRegion.svelte";
   import Logo from "./Logo.svelte";
@@ -138,6 +139,8 @@
 <Aurora />
 
 <a class="skip" href="#contenu" onclick={skip}>{t("shell.skip")}</a>
+
+<EnglishLink />
 
 {#if banner}
   <div class="banner-slot" bind:clientHeight={bannerH}>{@render banner()}</div>

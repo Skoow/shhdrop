@@ -1,5 +1,6 @@
 import { bundled, fetchEn } from "./en-source";
 import { fr } from "./fr";
+import { BILINGUE, langueDuChemin } from "../app/langues";
 import { plural, type Lang } from "./format";
 
 type Dict = Record<keyof typeof fr, string>;
@@ -48,10 +49,23 @@ export function detectLang(languages: readonly string[] = typeof navigator === "
   return "fr";
 }
 
+/**
+ * Langue fixée par l'adresse d'une page bilingue (app/langues.ts, 20 novembre) : « /en… » en
+ * anglais, la version française en français (le serveur y a déjà envoyé un navigateur anglophone
+ * vers « /en », static.go) ; null ailleurs, dans la démo et sous vitest.
+ */
+export function langueDeLAdresse(pathname: string, base: string = import.meta.env.BASE_URL, bilingue: boolean = BILINGUE): Lang | null {
+  if (!bilingue) return null;
+  const b = base.replace(/\/$/, "");
+  if (b !== "" && pathname !== b && !pathname.startsWith(b + "/")) return null;
+  return langueDuChemin(pathname.slice(b.length) || "/")?.lang ?? null;
+}
+
 // Sans mémorisation (aucun stockage) : la langue est recalculée à chaque visite. Plus de choix
-// dans le pied de page (décision du propriétaire du 12 novembre) : la langue suit le navigateur.
-// `setLang` reste pour les tests (et un futur choix explicite).
-const wanted = detectLang();
+// dans le pied de page (décision du propriétaire du 12 novembre) : la langue suit le navigateur,
+// sauf sur une page bilingue, où son adresse la donne (ci-dessus). `setLang` reste pour les tests
+// (et un futur choix explicite).
+const wanted = (typeof location === "undefined" ? null : langueDeLAdresse(location.pathname)) ?? detectLang();
 let lang = $state<Lang>(dicts[wanted] !== undefined ? wanted : "fr");
 
 function applyHtmlLang(l: Lang): void {

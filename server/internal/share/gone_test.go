@@ -255,13 +255,16 @@ func TestDetachedClosedAtDone(t *testing.T) {
 // Exceptions sans grâce : signalement et destruction par l'administrateur coupent tous les
 // flux en cours (octets reçus < taille) ; aucune requête suivante n'est servie.
 func TestReportAndAdminCutStreams(t *testing.T) {
-	var grant2 string // octroi de la seconde ouverture, posé avant chaque cas
+	var grant1, grant2 string // octrois des deux ouvertures, posés avant chaque cas
 	for _, tc := range []struct {
 		name string
 		kill func(s *Service, k keys, id string)
 	}{
-		{"signalement (partage de 2 ouvertures : une voix suffit)", func(s *Service, k keys, _ string) {
-			// La seconde ouverture signale avec son octroi : 1 voix, ReportsNeeded(2) = 1.
+		{"signalement (partage de 2 ouvertures : deux voix)", func(s *Service, k keys, _ string) {
+			// ReportsNeeded(2) = 2 : la première voix ne coupe rien, la seconde efface.
+			if gone, _, err := s.Report(k.acces, k.preuve, grant1); err != nil || gone {
+				t.Fatal(gone, err)
+			}
 			if gone, _, err := s.Report(k.acces, k.preuve, grant2); err != nil || !gone {
 				t.Fatal(gone, err)
 			}
@@ -284,7 +287,12 @@ func TestReportAndAdminCutStreams(t *testing.T) {
 			s, _ := newSvc(t)
 			k := newKeys()
 			id := ready(t, s, k, gb, 24, 2)
-			o1, _, _ := s.Unlock(id, k.acces, k.preuve)
+			op1, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			o1 := op1.N
+			grant1 = op1.Grant
 			op2, err := s.UnlockGrant(id, k.acces, k.preuve, "")
 			if err != nil {
 				t.Fatal(err)

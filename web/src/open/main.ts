@@ -3,14 +3,12 @@
 // destinataire ne charge que ce qui sert à ouvrir. Les liens vers le reste du site chargent leur
 // page (router.svelte.ts, setEntry).
 import { mount } from "svelte";
-import { blockZoom } from "../app/no-zoom";
 import { setEntry } from "../app/router.svelte";
 import { pageReturns } from "../history/returns";
 import { langReady } from "../i18n/i18n.svelte";
 import OpenApp from "./OpenApp.svelte";
 
 setEntry("s");
-blockZoom(); // zoom bloqué (propriétaire, 18 novembre)
 // Démo GitHub Pages (UI §14.3) : même installation que l'application (bandeau, titres « Démo · »).
 if (import.meta.env.MODE === "demo") await (await import("../demo/install")).installDemo(window);
 

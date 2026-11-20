@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "../i18n/en";
 import { fr } from "../i18n/fr";
 import { setLang } from "../i18n/i18n.svelte";
-import { STEP_MIN_MS, STEP_MS, STEPS, dureeEtape } from "./demo-steps";
+import { LOG, PAUSE, STEP_MIN_MS, STEP_MS, STEPS, TYPE_MS, dureeEtape, lettresEtape } from "./demo-steps";
 import SecureDemo from "./SecureDemo.svelte";
 
 let c: Record<string, unknown> | null = null;
@@ -80,6 +80,21 @@ describe("SecureDemo", () => {
     }
     expect(dureeEtape("")).toBe(STEP_MIN_MS);
     expect(dureeEtape("x".repeat(1000))).toBe(STEP_MS);
+  });
+
+  it("la frappe du journal finit au moins 0,5 s avant la fin de chaque étape (fr et en)", () => {
+    for (const dict of [fr, en] as Record<string, string>[]) {
+      for (const n of STEPS) {
+        let lettres = 0;
+        for (const l of LOG.filter((x) => x.n === n)) {
+          if (l.late) lettres += PAUSE;
+          lettres += [...dict[l.text]!].length + [...`✓ ${dict[l.st]!}`].length;
+        }
+        expect(lettresEtape(n, (k) => dict[k]!)).toBe(lettres);
+        const dur = dureeEtape(dict[`demo.s${n}.t`]! + dict[`demo.s${n}.d`]!, lettres);
+        expect(lettres * TYPE_MS, `étape ${n}`).toBeLessThanOrEqual(dur - 500);
+      }
+    }
   });
 
   it("bouton pause/lecture visible : arrête puis reprend la boucle", () => {
@@ -164,7 +179,7 @@ describe("journal tapé (18 novembre) : un seul curseur, mots entiers", () => {
     for (let n = 1; n <= STEPS.length; n++) {
       // Pendant la frappe : un curseur au plus.
       // Pas de 35 ms (TYPE_MS) : chaque lettre relance son minuteur au passage des effets.
-      const dur = dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr]);
+      const dur = dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr], lettresEtape(n, (k) => fr[k as keyof typeof fr]));
       const ticks = Math.floor((dur - 100) / 35);
       for (let k = 0; k < ticks; k++) {
         vi.advanceTimersByTime(35);

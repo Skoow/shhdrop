@@ -103,6 +103,8 @@ const ACCOUNT_TRACES = ["/api/compte", "shhdrop-compte"];
 /** Rend la liste des problèmes (vide si tout va bien). `comptes` : build de production avec __COMPTES__ (la démo l'a toujours). */
 /** Pages d'information servies par leur propre fichier (vite.config.ts, PAGE_PATHS). */
 export const INFO_PAGES = ["securite.html", "confidentialite.html", "offres.html", "conditions.html", "mentions-legales.html", "signaler.html"];
+/** Versions anglaises (pages bilingues du 20 novembre, src/app/langues.ts), production seulement : accueil et pages d'information. */
+export const EN_PAGES = ["en.html", ...INFO_PAGES.map((p) => "en-" + p)];
 
 /** `pages` : pages d'information exigées (le vrai build : INFO_PAGES ; les petits sites des tests : aucune). */
 export function checkDist(dir, demo, comptes = false, pages = []) {
@@ -144,6 +146,15 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
       continue;
     }
     problems.push(...checkSri(page, html, (rel) => byRel.get(rel) ?? null, demo ? DEMO_BASE : "/"));
+    // Version anglaise : <html lang="en"> ; l'accueil anglais (en.html) est l'application avec
+    // son accueil écrit, comme index.html (il charge donc le moteur).
+    if (page.startsWith("en") && !/<html lang="en"/.test(html)) problems.push(`${page} : version anglaise sans <html lang="en">`);
+    if (page === "en.html") {
+      const home = /<!--shh-home-->([\s\S]*?)<!--\/shh-home-->/.exec(html)?.[1];
+      if (home === undefined || !/<h1[^>]*>/.test(home)) problems.push("en.html : accueil anglais non écrit (sans titre h1)");
+      else if (/\sstyle="/.test(home) || /\/src\//.test(home)) problems.push("en.html : style en ligne ou adresse de développement dans l'accueil écrit");
+      continue;
+    }
     const app = /<div id="app">([\s\S]*?)<\/body>/.exec(html)?.[1] ?? "";
     if (!/<h1[^>]*>[^<]+/.test(app)) problems.push(`${page} : contenu non écrit dans le HTML (aucun titre h1 avant le script)`);
     if (/<!--shh-page-->/.test(html)) problems.push(`${page} : gabarit non rempli`);
@@ -203,8 +214,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     // Pages d'information : leur contenu écrit cite des liens sortants (<a href>, ouverts par la
     // personne, jamais chargés par la page) ; seuls ces liens-là sont admis.
     let text = f.data.toString("utf8");
-    if (INFO_PAGES.includes(f.rel) || f.rel === "index.html")
-      text = text.replace(/<a\b[^>]*\shref="https:\/\/[^"]*"[^>]*>/g, "<a>").replace(/<link rel="canonical" href="https:\/\/shhgone\.com\/[a-z-]*" \/>/g, "");
+    if (INFO_PAGES.includes(f.rel) || EN_PAGES.includes(f.rel) || f.rel === "index.html")
+      text = text
+        .replace(/<a\b[^>]*\shref="https:\/\/[^"]*"[^>]*>/g, "<a>")
+        .replace(/<link rel="(?:canonical|alternate" hreflang="(?:fr|en|x-default))" href="https:\/\/shhgone\.com\/[a-z/-]*" \/>/g, "");
     for (const url of findExternalUrls(text)) problems.push(`${f.rel} : adresse externe « ${url} » (aucune ressource tierce)`);
   }
 
@@ -342,7 +355,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   // Le point d'entrée des pages d'information construit (assets/page-*.js) : ses six pages sont
   // exigées. Les petits sites des tests, qui n'en ont pas, ne les demandent pas.
   const hasPages = existsSync(join(dir, "assets")) && readdirSync(join(dir, "assets")).some((n) => /^page-[^/]+\.js$/.test(n));
-  const problems = checkDist(dir, demo, comptes, hasPages ? INFO_PAGES : []);
+  const problems = checkDist(dir, demo, comptes, hasPages ? (demo ? INFO_PAGES : [...INFO_PAGES, ...EN_PAGES]) : []);
   if (problems.length > 0) {
     for (const p of problems) console.error(`check-dist${demo ? " --demo" : ""} : ${p}`);
     process.exit(1);

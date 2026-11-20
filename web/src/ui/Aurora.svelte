@@ -8,6 +8,7 @@
   import inkUrl from "../assets/aurora-ink.png";
   import tideUrl from "../assets/aurora-tide.png";
   import mintUrl from "../assets/aurora-mint.png";
+  import { reprendreAmbiance } from "./ambiance";
 
   /** Échelles horizontale et verticale : une nappe couvre 150 × 95 vmax, comme le prototype. */
   // Rendu du build (pages séparées) : pas de fenêtre, une taille de téléphone, corrigée au montage.
@@ -17,11 +18,21 @@
   }
   let k = $state(scales());
   let hidden = $state(typeof document !== "undefined" && document.hidden);
+  // Calques écrits au build, gardés au montage (ui/ambiance.ts) : repris tels quels, sans en
+  // dessiner de nouveaux ; seules les échelles et la pause leur sont posées.
+  const garde = typeof document === "undefined" ? null : reprendreAmbiance();
+  $effect(() => {
+    if (!garde) return;
+    garde.aurora.style.setProperty("--kx", String(k.x));
+    garde.aurora.style.setProperty("--ky", String(k.y));
+    garde.aurora.classList.toggle("paused", hidden);
+  });
 </script>
 
 <svelte:window onresize={() => (k = scales())} />
 <svelte:document onvisibilitychange={() => (hidden = document.hidden)} />
 
+{#if !garde}
 <!-- Refonte du 12 novembre : nuit bleue sous l'aurore. Plus de trame de petites croix
      (propriétaire, 18 novembre : un seul motif, les pictogrammes). -->
 <div class="night" aria-hidden="true"></div>
@@ -32,9 +43,17 @@
   <img class="aur bloom" src={mintUrl} alt="" width="128" height="128" decoding="async" />
 </div>
 <div class="grain" aria-hidden="true"></div>
+{/if}
 
 <style>
   .aurora {
+    /* Échelles par défaut (performance, 20 novembre) : la page écrite au build n'a pas les
+       --kx/--ky du script (la CSP refuse les styles en ligne) ; sans elles, les nappes restaient
+       à 128 px puis s'agrandissaient au montage, et le navigateur comptait ce grand affichage
+       tardif comme « plus grand élément » (LCP de 4,6 s sur mobile). Valeurs d'un grand
+       téléphone (960 px de haut) et d'un écran de 1440 px ; le script pose les exactes. */
+    --kx: 11.25;
+    --ky: 7.13;
     position: fixed;
     inset: 0;
     z-index: -2;
@@ -43,6 +62,12 @@
     contain: strict;
     view-transition-name: aurora;
     transition: opacity 1.2s var(--ease-in-out);
+  }
+  @media (min-width: 900px) {
+    .aurora {
+      --kx: 16.88;
+      --ky: 10.69;
+    }
   }
   /* Vignette fixe : les bords retombent vers --bg-deep. */
   .aurora::after {

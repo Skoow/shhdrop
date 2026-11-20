@@ -15,6 +15,9 @@ declare const __COMPTES__: boolean;
 /** Salon (plan C-3) : vrai en production avec le compte (création exigée par D42-26), faux dans la démo (pas de serveur du salon) ; faux sous vitest. */
 declare const __SALONS__: boolean;
 
+/** Pages bilingues écrites au build sous « /en » (app/langues.ts) : vrai hors démo ; faux sous vitest. */
+declare const __BILINGUE__: boolean;
+
 // Cadre PDF isolé : le worker de pdf.js, chargé sur le fil principal (UI §13).
 declare module "pdfjs-dist/build/pdf.worker.mjs" {
   export const WorkerMessageHandler: unknown;

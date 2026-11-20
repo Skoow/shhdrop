@@ -340,9 +340,8 @@ export async function axe(page: Page) {
         .map((a) => a.finished.catch(() => undefined)),
     ),
   );
-  // « meta-viewport » écartée, et elle seule : le zoom est bloqué par décision du propriétaire
-  // (18 novembre), écart à WCAG 1.4.4 signalé et assumé (app/no-zoom.ts). Tout le reste est vérifié.
-  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).disableRules(["meta-viewport"]).analyze();
+  // Toutes les règles, « meta-viewport » comprise : le zoom est permis (rétabli le 20 novembre).
+  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   return r.violations;
 }
 

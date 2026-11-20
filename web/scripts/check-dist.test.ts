@@ -87,6 +87,19 @@ describe("check-dist.mjs, production", () => {
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><img src="/src/assets/a.png">') }), false, false, ["securite.html"]).join("\n")).toMatch(/adresse de développement/);
     expect(checkDist(site({ ...ok, "assets/page-a.js": 'const e="/assets/engine-x.wasm";' }), false, false, ["securite.html"]).join("\n")).toMatch(/cite le moteur/);
     expect(checkDist(site({ ...ok, "securite.html": PAGE('<h1>S</h1><a href="https://github.com/x">code</a>') }), false, false, ["securite.html"])).toEqual([]);
+    // Versions anglaises (20 novembre) : <html lang="en">, accueil anglais écrit.
+    const EN_HOME = HOME("<h1>One link</h1>").replace("<html", '<html lang="en"');
+    const EN_PAGE = PAGE("<h1>Security</h1>").replace("<html", '<html lang="en"');
+    const en = { ...ok, "en.html": EN_HOME, "en-securite.html": EN_PAGE };
+    const P = ["securite.html", "en.html", "en-securite.html"];
+    expect(checkDist(site(en), false, false, P)).toEqual([]);
+    expect(checkDist(site({ ...en, "en-securite.html": PAGE("<h1>Security</h1>") }), false, false, P)).toContain('en-securite.html : version anglaise sans <html lang="en">');
+    expect(checkDist(site({ ...en, "en.html": APP.replace("<html", '<html lang="en"') }), false, false, P)).toContain("en.html : accueil anglais non écrit (sans titre h1)");
+    const { "en.html": _e, ...noEn } = en;
+    expect(checkDist(site(noEn), false, false, P)).toContain("en.html : page d'information absente");
+    const alt = '<link rel="alternate" hreflang="en" href="https://shhgone.com/en/securite" />';
+    expect(checkDist(site({ ...en, "securite.html": PAGE("<h1>S</h1>").replace("</head>", alt + "</head>") }), false, false, P)).toEqual([]);
+    expect(checkDist(site({ ...en, "securite.html": PAGE("<h1>S</h1>").replace("</head>", alt.replace("shhgone.com", "evil.example") + "</head>") }), false, false, P).join("\n")).toMatch(/adresse externe/);
     // Page « /s » (16 novembre) : présente, jamais indexée, sans le script de l'application d'envoi.
     const { "s.html": _s, ...noS } = ok;
     expect(checkDist(site(noS), false, false, ["securite.html"])).toContain("s.html : page d'ouverture absente");

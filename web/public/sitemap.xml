@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Pages publiques indexées (app/seo.ts, INDEXED) ; domaine de la spécification (shhgone.com). -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://shhgone.com/</loc></url>
-  <url><loc>https://shhgone.com/securite</loc></url>
-  <url><loc>https://shhgone.com/confidentialite</loc></url>
-  <url><loc>https://shhgone.com/offres</loc></url>
-  <url><loc>https://shhgone.com/conditions</loc></url>
-  <url><loc>https://shhgone.com/mentions-legales</loc></url>
+<!-- Pages publiques indexées (app/seo.ts, INDEXED), en français et en anglais (pages bilingues,
+     app/langues.ts, 20 novembre) ; domaine de la spécification (shhgone.com). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url><loc>https://shhgone.com/</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/"/></url>
+  <url><loc>https://shhgone.com/en</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/"/></url>
+  <url><loc>https://shhgone.com/securite</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/securite"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/securite"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/securite"/></url>
+  <url><loc>https://shhgone.com/en/securite</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/securite"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/securite"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/securite"/></url>
+  <url><loc>https://shhgone.com/confidentialite</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/confidentialite"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/confidentialite"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/confidentialite"/></url>
+  <url><loc>https://shhgone.com/en/confidentialite</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/confidentialite"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/confidentialite"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/confidentialite"/></url>
+  <url><loc>https://shhgone.com/offres</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/offres"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/offres"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/offres"/></url>
+  <url><loc>https://shhgone.com/en/offres</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/offres"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/offres"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/offres"/></url>
+  <url><loc>https://shhgone.com/conditions</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/conditions"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/conditions"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/conditions"/></url>
+  <url><loc>https://shhgone.com/en/conditions</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/conditions"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/conditions"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/conditions"/></url>
+  <url><loc>https://shhgone.com/mentions-legales</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/mentions-legales"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/mentions-legales"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/mentions-legales"/></url>
+  <url><loc>https://shhgone.com/en/mentions-legales</loc><xhtml:link rel="alternate" hreflang="fr" href="https://shhgone.com/mentions-legales"/><xhtml:link rel="alternate" hreflang="en" href="https://shhgone.com/en/mentions-legales"/><xhtml:link rel="alternate" hreflang="x-default" href="https://shhgone.com/mentions-legales"/></url>
 </urlset>

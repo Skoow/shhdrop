@@ -236,6 +236,27 @@ var pageFiles = map[string]string{
 	"/signaler":         "signaler.html",
 	// Liens de partage et de gestion sous « /s » (16 novembre) : page d'ouverture seule.
 	"/s": "s.html",
+	// Versions anglaises des pages bilingues (20 novembre, web/vite.config.ts, infoPages).
+	"/en":                  "en.html",
+	"/en/securite":         "en-securite.html",
+	"/en/confidentialite":  "en-confidentialite.html",
+	"/en/offres":           "en-offres.html",
+	"/en/conditions":       "en-conditions.html",
+	"/en/mentions-legales": "en-mentions-legales.html",
+	"/en/signaler":         "en-signaler.html",
+}
+
+// enVersion : page française → sa version anglaise (web/src/app/langues.ts, PAGES_BILINGUES).
+// Aucun renvoi selon la langue : le serveur ne lit pas Accept-Language (spec §36 S2, Caddy le
+// retire) ; c'est l'adresse qui donne la langue de ces pages.
+var enVersion = map[string]string{
+	"/":                 "/en",
+	"/securite":         "/en/securite",
+	"/confidentialite":  "/en/confidentialite",
+	"/offres":           "/en/offres",
+	"/conditions":       "/en/conditions",
+	"/mentions-legales": "/en/mentions-legales",
+	"/signaler":         "/en/signaler",
 }
 
 // salonRoutes : pages du salon (table SALON_PATHS de web/src/app/router.svelte.ts, plan C-3),

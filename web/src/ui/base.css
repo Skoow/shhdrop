@@ -9,7 +9,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* Zoom bloqué (propriétaire, 18 novembre) : pas de zoom au double-toucher, nulle part (app/no-zoom.ts). */
+  /* Pas de zoom au double-toucher (réponse immédiate au toucher) ; le pincement reste permis
+     (WCAG 1.4.4 : zoom rétabli le 20 novembre, décision du propriétaire). */
   touch-action: manipulation;
 }
 

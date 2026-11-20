@@ -4,6 +4,9 @@
 // forme, refusée depuis le 18 novembre) n'ouvre rien : l'accueil le retire de l'adresse.
 import { flushSync } from "svelte";
 import { MANAGE_FRAGMENT } from "../engine/pure";
+import type { Lang } from "../i18n/format";
+import { getLang } from "../i18n/i18n.svelte";
+import { BILINGUE, PAGES_BILINGUES, cheminEn, langueDuChemin } from "./langues";
 import { runTransition } from "../ui/viewTransition";
 import { createLeaveGuard } from "./leave-guard";
 
@@ -80,13 +83,20 @@ export function suite(search: string): "salon" | null {
   return search === "?suite=salon" ? "salon" : null;
 }
 
-export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false, comptes: boolean = __COMPTES__, salons: boolean = __SALONS__): Route {
+export function match(pathname: string, hash = "", base: string = import.meta.env.BASE_URL, reopen = false, comptes: boolean = __COMPTES__, salons: boolean = __SALONS__, bilingue: boolean = BILINGUE): Route {
   const prefix = base.endsWith("/") ? base.slice(0, -1) : base; // "" ou "/shhdrop"
   let p = pathname;
   if (prefix !== "") {
     if (p === prefix) p = "/";
     else if (p.startsWith(prefix + "/")) p = p.slice(prefix.length);
     else return { name: "notfound" };
+  }
+  // Version anglaise d'une page bilingue (« /en », « /en/securite », app/langues.ts) : même
+  // route que la version française ; « /en/… » d'une autre page est introuvable.
+  if (p === "/en" || p.startsWith("/en/")) {
+    const fr = langueDuChemin(p);
+    if (fr === null || !bilingue) return { name: "notfound" };
+    p = fr.chemin;
   }
   if (p === "/") {
     // Ouverture déverrouillée rechargée sous « / » (adresse montrée, shownPath) : retour à « /s ».
@@ -151,7 +161,6 @@ if (typeof window !== "undefined")
 
 const base = () => import.meta.env.BASE_URL;
 
-/** Adresse complète d'un chemin de l'application (préfixe de dépôt en démo). */
 /**
  * Pages servies par leur propre fichier HTML (pages séparées, conception du 16 novembre) : le
  * serveur répond « securite.html » à « /securite ». Entre l'application (index.html) et ces
@@ -199,8 +208,13 @@ export function currentPath(): string {
   return href(info ?? (n === "offres" ? "/offres" : "/"));
 }
 
-export function href(path: string): string {
-  return base().replace(/\/$/, "") + path;
+/**
+ * Adresse complète d'un chemin de l'application (préfixe de dépôt en démo). Page bilingue en
+ * anglais (app/langues.ts) : sa version « /en… », pour rester dans la langue affichée.
+ */
+export function href(path: string, lang: Lang = getLang(), bilingue: boolean = BILINGUE): string {
+  const p = bilingue && PAGES_BILINGUES.includes(path) ? cheminEn(lang, path) : path;
+  return base().replace(/\/$/, "") + p;
 }
 
 /**

@@ -3,9 +3,7 @@ import App from "./App.svelte";
 import { moveToLinkPage } from "./app/router.svelte";
 import { pageReturns } from "./history/returns";
 import { langReady } from "./i18n/i18n.svelte";
-import { blockZoom } from "./app/no-zoom";
-
-blockZoom(); // zoom bloqué (propriétaire, 18 novembre)
+import { viderSaufAmbiance } from "./ui/ambiance";
 
 // Ouverture déverrouillée rechargée sous « / » (adresse montrée) : la page « /s » la rouvre, avant
 // tout le reste ; rien n'est monté ici (aucun écran affiché un instant).
@@ -24,6 +22,6 @@ await langReady;
 const target = document.getElementById("app");
 if (!target) throw new Error("#app introuvable");
 // Accueil écrit au build (référencement, 18 novembre) : remplacé par l'application vivante.
-if (!moved) target.replaceChildren();
+if (!moved) viderSaufAmbiance(target); // lumière d'ambiance gardée (ui/ambiance.ts)
 
 export default moved ? undefined : mount(App, { target });

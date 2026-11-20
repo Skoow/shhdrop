@@ -460,7 +460,8 @@ test.describe("en-US", () => {
 
   test("titre, infographie, sections en anglais ; axe ; capture", async ({ page, shh, isMobile }) => {
     await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1280, height: 900 });
-    await page.goto(shh.origin + "/");
+    // Version anglaise de l'accueil : « /en » (pages bilingues, 20 novembre).
+    await page.goto(shh.origin + "/en");
     await expect(page.getByRole("heading", { level: 1, name: "One link, one password, then it's gone." })).toBeVisible();
     await expect(page.locator("[data-demo-steps] li").nth(1)).toContainText("Encrypted on your device");
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();

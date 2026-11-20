@@ -45,4 +45,20 @@ describe("applySeo", () => {
     applySeo("home", document, ENV);
     expect(desc()).toMatch(/^Send files/);
   });
+  it("pages bilingues (20 novembre) : canonique dans la langue affichée, hreflang fr, en et x-default", () => {
+    const alt = () => [...document.head.querySelectorAll<HTMLLinkElement>('link[rel="alternate"]')].map((l) => [l.hreflang, l.getAttribute("href")]);
+    const B = { ...ENV, bilingue: true };
+    applySeo("securite", document, B);
+    expect(canon()).toBe("https://shhdrop.app/securite");
+    expect(alt()).toEqual([["fr", "https://shhdrop.app/securite"], ["en", "https://shhdrop.app/en/securite"], ["x-default", "https://shhdrop.app/securite"]]);
+    setLang("en");
+    applySeo("home", document, B);
+    expect(canon()).toBe("https://shhdrop.app/en");
+    expect(alt()).toEqual([["fr", "https://shhdrop.app/"], ["en", "https://shhdrop.app/en"], ["x-default", "https://shhdrop.app/"]]);
+    applySeo("envoyer", document, B);
+    expect(alt()).toEqual([]);
+    expect(canon()).toBeNull();
+    applySeo("home", document, { ...B, demo: true });
+    expect(alt()).toEqual([]);
+  });
 });

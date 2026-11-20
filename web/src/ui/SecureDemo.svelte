@@ -9,7 +9,7 @@
   import { t, type Key } from "../i18n/i18n.svelte";
   import { FileText, Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
-  import { PAUSE, STEPS, TYPE_MS, dureeEtape } from "./demo-steps";
+  import { LOG, PAUSE, STEPS, TYPE_MS, dureeEtape, lettresEtape, type Line } from "./demo-steps";
 
   const uid = $props.id();
   // Section de l'accueil qui porte le titre visible (19 novembre, 3) : sinon, titre caché propre.
@@ -43,7 +43,7 @@
     if (!playing) return;
     const now = step; // relu à chaque étape : un minuteur par étape
     // Durée selon le texte de l'étape (titre et description, 20 novembre).
-    const ms = dureeEtape(t(`demo.s${now}.t` as Key) + t(`demo.s${now}.d` as Key));
+    const ms = dureeEtape(t(`demo.s${now}.t` as Key) + t(`demo.s${now}.d` as Key), lettresEtape(now, t));
     const timer = setTimeout(() => {
       step = now === STEPS.length ? 1 : now + 1;
       typed = 0; // la frappe de l'étape suivante repart du début
@@ -92,18 +92,6 @@
   // par lettre (il passe à la ligne si la place manque, aucun mot n'est coupé), puis l'état, puis
   // descend à la ligne suivante ; à la fin, il reste et clignote au bout de la dernière ligne. La
   // ligne de l'attaquant (« late ») commence un court instant après celle de l'étape.
-  type Line = { n: number; text: Key; st: Key; tone: "ok" | "atk" | "end"; late?: boolean };
-  const LOG: Line[] = [
-    { n: 1, text: "demo.log.drop", st: "demo.st.ready", tone: "ok" },
-    { n: 2, text: "demo.log.seal", st: "demo.st.ok", tone: "ok" },
-    { n: 3, text: "demo.log.send", st: "demo.st.ok", tone: "ok" },
-    { n: 3, text: "demo.log.intercept", st: "demo.unreadable", tone: "atk", late: true },
-    { n: 4, text: "demo.log.server", st: "demo.unreadable", tone: "ok" },
-    { n: 4, text: "demo.log.search", st: "demo.st.nothing", tone: "atk", late: true },
-    { n: 5, text: "demo.log.link", st: "demo.st.ok", tone: "ok" },
-    { n: 6, text: "demo.log.open", st: "demo.st.decrypted", tone: "ok" },
-    { n: 7, text: "demo.log.erase", st: "demo.st.done", tone: "end" },
-  ];
   /** Lettres tapées depuis le début de l'étape (une toutes les TYPE_MS, seulement en lecture). */
   let typed = $state(0);
   type Row = { key: string; tone: Line["tone"]; text: string[]; st: string[]; start: number; full: boolean };

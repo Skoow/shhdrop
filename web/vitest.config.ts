@@ -7,7 +7,7 @@ export default defineConfig({
   // sans DOM ne sont pas concernés.
   resolve: { conditions: ["browser"] },
   // Drapeau de construction du compte (vite.config.ts) : faux sous vitest comme par défaut.
-  define: { __COMPTES__: "false", __SALONS__: "false" },
+  define: { __COMPTES__: "false", __SALONS__: "false", __BILINGUE__: "false" },
   // Listes d'adresses jetables du serveur, lues par routes/compte/verifs.ts (20 novembre).
   server: { fs: { allow: [".", "../server/internal/compte"] } },
   test: {

@@ -826,7 +826,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
   /** Voix de signalement par partage (n° d'ouverture), en mémoire, comme share/report.go. */
   const votes = new Map<string, Set<number>>();
   /** Voix qui effacent un partage de maxOpens ouvertures permises (moitié, arrondie au-dessus). */
-  const reportsNeeded = (maxOpens: number) => Math.max(1, Math.ceil(maxOpens / 2));
+  const reportsNeeded = (maxOpens: number) => Math.max(1, Math.min(2, maxOpens), Math.ceil(maxOpens / 2)); // comme share.ReportsNeeded
 
   /**
    * Destinataire : K_accès en en-tête, K_preuve dans le corps (POST /api/shares/destroy). Sans

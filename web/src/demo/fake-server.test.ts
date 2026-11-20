@@ -281,9 +281,12 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const { net, statuses } = setup({ rateBytesPerS: 1e9 });
     const r = await share(net, 2, [bigFile()]);
     const a = await openShare(r.link, PW, ORIGIN, undefined, net);
-    expect(await a.report(1)).toBe(true); // 2 ouvertures permises : une voix suffit
+    const b = await openShare(r.link, PW, ORIGIN, undefined, net);
+    // 2 ouvertures permises : deux voix (20 novembre, suite) ; la première ne coupe rien.
+    expect(await a.report(1)).toBe(false);
+    expect(await b.report(1)).toBe(true);
     await expect(a.item(0)).rejects.toThrow();
-    expect(statuses, statuses.join("\n")).toContain("GET /api/shares/segments/0 410");
+    expect(statuses.some((x) => /^GET \/api\/shares\/segments\/\d+ 410$/.test(x)), statuses.join("\n")).toBe(true);
     const fake2 = createFakeServer();
     // Catégorie (conception compte §21.10.2) : entier 1 à 10, seulement avec "report" (comme le serveur).
     const bad: Record<string, unknown>[] = [

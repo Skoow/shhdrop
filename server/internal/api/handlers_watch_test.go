@@ -297,7 +297,7 @@ func TestWatchLimits(t *testing.T) {
 func TestReportCutsStream(t *testing.T) {
 	e := newEnv(t, false, nil)
 	k := newKeys()
-	c := e.create(t, "", k, 80, 2)
+	c := e.create(t, "", k, 80, 3)
 	e.upload(t, c, 80)
 	dl, _ := e.unlock(t, c.ID, k)
 	srv := prodServer(t, e.h)
@@ -307,9 +307,11 @@ func TestReportCutsStream(t *testing.T) {
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatal(resp, err)
 	}
-	// Seconde ouverture qui signale : 1 voix, la moitié de 2 ouvertures (20 novembre).
-	g := e.grant(t, k)
-	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g, nil)}), 200, `{"detruit":1}`)
+	// Deux autres ouvertures signalent : 2 voix sur 3 ouvertures permises (20 novembre) ; la
+	// première ne coupe rien.
+	g1, g2 := e.grant(t, k), e.grant(t, k)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g1, nil)}), 200, `{"detruit":0}`)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g2, nil)}), 200, `{"detruit":1}`)
 	cn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, _ := io.Copy(io.Discard, resp.Body)
 	if n >= int64(share.SegmentSize(80, 0)) {
