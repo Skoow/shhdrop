@@ -129,6 +129,11 @@ describe("salon : trois clients, vrai moteur", () => {
     expect(c.recus.some(message(e2.id))).toBe(false);
     // Accueil de la reconnexion : 0x0E renvoyé pour la trame de règle 1 (rang dans (émission, depuis]),
     // jamais pour le retrait.
+    // Les 0x0E de l'accueil sont écrits par lots de l'écrivain, hors de la file : ils peuvent
+    // suivre les trames du rattrapage. On les attend, puis un aller-retour 0x04 → 0x08.
+    const fin = Date.now() + 10_000;
+    while (c.effaces.filter((s) => s === seqInst).length < 2 && Date.now() < fin) await new Promise((r) => setTimeout(r, 20));
+    await c.ping();
     expect(c.effaces.filter((s) => s === seqInst).length).toBe(2);
     expect(c.effaces).not.toContain(seqRetire);
 
