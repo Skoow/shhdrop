@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/skoow/shhdrop/server/internal/limits"
 	"io"
 	"net/http"
 	"time"
@@ -134,7 +135,27 @@ func failCompte(w http.ResponseWriter, err error) {
 
 // lire : corps JSON strict (readJSONMax) et sans aucun `null`. Même échéance de lecture que
 // readJSONMax (audit du 13 novembre, D5), posée avant la première lecture.
+//
+// Gros corps (max au-delà de maxJSON : coffres, fin d'inscription, récupération ; audit du
+// 20 novembre) : le jeton est dans le corps, donc tout est lu avant de pouvoir refuser. Sans
+// borne, quelques centaines de connexions tenaient chacune 1 Mio pendant l'échéance de lecture
+// et faisaient tuer le serveur par le noyau. Trois garde-fous avant la première lecture :
+// longueur annoncée exigée et sous le plafond (pas d'envoi par blocs), et une place de
+// grosCorps (16 en tout, 2 par connexion, 4 par bloc /48), sinon 503 busy et connexion fermée.
 func lire(w http.ResponseWriter, r *http.Request, v any, max int64) error {
+	if max > maxJSON {
+		if r.ContentLength < 0 || r.ContentLength > max {
+			w.Header().Set("Connection", "close")
+			return errBadRequest
+		}
+		k64, k48 := limits.Prefixes(ipOf(r))
+		rendre, err := grosCorps.Acquire(k64, k48)
+		if err != nil {
+			w.Header().Set("Connection", "close")
+			return compte.ErrBusy
+		}
+		defer rendre()
+	}
 	rc := http.NewResponseController(w)
 	if err := rc.SetReadDeadline(time.Now().Add(jsonReadTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		return errBadRequest
@@ -146,6 +167,14 @@ func lire(w http.ResponseWriter, r *http.Request, v any, max int64) error {
 	r.Body = io.NopCloser(bytes.NewReader(body))
 	return readJSONMax(w, r, v, max)
 }
+
+// grosCorps : lectures simultanées de gros corps JSON, pour tout le processus (au pire
+// 16 × 1 Mio lus, plus leurs copies de décodage : quelques dizaines de Mio).
+var grosCorps = limits.NewSlots(16, 2, 4)
+
+// corpsWebhook : lectures simultanées de webhooks de paiement (256 Kio chacun). Les
+// prestataires envoient depuis peu d'adresses : 4 par connexion.
+var corpsWebhook = limits.NewSlots(8, 4, 8)
 
 func sansNull(b []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(b))

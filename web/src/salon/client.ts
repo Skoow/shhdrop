@@ -198,7 +198,7 @@ export class ClientSalon {
    * libérée, serveur redémarré) : nouvelle entrée par `rejoindre`, comme d'habitude.
    */
   static reprendre(deps: Deps, o: { kLien: Uint8Array; cles: ClesSalon; jeton: string; siege: number; sGestion?: Uint8Array }): ClientSalon {
-    const e: api.Entree = { jeton: o.jeton, siege: o.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: 0, maxMembers: 0, membersCanDestroy: false, budgetLeft: 0 };
+    const e: api.Entree = { jeton: o.jeton, siege: o.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: 0, maxMembers: 0, membersCanDestroy: false, budgetLeft: 0, appels: false };
     const c = new ClientSalon(deps, o.cles, o.kLien, o.sGestion, e);
     c.#repriseBase = true;
     c.#connecter(DEPUIS_REPRISE);
@@ -850,6 +850,12 @@ export class ClientSalon {
   ecrit(): void {
     if (!this.dansLeGroupe() || !this.#rattrape) return;
     this.#volatil({ k: "ecrit" });
+  }
+
+  /** Message d'un appel (présence, fin, signalisation) : volatile ; faux si le moteur refuse pour l'instant. */
+  appel(m: Extract<Message, { k: "appel_present" | "appel_fin" | "appel_signal" }>): boolean {
+    if (!this.dansLeGroupe() || !this.#rattrape) return false;
+    return this.#volatil(m);
   }
 
   /** Accusés `recu`/`vu`/`piece_ouverte`/`piece_telechargee` (identifiants de 16 octets), groupés par périodes de 2,5 s. */

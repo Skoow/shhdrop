@@ -32,6 +32,8 @@ const (
 	EcrituresCoffreParHeure = 60
 	// PseudoVerifierParHeure : vérifications de pseudo par heure, par étape ou par compte.
 	PseudoVerifierParHeure = 30
+	// AppelsParHeure : demandes d'identifiants du relais des appels, par heure et par membre.
+	AppelsParHeure = 20
 	// BannissementsParHeure : garde-fou global contre un jeton d'administration volé (§21.11).
 	BannissementsParHeure = 20
 )
@@ -141,6 +143,16 @@ func (l *Limiter) AllowPseudoVerifier(id []byte) bool {
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
 	return allowUnLocked(l.pseudoCpt, l.cleLocked("pseudo", id), PseudoVerifierParHeure)
+}
+
+// AllowAppel : une demande d'identifiants du relais des appels pour le membre id (empreinte de
+// son jeton), 20 par heure, comptée à l'appel. Même table que les vérifications de pseudo : les
+// clés sont séparées par sorte (cleLocked).
+func (l *Limiter) AllowAppel(id []byte) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotateLocked(l.now())
+	return allowUnLocked(l.pseudoCpt, l.cleLocked("appel", id), AppelsParHeure)
 }
 
 // AllowBannir : un bannissement, 20 par heure au plus pour tout le serveur, compté à l'appel.

@@ -15,10 +15,10 @@ use shhdrop_core::kdf::sha256;
 use shhdrop_core::{KLien, KMdp};
 use shhdrop_salon::{
     ClesSalon, EN_TETE_CONTROLE, EnTete, Enveloppe, Error, Etat, Graine, JSON_MAX, MAX_CHARGE,
-    Message, RefPiece, Regle, SortePiece, TAILLE_O, TAILLE_TRAME, cle_acces, cle_maitre,
-    cle_publique_role, cle_unicite, cles_depuis_maitre, cles_salon, code_verification, decoder,
-    en_tete_coherent, en_tete_de, encoder, etat, jeton_gestion, lire_en_tete, nettoyer_texte,
-    ouvrir, sceller, verifier_pseudo,
+    Message, RefPiece, Regle, SortePiece, SorteSignal, TAILLE_O, TAILLE_TRAME, cle_acces,
+    cle_maitre, cle_publique_role, cle_unicite, cles_depuis_maitre, cles_salon, code_verification,
+    decoder, en_tete_coherent, en_tete_de, encoder, etat, jeton_gestion, lire_en_tete,
+    nettoyer_texte, ouvrir, sceller, verifier_pseudo,
 };
 
 const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../vectors/salon-v3.json");
@@ -581,6 +581,21 @@ fn env_de(v: &Value) -> Enveloppe {
             cible: id16(&m["cible"]),
         },
         "ecrit" => Message::Ecrit,
+        "appel_present" => Message::AppelPresent {
+            appel: id16(&m["appel"]),
+            video: m["video"].as_bool().unwrap(),
+        },
+        "appel_fin" => Message::AppelFin {
+            appel: id16(&m["appel"]),
+        },
+        "appel_signal" => Message::AppelSignal {
+            appel: id16(&m["appel"]),
+            pour: m["pour"].as_u64().unwrap() as u8,
+            sorte: SorteSignal::depuis_nom(&s("sorte")).unwrap(),
+            i: m["i"].as_u64().unwrap() as u8,
+            n: m["n"].as_u64().unwrap() as u8,
+            x: s("x"),
+        },
         "recu" => Message::Recu { ids: ids_de(m) },
         "vu" => Message::Vu { ids: ids_de(m) },
         "piece_ouverte" => Message::PieceOuverte { ids: ids_de(m) },
@@ -637,6 +652,19 @@ fn env_vers(e: &Enveloppe) -> Value {
         Message::Modif { cible, x } => json!({ "k": "modif", "cible": hex(cible), "x": x }),
         Message::Retrait { cible } => json!({ "k": "retrait", "cible": hex(cible) }),
         Message::Ecrit => json!({ "k": "ecrit" }),
+        Message::AppelPresent { appel, video } => {
+            json!({ "k": "appel_present", "appel": hex(appel), "video": video })
+        }
+        Message::AppelFin { appel } => json!({ "k": "appel_fin", "appel": hex(appel) }),
+        Message::AppelSignal {
+            appel,
+            pour,
+            sorte,
+            i,
+            n,
+            x,
+        } => json!({ "k": "appel_signal", "appel": hex(appel), "pour": pour,
+            "sorte": sorte.nom(), "i": i, "n": n, "x": x }),
         Message::Recu { ids: i } => json!({ "k": "recu", "ids": ids(i) }),
         Message::Vu { ids: i } => json!({ "k": "vu", "ids": ids(i) }),
         Message::PieceOuverte { ids: i } => json!({ "k": "piece_ouverte", "ids": ids(i) }),
@@ -686,6 +714,11 @@ fn decode_case(c: &Value) -> Value {
 fn enveloppe(label: &str, e: u8, message: Value) -> Value {
     json!({ "id": h(&format!("messages/{label}/id"), 16), "t": 1_700_000_000_000u64,
             "e": e, "message": message })
+}
+
+fn signal(pour: u8, sorte: &str, i: u8, n: u8, x: &str) -> Value {
+    json!({ "k": "appel_signal", "appel": h("messages/appel", 16), "pour": pour,
+            "sorte": sorte, "i": i, "n": n, "x": x })
 }
 
 fn messages() -> Value {
@@ -847,6 +880,72 @@ fn messages() -> Value {
             profil("Alice", 0, avatar(2)),
         ),
         ("depart", 0, json!({ "k": "depart" })),
+        // Appels (20 novembre) : présence, fin, signalisation en morceaux.
+        (
+            "appel_present",
+            0,
+            json!({ "k": "appel_present", "appel": h("messages/appel", 16), "video": true }),
+        ),
+        (
+            "appel_fin",
+            0,
+            json!({ "k": "appel_fin", "appel": h("messages/appel", 16) }),
+        ),
+        (
+            "appel_offre",
+            0,
+            signal(3, "offre", 0, 2, "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\n"),
+        ),
+        (
+            "appel_reponse_dernier_morceau",
+            0,
+            signal(0, "reponse", 7, 8, "a=setup:active\r\n"),
+        ),
+        (
+            "appel_glace",
+            0,
+            signal(
+                254,
+                "glace",
+                0,
+                1,
+                "{\"candidate\":\"candidate:1 1 udp 1 192.0.2.1 3478 typ relay\"}",
+            ),
+        ),
+        (
+            "appel_signal_plein",
+            0,
+            signal(1, "offre", 0, 1, &"a".repeat(3600)),
+        ),
+        (
+            "appel_signal_trop_long",
+            0,
+            signal(1, "offre", 0, 1, &"a".repeat(3601)),
+        ),
+        ("appel_signal_vide", 0, signal(1, "offre", 0, 1, "")),
+        ("appel_signal_hors_ascii", 0, signal(1, "offre", 0, 1, "é")),
+        (
+            "appel_signal_tabulation",
+            0,
+            signal(1, "offre", 0, 1, "a\tb"),
+        ),
+        ("appel_signal_i_hors_n", 0, signal(1, "offre", 2, 2, "a")),
+        (
+            "appel_signal_17_morceaux",
+            0,
+            signal(1, "offre", 0, 17, "a"),
+        ),
+        (
+            "appel_signal_zero_morceau",
+            0,
+            signal(1, "offre", 0, 0, "a"),
+        ),
+        ("appel_glace_en_morceaux", 0, signal(1, "glace", 0, 2, "a")),
+        (
+            "appel_signal_siege_reserve",
+            0,
+            signal(255, "offre", 0, 1, "a"),
+        ),
         // Rotation de l'invitation (13 novembre) : numéro et K_maître_s' (32 octets).
         (
             "rotation",
@@ -888,6 +987,30 @@ fn messages() -> Value {
     let head =
         |k: &str| format!("{{\"v\":3,\"id\":\"{id}\",\"t\":1700000000000,\"e\":0,\"k\":\"{k}\"");
     let dec: Vec<(&str, Value)> = vec![
+        (
+            "appel_present",
+            json!({ "utf8": format!("{},\"c\":\"{id2}\",\"video\":false}}", head("appel_present")) }),
+        ),
+        (
+            "appel_present_video_pas_booleen",
+            json!({ "utf8": format!("{},\"c\":\"{id2}\",\"video\":1}}", head("appel_present")) }),
+        ),
+        (
+            "appel_fin_champ_en_trop",
+            json!({ "utf8": format!("{},\"c\":\"{id2}\",\"video\":false}}", head("appel_fin")) }),
+        ),
+        (
+            "appel_signal",
+            json!({ "utf8": format!("{},\"c\":\"{id2}\",\"pour\":2,\"s\":\"glace\",\"i\":0,\"n\":1,\"x\":\"a\"}}", head("appel_signal")) }),
+        ),
+        (
+            "appel_signal_sorte_inconnue",
+            json!({ "utf8": format!("{},\"c\":\"{id2}\",\"pour\":2,\"s\":\"autre\",\"i\":0,\"n\":1,\"x\":\"a\"}}", head("appel_signal")) }),
+        ),
+        (
+            "appel_signal_siege_256",
+            json!({ "utf8": format!("{},\"c\":\"{id2}\",\"pour\":256,\"s\":\"glace\",\"i\":0,\"n\":1,\"x\":\"a\"}}", head("appel_signal")) }),
+        ),
         (
             "texte",
             json!({ "utf8": format!("{},\"x\":\"Allo\"}}", head("texte")) }),

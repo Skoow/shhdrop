@@ -116,9 +116,10 @@ RUN go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o /out/shhche
 RUN mkdir -m 0700 /out/data
 
 # --- Image finale : rien d'autre que deux binaires, le site et les certificats racine -----
-# scratch : ni shell, ni bibliothèque, ni gestionnaire de paquets. Seule connexion sortante
-# du serveur : SMTP en TLS vérifié vers SHH_SMTP_HOST, avec SHH_COMPTES=1 seulement
-# (internal/courriel/smtp.go, conception du compte §3.2) ; elle exige les certificats racine,
+# scratch : ni shell, ni bibliothèque, ni gestionnaire de paquets. Connexions sortantes du
+# serveur : SMTP en TLS vérifié vers SHH_SMTP_HOST, avec SHH_COMPTES=1 seulement, et l'API de
+# chaque prestataire de paiement configuré, avec SHH_PAIEMENT=1 seulement (compose.yaml)
+# (internal/courriel/smtp.go, conception du compte §3.2) ; elles exigent les certificats racine,
 # copiés de l'étape server (paquet ca-certificates de l'image golang épinglée ci-dessus), au
 # chemin que lit crypto/x509 sous Linux. Avec SHH_COMPTES=0, ils ne servent à rien.
 FROM scratch

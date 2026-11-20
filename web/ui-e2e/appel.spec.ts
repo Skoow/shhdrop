@@ -1,0 +1,271 @@
+// Appel audio et vidéo À TROIS, de bout en bout par l'interface (conception des appels,
+// 20 novembre) : vrai binaire Go (SHH_SALONS=1, SHH_COMPTES=1, relais configuré), vrai relais
+// TURN (coturn, lancé ici sur l'adresse de la machine), trois navigateurs Chromium avec micro et
+// caméra factices. Prouve : l'appel se lance, les deux autres le voient et le rejoignent, chacun
+// reçoit vraiment l'image et le son des autres, TOUT le média passe par le relais (aucune
+// connexion directe : paires de candidats « relay » des deux côtés), micro et caméra se coupent,
+// raccrocher retire la tuile chez les autres.
+//
+// coturn : paquet « coturn » (apt). Absent hors CI : test sauté avec un message ; en CI il est
+// exigé (l'étape d'installation est dans .github/workflows/ci.yml).
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+import { networkInterfaces, tmpdir } from "node:os";
+import { join } from "node:path";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
+import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
+import { siteComptes } from "./comptes-site";
+import { axe, capture, expect, test as base } from "./fixtures";
+
+const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
+const SMTP_MDP = "SmtpUiSecretVq4nRw";
+
+function turnserver(): string | null {
+  try {
+    return execFileSync("which", ["turnserver"], { encoding: "utf8" }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+/** Adresse IPv4 de la machine hors boucle locale : Chromium ne propose pas de candidat sur 127.0.0.1. */
+function adresse(): string | null {
+  for (const l of Object.values(networkInterfaces())) for (const a of l ?? []) if (a.family === "IPv4" && !a.internal) return a.address;
+  return null;
+}
+function portLibre(): Promise<number> {
+  return new Promise((ok, ko) => {
+    const s = createServer();
+    s.once("error", ko);
+    s.listen(0, "127.0.0.1", () => {
+      const p = (s.address() as { port: number }).port;
+      s.close(() => ok(p));
+    });
+  });
+}
+
+type Relais = { url: string; secretFile: string; arreter(): void };
+
+const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string }>({
+  site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
+  smtp: async ({}, use) => {
+    const smtp = await demarrerSMTP();
+    try {
+      await use(smtp);
+    } finally {
+      await smtp.fermer();
+    }
+  },
+  relais: async ({}, use) => {
+    const bin = turnserver()!;
+    const ip = adresse()!;
+    const port = await portLibre();
+    const secret = randomBytes(24).toString("hex");
+    const dir = mkdtempSync(join(tmpdir(), "shh-turn-"));
+    const secretFile = join(dir, "turn.secret");
+    writeFileSync(secretFile, secret + "\n");
+    chmodSync(secretFile, 0o600);
+    // Mêmes choix que deploy/turnserver.conf (identifiants temporaires, aucun journal), sur
+    // l'adresse de la machine ; les plages privées restent permises ici (la machine de test en est une).
+    const proc: ChildProcess = spawn(
+      bin,
+      ["-n", "--listening-ip", ip, "--relay-ip", ip, "--listening-port", String(port), "--min-port", "49160", "--max-port", "49400", "--use-auth-secret", "--static-auth-secret", secret, "--realm", "shhgone.test", "--fingerprint", "--no-tls", "--no-dtls", "--no-cli", "--no-multicast-peers", "--log-file", "/dev/null", "--no-stdout-log", "--pidfile", join(dir, "turn.pid")],
+      { stdio: "ignore" },
+    );
+    await new Promise((r) => setTimeout(r, 1_500));
+    try {
+      await use({ url: `turn:${ip}:${port}?transport=udp`, secretFile, arreter: () => proc.kill("SIGKILL") });
+    } finally {
+      proc.kill("SIGKILL");
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  shhServer: async ({ smtp, site, relais }, use) =>
+    use({
+      comptes: { cle: new Uint8Array(randomBytes(32)), smtpPort: smtp.port, smtpMdp: SMTP_MDP, from: FROM },
+      env: { SHH_STATIC_DIR: site, SHH_TURN_URLS: relais.url, SHH_TURN_SECRET_FILE: relais.secretFile },
+    }),
+});
+
+test.use({
+  locale: "fr-FR",
+  timezoneId: "Europe/Paris",
+  permissions: ["camera", "microphone"],
+  // Les options de lancement du projet sont remplacées en bloc : le chemin local du navigateur (playwright.config.ts) est redit.
+  launchOptions: { ...(process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : {}), args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
+});
+test.skip(({ browserName }) => browserName !== "chromium", "appel.spec.ts : Chromium (micro et caméra factices)");
+test.skip(() => !process.env.CI && (turnserver() === null || adresse() === null), "coturn absent de cette machine (apt install coturn) : exigé en CI");
+test.setTimeout(420_000);
+
+const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));
+const bouton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
+const titre = (page: Page, name: string) => page.getByRole("heading", { level: 1, name, exact: true });
+const fil = (page: Page) => page.getByRole("log");
+const appel = (page: Page) => page.locator("section[data-appel='dans']");
+const tuiles = (page: Page) => appel(page).locator("li.tuile");
+
+/** Garde chaque RTCPeerConnection de la page, pour lire ensuite par où passe le média. */
+async function espionner(ctx: BrowserContext): Promise<void> {
+  await ctx.addInitScript(() => {
+    const w = window as unknown as { __pcs: RTCPeerConnection[]; RTCPeerConnection: typeof RTCPeerConnection };
+    w.__pcs = [];
+    const Vrai = w.RTCPeerConnection;
+    w.RTCPeerConnection = class extends Vrai {
+      constructor(c?: RTCConfiguration) {
+        super(c);
+        w.__pcs.push(this);
+      }
+    };
+  });
+}
+
+/** Pour chaque connexion ouverte : types des candidats choisis, octets reçus en audio et en vidéo, politique ICE. */
+async function etatDesConnexions(page: Page) {
+  return page.evaluate(async () => {
+    const w = window as unknown as { __pcs: RTCPeerConnection[] };
+    const out: { politique: string | undefined; local: string; distant: string; audio: number; video: number }[] = [];
+    for (const pc of w.__pcs) {
+      if (pc.connectionState !== "connected") continue;
+      const stats = await pc.getStats();
+      let local = "";
+      let distant = "";
+      let audio = 0;
+      let video = 0;
+      stats.forEach((s) => {
+        if (s.type === "candidate-pair" && s.nominated && s.state === "succeeded") {
+          local = stats.get(s.localCandidateId)?.candidateType ?? "";
+          distant = stats.get(s.remoteCandidateId)?.candidateType ?? "";
+        }
+        if (s.type === "inbound-rtp" && s.kind === "audio") audio += s.bytesReceived ?? 0;
+        if (s.type === "inbound-rtp" && s.kind === "video") video += s.bytesReceived ?? 0;
+      });
+      out.push({ politique: pc.getConfiguration().iceTransportPolicy, local, distant, audio, video });
+    }
+    return out;
+  });
+}
+
+async function inscrire(page: Page, origin: string, smtp: FauxSMTP, email: string, mdp: string): Promise<void> {
+  await page.goto(origin + "/compte/inscription?suite=salon");
+  await champ(page, "Adresse e-mail").fill(email);
+  await champ(page, "Mot de passe").fill(mdp);
+  await champ(page, "Confirmer le mot de passe").fill(mdp);
+  await bouton(page, "Créer").click();
+  const code = codeDuCourriel(await smtp.attendre(1)).code;
+  await champ(page, "Code reçu par e-mail").fill(code);
+  await bouton(page, "Valider").click();
+  await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
+}
+
+async function inviter(browser: Browser, use: object, lien: string, mdp: string, pseudo: string): Promise<{ ctx: BrowserContext; page: Page; erreurs: string[] }> {
+  const ctx = await browser.newContext({ ...use, locale: "fr-FR", timezoneId: "Europe/Paris", permissions: ["camera", "microphone"] });
+  await espionner(ctx);
+  const page = await ctx.newPage();
+  const erreurs: string[] = [];
+  page.on("pageerror", (e) => erreurs.push(e.message));
+  page.on("console", (m) => /Refused to|Content Security Policy/.test(m.text()) && erreurs.push(m.text()));
+  await page.goto(lien);
+  await champ(page, "Mot de passe du salon").fill(mdp);
+  await bouton(page, "Continuer").click();
+  await expect(titre(page, "Un salon qui s'efface")).toBeVisible({ timeout: 30_000 });
+  await champ(page, "Pseudonyme pour ce salon").fill(pseudo);
+  await bouton(page, "Entrer dans le salon").click();
+  await expect(fil(page)).toBeVisible();
+  return { ctx, page, erreurs };
+}
+
+test("appel vidéo à trois : tout passe par le relais, micro, caméra, raccrocher", async ({ page, context, shh, smtp, browser }, info) => {
+  const r = randomBytes(4).toString("hex");
+  await espionner(context);
+
+  // --- A crée le salon et y entre ----------------------------------------------------------------------
+  await inscrire(page, shh.origin, smtp, `Appel.${r}@exemple.org`, `MdpCompteAppel-${r}-9`);
+  await bouton(page, "Continuer").click();
+  await bouton(page, "Créer le salon").click();
+  await expect(titre(page, "Salon prêt")).toBeVisible({ timeout: 60_000 });
+  const lien = (await page.locator(".cf").filter({ hasText: "Lien d'invitation" }).locator(".val").textContent())!.trim();
+  const mdp = (await page.locator(".cf").filter({ hasText: "Mot de passe" }).locator(".val").textContent())!.trim();
+  await bouton(page, "Entrer dans le salon").click();
+  await champ(page, "Pseudonyme pour ce salon").fill(`Lea${r.slice(0, 4)}`);
+  await bouton(page, "Entrer dans le salon").click();
+  await expect(fil(page)).toBeVisible();
+
+  const b = await inviter(browser as Browser, info.project.use, lien, mdp, `Hugo${r.slice(4, 8)}`);
+  const c = await inviter(browser as Browser, info.project.use, lien, mdp, `Nora${r.slice(2, 6)}`);
+  try {
+    // Les trois sont dans le groupe chiffré : un message de A arrive chez B et C.
+    await page.getByLabel("Message", { exact: true }).fill(`Avant l'appel ${r}`);
+    await page.getByRole("region", { name: "Conversation", exact: true }).getByRole("button", { name: "Envoyer", exact: true }).click();
+    for (const p of [b.page, c.page]) await expect(fil(p).getByText(`Avant l'appel ${r}`, { exact: true })).toBeVisible({ timeout: 60_000 });
+
+    // --- A lance un appel vidéo ; B et C le voient et le rejoignent ----------------------------------
+    await bouton(page, "Appel vidéo").click();
+    await expect(appel(page)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("En attente des autres participants…")).toBeVisible();
+    for (const p of [b.page, c.page]) await expect(p.getByText("Appel en cours (1)")).toBeVisible({ timeout: 30_000 });
+    await capture(b.page, "appel-bandeau");
+    await bouton(b.page, "Rejoindre avec la caméra").click();
+    await expect(appel(b.page)).toBeVisible({ timeout: 30_000 });
+    await expect(c.page.getByText("Appel en cours (2)")).toBeVisible({ timeout: 30_000 });
+    await bouton(c.page, "Rejoindre").click(); // sans caméra
+    await expect(appel(c.page)).toBeVisible({ timeout: 30_000 });
+
+    // Trois tuiles partout, les deux autres « liées ».
+    for (const p of [page, b.page, c.page]) {
+      await expect(tuiles(p)).toHaveCount(3, { timeout: 60_000 });
+      await expect(tuiles(p).and(p.locator("[data-lien='lie']"))).toHaveCount(2, { timeout: 90_000 });
+    }
+    // Le panneau d'appel reste collé sous la barre du site, même la page défilée.
+    await expect(appel(page)).toBeInViewport();
+    await capture(page, "appel-a-trois");
+    expect(await axe(page)).toEqual([]);
+
+    // --- Le média arrive vraiment, et seulement par le relais ----------------------------------------
+    await expect
+      .poll(
+        async () => {
+          const e = await etatDesConnexions(page);
+          return e.length === 2 && e.every((x) => x.audio > 0) && e.some((x) => x.video > 0);
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+    for (const p of [page, b.page, c.page]) {
+      const e = await etatDesConnexions(p);
+      expect(e.length).toBe(2);
+      for (const x of e) expect([x.politique, x.local, x.distant]).toEqual(["relay", "relay", "relay"]);
+    }
+    // A voit l'image de B (caméra allumée) : la vidéo distante avance.
+    const videoDeB = tuiles(page).filter({ hasText: `Hugo${r.slice(4, 8)}` }).locator("video");
+    await expect.poll(() => videoDeB.evaluate((v: HTMLVideoElement) => v.videoWidth > 0 && v.currentTime > 0), { timeout: 30_000 }).toBe(true);
+    // C est entré sans caméra : pas d'image, son initiale à la place.
+    await expect(tuiles(page).filter({ hasText: `Nora${r.slice(2, 6)}` }).locator(".pastille")).toBeVisible();
+
+    // --- Micro et caméra ---------------------------------------------------------------------------
+    await bouton(b.page, "Couper le micro").click();
+    await expect(bouton(b.page, "Réactiver le micro")).toBeVisible();
+    await bouton(b.page, "Éteindre la caméra").click();
+    await expect(tuiles(page).filter({ hasText: `Hugo${r.slice(4, 8)}` }).locator(".pastille")).toBeVisible({ timeout: 30_000 });
+    await bouton(c.page, "Allumer la caméra").click();
+    await expect(tuiles(page).filter({ hasText: `Nora${r.slice(2, 6)}` }).locator(".pastille")).toHaveCount(0, { timeout: 30_000 });
+
+    // --- Raccrocher -----------------------------------------------------------------------------------
+    await bouton(page, "Raccrocher").click();
+    await expect(appel(page)).toHaveCount(0);
+    await expect(page.getByText("Appel en cours (2)")).toBeVisible({ timeout: 30_000 });
+    for (const p of [b.page, c.page]) await expect(tuiles(p)).toHaveCount(2, { timeout: 30_000 });
+    await bouton(b.page, "Raccrocher").click();
+    await bouton(c.page, "Raccrocher").click();
+    // Plus personne : le bandeau disparaît, les boutons d'appel reviennent.
+    await expect(bouton(page, "Appel audio")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Appel en cours/)).toHaveCount(0);
+
+    expect(b.erreurs).toEqual([]);
+    expect(c.erreurs).toEqual([]);
+  } finally {
+    await b.ctx.close();
+    await c.ctx.close();
+  }
+});

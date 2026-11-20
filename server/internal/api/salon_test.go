@@ -394,7 +394,7 @@ func TestRejoindreHTTP(t *testing.T) {
 	e, m := salonEnv(t)
 	k := newKeys()
 	e.creerSalon(t, k, 3)
-	want := []string{"budget_left", "expires_in_s", "max_members", "member_token", "members_can_destroy", "nonce_arrivee", "seat", "seq"}
+	want := []string{"budget_left", "calls", "expires_in_s", "max_members", "member_token", "members_can_destroy", "nonce_arrivee", "seat", "seq"}
 	var seqs []float64
 	for i, createur := range []bool{true, false} {
 		w := e.rejoindre(k, createur)
@@ -419,7 +419,7 @@ func TestRejoindreHTTP(t *testing.T) {
 			t.Fatalf("nonce_arrivee : %v", r["nonce_arrivee"])
 		}
 		// Aucune horloge avancée depuis la création : même échéance que sa réponse.
-		if r["seat"] != float64(i) || r["max_members"] != 3.0 || r["members_can_destroy"] != false ||
+		if r["calls"] != false || r["seat"] != float64(i) || r["max_members"] != 3.0 || r["members_can_destroy"] != false ||
 			r["budget_left"] != 2147483648.0 || r["expires_in_s"] != 4377.0 {
 			t.Fatalf("réponse : %v", r)
 		}

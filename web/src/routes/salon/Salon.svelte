@@ -7,7 +7,7 @@
   import { formatDuration } from "../../i18n/format";
   import { navigate } from "../../app/router.svelte";
   import { lireFragment } from "../../salon/liens";
-  import { vue, ouvrirInvitation, ouvrirGestion, detruireParGestion, oublierGestion, deverrouiller, oublier, reveiller } from "../../salon/salon.svelte";
+  import { vue, ouvrirInvitation, ouvrirGestion, detruireParGestion, oublierGestion, deverrouiller, oublier, reveiller, reprendreLaMain } from "../../salon/salon.svelte";
   import InlineConfirm from "../../ui/InlineConfirm.svelte";
   import Cadre from "../compte/Cadre.svelte";
   import TextField from "../../ui/TextField.svelte";
@@ -116,7 +116,7 @@
 {:else if vue.etape === "fin"}
   <Cadre titre={t("salon.end.title")}>
     <p class="note" role="status">{fin()}</p>
-    {#if vue.lienReprise}<div class="actions"><Button onpress={() => location.assign(vue.lienReprise!)}>{t("salon.end.reprendre")}</Button></div>{/if}
+    {#if vue.reprise}<div class="actions"><Button onpress={() => reprendreLaMain()}>{t("salon.end.reprendre")}</Button></div>{/if}
     <div class="actions"><Button variant="secondary" onpress={() => navigate("/")}>{t("salon.end.home")}</Button></div>
   </Cadre>
 {:else if vue.etape === "gestion" && vue.gestionSeule}

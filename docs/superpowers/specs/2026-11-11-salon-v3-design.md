@@ -263,6 +263,8 @@ Choisi sur la page d'explication avant d'entrer (§39.4, règles de forme et d'u
 
 ## 8. Appels audio et vidéo : plus tard, payants, mais préparés
 
+> **20 novembre** : appels conçus, codés et testés ; conception dans `2026-11-20-appels-design.md`. Écart à valider par le propriétaire : pas de SFrame tant que les appels sont en maillage (son §2.1). Désactivés en production tant que le relais n'est pas installé.
+
 **Fonctions payantes** (décision du propriétaire, 11 novembre). Rien n'est codé maintenant. Contraintes posées dès aujourd'hui pour ne rien bloquer :
 
 - **Jamais en direct entre participants** : un appel direct révélerait l'adresse IP de chacun aux autres (contraire à §39.3.1). Les appels passeront par un relais de notre serveur (TURN, mode « relais seulement »).

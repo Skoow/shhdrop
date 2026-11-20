@@ -1244,3 +1244,27 @@ func TestSegmentRateReglable(t *testing.T) {
 		t.Fatal("/48 :", n)
 	}
 }
+
+// Requêtes par bloc /48 (audit du 20 novembre) : dix connexions d'un même /48 épuisent le
+// bloc ; une onzième est refusée, un autre bloc n'est pas touché.
+func TestAllowRequestPar48(t *testing.T) {
+	now := t0
+	l := newLim(&now)
+	for s := 0; s < RequestsPer48Min/RequestsPerMin; s++ {
+		for i := 0; i < RequestsPerMin; i++ {
+			if !l.AllowRequest(ip(fmt.Sprintf("2001:db8:7:%x::1", s))) {
+				t.Fatalf("connexion %d, requête %d refusée", s, i)
+			}
+		}
+	}
+	if l.AllowRequest(ip("2001:db8:7:ffff::1")) {
+		t.Fatal("bloc /48 plein : requête acceptée")
+	}
+	if !l.AllowRequest(ip("2001:db8:8::1")) {
+		t.Fatal("autre bloc refusé")
+	}
+	now = now.Add(time.Minute)
+	if !l.AllowRequest(ip("2001:db8:7:ffff::1")) {
+		t.Fatal("minute suivante : toujours refusé")
+	}
+}

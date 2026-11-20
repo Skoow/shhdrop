@@ -347,7 +347,10 @@ func NewWithProbes(svc *share.Service, sig *token.Signer, lim *limits.Limiter, c
 // route /api/paiement/* (même 404 qu'une route inconnue). Rangé ici pour garder la signature de
 // New ; indépendant du salon et du compte.
 type Salons struct {
-	Origin   string
+	Origin string
+	// Turn : relais des appels (SHH_TURN_URLS, SHH_TURN_SECRET_FILE) ; URLs vide : pas d'appels
+	// (aucune route /api/salons/appel).
+	Turn     Turn
 	M        *salon.Manager
 	Comptes  *compte.Service
 	Paiement *paiement.Service
@@ -376,7 +379,7 @@ func newHandler(s *server, static http.Handler, sal Salons) http.Handler {
 	// Salon (SHH_SALONS=1) : sans gestionnaire, aucune route /api/salons/* (404 uniforme).
 	s.salons = sal.M
 	if sal.M != nil {
-		salonAPI{server: s, m: sal.M, origin: sal.Origin, comptes: sal.Comptes}.routes(api)
+		salonAPI{server: s, m: sal.M, origin: sal.Origin, comptes: sal.Comptes, turn: sal.Turn}.routes(api)
 	}
 	if sal.Comptes != nil {
 		compteAPI{server: s, c: sal.Comptes}.routes(api)

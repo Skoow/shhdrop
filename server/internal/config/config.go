@@ -36,6 +36,10 @@ type Config struct {
 	// Origin (SHH_ORIGIN, obligatoire avec SHH_SALONS=1) : origine publique du site, comparée
 	// à l'en-tête Origin du WebSocket et copiée dans la CSP (connect-src wss://hôte).
 	Origin string
+	// TurnURLs, TurnSecretFile (SHH_TURN_URLS, SHH_TURN_SECRET_FILE ; appels.go) : relais des
+	// appels du salon ; vides : pas d'appels.
+	TurnURLs       []string
+	TurnSecretFile string
 	// Capacity : places du serveur (capacity.go), réglables ou calculées d'après la machine.
 	Capacity Capacity
 	// AdminListen (SHH_ADMIN_LISTEN, hôte:port) : écouteur du tableau de bord d'administration,
@@ -158,6 +162,9 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SHH_SALONS=1 exige SHH_ORIGIN (origine publique du site, ex. https://shhgone.com)")
 	}
 	if err := comptesFromEnv(&c); err != nil {
+		return Config{}, err
+	}
+	if err := appelsFromEnv(&c); err != nil {
 		return Config{}, err
 	}
 	if err := paiementFromEnv(&c); err != nil {

@@ -69,3 +69,8 @@ export { default as ChevronRight } from "./icons/ChevronRight.svelte";
 export { default as Menu } from "./icons/Menu.svelte";
 export { default as LogOut } from "./icons/LogOut.svelte";
 export { default as Tag } from "./icons/Tag.svelte";
+export { default as Phone } from "./icons/Phone.svelte";
+export { default as PhoneOff } from "./icons/PhoneOff.svelte";
+export { default as Video } from "./icons/Video.svelte";
+export { default as VideoOff } from "./icons/VideoOff.svelte";
+export { default as MicOff } from "./icons/MicOff.svelte";

@@ -5,6 +5,7 @@
   // une ouverture de plus), « Actualiser » (au plus une relecture toutes les 5 min). Salon :
   // libellé, temps restant ; l'entrée dans le salon arrive avec ses écrans (C-3, C-5).
   import { href } from "../app/router.svelte";
+  import { lienDuSalon } from "../history/room-link";
   import { formatBytes, formatClock, formatDayTime, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import type { ShareInfo } from "../history/live.svelte";
@@ -99,7 +100,7 @@
         <p class="sub">{entry.sorte === "salon_cree" ? t("home.inbox.created", { date }) : t("home.inbox.joined", { date })}</p>
         {#if __SALONS__}
           <!-- Salon (plan C-3) : le lien d'invitation gardé ouvre la page du salon (le mot de passe reste demandé). -->
-          <div class="acts"><Button variant="primary" onpress={() => location.assign(entry.link)}>{t("home.inbox.room.open")}</Button></div>
+          <div class="acts"><Button variant="primary" onpress={() => location.assign(lienDuSalon(entry.link))}>{t("home.inbox.room.open")}</Button></div>
         {:else}
           <p class="sub">{t("home.inbox.room.later")}</p>
         {/if}

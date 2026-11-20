@@ -36,6 +36,9 @@ const (
 	// arrondie au quart d'heure comme UploadLife.
 	PaidUploadLife = 24*time.Hour + 15*time.Minute
 	RequestsPerMin = 60
+	// RequestsPer48Min : requêtes par minute et par bloc /48 (audit du 20 novembre : un /56
+	// résidentiel donne 256 /64 ; sans ce plafond la limite par connexion ne bornait rien).
+	RequestsPer48Min = 600
 	// SegmentsPerMin : requêtes de segments à jeton valide par minute et par connexion,
 	// compteur à part ; valeur par défaut, réglable (SetSegmentsPerMin, SHH_SEGMENTS_PER_MIN).
 	// 1 500 segments de 4 Mio par minute ≈ 840 Mbit/s par expéditeur (décision du propriétaire
@@ -115,6 +118,7 @@ type Limiter struct {
 	paid48 map[string]int64
 	minute int64 // minute courante (minutes depuis 1970)
 	req    map[string]int
+	req48  map[string]int
 	seg    map[string]int
 	seg48  map[string]int
 	// Salon : créations du jour, entrées de l'heure, trames de la minute.
@@ -280,6 +284,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.bytes48 = map[string]int64{}
 		l.paid64, l.paid48 = map[string]int64{}, map[string]int64{}
 		l.req = map[string]int{}
+		l.req48 = map[string]int{}
 		l.seg = map[string]int{}
 		l.seg48 = map[string]int{}
 		l.uploads = map[string]upload{}
@@ -331,6 +336,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 	if m := floorDiv(t, 60); m != l.minute {
 		l.minute = m
 		l.req = map[string]int{}
+		l.req48 = map[string]int{}
 		l.seg = map[string]int{}
 		l.seg48 = map[string]int{}
 		l.frame64 = map[string]int{}
@@ -659,17 +665,13 @@ func (l *Limiter) AbandonUpload(id string) {
 	l.endLocked(id, true, true, nil)
 }
 
-// AllowRequest : 60 requêtes par minute (fenêtre fixe) et par connexion.
+// AllowRequest : 60 requêtes par minute (fenêtre fixe) et par connexion, 600 par bloc /48. Une
+// requête refusée n'est comptée nulle part.
 func (l *Limiter) AllowRequest(ip netip.Addr) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
-	k64, _ := l.keyLocked(ip)
-	if l.req[k64] >= RequestsPerMin {
-		return false
-	}
-	l.req[k64]++
-	return true
+	return l.allowPairLocked(ip, l.req, l.req48, RequestsPerMin, RequestsPer48Min)
 }
 
 // AllowSegment : SegmentsPerMin requêtes de segments par minute (fenêtre fixe, réglable) et

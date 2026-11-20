@@ -116,7 +116,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         "Mot de passe : Argon2id (RustCrypto, dans le moteur WebAssembly du site), 64 Mio de mémoire, 3 passes, combiné à la clé du fragment du lien (après #), jamais transmise au serveur.",
         `Ouverture : le serveur vérifie une preuve dérivée de la clé et du mot de passe, sans recevoir ni l'une ni l'autre ; ${v.tries} preuves fausses détruisent le partage.`,
         "Taille : le contenu chiffré occupe des paliers fixes ; le serveur ne connaît que le palier.",
-        "Navigateur : en-têtes stricts (Content-Security-Policy, Permissions-Policy) ; aucun script, police ni traceur d'un autre site. Seule exception, la vérification anti-robot de secours (Google reCAPTCHA), chargée après un clic dans un cadre isolé sur un autre site, jamais sur une page qui détient des clés.",
+        "Navigateur : en-têtes stricts (Content-Security-Policy, Permissions-Policy) ; aucun script, police ni traceur d'un autre site.",
       ],
       links: [
         { label: "Code source public (GitHub)", url: SOURCE_URL },
@@ -140,7 +140,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         h: "Ce que nous ne gardons pas",
         list: [
           "Votre adresse IP n'est pas enregistrée. Le serveur la voit le temps de la connexion, comme tout site web, mais ne l'écrit nulle part.",
-          "Aucun cookie de notre part, et aucune mesure d'audience. Seul le repli Google reCAPTCHA, si vous le choisissez, peut déposer les cookies de Google, dans son cadre à part.",
+          "Aucun cookie de notre part, et aucune mesure d'audience.",
           "Aucun journal des partages, aucune mesure d'audience. Le serveur tient seulement, en mémoire, des compteurs globaux pour son exploitation (par exemple le nombre de partages créés depuis son dernier démarrage) : rien par personne, par adresse ni par partage, rien sur disque.",
         ],
       },
@@ -149,7 +149,9 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Le contenu déchiffré reste en mémoire et n'est jamais écrit dans le stockage du navigateur.",
           "Le lien et un jeton d'ouverture restent dans le stockage de l'onglet le temps de l'ouverture, pour qu'un rechargement ne coûte pas une ouverture.",
-          "Vos préférences (langue) restent sur votre appareil.",
+          "La langue affichée suit celle de votre navigateur : rien n'est gardé pour cela.",
+          "Salon : pour retrouver votre place après un rechargement, votre jeton de membre, le nom que vous y portez et la clé du salon sont gardés chiffrés sur cet appareil, lisibles seulement avec le mot de passe du salon ; ils s'effacent à la fin du salon.",
+          "Offres payantes : le pass et les jetons anonymes qu'il donne sont gardés chiffrés sur cet appareil.",
           "Si vous cochez « Garder ce partage », le lien reçu (avec sa clé), sa taille et son échéance sont gardés chiffrés sur cet appareil, jamais le mot de passe. Ils s'effacent 7 jours après l'échéance, ou quand vous les retirez.",
           "L'historique des téléchargements (nom, taille et sorte de chaque fichier enregistré, sa provenance et l'heure) reste chiffré sur cet appareil et n'est jamais envoyé ; jamais le lien ni le mot de passe. Chaque entrée s'efface après 30 jours ; la page Téléchargements permet de le couper ou de tout effacer.",
         ],
@@ -158,7 +160,7 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
         id: "verification",
         h: "Vérification anti-robot",
         p: [
-          "Une petite preuve de calcul est faite par votre navigateur, sans service extérieur. Si elle échoue, un repli Google reCAPTCHA peut être proposé, seulement après un clic et dans un cadre isolé sur un autre site, jamais sur une page qui détient des clés. Google voit alors votre adresse IP ; notre serveur, jamais.",
+          "Une petite preuve de calcul est faite par votre navigateur, sans service extérieur.",
         ],
       },
       {
@@ -380,7 +382,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         "Password: Argon2id (RustCrypto, in the site's WebAssembly engine), 64 MiB of memory, 3 passes, combined with the key in the link fragment (after #), which is never sent to the server.",
         `Opening: the server checks a proof derived from the key and the password, without receiving either; ${v.tries} wrong proofs destroy the share.`,
         "Size: encrypted content fills fixed tiers; the server only knows the tier.",
-        "Browser: strict headers (Content-Security-Policy, Permissions-Policy); no script, font or tracker from another site. The one exception is the fallback bot check (Google reCAPTCHA), loaded after a click in an isolated frame on another site, never on a page that holds keys.",
+        "Browser: strict headers (Content-Security-Policy, Permissions-Policy); no script, font or tracker from another site.",
       ],
       links: [
         { label: "Public source code (GitHub)", url: SOURCE_URL },
@@ -404,7 +406,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         h: "What we don't keep",
         list: [
           "Your IP address is not recorded. The server sees it while you are connected, like any website, but never writes it down.",
-          "No cookies of ours, and no analytics. Only the Google reCAPTCHA fallback, if you choose it, may set Google's cookies, inside its separate frame.",
+          "No cookies of ours, and no analytics.",
           "No log of shares, no audience measurement. The server only keeps, in memory, global counters for its own operation (for example the number of shares created since it last started): nothing per person, per address or per share, nothing on disk.",
         ],
       },
@@ -413,7 +415,9 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         list: [
           "Decrypted content stays in memory and is never written to browser storage.",
           "The link and an open token stay in the tab's storage while the share is open, so a reload doesn't cost an open.",
-          "Your preferences (language) stay on your device.",
+          "The display language follows your browser's: nothing is stored for it.",
+          "Room: to get your seat back after a reload, your member token, the name you use there and the room key are kept encrypted on this device, readable only with the room password; they are erased when the room ends.",
+          "Paid plans: the pass and the anonymous tokens it gives are kept encrypted on this device.",
           "If you tick “Keep this share”, the received link (with its key), its size and its expiry are kept encrypted on this device, never the password. They are erased 7 days after expiry, or when you remove them.",
           "The downloads history (name, size and kind of each saved file, where it came from and the time) stays encrypted on this device and is never sent; never the link or the password. Each entry is erased after 30 days; the Downloads page lets you turn it off or erase it all.",
         ],
@@ -422,7 +426,7 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
         id: "verification",
         h: "Bot check",
         p: [
-          "Your browser solves a small proof of work, with no outside service. If it fails, a Google reCAPTCHA fallback may be offered, only after a click and inside an isolated frame on another site, never on a page that holds keys. Google then sees your IP address; our server never does.",
+          "Your browser solves a small proof of work, with no outside service.",
         ],
       },
       {
@@ -580,7 +584,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
           "Signalements : seulement leur catégorie, comptée en mémoire. Un bannissement garde l'empreinte de l'adresse, sa durée (3 ans par défaut) et sa catégorie, montrée à la personne ; un recours est possible.",
           "Après une récupération par e-mail, l'adresse ne peut pas être changée ni le compte supprimé pendant 7 jours, par sécurité.",
           "La base des comptes est sauvegardée chaque jour, chiffrée, chez un autre hébergeur ; chaque copie est effacée après 30 jours. Un compte supprimé peut donc rester jusqu'à 30 jours dans ces copies.",
-          "Sans connexion pendant 13 mois, le compte est effacé. Nous ne pouvons pas vous prévenir : nous n'avons pas votre adresse.",
+          "Sans connexion pendant 13 mois, le compte est effacé, au plus tard au début du 14e mois. Nous ne pouvons pas vous prévenir : nous n'avons pas votre adresse.",
         ],
       }),
       "Vos droits",
@@ -601,7 +605,7 @@ const COMPTE_FR: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       p: [
         "Un compte gratuit sert seulement à créer des salons ; partager, ouvrir un lien et rejoindre un salon restent sans compte. Il faut avoir au moins 15 ans.",
         "Un compte qui crée des salons pour nuire peut être banni : il ne peut plus créer de salon, ses salons sont fermés, et la même adresse ne peut pas en recréer un pendant la durée du bannissement (3 ans par défaut). Le motif est montré à la connexion ; un recours est possible par le contact des mentions légales.",
-        "Un compte sans connexion pendant 13 mois est effacé.",
+        "Un compte sans connexion pendant 13 mois est effacé, au plus tard au début du 14e mois.",
       ],
     }),
   }),
@@ -640,7 +644,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
           "Reports: only their category, counted in memory. A ban keeps the fingerprint of the address, its length (3 years by default) and its category, shown to the person; an appeal is possible.",
           "After a recovery by email, the address cannot be changed and the account cannot be deleted for 7 days, for safety.",
           "The accounts database is backed up every day, encrypted, with another host; each copy is erased after 30 days. A deleted account can therefore remain in these copies for up to 30 days.",
-          "With no sign-in for 13 months, the account is erased. We cannot warn you: we do not have your address.",
+          "With no sign-in for 13 months, the account is erased, at the latest at the start of the 14th month. We cannot warn you: we do not have your address.",
         ],
       }),
       "Your rights",
@@ -661,7 +665,7 @@ const COMPTE_EN: Partial<Record<InfoName, (p: InfoPage) => InfoPage>> = {
       p: [
         "A free account is only used to create rooms; sharing, opening a link and joining a room need no account. You must be at least 15.",
         "An account that creates rooms to do harm can be banned: it can no longer create rooms, its rooms are closed, and the same address cannot create another one for the length of the ban (3 years by default). The reason is shown at sign-in; an appeal is possible through the contact in the legal notice.",
-        "An account with no sign-in for 13 months is erased.",
+        "An account with no sign-in for 13 months is erased, at the latest at the start of the 14th month.",
       ],
     }),
   }),

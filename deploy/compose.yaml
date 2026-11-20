@@ -90,6 +90,11 @@ services:
       # empêche le serveur de démarrer ET « shhdrop admin » de tourner (deploy/README.md §10).
       SHH_ORIGIN: https://${SHH_DOMAIN:?SHH_DOMAIN manquant (nom du site)}
       SHH_SALONS_MAX: ${SHH_SALONS_MAX:-200}
+      # Appels audio et vidéo du salon (README §14) : vides = pas d'appels. Le relais TURN
+      # (coturn) tourne sur la machine, hors de cette pile ; le serveur ne lui parle jamais,
+      # il calcule seulement des identifiants temporaires avec le secret partagé.
+      SHH_TURN_URLS: ${SHH_TURN_URLS:-}
+      SHH_TURN_SECRET_FILE: ${SHH_TURN_SECRET_FILE:-}
       # Capacité (README §11) : vide = calculée au démarrage d'après GOMEMLIMIT et nofile.
       SHH_UPLOADS_MAX: ${SHH_UPLOADS_MAX:-}
       SHH_DOWNLOADS_MAX: ${SHH_DOWNLOADS_MAX:-}

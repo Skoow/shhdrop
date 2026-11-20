@@ -810,6 +810,70 @@
     "decode": [
       {
         "bytes": {
+          "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"appel_present\",\"c\":\"e_lxkpvK-91uSBHfWhkwcw\",\"video\":false}"
+        },
+        "envelope": {
+          "e": 0,
+          "id": "dd39dde1585f61b9561af2261521779d",
+          "message": {
+            "appel": "7bf971929bcafbdd6e4811df5a193073",
+            "k": "appel_present",
+            "video": false
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_present"
+      },
+      {
+        "bytes": {
+          "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"appel_present\",\"c\":\"e_lxkpvK-91uSBHfWhkwcw\",\"video\":1}"
+        },
+        "error": "message_invalide",
+        "label": "appel_present_video_pas_booleen"
+      },
+      {
+        "bytes": {
+          "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"appel_fin\",\"c\":\"e_lxkpvK-91uSBHfWhkwcw\",\"video\":false}"
+        },
+        "error": "message_invalide",
+        "label": "appel_fin_champ_en_trop"
+      },
+      {
+        "bytes": {
+          "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"appel_signal\",\"c\":\"e_lxkpvK-91uSBHfWhkwcw\",\"pour\":2,\"s\":\"glace\",\"i\":0,\"n\":1,\"x\":\"a\"}"
+        },
+        "envelope": {
+          "e": 0,
+          "id": "dd39dde1585f61b9561af2261521779d",
+          "message": {
+            "appel": "7bf971929bcafbdd6e4811df5a193073",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 2,
+            "sorte": "glace",
+            "x": "a"
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_signal"
+      },
+      {
+        "bytes": {
+          "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"appel_signal\",\"c\":\"e_lxkpvK-91uSBHfWhkwcw\",\"pour\":2,\"s\":\"autre\",\"i\":0,\"n\":1,\"x\":\"a\"}"
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_sorte_inconnue"
+      },
+      {
+        "bytes": {
+          "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"appel_signal\",\"c\":\"e_lxkpvK-91uSBHfWhkwcw\",\"pour\":256,\"s\":\"glace\",\"i\":0,\"n\":1,\"x\":\"a\"}"
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_siege_256"
+      },
+      {
+        "bytes": {
           "utf8": "{\"v\":3,\"id\":\"3Tnd4VhfYblWGvImFSF3nQ\",\"t\":1700000000000,\"e\":0,\"k\":\"texte\",\"x\":\"Allo\"}"
         },
         "envelope": {
@@ -2123,6 +2187,273 @@
         },
         "label": "depart",
         "len": 74
+      },
+      {
+        "encoded_hex": "7b2276223a332c226964223a223138755f44726b71366d61555a4341616137507a3551222c2274223a313730303030303030303030302c2265223a302c226b223a22617070656c5f70726573656e74222c2263223a226f6e3559613159437267447742586777556857644751222c22766964656f223a747275657d",
+        "envelope": {
+          "e": 0,
+          "id": "d7cbbf0eb92aea669464201a6bb3f3e5",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "k": "appel_present",
+            "video": true
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_present",
+        "len": 123
+      },
+      {
+        "encoded_hex": "7b2276223a332c226964223a22794f39576f7231456f756c6e6e5f6169437469744167222c2274223a313730303030303030303030302c2265223a302c226b223a22617070656c5f66696e222c2263223a226f6e3559613159437267447742586777556857644751227d",
+        "envelope": {
+          "e": 0,
+          "id": "c8ef56a2bd44a2e9679ff6a20ad8ad02",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "k": "appel_fin"
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_fin",
+        "len": 106
+      },
+      {
+        "encoded_hex": "7b2276223a332c226964223a2231745737634d58584b75477657384f3562454d6e5651222c2274223a313730303030303030303030302c2265223a302c226b223a22617070656c5f7369676e616c222c2263223a226f6e3559613159437267447742586777556857644751222c22706f7572223a332c2273223a226f66667265222c2269223a302c226e223a322c2278223a22763d305c725c6e6f3d2d2031203220494e20495034203132372e302e302e315c725c6e227d",
+        "envelope": {
+          "e": 0,
+          "id": "d6d5bb70c5d72ae1af5bc3b96c432755",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 2,
+            "pour": 3,
+            "sorte": "offre",
+            "x": "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\n"
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_offre",
+        "len": 184
+      },
+      {
+        "encoded_hex": "7b2276223a332c226964223a225a77324266446467376971644844545f543430513067222c2274223a313730303030303030303030302c2265223a302c226b223a22617070656c5f7369676e616c222c2263223a226f6e3559613159437267447742586777556857644751222c22706f7572223a302c2273223a227265706f6e7365222c2269223a372c226e223a382c2278223a22613d73657475703a6163746976655c725c6e227d",
+        "envelope": {
+          "e": 0,
+          "id": "670d817c3760ee2a9d1c34ff4f8d10d2",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 7,
+            "k": "appel_signal",
+            "n": 8,
+            "pour": 0,
+            "sorte": "reponse",
+            "x": "a=setup:active\r\n"
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_reponse_dernier_morceau",
+        "len": 169
+      },
+      {
+        "encoded_hex": "7b2276223a332c226964223a22457671774d5f383673626b365a2d466f5f5072506541222c2274223a313730303030303030303030302c2265223a302c226b223a22617070656c5f7369676e616c222c2263223a226f6e3559613159437267447742586777556857644751222c22706f7572223a3235342c2273223a22676c616365222c2269223a302c226e223a312c2278223a227b5c2263616e6469646174655c223a5c2263616e6469646174653a312031207564702031203139322e302e322e312033343738207479702072656c61795c227d227d",
+        "envelope": {
+          "e": 0,
+          "id": "12fab033ff3ab1b93a67e168fcfacf78",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 254,
+            "sorte": "glace",
+            "x": "{\"candidate\":\"candidate:1 1 udp 1 192.0.2.1 3478 typ relay\"}"
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_glace",
+        "len": 215
+      },
+      {
+        "encoded_hex": "7b2276223a332c226964223a2244556c614a4f46784b5a73397155446b596d77415067222c2274223a313730303030303030303030302c2265223a302c226b223a22617070656c5f7369676e616c222c2263223a226f6e3559613159437267447742586777556857644751222c22706f7572223a312c2273223a226f66667265222c2269223a302c226e223a312c2278223a22616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161227d",
+        "envelope": {
+          "e": 0,
+          "id": "0d495a24e171299b3da940e4626c003e",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "t": 1700000000000
+        },
+        "label": "appel_signal_plein",
+        "len": 3749
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "d9510d831b974c659d61001ed131104f",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_trop_long"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "113bad6e7e52489b6983f3966d25d694",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 1,
+            "sorte": "offre",
+            "x": ""
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_vide"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "ce1eb0aab40b3398dedbd76d3cf2ed8e",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "é"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_hors_ascii"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "edfa484e80032990f2898d5b49fc94cb",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "a\tb"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_tabulation"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "2184d60dd1c7f067d94ac99937646373",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 2,
+            "k": "appel_signal",
+            "n": 2,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "a"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_i_hors_n"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "a8b653fe18fa7893a764b732f12ed296",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 17,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "a"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_17_morceaux"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "f807ba35c13f6a2722463431be7a72ca",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 0,
+            "pour": 1,
+            "sorte": "offre",
+            "x": "a"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_zero_morceau"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "f7059a7243b8051679584a4fb179b34f",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 2,
+            "pour": 1,
+            "sorte": "glace",
+            "x": "a"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_glace_en_morceaux"
+      },
+      {
+        "envelope": {
+          "e": 0,
+          "id": "f145dc5838b8fcd25826c2447aec189b",
+          "message": {
+            "appel": "a27e586b5602ae00f005783052159d19",
+            "i": 0,
+            "k": "appel_signal",
+            "n": 1,
+            "pour": 255,
+            "sorte": "offre",
+            "x": "a"
+          },
+          "t": 1700000000000
+        },
+        "error": "message_invalide",
+        "label": "appel_signal_siege_reserve"
       },
       {
         "encoded_hex": "7b2276223a332c226964223a226155535a5175414d516f36505a64515731334a712d51222c2274223a313730303030303030303030302c2265223a302c226b223a22726f746174696f6e222c226e223a312c22636c65223a222d4a5a58514b724d4d4836616f5136615466382d424e316c58794f646e673578705f59516e774758775338227d",

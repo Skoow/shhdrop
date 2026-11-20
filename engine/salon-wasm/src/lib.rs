@@ -34,7 +34,7 @@ use shhdrop_core::format::MAX_SAFE;
 use shhdrop_core::{KLien, KMdp};
 use shhdrop_salon::{
     self as salon, EnTete, Enveloppe, Etat, Evenement, Graine, IdMessage, Message, RefPiece, Regle,
-    SortePiece,
+    SortePiece, SorteSignal,
 };
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
@@ -58,6 +58,11 @@ export type Message =
   | { k: "modif"; cible: Uint8Array; x: string }
   | { k: "retrait"; cible: Uint8Array }
   | { k: "ecrit" }
+  /** Appels (conception des appels, 20 novembre), volatils. `appel` : identifiant de l'appel, 16 octets. Présence : envoyée à l'entrée puis à intervalle régulier. */
+  | { k: "appel_present"; appel: Uint8Array; video: boolean }
+  | { k: "appel_fin"; appel: Uint8Array }
+  /** Signalisation WebRTC pour le siège `pour` : morceau `i` sur `n` (au plus 8, 3 600 octets ASCII chacun) d'une offre ou d'une réponse SDP, ou un candidat ICE (`n` = 1). */
+  | { k: "appel_signal"; appel: Uint8Array; pour: number; sorte: "offre" | "reponse" | "glace"; i: number; n: number; x: string }
   | { k: "recu"; ids: Uint8Array[] }
   | { k: "vu"; ids: Uint8Array[] }
   /** Accusés « Ouvert » et « Téléchargé » d'une pièce (salon v3 §14.2). */
@@ -273,6 +278,21 @@ fn lire_message(m: &JsValue) -> Option<Message> {
             cible: id("cible")?,
         },
         "ecrit" => Message::Ecrit,
+        "appel_present" => Message::AppelPresent {
+            appel: id("appel")?,
+            video: get(m, "video").as_bool()?,
+        },
+        "appel_fin" => Message::AppelFin {
+            appel: id("appel")?,
+        },
+        "appel_signal" => Message::AppelSignal {
+            appel: id("appel")?,
+            pour: entier(&get(m, "pour"), 255)? as u8,
+            sorte: SorteSignal::depuis_nom(&texte(m, "sorte")?)?,
+            i: entier(&get(m, "i"), 255)? as u8,
+            n: entier(&get(m, "n"), 255)? as u8,
+            x: texte(m, "x")?,
+        },
         "recu" => Message::Recu {
             ids: ids(&get(m, "ids"))?,
         },
@@ -401,6 +421,31 @@ fn message_js(m: &Message) -> Object {
             set(&o, "cible", id_js(cible));
         }
         Message::Ecrit => k(&o, "ecrit"),
+        Message::AppelPresent { appel, video } => {
+            k(&o, "appel_present");
+            set(&o, "appel", id_js(appel));
+            set(&o, "video", *video);
+        }
+        Message::AppelFin { appel } => {
+            k(&o, "appel_fin");
+            set(&o, "appel", id_js(appel));
+        }
+        Message::AppelSignal {
+            appel,
+            pour,
+            sorte,
+            i,
+            n,
+            x,
+        } => {
+            k(&o, "appel_signal");
+            set(&o, "appel", id_js(appel));
+            set(&o, "pour", *pour);
+            set(&o, "sorte", sorte.nom());
+            set(&o, "i", *i);
+            set(&o, "n", *n);
+            set(&o, "x", x.as_str());
+        }
         Message::Recu { ids }
         | Message::Vu { ids }
         | Message::PieceOuverte { ids }

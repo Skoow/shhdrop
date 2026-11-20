@@ -95,6 +95,48 @@ pub enum SortePiece {
     Vocal,
 }
 
+/// Sorte d'un message de signalisation d'appel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SorteSignal {
+    Offre,
+    Reponse,
+    Glace,
+}
+
+impl SorteSignal {
+    pub const fn nom(self) -> &'static str {
+        match self {
+            SorteSignal::Offre => "offre",
+            SorteSignal::Reponse => "reponse",
+            SorteSignal::Glace => "glace",
+        }
+    }
+
+    pub fn depuis_nom(s: &str) -> Option<Self> {
+        Some(match s {
+            "offre" => SorteSignal::Offre,
+            "reponse" => SorteSignal::Reponse,
+            "glace" => SorteSignal::Glace,
+            _ => return None,
+        })
+    }
+}
+
+/// Octets d'un morceau de signalisation, au plus.
+pub const SIGNAL_MAX: usize = 3600;
+/// Morceaux d'une offre ou d'une réponse, au plus (28 800 octets de SDP).
+pub const SIGNAL_MORCEAUX: u8 = 8;
+/// Dernier siège qui peut recevoir un signal (0xFF est réservé).
+const SIEGE_MAX: u8 = 254;
+
+/// ASCII imprimable, retour chariot et saut de ligne : tout ce qu'un SDP ou un candidat contient.
+fn signal_valide(x: &str) -> bool {
+    !x.is_empty()
+        && x.len() <= SIGNAL_MAX
+        && x.bytes()
+            .all(|b| (0x20..=0x7E).contains(&b) || b == b'\r' || b == b'\n')
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     Texte {
@@ -158,7 +200,28 @@ pub enum Message {
         n: u32,
         cle: Graine,
     },
-    /// Sorte inconnue de ce moteur (appels futurs, autres versions) : ignorée, jamais une erreur.
+    /// Appel audio ou vidéo (conception des appels, 20 novembre) : « je suis dans l'appel `appel` »,
+    /// envoyé à l'entrée puis à intervalle régulier ; `video` : caméra allumée.
+    AppelPresent {
+        appel: IdMessage,
+        video: bool,
+    },
+    /// « Je quitte l'appel `appel`. »
+    AppelFin {
+        appel: IdMessage,
+    },
+    /// Signalisation WebRTC pour le siège `pour` : morceau `i` sur `n` d'une offre ou d'une
+    /// réponse SDP, ou un candidat ICE (`n` = 1). Chiffrée et signée par MLS comme tout message :
+    /// l'empreinte DTLS qu'elle porte est donc authentifiée entre membres.
+    AppelSignal {
+        appel: IdMessage,
+        pour: u8,
+        sorte: SorteSignal,
+        i: u8,
+        n: u8,
+        x: String,
+    },
+    /// Sorte inconnue de ce moteur (autres versions) : ignorée, jamais une erreur.
     Inconnu {
         sorte: String,
     },
@@ -239,8 +302,29 @@ fn verifier(e: &Enveloppe) -> Result<()> {
                 _ => Err(Error::MessageInvalide),
             }
         }
+        Message::AppelSignal {
+            pour,
+            sorte,
+            i,
+            n,
+            x,
+            ..
+        } => {
+            let morceaux = if *sorte == SorteSignal::Glace {
+                1
+            } else {
+                SIGNAL_MORCEAUX
+            };
+            if *pour <= SIEGE_MAX && (1..=morceaux).contains(n) && i < n && signal_valide(x) {
+                Ok(())
+            } else {
+                Err(Error::MessageInvalide)
+            }
+        }
         Message::Retrait { .. }
         | Message::Ecrit
+        | Message::AppelPresent { .. }
+        | Message::AppelFin { .. }
         | Message::Regle { .. }
         | Message::Depart
         | Message::Rotation { .. } => Ok(()),
@@ -373,6 +457,32 @@ fn ecrire(w: &mut Plafond, e: &Enveloppe) -> std::io::Result<()> {
             cle_id(w, "cible", cible)?;
         }
         Message::Ecrit => k(w, "ecrit")?,
+        Message::AppelPresent { appel, video } => {
+            k(w, "appel_present")?;
+            cle_id(w, "c", appel)?;
+            write!(w, ",\"video\":{video}")?;
+        }
+        Message::AppelFin { appel } => {
+            k(w, "appel_fin")?;
+            cle_id(w, "c", appel)?;
+        }
+        Message::AppelSignal {
+            appel,
+            pour,
+            sorte,
+            i,
+            n,
+            x,
+        } => {
+            k(w, "appel_signal")?;
+            cle_id(w, "c", appel)?;
+            write!(
+                w,
+                ",\"pour\":{pour},\"s\":\"{}\",\"i\":{i},\"n\":{n}",
+                sorte.nom()
+            )?;
+            cle_texte(w, "x", x)?;
+        }
         Message::Recu { ids: i } => {
             k(w, "recu")?;
             ids(w, i)?;
@@ -645,6 +755,22 @@ fn message(sorte: &str, o: &mut Map<String, Value>) -> Result<Message> {
             cible: id(o, "cible")?,
         },
         "ecrit" => Message::Ecrit,
+        "appel_present" => Message::AppelPresent {
+            appel: id(o, "c")?,
+            video: match prendre(o, "video")? {
+                Value::Bool(b) => b,
+                _ => return invalide(),
+            },
+        },
+        "appel_fin" => Message::AppelFin { appel: id(o, "c")? },
+        "appel_signal" => Message::AppelSignal {
+            appel: id(o, "c")?,
+            pour: u8::try_from(entier(o, "pour")?).map_or_else(|_| invalide(), Ok)?,
+            sorte: SorteSignal::depuis_nom(&texte(o, "s")?).map_or_else(invalide, Ok)?,
+            i: u8::try_from(entier(o, "i")?).map_or_else(|_| invalide(), Ok)?,
+            n: u8::try_from(entier(o, "n")?).map_or_else(|_| invalide(), Ok)?,
+            x: texte(o, "x")?,
+        },
         "recu" => Message::Recu { ids: liste_ids(o)? },
         "vu" => Message::Vu { ids: liste_ids(o)? },
         "piece_ouverte" => Message::PieceOuverte { ids: liste_ids(o)? },
@@ -723,11 +849,14 @@ pub fn nouvel_id() -> Result<IdMessage> {
 }
 
 /// Messages qui ne se rangent pas dans l'historique : « écrit… », accusés de réception, de lecture,
-/// d'ouverture et de téléchargement d'une pièce.
+/// d'ouverture et de téléchargement d'une pièce, présence et signalisation d'un appel.
 pub fn est_volatile(m: &Message) -> bool {
     matches!(
         m,
         Message::Ecrit
+            | Message::AppelPresent { .. }
+            | Message::AppelFin { .. }
+            | Message::AppelSignal { .. }
             | Message::Recu { .. }
             | Message::Vu { .. }
             | Message::PieceOuverte { .. }

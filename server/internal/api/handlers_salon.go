@@ -26,6 +26,8 @@ type salonAPI struct {
 	// comptes : service du compte (SHH_COMPTES=1) ; nil : création sans compte, comme avant le
 	// compte (conception du compte §8.1).
 	comptes *compte.Service
+	// turn : relais des appels ; URLs vide : pas d'appels (handlers_salon_appel.go).
+	turn Turn
 }
 
 // errCompteRequis : création de salon sans session valable avec SHH_COMPTES=1 (401
@@ -42,6 +44,9 @@ func (a salonAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/salons/detruire", a.detruire)
 	mux.HandleFunc("POST /api/salons/signaler", a.signaler)
 	mux.HandleFunc("GET /api/salons/ws", a.salonWS)
+	if a.turn.actif() {
+		mux.HandleFunc("POST /api/salons/appel", a.appel)
+	}
 	a.routesPieces(mux)
 }
 
@@ -263,8 +268,9 @@ func (a salonAPI) rejoindre(w http.ResponseWriter, r *http.Request) {
 		MaxMembers        int    `json:"max_members"`
 		MembersCanDestroy bool   `json:"members_can_destroy"`
 		BudgetLeft        int64  `json:"budget_left"`
+		Calls             bool   `json:"calls"`
 	}{b64.EncodeToString(e.Jeton[:]), int(e.Siege), e.Seq, b64.EncodeToString(e.Nonce[:]), secs(e.ExpiresIn),
-		e.MaxMembers, e.MembersCanDestroy, e.BudgetLeft})
+		e.MaxMembers, e.MembersCanDestroy, e.BudgetLeft, a.turn.actif()})
 }
 
 // gestion : GET /api/salons/gestion (X-Shh-Manage) ; present = sièges occupés.

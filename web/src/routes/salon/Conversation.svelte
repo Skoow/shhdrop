@@ -18,8 +18,10 @@
   import Emojis from "./Emojis.svelte";
   import Piece from "./Piece.svelte";
   import Fichiers from "./Fichiers.svelte";
+  import Appel from "./Appel.svelte";
+  import IconButton from "../../ui/IconButton.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
-  import { Mic, Paperclip } from "../../ui/Icon";
+  import { Mic, Paperclip, Phone, Video } from "../../ui/Icon";
   import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
 
   const vue = S.vue;
@@ -58,6 +60,7 @@
   const enLigne = $derived((void vue.rev, [...conv.presents].filter((s) => conv.presence.get(s)?.enLigne).length));
   const libres = $derived((void vue.rev, Math.max(0, vue.places - conv.presents.size)));
   const reste = $derived(Math.max(0, (vue.finMs - maintenant) / 1000));
+  const etatAppel = $derived((void vue.rev, S.appel()?.etat ?? "aucun"));
 
   function nom(siege: number): string {
     const n = conv.nom(siege);
@@ -341,6 +344,10 @@
       </p>
     </div>
     <div class="boutons">
+      {#if vue.appels && etatAppel === "aucun"}
+        <IconButton label={t("salon.appel.audio")} variant="secondary" onpress={() => void S.appel()?.rejoindre(false)}><Phone size={20} /></IconButton>
+        <IconButton label={t("salon.appel.video")} variant="secondary" onpress={() => void S.appel()?.rejoindre(true)}><Video size={20} /></IconButton>
+      {/if}
       {#if silencieux}
         <Button variant="secondary" dense onpress={() => S.silencieux(null)}>{t("salon.son.reactiver")}</Button>
       {:else}
@@ -356,6 +363,7 @@
           }}>{t("salon.room.members")}</Button>{/if}
     </div>
   </header>
+  {#if vue.appels}<Appel />{/if}
 
   <div class="corps">
     <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>

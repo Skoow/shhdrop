@@ -224,11 +224,12 @@ func tightenPerms(dataDir string) error {
 
 // salonsOf : réglages du salon donnés à l'API, valeur zéro (désactivé) sans SHH_SALONS=1,
 // même si SHH_ORIGIN est posée (la CSP reste alors celle d'avant le salon).
-func salonsOf(cfg config.Config, m *salon.Manager, cpt *comptes) api.Salons {
+func salonsOf(cfg config.Config, m *salon.Manager, cpt *comptes, turn api.Turn) api.Salons {
 	if !cfg.Salons {
 		return api.Salons{}
 	}
 	s := api.Salons{Origin: cfg.Origin, M: m}
+	s.Turn = turn
 	if cfg.Comptes && cpt != nil {
 		s.Comptes = cpt.svc // SHH_COMPTES=0 : nil, aucune route /api/compte/*
 	}
@@ -509,7 +510,15 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	sal := salonsOf(cfg, sm, cpt)
+	var turn api.Turn
+	if len(cfg.TurnURLs) != 0 {
+		sec, err := config.LireSecretTurn(cfg.TurnSecretFile)
+		if err != nil {
+			return shown(err.Error())
+		}
+		turn = api.Turn{URLs: cfg.TurnURLs, Secret: sec}
+	}
+	sal := salonsOf(cfg, sm, cpt, turn)
 	if pai != nil {
 		sal.Paiement = pai.svc // SHH_PAIEMENT=0 : nil, aucune route /api/paiement/*
 	}
@@ -560,7 +569,7 @@ func serve(ctx context.Context, cfg config.Config, out io.Writer) error {
 	} else {
 		close(cdone)
 	}
-	// Compte : passe quotidienne (inactifs depuis 13 mois, sessions et bannissements échus),
+	// Compte : passe quotidienne (inactifs depuis 13 mois pleins, soit 14 au plus : effacement.go, sessions et bannissements échus),
 	// au démarrage puis au premier tour de chaque jour UTC.
 	edone := make(chan struct{})
 	if cpt != nil && cpt.svc != nil {

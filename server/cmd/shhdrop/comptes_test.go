@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"github.com/skoow/shhdrop/server/internal/api"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,7 +85,7 @@ func TestBrancherComptesDesactive(t *testing.T) {
 	if err := brancherComptes(config.Config{}, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	if s := salonsOf(config.Config{Salons: true}, nil, &comptes{}); s.Comptes != nil {
+	if s := salonsOf(config.Config{Salons: true}, nil, &comptes{}, api.Turn{}); s.Comptes != nil {
 		t.Fatal("service du compte sans SHH_COMPTES")
 	}
 }
@@ -105,7 +106,7 @@ func TestBrancherComptesActive(t *testing.T) {
 	if err := brancherComptes(cfg, cpt, limits.New(time.Now), nil); err != nil || cpt.svc == nil || cpt.env == nil {
 		t.Fatal(err)
 	}
-	if s := salonsOf(cfg, nil, cpt); s.Comptes != cpt.svc {
+	if s := salonsOf(cfg, nil, cpt, api.Turn{}); s.Comptes != cpt.svc {
 		t.Fatal("service non donné à l'API")
 	}
 	cfg.SMTP.PasswordFile = filepath.Join(secrets, "absent")

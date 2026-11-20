@@ -3,7 +3,7 @@
   // __COMPTES__). « Exporter mes données » : fichier JSON fait SUR L'APPAREIL (account/
   // session.svelte.ts : données du serveur, profil, listes sans leurs secrets, jamais l'adresse),
   // enregistré par un lien blob: local. « Effacer les données de cet appareil » : historique et
-  // téléchargements gardés ici (le compte n'est pas touché). Effacement après 13 mois sans connexion.
+  // téléchargements gardés ici (le compte n'est pas touché). Effacement après 13 mois pleins sans connexion (au plus tard au début du 14e mois).
   import { exporterDonnees } from "../../../account/session.svelte";
   import { clearDownloads } from "../../../downloads/live.svelte";
   import { clearHistory } from "../../../history/live.svelte";

@@ -10,8 +10,10 @@ import * as api from "./api";
 import { SvelteSet } from "svelte/reactivity";
 import { ClientSalon, type EvClient, type Fin } from "./client";
 import { Conversation, type Bulle, type PieceInfo } from "./conversation";
+import { Appel } from "./appel";
 import { AFFICHE_MAX, PIECE_MAX, envoyerPiece, lirePiece } from "./pieces";
 import { IMAGES_SURES, typeAffichage } from "./affichage";
+import { previewable } from "../media/dimensions";
 import { stripMetadata } from "../media/strip";
 import { clickDownload, REVOKE_AFTER_MS } from "../viewers/save";
 import { preparer, oublier as oublierPreparation, type Duree } from "./creation";
@@ -68,9 +70,23 @@ export const vue = $state({
   attenteDepuis: null as number | null,
   fin: null as Fin | null,
   membresPeuventDetruire: false,
-  /** Créateur délogé : lien d'invitation pour reprendre la main (en mémoire de la page seulement). */
-  lienReprise: null as string | null,
+  /** Créateur délogé : « Reprendre la main ici » est proposé (le lien lui-même n'est pas dans cet état : reprendreLaMain). */
+  reprise: false,
+  /** Le serveur offre les appels audio et vidéo (relais TURN configuré). */
+  appels: false,
 });
+
+/**
+ * Créateur délogé : lien d'invitation pour reprendre la main. Hors de l'état réactif (app/link.ts :
+ * une clé de lien n'y va jamais) ; oublié avec le salon (oublier).
+ */
+let lienReprise: string | null = null;
+/** « Reprendre la main ici » : rouvre le lien d'invitation (mot de passe redemandé). */
+export function reprendreLaMain(): void {
+  const l = lienReprise;
+  lienReprise = null;
+  if (l) location.assign(l);
+}
 
 type Session = {
   eng: SalonEngine;
@@ -79,6 +95,8 @@ type Session = {
   meta?: api.Meta;
   client?: ClientSalon;
   conv?: Conversation;
+  /** Appel audio ou vidéo du salon (un seul à la fois). */
+  appel?: Appel;
   sGestion?: Uint8Array<ArrayBuffer>;
   /** S_gestion venu d'un lien de gestion collé (pas de l'historique) : abandonné si le serveur le refuse. */
   gestionColle?: boolean;
@@ -102,6 +120,10 @@ const ouvrirWS = (url: string) => new WebSocket(url) as unknown as import("./cli
 export function conversation(): Conversation | null {
   return s?.conv ?? null;
 }
+/** Appel du salon (état lu après `vue.rev`), ou null hors d'un salon. */
+export function appel(): Appel | null {
+  return s?.appel ?? null;
+}
 export function client(): ClientSalon | null {
   return s?.client ?? null;
 }
@@ -113,13 +135,15 @@ export function moteur(): SalonEngine | null {
 export function oublier(): void {
   if (!s) return;
   for (const f of s.stop) f();
+  s.appel?.fermer();
   s.client?.fermer();
   if (!s.client) s.cles?.free();
   s.kLien.fill(0);
   s.sGestion?.fill(0);
   s = undefined;
   oublierPieces();
-  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, lienReprise: null });
+  Object.assign(vue, { etape: "vide", erreur: null, pret: null, nouvelleInvitation: null, gestionSeule: null, monPseudo: null, silence: 0, dansLeGroupe: false, attenteDepuis: null, createur: false, reprise: false, appels: false });
+  lienReprise = null;
 }
 
 // --- Invité : lien, mot de passe -----------------------------------------------------------------
@@ -364,7 +388,33 @@ function demarrer(x: Session, c: ClientSalon, e: api.Entree): void {
   vue.createur = c.createur;
   vue.membresPeuventDetruire = e.membersCanDestroy;
   vue.fin = null;
+  vue.appels = e.appels;
+  x.appel?.fermer();
+  x.appel = nouvelAppel(x, c);
   x.stop.push(c.ecouter((ev) => surEvenement(x, ev)));
+}
+
+/** Appel branché sur ce client : messages chiffrés par le salon, média par le relais seulement (appel.ts). */
+function nouvelAppel(x: Session, c: ClientSalon): Appel {
+  return new Appel({
+    moi: c.siege,
+    envoyer: (m) => x.client?.appel(m) ?? false,
+    relais: () => api.relaisAppel(net(), c.jeton),
+    media: (o) =>
+      navigator.mediaDevices.getUserMedia({
+        audio: o.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false,
+        video: o.video ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: "user" } : false,
+      }),
+    pair: (cfg) => new RTCPeerConnection(cfg),
+    flux: () => new MediaStream(),
+    alea: () => crypto.getRandomValues(new Uint8Array(16)),
+    maintenant: () => Date.now(),
+    plusTard: (ms, f) => {
+      const t = setTimeout(f, ms);
+      return () => clearTimeout(t);
+    },
+    change: () => vue.rev++,
+  });
 }
 
 function surEvenement(x: Session, ev: EvClient): void {
@@ -384,9 +434,14 @@ function surEvenement(x: Session, ev: EvClient): void {
       break;
     case "depart":
       conv.depart(ev.siege);
+      x.appel?.parti(ev.siege);
       break;
     case "exclusion":
-      if (ev.siege !== undefined) conv.depart(ev.siege, true);
+      if (ev.siege !== undefined) {
+        conv.depart(ev.siege, true);
+        // Exclu : sa connexion d'appel est coupée aussitôt.
+        x.appel?.parti(ev.siege);
+      }
       break;
     case "presence":
       conv.presenceDe(ev.siege, { enLigne: ev.enLigne, derniereMin: ev.derniereMin });
@@ -401,6 +456,11 @@ function surEvenement(x: Session, ev: EvClient): void {
       vue.dansLeGroupe = ev.dansLeGroupe;
       break;
     case "message": {
+      const m = ev.enveloppe.message;
+      if (m.k === "appel_present" || m.k === "appel_fin" || m.k === "appel_signal") {
+        x.appel?.recu(ev.siege, m);
+        break;
+      }
       const r = conv.message(ev.seq, ev.siege, ev.epoque, ev.enveloppe);
       if (r) c.accuser("recu", [r.recu]);
       // Notre pseudonyme pris par un siège arrivé avant : retour au champ (exigence 11).
@@ -452,15 +512,20 @@ function surEvenement(x: Session, ev: EvClient): void {
       break;
     case "nouvelleEntree":
       conv.moi = ev.siege;
+      // Nouveau siège : l'appel en cours est quitté (les paires sont nommées par siège).
+      x.appel?.fermer();
+      x.appel = nouvelAppel(x, c);
       ecrirePreuve(x);
       if (vue.monPseudo) envoyerProfil(x);
       break;
     case "fin":
       vue.fin = ev.raison;
       vue.etape = "fin";
+      x.appel?.fermer();
       // Créateur délogé (exigence C-3 35) : pas de reconnexion d'elle-même ; « Reprendre la main ici »
       // rouvre le lien d'invitation (mot de passe redemandé, lien de gestion relu dans l'historique).
-      vue.lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
+      lienReprise = ev.raison === "remplace" && x.sGestion ? lienSalon(location.origin, "c", x.kLien, import.meta.env.BASE_URL) : null;
+      vue.reprise = lienReprise !== null;
       // Secrets effacés tout de suite ; ce qui est à l'écran reste jusqu'à ce que la personne parte
       // (sauf exclusion : tout disparaît, spec §39.13.1b).
       x.client = undefined;
@@ -530,7 +595,7 @@ function origineLien(x: Session): Uint8Array {
 function ecrirePreuve(x: Session): void {
   const c = x.client;
   if (!x.preuve?.cle || !x.preuve.sel || !c || !vue.monPseudo || !x.kMaitre) return;
-  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion, silence: vue.silence }, vue.finMs);
+  void preuve.ecrire(x.preuve.index, x.preuve.cle, x.preuve.sel, { jeton: c.jeton, siege: c.siege, pseudo: vue.monPseudo, couleur: x.couleur ?? 0, kMaitre: x.kMaitre, sGestion: x.sGestion, silence: vue.silence, appels: vue.appels }, vue.finMs);
 }
 
 /** Mode silencieux (v3 §14.4) : « toujours », 1 h, 8 h, ou null pour réactiver le son. */
@@ -558,7 +623,7 @@ async function reprendreParLaPreuve(x: Session, mdp: string, sel: Uint8Array<Arr
   x.cles?.free();
   x.cles = cles;
   const client = ClientSalon.reprendre(deps(x.eng), { kLien: x.kLien, cles, jeton: c.jeton, siege: c.siege, sGestion: x.sGestion });
-  demarrer(x, client, { jeton: c.jeton, siege: c.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: Math.max(0, (vue.finMs - Date.now()) / 1000), maxMembers: vue.places, membersCanDestroy: false, budgetLeft: 0 });
+  demarrer(x, client, { jeton: c.jeton, siege: c.siege, seq: 0, nonce: new Uint8Array(16), expiresInS: Math.max(0, (vue.finMs - Date.now()) / 1000), maxMembers: vue.places, membersCanDestroy: false, budgetLeft: 0, appels: c.appels === true });
   vue.monPseudo = c.pseudo;
   vue.silence = c.silence ?? 0;
   envoyerProfil(x);
@@ -753,7 +818,13 @@ export async function afficherPiece(b: Bulle): Promise<void> {
   const mime = typeAffichage(p.sorte, p.mime);
   if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
   try {
-    const blob = await lirePiece(net(), x.client.jeton, p.ref);
+    const blob = await lirePiece(net(), x.client.jeton, p.ref, p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX);
+    if (s !== x) return;
+    // Image aux dimensions démesurées (bombe de décompression) : jamais décodée d'office.
+    if (p.sorte === "image" && !(await previewable(blob))) {
+      pieces.erreurs[b.cle] = "lecture";
+      return;
+    }
     if (s !== x) return;
     pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: mime }));
   } catch (e) {
@@ -843,14 +914,17 @@ export async function choisirAvatar(photo: Uint8Array | null): Promise<void> {
 }
 
 /** Avatar d'un siège (profil) : adresse blob: (image/jpeg seulement), ou null. */
+/** Octets d'une photo de profil, au plus (v3 §7.2). */
+const AVATAR_MAX = 65536;
+
 export async function avatarDe(siege: number): Promise<void> {
   const x = s;
   const cle = `avatar:${siege}`;
   const ref = x?.conv?.avatars.get(siege);
   if (!x?.client || !ref || pieces.urls[cle]) return;
   try {
-    const blob = await lirePiece(net(), x.client.jeton, ref);
-    if (s === x && blob.size <= 65536) pieces.urls[cle] = URL.createObjectURL(new Blob([blob], { type: "image/jpeg" }));
+    const blob = await lirePiece(net(), x.client.jeton, ref, AVATAR_MAX);
+    if (s === x && blob.size <= AVATAR_MAX && (await previewable(blob)) && s === x) pieces.urls[cle] = URL.createObjectURL(new Blob([blob], { type: "image/jpeg" }));
   } catch {
     // avatar indisponible : l'initiale reste
   }

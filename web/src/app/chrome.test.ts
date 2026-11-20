@@ -12,6 +12,19 @@ describe("geste transmis par l'adresse", () => {
     expect(chrome.pending).toBe("texte");
     expect(location.pathname + location.search).toBe("/envoyer");
   });
+  // Audit du 20 novembre : un lien venu d'ailleurs ne doit jamais allumer le micro ni la caméra.
+  it("« ?ajout=vocal » et « ?ajout=media » : aucun geste joué d'office, les actions ressortent seulement", () => {
+    for (const g of ["vocal", "media"]) {
+      history.replaceState(null, "", "/envoyer?ajout=" + g);
+      chrome.pending = null;
+      chrome.spot = null;
+      takeGestureFromUrl();
+      expect(chrome.pending, g).toBeNull();
+      expect(chrome.spot, g).toBe("make");
+      expect(location.pathname + location.search).toBe("/envoyer");
+    }
+    chrome.spot = null;
+  });
   it("geste inconnu, autre page ou autre paramètre : ignoré, adresse nettoyée si « ?ajout= »", () => {
     for (const url of ["/envoyer?ajout=script", "/?ajout=texte", "/envoyer?ajout=texte&x=1", "/envoyer?x=texte"]) {
       history.replaceState(null, "", url);

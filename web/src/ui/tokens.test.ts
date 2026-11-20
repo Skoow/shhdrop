@@ -451,6 +451,8 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "menu",
     // Menu du téléphone, compte et offres (18 novembre).
     "log-out", "tag",
+    // Appels du salon (20 novembre).
+    "phone", "phone-off", "video", "video-off", "mic-off",
   ];
   const pascal = (s: string) =>
     s.split("-").map((p) => p[0]!.toUpperCase() + p.slice(1)).join("");

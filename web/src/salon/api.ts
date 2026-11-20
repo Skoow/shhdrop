@@ -106,6 +106,8 @@ export type Entree = {
   maxMembers: number;
   membersCanDestroy: boolean;
   budgetLeft: number;
+  /** Appels audio et vidéo offerts par ce serveur (relais TURN configuré). */
+  appels: boolean;
 };
 
 /**
@@ -130,6 +132,7 @@ export async function rejoindre(n: Net, kAcces: Uint8Array, kPreuve: Uint8Array,
     maxMembers: entier(o, "max_members"),
     membersCanDestroy: o.members_can_destroy,
     budgetLeft: entier(o, "budget_left"),
+    appels: o.calls === true,
   };
 }
 
@@ -143,6 +146,20 @@ export async function gestion(n: Net, jGestion: Uint8Array): Promise<{ expiresIn
 export async function detruire(n: Net, qui: { jGestion: Uint8Array } | { jeton: string }, signaler = false): Promise<void> {
   const h: Record<string, string> = "jGestion" in qui ? { "X-Shh-Manage": cle(qui.jGestion) } : { "X-Shh-Membre": qui.jeton };
   await appel(n, "POST", "/detruire", h, signaler ? { reason: "report" } : {});
+}
+
+/** Identifiants temporaires du relais TURN des appels (rien qui désigne le salon ni le membre). */
+export type Relais = { urls: string[]; username: string; credential: string; ttlS: number };
+
+const URL_RELAIS = /^turns?:[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{1,5})?(\?transport=(udp|tcp))?$/;
+
+/** POST /api/salons/appel : identifiants du relais pour ce membre. 404 : pas d'appels sur ce serveur ; 429 : trop de demandes. */
+export async function relaisAppel(n: Net, jeton: string): Promise<Relais> {
+  const o = await appel(n, "POST", "/appel", { "X-Shh-Membre": jeton }, {});
+  const { urls, username, credential } = o;
+  if (!Array.isArray(urls) || urls.length < 1 || urls.length > 4 || !urls.every((u) => typeof u === "string" && URL_RELAIS.test(u))) throw invalide();
+  if (typeof username !== "string" || !/^[0-9]{1,12}:[0-9a-f]{32}$/.test(username) || typeof credential !== "string" || !/^[A-Za-z0-9+/]{27}=$/.test(credential)) throw invalide();
+  return { urls: urls as string[], username, credential, ttlS: entier(o, "ttl_s") };
 }
 
 /** POST /api/salons/signaler : « Quitter et signaler » (le membre part comme par un 0x03). */

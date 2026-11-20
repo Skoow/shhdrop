@@ -365,7 +365,7 @@ Interdits, côté serveur comme côté navigateur : mesure d'audience, télémé
 | Compteur (mémoire seulement) | Clé | Durée de vie | Pourquoi il est nécessaire |
 |---|---|---|---|
 | Créations et octets du jour (`count64`, `count48`, `bytes64`, `bytes48`) | HMAC(secret du jour, /64 ou IPv4, /48) | jusqu'à minuit UTC, secret jeté (envois en cours : D42-1) | quotas de §4 (10 et 30 liens, 6 et 12 Gio de données utiles, §24) |
-| Requêtes et segments de la minute (`req`, `seg`, `seg48`) | idem | 1 min | limites de débit de §4 et §24 |
+| Requêtes et segments de la minute (`req`, `req48` : requêtes par bloc /48, audit du 20 novembre, `seg`, `seg48`) | idem | 1 min | limites de débit de §4 et §24 |
 | Transferts simultanés (`Slots`) | idem, plus un total | durée du transfert | transferts bornés (§24, audit E1) |
 | Transferts simultanés par envoi et par ouverture (`Keyed`, 11 novembre, audits I3 et M4) | id interne de l'envoi ; (id interne, n° d'ouverture) | durée du transfert ; une clé sans transfert est oubliée aussitôt | au plus 4 par envoi et 4 par ouverture (§24) |
 | Envois en scellement (`sealing`, 11 novembre, audit F6) | id interne de l'envoi | le temps d'un `finalize` | segments refusés pendant que `finalize` écrit le bourrage ; présence seulement, aucun compte |

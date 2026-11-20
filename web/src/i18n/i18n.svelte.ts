@@ -90,7 +90,8 @@ export function setLang(l: Lang): Promise<void> {
 }
 
 /** Langue du navigateur prête (main.ts l'attend avant l'affichage : aucun texte ne change sous les yeux). */
-export const langReady: Promise<void> = wanted === lang ? Promise.resolve() : setLang(wanted);
+// getLang() et non `lang` : lecture voulue de la valeur de départ, hors de toute dépendance réactive.
+export const langReady: Promise<void> = wanted === getLang() ? Promise.resolve() : setLang(wanted);
 
 export function t(key: Key, params?: Record<string, string | number>): string {
   const d = dicts[lang] ?? fr;

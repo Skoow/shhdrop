@@ -24,8 +24,8 @@ pub use groupe::{
     identite_createur, nouvelle_identite,
 };
 pub use message::{
-    Enveloppe, Graine, IdMessage, JSON_MAX, Message, RefPiece, SortePiece, decoder, encoder,
-    est_volatile, nouvel_id,
+    Enveloppe, Graine, IdMessage, JSON_MAX, Message, RefPiece, SIGNAL_MAX, SIGNAL_MORCEAUX,
+    SortePiece, SorteSignal, decoder, encoder, est_volatile, nouvel_id,
 };
 pub use stockage::{Fournisseur, Stockage};
 pub use texte::{cle_unicite, nettoyer_nom, nettoyer_texte, verifier_pseudo};

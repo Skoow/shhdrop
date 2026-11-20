@@ -48,6 +48,20 @@ describe("pièces du salon", () => {
       expect(f.vus.filter((v) => v === "GET /api/salons/pieces/segments/0")).toHaveLength(1);
     }, 60_000);
   }
+  // Audit du 20 novembre : la taille annoncée par le message ne lie personne ; la taille réelle
+  // (manifeste) est vérifiée avant de demander la suite.
+  it("pièce plus grosse que le plafond donné : refusée sans lire le contenu", async () => {
+    const f = fauxServeur();
+    const data = new Uint8Array(64 * 65536 * 2 + 10); // trois segments
+    const ref = await envoyerPiece(f.n, "J".repeat(43), new Blob([data]), { nom: "a.png", mime: "image/png", vocal: false });
+    f.vus.length = 0;
+    await expect(lirePiece(f.n, "J".repeat(43), ref, 65536)).rejects.toThrow("trop_gros");
+    // Le manifeste est en fin de conteneur : seuls le premier et le dernier segment sont lus,
+    // jamais le contenu entre les deux.
+    expect(f.vus).toEqual(["GET /api/salons/pieces/segments/0", "GET /api/salons/pieces/segments/2"]);
+    // Sous le plafond : lue.
+    expect((await lirePiece(f.n, "J".repeat(43), ref, data.length)).size).toBe(data.length);
+  }, 60_000);
   it("autre graine : refusé (paquet_corrompu)", async () => {
     const f = fauxServeur();
     const ref = await envoyerPiece(f.n, "J".repeat(43), new Blob([new Uint8Array(10)]), { nom: "a", mime: "text/plain", vocal: false });

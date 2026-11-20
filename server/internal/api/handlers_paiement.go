@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"github.com/skoow/shhdrop/server/internal/limits"
 	"io"
 	"net/http"
 	"strings"
@@ -310,6 +311,22 @@ func (a paiementAPI) webhook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
+	// Place prise avant toute lecture (audit du 20 novembre, comme lire) : sans elle, des
+	// centaines de corps de 256 Kio envoyés au ralenti tenaient la mémoire. Occupé : 503, le
+	// prestataire réessaie.
+	if r.ContentLength > maxWebhook {
+		w.Header().Set("Connection", "close")
+		writeErr(w, http.StatusBadRequest, "bad_request")
+		return
+	}
+	k64, k48 := limits.Prefixes(ipOf(r))
+	rendre, errPlace := corpsWebhook.Acquire(k64, k48)
+	if errPlace != nil {
+		w.Header().Set("Connection", "close")
+		writeRetry(w, http.StatusServiceUnavailable, "busy", slotRetry)
+		return
+	}
+	defer rendre()
 	rc := http.NewResponseController(w)
 	if err := rc.SetReadDeadline(time.Now().Add(jsonReadTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		writeErr(w, http.StatusBadRequest, "bad_request")

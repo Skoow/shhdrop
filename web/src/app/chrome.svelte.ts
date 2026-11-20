@@ -31,11 +31,16 @@ export function goToSend(g: AddGesture): void {
   chrome.pending = g;
   navigate("/envoyer");
 }
-/** Au démarrage de l'application : « ?ajout=<geste> » exactement, sur /envoyer, puis l'adresse nettoyée. */
+/** Au démarrage de l'application : « ?ajout=<geste> » exactement, sur /envoyer, puis l'adresse nettoyée. Seuls « fichiers » et « texte » sont joués d'office. */
 export function takeGestureFromUrl(loc: Location = location, h: History = history): void {
   const m = /^\?ajout=([a-z]+)$/.exec(loc.search);
   if (m === null) return;
   h.replaceState(h.state, "", loc.pathname);
   const g = m[1] as AddGesture;
-  if (GESTURES.includes(g) && loc.pathname === href("/envoyer")) chrome.pending = g;
+  if (!GESTURES.includes(g) || loc.pathname !== href("/envoyer")) return;
+  // Micro et caméra (audit du 20 novembre) : n'importe quel site peut pointer vers cette adresse,
+  // et un navigateur qui a déjà l'autorisation allumerait le capteur à la seule visite. Venus de
+  // l'adresse, ces deux gestes font seulement ressortir les actions : la personne clique ici.
+  if (g === "vocal" || g === "media") chrome.spot = "make";
+  else chrome.pending = g;
 }

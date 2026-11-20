@@ -29,6 +29,7 @@ var allowedMaps = map[string]string{
 	"limits/limits.go:bytes64":          "§9.5 créations et octets du jour",
 	"limits/limits.go:bytes48":          "§9.5 créations et octets du jour",
 	"limits/limits.go:req":              "§9.5 requêtes et segments de la minute",
+	"limits/limits.go:req48":            "§9.5 requêtes et segments de la minute",
 	"limits/limits.go:seg":              "§9.5 requêtes et segments de la minute",
 	"limits/limits.go:seg48":            "§9.5 requêtes et segments de la minute",
 	"limits/limits.go:uploads":          "§9.5 envois anticipés en cours",

@@ -470,3 +470,26 @@ chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop
 ### 13.3 Sauvegarde et restauration
 
 `paiements.db` (empreintes des pass, commandes en attente, références des prestataires ; aucune identité, aucun montant, aucun pays ; jamais les clés privées des jetons) est sauvegardée **avec `comptes.db`**, chaque jour, dans son propre fichier chiffré (§12.4), et se restaure de la même façon (§12.5 : clés de jetons effacées ; un pass payé depuis la sauvegarde est à rembourser depuis le tableau de bord du prestataire). La sauvegarde doit être en place **le jour de l'activation** : perdre `paiements.db` rendrait inutilisables tous les pass payés.
+
+## 14. Appels audio et vidéo du salon (désactivés) : relais TURN
+
+Conception : `docs/superpowers/specs/2026-11-20-appels-design.md`. Les appels sont **désactivés** tant que `SHH_TURN_URLS` et `SHH_TURN_SECRET_FILE` sont vides : aucune route, aucun bouton dans le salon.
+
+Tout le son et l'image passent par un relais TURN (coturn) installé **sur la machine**, hors de la pile Docker. Le relais ne voit que des paquets chiffrés de bout en bout et les adresses IP des deux bouts, en mémoire ; il n'écrit aucun journal. Le serveur Go ne parle jamais au relais.
+
+À décider avant d'activer (propriétaire) :
+
+- **Bande passante.** Un appel vidéo à 6 demande environ 15 Mbit/s au relais, dans chaque sens. `turnserver.conf` plafonne à 60 Mbit/s en tout.
+- **Offre payante.** La spécification du salon (v3 §8) réserve les appels aux offres payantes ; le paiement n'est pas ouvert. Activer le relais aujourd'hui ouvre les appels à tous les salons.
+- **Nom et ports.** Un nom `turn.<domaine>` vers l'adresse publique ; ports 3478 (UDP et TCP) et 49160 à 49999 (UDP) ouverts dans le pare-feu ; 5349 (TLS) si un certificat est posé.
+
+Mise en place :
+
+1. `apt install coturn`, puis copier `deploy/turnserver.conf` en `/etc/turnserver.conf` (propriétaire `turnserver`, mode 0600).
+2. Y remplacer `<IP_PUBLIQUE>` (trois fois) et `<SECRET>` (`openssl rand -hex 24`).
+3. Écrire le même secret, seul sur une ligne, dans `<SHH_DATA_ROOT>/secrets/shh_turn_secret` (compte 65532, mode 0400).
+4. Dans `deploy/.env` : `SHH_TURN_URLS=turn:turn.<domaine>:3478?transport=udp,turn:turn.<domaine>:3478?transport=tcp` et `SHH_TURN_SECRET_FILE=/run/secrets/shh_turn_secret`.
+5. `systemctl enable --now coturn`, puis `deploy.sh`.
+6. Vérifier : `journalctl -u coturn` reste vide ; dans un salon, les boutons d'appel apparaissent ; un appel entre deux appareils sur deux réseaux différents s'établit.
+
+Couper les appels : vider les deux variables et relancer `deploy.sh` ; `systemctl disable --now coturn`.

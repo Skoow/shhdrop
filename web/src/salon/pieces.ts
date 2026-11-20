@@ -71,8 +71,10 @@ export async function envoyerPiece(n: api.Net, jeton: string, blob: Blob, o: { n
 /**
  * Lit une pièce reçue (`ref` du message `piece` ou de l'avatar d'un profil) : octets du fichier.
  * Le segment 0 n'est lu qu'une fois (budget de lecture du serveur, plan C-2 Task 13).
+ * `max` : octets acceptés au plus ; une pièce plus grosse lève « trop_gros » dès le manifeste lu
+ * (premier et dernier segments), sans lire le contenu (un membre ne peut pas faire télécharger 500 Mo à tous par une photo ou un avatar).
  */
-export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece): Promise<Blob> {
+export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece, max: number = PIECE_MAX): Promise<Blob> {
   const seg0 = await api.lireSegment(n, jeton, ref.piece, 0);
   const premier = seg0;
   const { engagement } = await readHeader(seg0);
@@ -90,12 +92,21 @@ export async function lirePiece(n: api.Net, jeton: string, ref: RefPiece): Promi
         keys,
       );
       try {
+        // Taille réelle (manifeste chiffré) : la taille annoncée par le message
+        // ne lie personne (audit du 20 novembre). Au-delà de `max`, rien d'autre n'est demandé.
+        const e = rd.manifest.items[0];
+        if (!e || e.size > max) throw new Error("trop_gros");
         const parts: BlobPart[] = [];
+        let recu = 0;
         await rd.streamItem(0, (c) => {
+          recu += c.length;
+          if (recu > max) {
+            c.fill(0);
+            throw new Error("trop_gros");
+          }
           parts.push(c.slice());
           c.fill(0);
         });
-        const e = rd.manifest.items[0];
         return new Blob(parts, { type: e?.kind === "file" ? "application/octet-stream" : "text/plain" });
       } finally {
         rd.wipe();
