@@ -2,27 +2,27 @@
   // Inscription (/compte/inscription ; conception compte §10.1, §12.1, §21.3, §21.15.2 ; plan,
   // lot 10). Page montée seulement si __COMPTES__ (App.svelte) : sans le drapeau, la route n'existe
   // pas et ce module n'est pas dans le site.
-  // 1. Adresse, mot de passe, pseudo, photo facultative, case des 15 ans : vérifiés sur l'appareil
-  //    (verifierSaisie) avant tout envoi ; puis preuve anti-robot et inscription/debut, qui répond
-  //    toujours de la même façon, que l'adresse ait un compte ou non.
-  // 2. Code reçu : la disponibilité du pseudo n'est demandée qu'ici (pseudo/verifier exige
-  //    l'étape) ; « Créer le compte » tire les clés et construit les deux coffres sur l'appareil
-  //    (account/session.svelte.ts). L'état de l'adresse (déjà inscrite, bannie) n'est dit qu'après
-  //    le code juste. Aucune étape de code de secours (décision 1 du propriétaire, §21.2).
+  // Simplifiée le 20 novembre (propriétaire) : plus de pseudo, de photo ni de case à cocher.
+  // 1. Adresse, mot de passe et sa confirmation, vérifiés sur l'appareil (verifierSaisie) avant
+  //    tout envoi ; « Créer » : preuve anti-robot et inscription/debut, qui répond toujours de la
+  //    même façon, que l'adresse ait un compte ou non. Sous le bouton, la phrase des 15 ans et des
+  //    conditions (l'acceptation est faite par la création, datée par elle).
+  // 2. Code reçu : « Valider » tire les clés et construit les deux coffres sur l'appareil
+  //    (account/session.svelte.ts), avec un pseudo provisoire tiré au hasard (le serveur exige un
+  //    pseudo unique) : à changer ensuite dans le profil ; s'il est déjà pris, un autre est tiré.
+  //    L'état de l'adresse (déjà inscrite, bannie) n'est dit qu'après le code juste. Aucune étape
+  //    de code de secours (décision 1 du propriétaire, §21.2).
   // Le mot de passe ne quitte pas l'appareil ; rien n'est écrit dans l'adresse de la page.
   import { tick } from "svelte";
-  import { confirmer, inscrire, pseudoLibre, REGLAGES_DEFAUT, verifierSaisie } from "../../account/session.svelte";
+  import { confirmer, inscrire, REGLAGES_DEFAUT, verifierSaisie } from "../../account/session.svelte";
   import { followLink, href, navigate, suite } from "../../app/router.svelte";
   import { getLang, t } from "../../i18n/i18n.svelte";
   import { announce } from "../../ui/announce";
-  import AvatarPicker from "../../ui/AvatarPicker.svelte";
   import Banner from "../../ui/Banner.svelte";
   import Button from "../../ui/Button.svelte";
   import CodeField from "../../ui/CodeField.svelte";
-  import PseudoField from "../../ui/PseudoField.svelte";
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
-  import Case from "./Case.svelte";
   import { codeDe, erreur, jourLong, type Champ } from "./erreurs";
   import MotDePasse from "./MotDePasse.svelte";
   import { obtenirPreuve, preparerPreuve } from "./preuve";
@@ -35,15 +35,20 @@
   let etape = $state<"saisie" | "code" | "fini">("saisie");
   let email = $state("");
   let mdp = $state("");
+  let mdp2 = $state("");
   let pseudo = $state("");
-  let photo = $state.raw<Uint8Array | null>(null);
-  let age = $state(false);
   let code = $state("");
-  let errs = $state<Partial<Record<Champ | "age", string>>>({});
+  let errs = $state<Partial<Record<Champ | "mdp2", string>>>({});
   let bandeau = $state<{ kind: "info" | "warn" | "danger"; texte: string; liens?: boolean } | null>(null);
   let envoi = $state(false);
-  const els: Partial<Record<Champ | "age", HTMLInputElement | undefined>> = $state({});
-  const ORDRE: (Champ | "age")[] = ["email", "mdp", "pseudo", "age", "code"];
+  const els: Partial<Record<Champ | "mdp2", HTMLInputElement | undefined>> = $state({});
+  const ORDRE: (Champ | "mdp2")[] = ["email", "mdp", "mdp2", "code"];
+
+  /** Pseudo provisoire (« Membre » et 6 chiffres tirés au hasard), à changer dans le profil. */
+  function pseudoProvisoire(): string {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000;
+    return `${t("account.pseudo.temp")}${String(n).padStart(6, "0")}`;
+  }
 
   async function focusErreur() {
     await tick();
@@ -52,26 +57,18 @@
   }
   function montrer(e: unknown, moment: "inscription" | "code") {
     const x = erreur(e, moment);
-    if (x.champ) {
+    if (x.champ && x.champ !== "pseudo" && x.champ !== "photo") {
       errs = { ...errs, [x.champ]: x.texte };
       void focusErreur();
     } else bandeau = { kind: "danger", texte: x.texte };
   }
 
-  /** Règle du pseudo sur l'appareil ; disponibilité seulement quand l'étape existe. */
-  async function verifierPseudo(p: string): Promise<string> {
-    const r = await verifierSaisie({ pseudo: p });
-    if (r.pseudo) return r.pseudo;
-    if (etape !== "code") return "plus_tard";
-    return (await pseudoLibre(p)) ? "libre" : "pris";
-  }
-
   async function recevoir() {
     bandeau = null;
-    const r = await verifierSaisie({ email, mdp, pseudo });
+    const r = await verifierSaisie({ email, mdp });
     const e: typeof errs = {};
     for (const [k, v] of Object.entries(r)) e[k as Champ] = erreur(new Error(v), "inscription").texte;
-    if (!age) e.age = t("account.age.err");
+    if (!e.mdp && mdp2 !== mdp) e.mdp2 = t("account.password2.err");
     errs = e;
     if (Object.keys(e).length > 0) return focusErreur();
     try {
@@ -95,7 +92,16 @@
     }
     envoi = true;
     try {
-      await confirmer(code, mdp, { pseudo, photo, langue: getLang(), reglages: { ...REGLAGES_DEFAUT }, pass: null }, false);
+      // Pseudo provisoire ; déjà pris (rare) : un autre, deux fois au plus (l'étape reste valable).
+      for (let essai = 0; ; essai++) {
+        pseudo = pseudoProvisoire();
+        try {
+          await confirmer(code, mdp, { pseudo, photo: null, langue: getLang(), reglages: { ...REGLAGES_DEFAUT }, pass: null }, false);
+          break;
+        } catch (x) {
+          if (codeDe(x) !== "pseudo_pris" || essai >= 2) throw x;
+        }
+      }
     } catch (x) {
       const c = codeDe(x);
       if (c === "deja_inscrit") bandeau = { kind: "info", texte: t("account.state.deja"), liens: true };
@@ -110,6 +116,7 @@
       envoi = false;
     }
     mdp = "";
+    mdp2 = "";
     etape = "fini";
     announce(t("account.created"));
   }
@@ -141,13 +148,12 @@
     <form novalidate onsubmit={(e) => e.preventDefault()} oninput={preparerPreuve}>
       <TextField label={t("account.email")} type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" hint={t("account.email.hint")} error={errs.email} bind:value={email} bind:el={els.email} oninput={() => (errs.email = undefined)} />
       <MotDePasse label={t("account.password")} autocomplete="new-password" hint={t("account.password.hint")} error={errs.mdp} bind:value={mdp} bind:el={els.mdp} oninput={() => (errs.mdp = undefined)} />
-      <PseudoField bind:value={pseudo} verifier={verifierPseudo} error={errs.pseudo} bind:el={els.pseudo} onsaisie={() => (errs.pseudo = undefined)} />
-      <AvatarPicker bind:photo initiale={pseudo.trim()} />
-      <div class="age">
-        <Case label={t("account.age")} bind:checked={age} error={errs.age} bind:el={els.age} />
-        <a class="lien" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.age.link")}</a>
-      </div>
-      <Button type="submit" onpress={recevoir}>{t("account.signup.send")}</Button>
+      <MotDePasse label={t("account.password2")} autocomplete="new-password" error={errs.mdp2} bind:value={mdp2} bind:el={els.mdp2} oninput={() => (errs.mdp2 = undefined)} />
+      <Button type="submit" onpress={recevoir}>{t("account.signup.go")}</Button>
+      <!-- Plus de case (20 novembre) : la création vaut acceptation, dite ici avec le lien. -->
+      <p class="legal" data-legal>
+        {t("account.signup.legal.a")}<a class="lien-t" href={href("/conditions")} target="_blank" rel="noopener noreferrer">{t("account.signup.legal.link")}</a>{t("account.signup.legal.b")}
+      </p>
     </form>
     <ul class="liens">
       <li><a href={href(versConnexion)} onclick={(e) => followLink(e, versConnexion)}>{t("account.signup.have")}</a></li>
@@ -156,7 +162,6 @@
     <p class="note">{t("account.code.sent")}</p>
     <DemoCode />
     <form novalidate onsubmit={(e) => e.preventDefault()}>
-      <PseudoField bind:value={pseudo} verifier={verifierPseudo} error={errs.pseudo} bind:el={els.pseudo} onsaisie={() => (errs.pseudo = undefined)} />
       <CodeField label={t("account.code")} error={errs.code} bind:value={code} bind:el={els.code} onvalue={() => (errs.code = undefined)} />
       <Button type="submit" onpress={creer}>{envoi ? t("account.verifying") : t("account.signup.create")}</Button>
     </form>
@@ -165,6 +170,10 @@
       <Button variant="ghost" onpress={modifier}>{t("account.email.edit")}</Button>
     </div>
   {:else}
+    <p class="note" data-pseudo-temp>
+      {t("account.created.pseudo", { pseudo })}
+      <a class="lien-t" href={href("/compte/profil")} onclick={(e) => followLink(e, "/compte/profil")}>{t("account.created.pseudo.link")}</a>
+    </p>
     <div class="actions">
       <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>
     </div>
@@ -172,13 +181,17 @@
 </Cadre>
 
 <style>
-  .age {
-    display: grid;
-    gap: 0;
-  }
-  .age .lien {
-    margin-left: calc(22px + var(--sp-3));
+  .legal {
+    margin: calc(-1 * var(--sp-2)) 0 0;
+    color: var(--text-2);
     font-size: var(--fs-small);
+    line-height: 1.5;
+    text-align: center;
+    text-wrap: pretty;
+  }
+  .lien-t {
+    color: var(--accent);
+    text-underline-offset: 3px;
   }
   .liens-b {
     display: flex;

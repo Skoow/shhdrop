@@ -50,12 +50,14 @@ afterEach(() => {
 });
 
 describe("Connexion", () => {
-  it("titre, champs, case « Rester connecté » décochée avec son indice, liens", async () => {
+  it("titre, champs, case « Rester connecté » décochée sans indice (20 novembre), liens", async () => {
     await monter(Connexion);
     expect(document.querySelector("h1")!.textContent).toBe("Se connecter");
     expect(champ("Mot de passe").getAttribute("autocomplete")).toBe("current-password");
     expect(champ("Rester connecté sur cet appareil").checked).toBe(false);
-    expect(texte()).toContain("À éviter sur un appareil partagé.");
+    expect(texte()).not.toContain("appareil partagé");
+    // « Créer un compte » à droite : les deux liens aux deux bords.
+    expect(document.querySelector("ul.liens")!.classList.contains("split")).toBe(true);
     const liens = [...document.querySelectorAll("a")].map((a) => [a.textContent!.trim(), a.getAttribute("href")]);
     expect(liens).toContainEqual(["Mot de passe oublié ?", "/compte/oubli"]);
     expect(liens).toContainEqual(["Créer un compte", "/compte/inscription"]);

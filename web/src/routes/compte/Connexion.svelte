@@ -141,12 +141,13 @@
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <TextField label={t("account.email")} type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" error={errs.email} bind:value={email} bind:el={els.email} oninput={() => (errs.email = undefined)} />
       <MotDePasse label={t("account.password")} autocomplete="current-password" bind:value={mdp} />
-      <Case label={t("account.stay")} hint={t("account.stay.hint")} bind:checked={rester} />
+      <Case label={t("account.stay")} bind:checked={rester} />
       <Button type="submit" onpress={connecter}>{envoi ? t("account.verifying") : t("account.login.submit")}</Button>
     </form>
-    <ul class="liens">
+    <!-- « Créer un compte » à droite (propriétaire, 20 novembre). -->
+    <ul class="liens split">
       <li><a href={href("/compte/oubli")} onclick={(e) => followLink(e, "/compte/oubli")}>{t("account.login.forgot")}</a></li>
-      <li><a href={href(versInscription)} onclick={(e) => followLink(e, versInscription)}>{t("account.login.create")}</a></li>
+      <li><a href={href(versInscription)} onclick={(e) => followLink(e, versInscription)} data-create>{t("account.login.create")}</a></li>
     </ul>
   {:else}
     <form novalidate onsubmit={(e) => e.preventDefault()}>

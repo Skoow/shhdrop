@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
-// Inscription (conception compte §12.1, §21.3, §21.15.2 ; plan, lot 10) : erreurs exactes, pseudo
-// vérifié 400 ms après la frappe (« Disponible », « Déjà pris »), aucune étape de code de
-// secours, messages d'état après le code juste, rien dans l'adresse de la page.
+// Inscription (conception compte §12.1, §21.3, §21.15.2 ; plan, lot 10 ; simplifiée le 20 novembre :
+// adresse, mot de passe et confirmation, « Créer », phrase des 15 ans dessous ; pseudo provisoire
+// tiré au hasard) : erreurs exactes, aucune étape de code de secours, messages d'état après le
+// code juste, rien dans l'adresse de la page.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "../../i18n/i18n.svelte";
-import { attendre, bouton, champ, cocher, demonter, erreurDe, monter, PREUVE, presser, saisir, texte } from "./pages.test-helper";
+import { attendre, bouton, champ, demonter, erreurDe, monter, PREUVE, presser, saisir, texte } from "./pages.test-helper";
 
 const NN = " ";
 const C = vi.hoisted(() => ({
@@ -17,16 +18,15 @@ const { CompteError } = await import("../../account/session.svelte");
 const { default: Inscription } = await import("./Inscription.svelte");
 
 const MDP = "correct horse battery";
-async function remplir(o: { email?: string; mdp?: string; pseudo?: string; age?: boolean } = {}) {
+async function remplir(o: { email?: string; mdp?: string; mdp2?: string } = {}) {
   await monter(Inscription);
   saisir("Adresse e-mail", o.email ?? "Lea@Exemple.fr");
   saisir("Mot de passe", o.mdp ?? MDP);
-  saisir("Pseudo", o.pseudo ?? "Léa");
-  if (o.age !== false) cocher(`J'ai au moins 15${NN}ans et j'accepte les conditions d'utilisation`);
+  saisir("Confirmer le mot de passe", o.mdp2 ?? o.mdp ?? MDP);
 }
 async function jusquAuCode() {
   await remplir();
-  await presser("Recevoir un code");
+  await presser("Créer");
 }
 
 beforeEach(() => {
@@ -55,7 +55,14 @@ describe("Inscription, étape 1", () => {
     expect(champ("Mot de passe").type).toBe("password");
     expect(texte()).toContain(`10${NN}caractères au moins`);
     expect(texte()).toContain(`C'est votre seul moyen de récupérer le compte${NN}: utilisez une adresse que vous gardez.`);
-    expect(texte()).toContain("Ajouter une photo");
+    // 20 novembre : ni pseudo, ni photo, ni case ; la phrase des 15 ans sous « Créer ».
+    expect(texte()).not.toContain("Ajouter une photo");
+    expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(champ("Confirmer le mot de passe").getAttribute("autocomplete")).toBe("new-password");
+    expect(document.querySelector("[data-legal]")!.textContent!.replace(/[ \n\t]+/g, " ").trim()).toBe(
+      `En créant un compte, vous confirmez avoir au moins 15${NN}ans et accepter les conditions d'utilisation.`,
+    );
+    expect(document.querySelector<HTMLAnchorElement>("[data-legal] a")!.getAttribute("href")).toBe("/conditions");
     expect([...document.querySelectorAll("a")].map((a) => a.textContent!.trim())).toContain("J'ai déjà un compte");
     // Le mot de passe s'affiche ou se masque.
     await presser("Afficher le mot de passe");
@@ -63,13 +70,11 @@ describe("Inscription, étape 1", () => {
   });
 
   it("erreurs exactes reliées aux champs, focus sur le premier ; aucune requête", async () => {
-    C.verifierSaisie.mockResolvedValue({ email: "adresse_non_ascii", mdp: "mdp_court", pseudo: "pseudo_ecritures" });
-    await remplir({ age: false });
-    await presser("Recevoir un code");
+    C.verifierSaisie.mockResolvedValue({ email: "adresse_non_ascii", mdp: "mdp_court" });
+    await remplir();
+    await presser("Créer");
     expect(erreurDe("Adresse e-mail")).toBe("Utilisez une adresse sans accent ni caractère spécial.");
     expect(erreurDe("Mot de passe")).toBe(`Au moins 10${NN}caractères.`);
-    expect(erreurDe("Pseudo")).toBe("Une seule écriture à la fois.");
-    expect(texte()).toContain("Cochez cette case pour continuer.");
     expect(document.activeElement).toBe(champ("Adresse e-mail"));
     expect(C.inscrire).not.toHaveBeenCalled();
     expect(P.obtenirPreuve).not.toHaveBeenCalled();
@@ -77,9 +82,17 @@ describe("Inscription, étape 1", () => {
       demonter();
       C.verifierSaisie.mockResolvedValue(code.startsWith("mdp") ? { mdp: code } : { email: code });
       await remplir();
-      await presser("Recevoir un code");
+      await presser("Créer");
       expect(texte()).toContain(msg);
     }
+    // Confirmation différente : erreur sous la confirmation, aucune requête.
+    demonter();
+    C.verifierSaisie.mockResolvedValue({});
+    await remplir({ mdp2: "autre chose encore" });
+    await presser("Créer");
+    expect(erreurDe("Confirmer le mot de passe")).toBe("Les deux mots de passe ne sont pas identiques.");
+    expect(document.activeElement).toBe(champ("Confirmer le mot de passe"));
+    expect(C.inscrire).not.toHaveBeenCalled();
   });
 
   it("adresse jetable (serveur) : message sous l'adresse ; limite et indisponibilité : messages exacts", async () => {
@@ -87,26 +100,14 @@ describe("Inscription, étape 1", () => {
     await jusquAuCode();
     expect(erreurDe("Adresse e-mail")).toBe("Les adresses jetables ne sont pas acceptées.");
     C.inscrire.mockRejectedValueOnce(new CompteError(429, "limit", { retryAfterS: 3600 }));
-    await presser("Recevoir un code");
+    await presser("Créer");
     expect(texte()).toContain(`Trop de tentatives. Réessayez dans 1${NN}h.`);
     C.inscrire.mockRejectedValueOnce(new CompteError(503, "busy"));
-    await presser("Recevoir un code");
+    await presser("Créer");
     expect(texte()).toContain("Les inscriptions sont momentanément fermées. Réessayez plus tard.");
     C.inscrire.mockRejectedValueOnce(new Error("reseau"));
-    await presser("Recevoir un code");
+    await presser("Créer");
     expect(texte()).toContain("Connexion perdue. Vérifiez votre réseau et réessayez.");
-  });
-
-  it("pseudo : règle vérifiée 400 ms après la frappe ; disponibilité dite seulement à l'étape du code", async () => {
-    await monter(Inscription);
-    saisir("Pseudo", "Léa");
-    await new Promise((r) => setTimeout(r, 300));
-    expect(C.verifierSaisie).not.toHaveBeenCalled();
-    await new Promise((r) => setTimeout(r, 150));
-    await attendre();
-    expect(C.verifierSaisie).toHaveBeenCalledWith({ pseudo: "Léa" });
-    expect(C.pseudoLibre).not.toHaveBeenCalled();
-    expect(texte()).toContain("La disponibilité sera vérifiée à l'étape suivante.");
   });
 
   it("envoi : adresse telle que tapée, langue de la page, preuve anti-robot ; rien dans l'adresse de la page", async () => {
@@ -119,21 +120,15 @@ describe("Inscription, étape 1", () => {
 });
 
 describe("Inscription, étape 2 (code)", () => {
-  it("le pseudo est vérifié auprès du serveur dès l'étape du code : « Disponible » ou « Déjà pris »", async () => {
-    C.pseudoLibre.mockResolvedValue(false);
+  it("aucune étape de code de secours : code juste → « Compte créé. » ; profil envoyé (pseudo provisoire, photo nulle, langue)", async () => {
     await jusquAuCode();
-    await new Promise((r) => setTimeout(r, 450));
-    await attendre();
-    expect(C.pseudoLibre).toHaveBeenCalledWith("Léa");
-    expect(erreurDe("Pseudo")).toBe("Déjà pris");
-  });
-
-  it("aucune étape de code de secours : code juste → « Compte créé. » ; profil envoyé (pseudo, photo nulle, langue)", async () => {
-    await jusquAuCode();
+    expect(document.querySelectorAll("[data-pseudo]")).toHaveLength(0);
     saisir("Code reçu par e-mail", "123 456");
-    await presser("Créer le compte");
-    expect(C.confirmer).toHaveBeenCalledWith("123456", MDP, expect.objectContaining({ pseudo: "Léa", photo: null, langue: "fr", pass: null }), false);
+    await presser("Valider");
+    expect(C.confirmer).toHaveBeenCalledWith("123456", MDP, expect.objectContaining({ pseudo: expect.stringMatching(/^Membre\d{6}$/), photo: null, langue: "fr", pass: null }), false);
     expect(texte()).toContain("Compte créé.");
+    const pseudo = (C.confirmer.mock.calls[0]![2] as { pseudo: string }).pseudo;
+    expect(document.querySelector("[data-pseudo-temp]")!.textContent!.replace(/[ \n\t]+/g, " ")).toContain(`Votre pseudo provisoire est «${NN}${pseudo}${NN}». Le changer dans votre profil`);
     expect(texte()).not.toMatch(/secours/i);
   });
 
@@ -141,13 +136,13 @@ describe("Inscription, étape 2 (code)", () => {
     await jusquAuCode();
     saisir("Code reçu par e-mail", "000000");
     C.confirmer.mockRejectedValueOnce(new CompteError(403, "code_faux", { attemptsLeft: 4 }));
-    await presser("Créer le compte");
+    await presser("Valider");
     expect(erreurDe("Code reçu par e-mail")).toBe(`Code incorrect. Il reste 4${NN}essais.`);
     C.confirmer.mockRejectedValueOnce(new CompteError(403, "code_faux", { attemptsLeft: 1 }));
-    await presser("Créer le compte");
+    await presser("Valider");
     expect(erreurDe("Code reçu par e-mail")).toBe(`Code incorrect. Il reste 1${NN}essai.`);
     C.confirmer.mockRejectedValueOnce(new CompteError(404, "not_found"));
-    await presser("Créer le compte");
+    await presser("Valider");
     expect(erreurDe("Code reçu par e-mail")).toBe("Code expiré. Demandez-en un nouveau.");
   });
 
@@ -155,20 +150,28 @@ describe("Inscription, étape 2 (code)", () => {
     await jusquAuCode();
     saisir("Code reçu par e-mail", "123456");
     C.confirmer.mockRejectedValueOnce(new CompteError(409, "deja_inscrit"));
-    await presser("Créer le compte");
+    await presser("Valider");
     expect(texte()).toContain(`Cette adresse a déjà un compte. Connectez-vous ou utilisez « Mot de passe oublié ».`);
     C.confirmer.mockRejectedValueOnce(new CompteError(403, "banni", { jusqu: "2029-11-14" }));
-    await presser("Créer le compte");
+    await presser("Valider");
     expect(texte()).toContain("Cette adresse ne peut pas créer de compte jusqu'au 14 novembre 2029.");
   });
 
-  it("pseudo pris à la fin : erreur sous le pseudo, l'étape reste", async () => {
+  it("pseudo provisoire déjà pris : un autre est tiré, sans rien demander ; trois refus : message", async () => {
     await jusquAuCode();
     saisir("Code reçu par e-mail", "123456");
     C.confirmer.mockRejectedValueOnce(new CompteError(409, "pseudo_pris"));
-    await presser("Créer le compte");
-    expect(erreurDe("Pseudo")).toBe("Déjà pris");
-    expect(bouton("Créer le compte")).toBeTruthy();
+    await presser("Valider");
+    expect(C.confirmer).toHaveBeenCalledTimes(2);
+    expect(texte()).toContain("Compte créé.");
+    demonter();
+    C.confirmer.mockReset();
+    C.confirmer.mockRejectedValue(new CompteError(409, "pseudo_pris"));
+    await jusquAuCode();
+    saisir("Code reçu par e-mail", "123456");
+    await presser("Valider");
+    expect(C.confirmer).toHaveBeenCalledTimes(3);
+    expect(bouton("Valider")).toBeTruthy();
   });
 
   it("« Renvoyer le code » : actif après 60 s ; « Modifier l'adresse » revient à l'étape 1", async () => {

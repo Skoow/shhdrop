@@ -70,19 +70,22 @@ const titre = (page: Page, name: string) => page.getByRole("heading", { level: 1
 /** Message d'état d'une section des paramètres (et non sa copie dans la région annoncée du site). */
 const statut = (page: Page, section: string) => page.getByRole("region", { name: section, exact: true }).getByRole("status");
 
-/** Inscription complète par la page : adresse, mot de passe, pseudo, case des 15 ans, code reçu. */
+/**
+ * Inscription complète par la page : adresse, mot de passe et confirmation, code reçu ; le pseudo
+ * provisoire attribué (20 novembre) est lu et gardé dans c.pseudo.
+ */
 async function inscrire(page: Page, origin: string, boite: Boite, c: Compte): Promise<void> {
   await page.goto(origin + "/compte/inscription");
   await expect(titre(page, "Créer un compte")).toBeVisible();
   await champ(page, "Adresse e-mail").fill(c.email);
   await champ(page, "Mot de passe").fill(c.mdp);
-  await champ(page, "Pseudo").fill(c.pseudo);
-  await page.getByLabel("J'ai au moins 15 ans et j'accepte les conditions d'utilisation").check();
-  await bouton(page, "Recevoir un code").click(); // preuve anti-robot calculée dans la page
+  await champ(page, "Confirmer le mot de passe").fill(c.mdp);
+  await bouton(page, "Créer").click(); // preuve anti-robot calculée dans la page
   const code = await boite.code(c.email);
   await champ(page, "Code reçu par e-mail").fill(code);
-  await bouton(page, "Créer le compte").click(); // Argon2id et coffres sur l'appareil
+  await bouton(page, "Valider").click(); // Argon2id et coffres sur l'appareil
   await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
+  c.pseudo = /«\s*(\S+)\s*»/u.exec((await page.locator("[data-pseudo-temp]").textContent()) ?? "")![1]!;
 }
 
 /** Connexion depuis la page de connexion ouverte ; rend la vue atteinte. */

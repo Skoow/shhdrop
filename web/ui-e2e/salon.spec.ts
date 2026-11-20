@@ -47,19 +47,22 @@ const fil = (page: Page) => page.getByRole("log");
 const saisie = (page: Page) => page.getByLabel("Message", { exact: true });
 const zone = (page: Page) => page.getByRole("region", { name: "Conversation", exact: true });
 
-/** Inscription complète par l'interface (adresse, mot de passe, pseudo, code reçu), suite « salon ». */
-async function inscrire(page: Page, origin: string, smtp: FauxSMTP, email: string, mdp: string, pseudo: string): Promise<void> {
+/**
+ * Inscription complète par l'interface (adresse, mot de passe et confirmation, code reçu), suite
+ * « salon » ; rend le pseudo provisoire attribué (20 novembre : plus de pseudo à l'inscription).
+ */
+async function inscrire(page: Page, origin: string, smtp: FauxSMTP, email: string, mdp: string): Promise<string> {
   await page.goto(origin + "/compte/inscription?suite=salon");
   await expect(titre(page, "Créer un compte")).toBeVisible();
   await champ(page, "Adresse e-mail").fill(email);
   await champ(page, "Mot de passe").fill(mdp);
-  await champ(page, "Pseudo").fill(pseudo);
-  await page.getByLabel("J'ai au moins 15 ans et j'accepte les conditions d'utilisation").check();
-  await bouton(page, "Recevoir un code").click();
+  await champ(page, "Confirmer le mot de passe").fill(mdp);
+  await bouton(page, "Créer").click();
   const code = codeDuCourriel(await smtp.attendre(1)).code;
   await champ(page, "Code reçu par e-mail").fill(code);
-  await bouton(page, "Créer le compte").click();
+  await bouton(page, "Valider").click();
   await expect(titre(page, "Compte créé.")).toBeVisible({ timeout: 30_000 });
+  return /«\s*(\S+)\s*»/u.exec((await page.locator("[data-pseudo-temp]").textContent()) ?? "")![1]!;
 }
 
 async function envoyer(page: Page, texte: string): Promise<void> {
@@ -75,11 +78,11 @@ test("deux navigateurs : création avec un compte, invitation, messages chiffré
   const r = randomBytes(4).toString("hex");
   const email = `Salon.${r}@exemple.org`;
   const mdpCompte = `MdpCompteSalon-${r}`;
-  const pseudoA = `Léa${r.slice(0, 4)}`;
+  // Pseudo du compte : provisoire, tiré à l'inscription (20 novembre).
   const pseudoB = `Hugo${r.slice(4, 8)}`;
 
   // --- Créatrice : compte, création, salon prêt -----------------------------------------------------
-  await inscrire(page, shh.origin, smtp, email, mdpCompte, pseudoA);
+  const pseudoA = await inscrire(page, shh.origin, smtp, email, mdpCompte);
   await bouton(page, "Continuer").click();
   await expect(titre(page, "Créer un salon")).toBeVisible();
   await capture(page, "salon-nouveau");

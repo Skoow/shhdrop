@@ -34,13 +34,12 @@ async function inscrire(page: Page, url: string) {
   await aller(page, url, "compte/inscription");
   await page.getByLabel("Adresse e-mail").fill(EMAIL);
   await page.getByLabel("Mot de passe", { exact: true }).fill(MDP);
-  await page.getByLabel("Pseudo").fill("Léa");
-  await page.getByRole("checkbox", { name: /J'ai au moins 15/ }).check();
-  await page.getByRole("button", { name: "Recevoir un code" }).click();
+  await page.getByLabel("Confirmer le mot de passe", { exact: true }).fill(MDP);
+  await page.getByRole("button", { name: "Créer", exact: true }).click();
   await expect(page.locator("[data-demo-code]")).toContainText("aucun e-mail n'est envoyé");
   const code = await codeAffiche(page);
   await page.getByLabel("Code reçu par e-mail").fill(code);
-  await page.getByRole("button", { name: "Créer le compte" }).click();
+  await page.getByRole("button", { name: "Valider", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Compte créé." })).toBeVisible({ timeout: 30_000 });
 }
 

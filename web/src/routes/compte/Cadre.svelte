@@ -1,6 +1,7 @@
 <script lang="ts">
   // Cadre des pages du compte (conception compte §12, §21.15) : colonne centrée de 28 rem au plus,
-  // titre de l'écran (focus à l'arrivée), sous-titre, contenu.
+  // titre de l'écran (focus à l'arrivée), sous-titre, contenu. 20 novembre (propriétaire : « une
+  // forme jolie ») : une carte arrondie, lueur menthe en haut, titre et sous-titre centrés.
   import { untrack, type Snippet } from "svelte";
 
   type Props = { titre: string; sous?: string; children: Snippet };
@@ -19,18 +20,33 @@
 
 <style>
   .cadre {
-    width: min(100%, 28rem);
-    margin-inline: auto;
-    padding: var(--sp-6) var(--sp-4) var(--sp-8);
+    position: relative;
+    isolation: isolate;
+    width: min(100%, 30rem);
+    margin: var(--sp-6) auto var(--sp-8);
+    padding: clamp(28px, 5vw, 44px) clamp(20px, 5vw, 40px) clamp(28px, 5vw, 40px);
     display: grid;
     gap: var(--sp-5);
     min-width: 0;
+    border-radius: clamp(20px, 3vw, 28px);
+    background:
+      radial-gradient(90% 60% at 50% -10%, rgb(95 227 181 / 0.14), transparent 70%),
+      linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.012)),
+      rgb(14 17 23);
+    box-shadow:
+      inset 0 0 0 1px rgb(233 236 242 / 0.1),
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 40px 80px -48px rgb(0 0 0 / 0.9);
   }
   .titre {
     margin: 0;
-    font-size: var(--fs-screen);
-    font-stretch: var(--wd-screen);
-    line-height: 1.1;
+    font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
+    font-weight: 700;
+    font-stretch: var(--wd-display, 112%);
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+    text-align: center;
+    text-wrap: balance;
   }
   .titre:focus {
     outline: none;
@@ -38,6 +54,8 @@
   .sous {
     margin: calc(-1 * var(--sp-3)) 0 0;
     color: var(--text-2);
+    text-align: center;
+    text-wrap: pretty;
   }
   .cadre :global(form) {
     display: grid;
@@ -51,6 +69,10 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  /* Deux liens aux deux bords (connexion : « Mot de passe oublié » à gauche, « Créer un compte » à droite). */
+  .cadre :global(.liens.split) {
+    justify-content: space-between;
   }
   .cadre :global(.liens a),
   .cadre :global(a.lien) {
@@ -73,10 +95,15 @@
   .cadre :global(.actions > .btn) {
     flex: 1 1 auto;
   }
-  @media (max-width: 899px) {
+  @media (max-width: 599px) {
     .cadre {
-      padding: var(--sp-2) 0 var(--sp-6);
+      margin-block: var(--sp-3) var(--sp-6);
       gap: var(--sp-4);
+    }
+  }
+  @media (forced-colors: active) {
+    .cadre {
+      border: 1px solid CanvasText;
     }
   }
 </style>
