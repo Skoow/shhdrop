@@ -228,8 +228,8 @@ describe("le serveur ne voit rien", () => {
     for (const l of ["id", "access_v", "proof_v", "manage_v"]) expect(found, l).toContain(l);
   });
 
-  it("la mémoire du processus serveur ne contient aucun repère", () => {
-    const res = scanProcessMemory(srv.pid, secrets);
+  it("la mémoire du processus serveur ne contient aucun repère", async () => {
+    const res = await scanProcessMemory(srv.pid, secrets);
     if (!res.ok) {
       const why = `lecture de /proc/${srv.pid}/mem impossible (${res.why})`;
       // En CI, ce test bloque la mise en ligne : sauter la fouille mémoire serait un faux succès.
@@ -246,7 +246,7 @@ describe("le serveur ne voit rien", () => {
     expect(res.rwFailedBytes, `zones rw-p illisibles : ${res.rwFailedBytes} / ${res.rwBytes} octets`).toBeLessThanOrEqual(res.rwBytes / 2);
     expect(res.hits).toEqual([]);
     // Témoin : l'identifiant interne du partage est retrouvé en mémoire (la lecture fonctionne).
-    const ctl = scanProcessMemory(srv.pid, [needle("id", handle)]);
+    const ctl = await scanProcessMemory(srv.pid, [needle("id", handle)]);
     expect(ctl.ok && ctl.hits).toEqual(["id"]);
   });
 

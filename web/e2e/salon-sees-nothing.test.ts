@@ -394,8 +394,8 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
     expect(s.pieces).toBe(3);
   });
 
-  it("mémoire du processus serveur : aucun repère de contenu ni de clé", () => {
-    const res = scanProcessMemory(srv.pid, secrets);
+  it("mémoire du processus serveur : aucun repère de contenu ni de clé", async () => {
+    const res = await scanProcessMemory(srv.pid, secrets);
     if (!res.ok) {
       const why = `lecture de /proc/${srv.pid}/mem impossible (${res.why})`;
       if (process.env.CI) throw new Error(`[le serveur ne voit rien : salon] fouille mémoire obligatoire en CI : ${why}`);
@@ -406,10 +406,10 @@ describe("le serveur ne voit rien : salon (C-2)", () => {
     expect(res.rwFailedBytes).toBeLessThanOrEqual(res.rwBytes / 2);
     expect(res.hits).toEqual([]);
     // Témoin : l'empreinte d'un jeton de membre (gardée en mémoire, jamais sur disque) est retrouvée.
-    const ctl = scanProcessMemory(srv.pid, [needle("empreinte de jeton", sha256(unb64u(c.jeton)) as Uint8Array<ArrayBuffer>)]);
+    const ctl = await scanProcessMemory(srv.pid, [needle("empreinte de jeton", sha256(unb64u(c.jeton)) as Uint8Array<ArrayBuffer>)]);
     expect(ctl.ok && ctl.hits).toEqual(["empreinte de jeton"]);
     // Témoin : l'adresse repère (vue en direct, jamais gardée sur disque) est retrouvée en mémoire.
-    const ip = scanProcessMemory(srv.pid, [needle("adresse (texte)", IP)]);
+    const ip = await scanProcessMemory(srv.pid, [needle("adresse (texte)", IP)]);
     expect(ip.ok && ip.hits).toEqual(["adresse (texte)"]);
   });
 

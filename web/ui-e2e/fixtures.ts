@@ -192,7 +192,28 @@ export const test = base.extend<{ shh: Shh; demo: Demo; shhServer: Pick<StartOpt
    * (browser.newContext) ne sont pas couverts.
    */
   pageErrors: [
-    async ({ context }, use) => {
+    async ({ context, browserName }, use) => {
+      // WebKit seulement : l'interception de Playwright (page.route) perd parfois une partie
+      // d'un corps de requête Blob quand le test retient la requête (sleep, barrière) : le
+      // serveur reçoit un segment plus court que son Content-Length et répond 400. Reproduit
+      // en local (WebKit 27.2, run CI 44666763368) ; sans page.route, ou avec un corps en
+      // octets, les mêmes envois passent. Défaut de l'outil, pas du site (Safari envoie le Blob
+      // entier hors interception) : dans le banc WebKit, le corps Blob d'un XMLHttpRequest
+      // part donc en octets, mêmes octets.
+      if (browserName === "webkit")
+        await context.addInitScript(() => {
+          const send = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, b?: Parameters<XMLHttpRequest["send"]>[0]) {
+            if (!(b instanceof Blob)) return send.call(this, b);
+            // Annulé pendant la lecture (abort() avant send) : le navigateur ne signale alors
+            // rien et send lèverait InvalidStateError ; l'annulation est signalée comme après send.
+            const go = (body: XMLHttpRequestBodyInit) => {
+              if (this.readyState === XMLHttpRequest.OPENED) send.call(this, body);
+              else this.dispatchEvent(new ProgressEvent("abort"));
+            };
+            b.arrayBuffer().then(go, () => go(b));
+          };
+        });
       const seen: string[] = [];
       context.on("weberror", (e) => {
         const err = e.error();

@@ -378,7 +378,7 @@ test.describe("intégrité des scripts et des styles (spec §28.3)", () => {
     for (const i of tags) expect(i).toMatch(/^sha384-[A-Za-z0-9+/]{64}$/);
   });
 
-  test("un script dont les octets ont changé en route est refusé par le navigateur : rien ne s'exécute", async ({ page, shh }) => {
+  test("un script dont les octets ont changé en route est refusé par le navigateur : rien ne s'exécute", async ({ page, shh, pageErrors }) => {
     // Un seul octet ajouté au script servi (ce que ferait un intermédiaire ou un cache piégé).
     await page.route("**/assets/index-*.js", async (route) => {
       const res = await route.fetch();
@@ -390,6 +390,10 @@ test.describe("intégrité des scripts et des styles (spec §28.3)", () => {
     await page.waitForLoadState("load");
     expect(await page.evaluate(() => (window as unknown as { __piege?: number }).__piege)).toBeUndefined();
     await expect(page.locator("#app > *")).toHaveCount(0);
+    // WebKit signale le refus lui-même comme une exception de la page (« Cannot load script due
+    // to integrity mismatch ») ; Chromium ne le signale qu'en console. C'est le refus attendu :
+    // retiré de la garde, toute autre exception la fait toujours échouer.
+    for (let i = pageErrors.length - 1; i >= 0; i--) if (/integrity mismatch/.test(pageErrors[i]!)) pageErrors.splice(i, 1);
   });
 });
 

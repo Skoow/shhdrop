@@ -52,20 +52,20 @@ describe("scanRegions (mémoire simulée)", () => {
     return mem.copy(buf, 0, pos, Math.min(pos + len, mem.length));
   };
 
-  it("aiguille à cheval sur la frontière de deux fenêtres : trouvée", () => {
+  it("aiguille à cheval sur la frontière de deux fenêtres : trouvée", async () => {
     for (const at of [W - 3, W - longest + 1, W - 1, 2 * W - longest - 5]) {
       const mem = Buffer.alloc(3 * W, 0x41);
       mem.write(mark, at);
-      const r = scanRegions([{ start: 0, end: mem.length, rw: true }], fromMem(mem), [n]);
+      const r = await scanRegions([{ start: 0, end: mem.length, rw: true }], fromMem(mem), [n]);
       expect(r.hits, `position ${at}`).toEqual(["repère"]);
       expect(r).toMatchObject({ regions: 1, rwRegions: 1, bytes: 3 * W, rwBytes: 3 * W, rwFailedBytes: 0, failures: 0 });
     }
   });
 
-  it("échecs de lecture comptés (octets distincts), zones non rw-p à part", () => {
+  it("échecs de lecture comptés (octets distincts), zones non rw-p à part", async () => {
     const mem = Buffer.alloc(4 * W, 0x41);
     // Zone rw-p de 4 W dont tout ce qui est après 2 W est illisible ; zone r--p lisible.
-    const r = scanRegions(
+    const r = await scanRegions(
       [
         { start: 0, end: 4 * W, rw: true },
         { start: 0, end: W, rw: false },
@@ -81,8 +81,8 @@ describe("scanRegions (mémoire simulée)", () => {
     expect(r.rwRegions).toBe(1);
   });
 
-  it("zone rw-p entièrement illisible : non comptée comme lue", () => {
-    const r = scanRegions([{ start: 0, end: W, rw: true }], () => {
+  it("zone rw-p entièrement illisible : non comptée comme lue", async () => {
+    const r = await scanRegions([{ start: 0, end: W, rw: true }], () => {
       throw new Error("EIO");
     }, [n]);
     expect(r).toMatchObject({ rwRegions: 0, rwBytes: W, rwFailedBytes: W, bytes: 0 });
@@ -97,7 +97,7 @@ describe("scanProcessMemory (processus réel)", () => {
     const child = spawn(process.execPath, ["-e", code], { stdio: ["ignore", "pipe", "inherit"] });
     try {
       await new Promise<void>((r) => child.stdout.once("data", () => r()));
-      const res = scanProcessMemory(child.pid!, [needle("repère", "REPERE-vivant-d4e5f6"), needle("absent", "jamais-present-9z9z9z")]);
+      const res = await scanProcessMemory(child.pid!, [needle("repère", "REPERE-vivant-d4e5f6"), needle("absent", "jamais-present-9z9z9z")]);
       if (!res.ok) {
         if (process.env.CI) throw new Error(res.why);
         console.warn(`fouille mémoire impossible ici : ${res.why}`);

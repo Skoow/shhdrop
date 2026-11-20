@@ -619,8 +619,8 @@ describe("le serveur ne voit rien : compte (lot 16)", () => {
     expect(JSON.stringify(ag)).toMatch(/\d/);
   });
 
-  it("mémoire du processus serveur : ni mot de passe, ni KEK, ni K_compte, ni pseudo affiché, ni photo, ni lien du coffre privé", () => {
-    const res = scanProcessMemory(srv.pid, jamaisRecus());
+  it("mémoire du processus serveur : ni mot de passe, ni KEK, ni K_compte, ni pseudo affiché, ni photo, ni lien du coffre privé", async () => {
+    const res = await scanProcessMemory(srv.pid, jamaisRecus());
     if (!res.ok) {
       const why = `lecture de /proc/${srv.pid}/mem impossible (${res.why})`;
       if (process.env.CI) throw new Error(`[le serveur ne voit rien : compte] fouille mémoire obligatoire en CI : ${why}`);
@@ -631,7 +631,7 @@ describe("le serveur ne voit rien : compte (lot 16)", () => {
     expect(res.rwFailedBytes).toBeLessThanOrEqual(res.rwBytes / 2);
     expect(res.hits).toEqual([]);
     // Témoin : l'empreinte d'adresse de A2 (pages de comptes.db dans le cache de SQLite) est retrouvée.
-    const ctl = scanProcessMemory(srv.pid, [octets("e_canon de A2", eCanon(adr.a2))]);
+    const ctl = await scanProcessMemory(srv.pid, [octets("e_canon de A2", eCanon(adr.a2))]);
     expect(ctl.ok && ctl.hits).toEqual(["e_canon de A2"]);
   });
 

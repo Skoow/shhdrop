@@ -83,9 +83,15 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   await page.route("**/api/paiement/commande", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: '{"url":"https://checkout.stripe.com/c/pay/cs_test_e2e"}' }),
   );
-  await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>Stripe</title>" }));
+  // La page hébergée est demandée, puis rien n'est affiché (204 : le navigateur reste sur la
+  // page) : sous WebKit, après une page d'une autre origine servie par route.fulfill, l'onglet
+  // ne navigue plus (« Assertion error » de Playwright, run CI 44666763368, reproduit en local) ;
+  // un abort mène Chromium à une page d'erreur qui coupe la navigation suivante. La requête
+  // suffit à la preuve.
+  await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ status: 204 }));
+  const hosted = page.waitForRequest("https://checkout.stripe.com/**");
   await go.click();
-  await page.waitForURL("https://checkout.stripe.com/c/pay/cs_test_e2e");
+  expect((await hosted).url()).toBe("https://checkout.stripe.com/c/pay/cs_test_e2e");
   expect(shh.foreignRequests.every((u) => u.startsWith("https://checkout.stripe.com/"))).toBe(true);
   shh.foreignRequests.splice(0); // la redirection voulue vers la page hébergée
   // Retour : le pass en attente est lu sur l'appareil, son état demandé au vrai serveur
@@ -112,9 +118,11 @@ test("Retour : reçu, puis arrêt du renouvellement ; en attente ; sans commande
   await page.route("**/api/paiement/commande", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: '{"url":"https://checkout.stripe.com/c/pay/cs_test_2"}' }),
   );
-  await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>Stripe</title>" }));
+  // Page hébergée demandée, rien affiché (204, voir le test précédent).
+  await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ status: 204 }));
+  const hosted = page.waitForRequest(/^https:\/\/checkout\.stripe\.com\//);
   await co.locator("[data-pay]").click();
-  await page.waitForURL(/checkout\.stripe\.com/);
+  await hosted;
   shh.foreignRequests.splice(0);
   // En attente d'abord, puis reçu (webhook arrivé).
   let n = 0;

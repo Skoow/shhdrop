@@ -61,8 +61,9 @@ export const MEM_WINDOW = 2 << 20; // 2 Mio
  * zone, par fenêtres de 2 Mio qui se chevauchent de (plus longue aiguille − 1) octets :
  * une aiguille à cheval sur deux fenêtres est donc vue en entier dans l'une d'elles.
  * Impossible d'ouvrir maps/mem (EPERM, EACCES, ENOENT…) → { ok: false, why }.
+ * Asynchrone : la boucle d'événements reprend la main entre deux fenêtres (voir scanRegions).
  */
-export function scanProcessMemory(pid: number, needles: Needle[]): MemScan {
+export async function scanProcessMemory(pid: number, needles: Needle[]): Promise<MemScan> {
   let maps: string;
   let fd: number;
   try {
@@ -78,7 +79,7 @@ export function scanProcessMemory(pid: number, needles: Needle[]): MemScan {
     regions.push({ start: parseInt(m[1]!, 16), end: parseInt(m[2]!, 16), rw: m[3] === "rw-p" });
   }
   try {
-    return { ok: true, ...scanRegions(regions, (buf, len, pos) => readSync(fd, buf, 0, len, pos), needles) };
+    return { ok: true, ...(await scanRegions(regions, (buf, len, pos) => readSync(fd, buf, 0, len, pos), needles)) };
   } finally {
     closeSync(fd);
   }
@@ -86,12 +87,18 @@ export function scanProcessMemory(pid: number, needles: Needle[]): MemScan {
 
 export type Region = { start: number; end: number; rw: boolean };
 
-/** Cœur de la fouille, séparé pour être testé avec une mémoire simulée. */
-export function scanRegions(
+/**
+ * Cœur de la fouille, séparé pour être testé avec une mémoire simulée. Rend la main à la
+ * boucle d'événements après chaque fenêtre : en CI, une fouille d'un seul tenant (≈ 60 s,
+ * run 44666763368) dépassait l'IdleTimeout du serveur (60 s) sans que Node voie la connexion
+ * gardée se fermer, ni réponde aux pings des WebSocket du salon ; le test suivant tombait sur
+ * « reseau » ou un siège déconnecté.
+ */
+export async function scanRegions(
   regions: Region[],
   read: (buf: Buffer, len: number, pos: number) => number,
   needles: Needle[],
-): { hits: string[] } & MemStats {
+): Promise<{ hits: string[] } & MemStats> {
   const longest = Math.max(1, ...needles.flatMap((n) => n.forms.map((f) => f.length)));
   if (longest > MEM_WINDOW / 2) throw new Error("aiguille trop longue pour la fenêtre");
   const step = MEM_WINDOW - (longest - 1);
@@ -126,6 +133,7 @@ export function scanRegions(
         readAny = true;
         for (const l of findIn(buf.subarray(0, got), needles)) hits.add(l);
       }
+      await new Promise<void>((r) => setImmediate(r));
       if (w + len >= end) break;
     }
     if (readAny) {

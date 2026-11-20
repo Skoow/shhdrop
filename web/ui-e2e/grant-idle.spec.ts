@@ -18,6 +18,10 @@ test("contenu ouvert, retour à l'accueil, 31 min sans activité : shh.og effac�
   expect(await page.evaluate(() => sessionStorage.getItem("shh.og") ?? "")).toContain(key);
   await page.locator("header a.logo").click();
   await expect(noteRow(page)).toHaveCount(0);
+  // L'accueil est une page à part (prérendue) : attendre qu'elle soit chargée, sinon WebKit
+  // peut encore être en pleine navigation (« Execution context was destroyed », run CI 44666763368).
+  await page.waitForURL(shh.origin + "/");
+  await page.waitForLoadState("load");
   expect(await page.evaluate(() => sessionStorage.getItem("shh.og") ?? "")).toContain(key); // pas encore
   await page.clock.fastForward("31:00");
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("shh.og"))).toBeNull();
