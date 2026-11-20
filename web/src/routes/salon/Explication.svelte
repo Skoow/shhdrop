@@ -108,7 +108,7 @@
     {#if premier}<p class="note" data-pseudo-compte>{t("salon.intro.pseudo.compte")}</p>{/if}
     {#if fige}<p class="note" data-pseudo-fige>{t("salon.intro.pseudo.fige")}</p>{/if}
     <div class="actions"><Button onpress={go}>{t("salon.intro.enter")}</Button></div>
-    {#if !vue.dansLeGroupe}<p class="note" role="status">{t("salon.intro.wait")}</p>{/if}
+    {#if !vue.dansLeGroupe && !vue.createur}<p class="note" role="status">{t("salon.intro.wait")}</p>{/if}
   </div>
 </Cadre>
 

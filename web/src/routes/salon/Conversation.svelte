@@ -329,10 +329,26 @@
     return t(`salon.room.sys.${e.quoi}`, { nom: nomDe(e) });
   }
   const attente = $derived(vue.attenteDepuis === null ? "" : maintenant - vue.attenteDepuis > 30_000 ? t("salon.room.wait.long") : maintenant - vue.attenteDepuis > 2_000 ? t("salon.room.wait.short") : "");
-  const large = typeof matchMedia === "function" && matchMedia("(min-width: 1100px)").matches;
+  // Disposition large (panneau des participants à droite) : suit la fenêtre (redimensionnement, appareil tourné).
+  const mqLarge = typeof matchMedia === "function" ? matchMedia("(min-width: 1100px)") : null;
+  let large = $state(mqLarge?.matches ?? false);
+  $effect(() => {
+    if (!mqLarge) return;
+    const suivre = () => (large = mqLarge.matches);
+    mqLarge.addEventListener("change", suivre);
+    return () => mqLarge.removeEventListener("change", suivre);
+  });
+  /** Échap, où que soit le focus dans le salon : ferme le sélecteur d'émojis ou le menu d'un message (revue du 20 novembre). */
+  function echappe(e: KeyboardEvent): void {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (emojis) {
+      emojis = false;
+      saisie?.focus();
+    } else if (menu !== null) menu = null;
+  }
 </script>
 
-<svelte:window onscroll={defile} />
+<svelte:window onscroll={defile} onkeydown={echappe} />
 
 <div class="salon">
   <header class="tete">
@@ -363,12 +379,12 @@
           }}>{t("salon.room.members")}</Button>{/if}
     </div>
   </header>
-  {#if vue.appels}<Appel />{/if}
 
   <div class="corps">
     <section class="col" aria-label={t("salon.room.label")} ondragover={(e) => e.dataTransfer?.types.includes("Files") && e.preventDefault()} ondrop={deposer}>
+      {#if vue.appels}<Appel />{/if}
       {#if vue.connexion === "coupe"}<p class="bandeau" role="status">{t("salon.room.reconnect")}</p>{/if}
-      {#if !vue.dansLeGroupe}<p class="bandeau" role="status">{t("salon.room.waitgroup")}</p>{/if}
+      {#if !vue.dansLeGroupe && !vue.createur}<p class="bandeau" role="status">{t("salon.room.waitgroup")}</p>{/if}
       {#if choixSilence && !silencieux}
         <div class="silence" role="group" aria-label={t("salon.son.silence")}>
           {#each [["toujours", "salon.son.toujours"], [1, "salon.son.1h"], [8, "salon.son.8h"]] as const as [c, cle] (c)}
@@ -593,8 +609,16 @@
     flex-direction: column;
     gap: var(--sp-2);
   }
+  /* Le panneau ne dicte plus la hauteur de la page (revue du 20 novembre : 850 px de vide entre
+     le dernier message et la saisie) : il reste sous la barre du site et défile en lui-même. */
   .panneau {
-    padding-top: var(--sp-4);
+    position: sticky;
+    top: 64px;
+    align-self: start;
+    max-height: calc(100dvh - 64px);
+    overflow: auto;
+    padding: var(--sp-4) 0;
+    overscroll-behavior: contain;
   }
   .bandeau {
     margin: var(--sp-2) 0 0;
@@ -823,6 +847,20 @@
     display: flex;
     align-items: flex-end;
     gap: var(--sp-2);
+  }
+  /* Téléphone (revue du 20 novembre : le champ ne faisait plus que 93 px) : le message prend
+     toute la largeur, les outils et « Envoyer » passent dessous. */
+  @media (max-width: 600px) {
+    .ligne {
+      flex-wrap: wrap;
+    }
+    .ligne textarea {
+      order: -1;
+      flex: 1 0 100%;
+    }
+    .ligne > :global(:last-child) {
+      margin-inline-start: auto;
+    }
   }
   textarea {
     flex: 1;

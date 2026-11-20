@@ -107,12 +107,12 @@
   </div>
   <ul class="plist">
     {#each priv as k, i (k)}
-      <li class={["prow", "rv", { soon: k === "room" }]} data-priv-card style:--i="{i * 70}ms" {@attach reveal}>
+      <li class={["prow", "rv", { soon: k === "room" && !__SALONS__ }]} data-priv-card style:--i="{i * 70}ms" {@attach reveal}>
         <span class="tile-ic" aria-hidden="true">
           {#if k === "account"}<UserX size={30} strokeWidth={1.7} />{:else if k === "server"}<EyeOff size={30} strokeWidth={1.7} />{:else if k === "clean"}<Broom size={30} strokeWidth={1.7} />{:else}<TabIcon id="chat" size={30} />{/if}
         </span>
         <div>
-          <h3>{t(`home.priv.${k}.t` as Key)}{#if k === "room"}{" "}<span class="pill">{t("foot.soon")}</span>{/if}</h3>
+          <h3>{t(`home.priv.${k}.t` as Key)}{#if k === "room" && !__SALONS__}{" "}<span class="pill">{t("foot.soon")}</span>{/if}</h3>
           <!-- Avec le compte (__COMPTES__) seulement, la ligne dit ce que garde le compte (conception compte §16). -->
           <p>{t((__COMPTES__ && k === "account" ? "home.priv.account.p.comptes" : `home.priv.${k}.p`) as Key)}</p>
         </div>

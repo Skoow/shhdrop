@@ -91,7 +91,8 @@
   // Accroche coupée autour des mots mis en avant (sans HTML dans les textes).
   const lede = $derived.by(() => {
     const marks: Record<string, string> = { "\u0000": t("hero.lede.voice"), "\u0001": t("hero.lede.notes"), "\u0002": t("hero.lede.room") };
-    return t("hero.lede2", { voice: "\u0000", notes: "\u0001", room: "\u0002" })
+    // Salon en service (__SALONS__) : plus de « bientôt » (revue du 20 novembre).
+    return t(__SALONS__ ? "hero.lede2.salon" : "hero.lede2", { voice: "\u0000", notes: "\u0001", room: "\u0002" })
       .split(/(\u0000|\u0001|\u0002)/)
       .map((p) => (p in marks ? { b: marks[p]! } : { s: p }));
   });

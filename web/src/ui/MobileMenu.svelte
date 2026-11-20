@@ -70,8 +70,26 @@
     const down = (e: Event) => {
       if (!wrap?.contains(e.target as Node)) open = false;
     };
+    // Clavier (revue du 20 novembre) : le focus qui sort du menu le ferme (la page derrière est
+    // voilée : on n'y tabule pas à l'aveugle), et Échap le ferme où que soit le focus.
+    const sorti = (e: FocusEvent) => {
+      const vers = e.relatedTarget as Node | null;
+      if (vers && !wrap?.contains(vers)) open = false;
+    };
+    const touche = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(true);
+      }
+    };
     document.addEventListener("pointerdown", down, true);
-    return () => document.removeEventListener("pointerdown", down, true);
+    wrap?.addEventListener("focusout", sorti);
+    window.addEventListener("keydown", touche);
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      wrap?.removeEventListener("focusout", sorti);
+      window.removeEventListener("keydown", touche);
+    };
   });
   // Changement d'écran ou envoi qui commence : menu fermé.
   $effect(() => {
