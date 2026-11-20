@@ -307,7 +307,12 @@ describe("inscription", () => {
     // Le serveur reçoit l'adresse exacte ; le pseudo seulement en p_canon.
     const fin = srv.requetes.find((r) => r.path.endsWith("inscription/fin"))!;
     expect(fin.body.p_canon).toBe("lea");
-    expect(tout).not.toContain("Lea");
+    // Le pseudo tel qu'écrit n'est dans aucun champ lisible. Les champs opaques (chiffrés ou
+    // aléatoires, en base64url) sont écartés : sur 8 000 caractères au hasard, « Lea » y apparaît
+    // une fois sur trente par pur hasard (échec intermittent de la CI, 20 novembre).
+    const lisibles = JSON.stringify(srv.requetes, (_k, v) => (typeof v === "string" && /^[A-Za-z0-9_-]{40,}$/.test(v) ? "" : v));
+    expect(lisibles).not.toContain("Lea");
+    expect(lisibles).toContain('"p_canon":"lea"');
     expect(srv.requetes[0]!.body).toEqual({ email: "lea.dupont@exemple.fr", langue: "fr", ...PREUVE });
   });
 
