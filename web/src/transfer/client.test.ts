@@ -743,7 +743,8 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
       if (p.endsWith("/destroy")) {
         bodies.push(String(init?.body));
         headers.push(new Headers(init?.headers).get("X-Shh-Access"));
-        return new Response(null, { status: 204 });
+        // Signalement : réponse {"detruit": faux} (une voix, pas encore la moitié) ; destruction : 204.
+        return String(init?.body).includes('"report"') ? j(200, { detruit: false }) : new Response(null, { status: 204 });
       }
       if (p.endsWith("/done")) {
         keepalive.push(init?.keepalive);
@@ -755,12 +756,13 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
     const net = { fetch: f, retryDelayMs: 1 };
     const o = await openShare(LINK, PW, ORIGIN, undefined, net);
     await expect(fetchMeta(LINK, ORIGIN, net)).rejects.toBeInstanceOf(NotFoundError);
-    await o.destroy(9);
+    expect(await o.report(9)).toBe(false);
     expect(bodies).toHaveLength(1);
     const b = JSON.parse(bodies[0]!) as Record<string, unknown>;
-    expect(Object.keys(b)).toEqual(["proof", "reason", "categorie"]);
+    expect(Object.keys(b)).toEqual(["proof", "reason", "categorie", "grant"]);
     expect(b.reason).toBe("report");
     expect(b.categorie).toBe(9);
+    expect(b.grant).toBe(GRANT0); // l'octroi de cette ouverture porte la voix (20 novembre)
     expect(typeof b.proof).toBe("string");
     expect(headers[0]).toMatch(/^[A-Za-z0-9_-]{43}$/);
     await o.destroy();

@@ -485,25 +485,47 @@ export const CATEGORIES: readonly Categorie[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const CATEGORIE_AUTRE: Categorie = 10;
 
 /**
- * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy ; un signalement porte sa
- * catégorie : corps exact `{"proof":…,"reason":"report","categorie":n}` (conception compte
- * §21.10.2 ; le serveur ne garde que des compteurs en mémoire). Expéditeur (S_gestion) : POST
- * /api/manage/destroy, S_gestion en en-tête, corps vide (spec §32). keepalive : la requête
- * survit à la fermeture de la page (annulation d'un envoi, `pagehide`).
+ * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy, corps `{"proof":…}` ;
+ * seulement quand plus aucune ouverture n'est possible (sinon 409 still_open, 20 novembre).
+ * Expéditeur (S_gestion) : POST /api/manage/destroy, S_gestion en en-tête, corps vide (spec
+ * §32). keepalive : la requête survit à la fermeture de la page (annulation d'un envoi,
+ * `pagehide`).
  */
-export async function destroy(c: Ctx, a: DestroyAuth, report?: Categorie, keepalive?: boolean): Promise<void> {
-  if (report !== undefined && !CATEGORIES.includes(report)) throw new Error("categorie_invalide");
-  const r = report === undefined ? {} : { reason: "report", categorie: report };
+export async function destroy(c: Ctx, a: DestroyAuth, keepalive?: boolean): Promise<void> {
   const q: Req =
     "sGestion" in a
       ? { method: "POST", path: "/api/manage/destroy", headers: { "X-Shh-Manage": b64u(a.sGestion) }, keepalive }
       : {
           method: "POST",
           path: "/api/shares/destroy",
-          body: JSON.stringify({ proof: b64u(a.kPreuve), ...r }),
+          body: JSON.stringify({ proof: b64u(a.kPreuve) }),
           headers: { "Content-Type": "application/json", "X-Shh-Access": b64u(a.kAcces) },
         };
   await send(c, q, none);
+}
+
+/**
+ * Signalement par un destinataire (décision du propriétaire, 20 novembre) : POST
+ * /api/shares/destroy, corps exact `{"proof":…,"reason":"report","categorie":n,"grant":…}`.
+ * L'octroi de l'ouverture porte une voix ; le partage n'est effacé, pour tous, que quand les
+ * voix atteignent la moitié des ouvertures permises (arrondie au-dessus). Rend vrai si cette
+ * voix l'a effacé. Le serveur ne garde que la voix (n° d'ouverture) et des compteurs, en
+ * mémoire (conception compte §21.10.2).
+ */
+export async function report(c: Ctx, a: { kAcces: KAcces; kPreuve: KPreuve }, categorie: Categorie, grant: string): Promise<boolean> {
+  if (!CATEGORIES.includes(categorie)) throw new Error("categorie_invalide");
+  const o = await send(
+    c,
+    {
+      method: "POST",
+      path: "/api/shares/destroy",
+      body: JSON.stringify({ proof: b64u(a.kPreuve), reason: "report", categorie, grant }),
+      headers: { "Content-Type": "application/json", "X-Shh-Access": b64u(a.kAcces) },
+    },
+    readJSON,
+  );
+  if (typeof o.detruit !== "boolean") throw new BadResponse();
+  return o.detruit;
 }
 
 export type Status = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };

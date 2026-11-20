@@ -169,44 +169,135 @@ const FR: Record<InfoName, (v: V) => InfoPage> = {
       },
     ],
   }),
-  conditions: () => ({
+  conditions: (v) => ({
     title: "Conditions d'utilisation",
-    lede: "Les règles d'usage de Shhgone.",
-    draft: true,
+    lede: "Les règles d'usage de Shhgone. Mise à jour le 20 novembre 2026.",
     blocks: [
-      { h: "Usage autorisé", p: ["Shhgone sert à transmettre des contenus de façon privée. Il est interdit de l'utiliser pour diffuser des contenus illégaux ou pour nuire à autrui."] },
-      { h: "Signalement", p: ["Tout destinataire peut signaler un partage : il est alors détruit tout de suite. Voir « Signaler un abus »."] },
-      { h: "Responsabilité", p: ["À compléter par le propriétaire."] },
-      { h: "Droit applicable", p: ["À compléter par le propriétaire."] },
+      {
+        h: "Objet",
+        p: [
+          "Shhgone permet d'envoyer des fichiers, des photos, des vidéos, des messages vocaux et des notes, chiffrés sur votre appareil, par un lien et un mot de passe, sans compte. Ces conditions s'appliquent à toute utilisation du site. En utilisant Shhgone, vous les acceptez.",
+        ],
+      },
+      {
+        h: "Le service",
+        list: [
+          "Vos contenus sont chiffrés dans votre navigateur avant de partir : nous ne pouvons ni les lire, ni les retrouver, ni les rendre.",
+          `Un partage s'efface à son échéance (${v.h} h au plus en gratuit), après le nombre d'ouvertures choisi (${v.opens} au plus), ou après ${v.tries} mots de passe faux. Limites en gratuit : ${v.n} éléments et ${v.size} par partage.`,
+          "Shhgone n'est pas un service de sauvegarde : gardez vos originaux. Un lien ou un mot de passe perdu ne peut pas être retrouvé, pas même par nous.",
+        ],
+      },
+      {
+        h: "Usage autorisé",
+        p: ["Shhgone sert à transmettre des contenus de façon privée. Il est interdit de l'utiliser pour :"],
+        list: [
+          "diffuser un contenu illégal : abus sexuels sur mineurs, apologie ou provocation au terrorisme, incitation à la haine ou à la violence, contenu intime diffusé sans accord ;",
+          "harceler, menacer, escroquer ou usurper l'identité de quelqu'un ;",
+          "diffuser un logiciel malveillant ou une page d'hameçonnage ;",
+          "partager un contenu sans en avoir le droit (droits d'auteur, vie privée, données personnelles d'autrui) ;",
+          "gêner le fonctionnement du service (envois automatisés en masse, contournement des limites ou de la vérification anti-robot).",
+        ],
+      },
+      {
+        h: "Vos responsabilités",
+        p: [
+          "Vous êtes responsable de ce que vous envoyez et de la personne à qui vous l'envoyez. Transmettez le lien et le mot de passe par deux moyens différents, et seulement à qui doit les recevoir.",
+        ],
+      },
+      {
+        h: "Signalement",
+        p: [
+          "Toute personne qui a ouvert un partage peut le signaler, une fois par ouverture. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (arrondie au-dessus : 1 sur 1, 1 sur 2, 2 sur 3, 3 sur 5). Une seule personne ne peut donc pas supprimer un partage destiné à plusieurs. Voir « Signaler un abus ».",
+          "Sur décision d'une autorité, ou quand on nous transmet le lien d'un partage manifestement illégal, nous pouvons aussi le supprimer.",
+        ],
+      },
+      {
+        h: "Disponibilité",
+        p: [
+          "Le service est fourni tel quel, sans garantie de disponibilité. Il peut être interrompu pour maintenance ou après un incident ; un envoi en cours peut alors être perdu et devra être refait.",
+        ],
+      },
+      {
+        h: "Responsabilité",
+        p: [
+          "Dans les limites permises par la loi, nous ne sommes pas responsables des contenus échangés, que nous ne pouvons pas lire, ni de la disparition d'un partage effacé selon ses règles (échéance, ouvertures, mots de passe faux, signalements). Rien dans ces conditions ne limite les droits que la loi vous garantit, notamment comme consommateur.",
+        ],
+      },
+      {
+        h: "Données personnelles",
+        p: ["Ce que nous gardons, et surtout ce que nous ne gardons pas, est décrit dans la page Confidentialité."],
+      },
+      {
+        h: "Propriété intellectuelle",
+        p: [
+          "Vos contenus restent les vôtres : nous n'acquérons aucun droit sur eux. Le code de Shhgone est public, sous licence AGPL-3.0.",
+        ],
+      },
+      {
+        h: "Modifications",
+        p: ["Nous pouvons modifier ces conditions. La date de mise à jour est indiquée en haut de cette page ; la version en vigueur est celle affichée au moment de votre utilisation."],
+      },
+      {
+        h: "Droit applicable",
+        p: [
+          "Ces conditions sont soumises au droit français. En cas de litige, une solution amiable est d'abord recherchée par le contact des mentions légales ; à défaut, les tribunaux français sont compétents, sous réserve des règles qui protègent le consommateur.",
+        ],
+      },
     ],
   }),
   mentions: () => ({
     title: "Mentions légales",
-    lede: "Informations sur l'éditeur et l'hébergeur du site.",
+    lede: "Qui édite Shhgone, qui l'héberge, et comment nous joindre.",
     draft: true,
     blocks: [
-      { h: "Éditeur", list: ["Nom ou raison sociale : à compléter par le propriétaire.", "Adresse : à compléter par le propriétaire.", "Contact : à compléter par le propriétaire.", "Directeur de la publication : à compléter par le propriétaire."] },
-      { h: "Hébergeur", list: ["Nom : à compléter par le propriétaire.", "Adresse : à compléter par le propriétaire."] },
-      { h: "Code source", p: ["Le code de Shhgone est public, sous licence AGPL-3.0."] },
+      {
+        h: "Éditeur",
+        list: [
+          "Nom ou raison sociale : à compléter par le propriétaire.",
+          "Statut et numéro d'immatriculation (si société) : à compléter par le propriétaire.",
+          "Adresse : à compléter par le propriétaire.",
+          "Contact : à compléter par le propriétaire.",
+          "Directeur de la publication : à compléter par le propriétaire.",
+        ],
+      },
+      {
+        h: "Hébergeur",
+        list: ["Nom ou raison sociale : à compléter par le propriétaire.", "Adresse : à compléter par le propriétaire.", "Téléphone : à compléter par le propriétaire."],
+      },
+      {
+        h: "Contact et contenus illicites",
+        p: [
+          "Pour signaler un contenu illicite : depuis le partage (« Signaler ce partage »), ou au contact de l'éditeur en joignant le lien ; vous pouvez aussi le signaler aux autorités (en France : PHAROS, internet-signalement.gouv.fr).",
+          "Point de contact unique pour les autorités et les utilisateurs (règlement européen sur les services numériques, articles 11 et 12) : le contact de l'éditeur, en français ou en anglais.",
+        ],
+      },
+      {
+        h: "Données personnelles",
+        p: ["Voir la page Confidentialité. Pour exercer vos droits, utilisez le contact de l'éditeur ; vous pouvez aussi saisir la CNIL (cnil.fr)."],
+      },
+      {
+        h: "Propriété intellectuelle et code source",
+        p: ["Le nom et le logo Shhgone appartiennent à l'éditeur. Le code de Shhgone est public, sous licence AGPL-3.0."],
+      },
     ],
   }),
   signaler: (v) => ({
     title: "Signaler un abus",
-    lede: "Un partage illégal ou malveillant ? Si vous avez le lien et le mot de passe, vous pouvez le détruire vous-même, tout de suite.",
+    lede: "Un partage illégal ou malveillant ? Si vous l'avez ouvert, vous pouvez le signaler en deux gestes.",
     blocks: [
       {
         h: "Depuis le partage",
         list: [
           "Ouvrez le partage avec son lien et son mot de passe.",
-          "Le partage ouvert, choisissez « Signaler ce partage » en bas de la page, dans le pied (colonne « Confiance »), choisissez ce qui se passe, puis « Signaler et détruire ».",
-          "Le partage est détruit aussitôt pour tout le monde : les téléchargements en cours sont coupés, aucune ouverture ne reste possible.",
+          "En bas du contenu, choisissez « Signaler ce partage », dites ce qui se passe, puis « Signaler ».",
+          "Chaque ouverture compte pour une voix. Le partage est supprimé pour tout le monde quand la moitié de ses ouvertures permises l'ont signalé (1 sur 1, 1 sur 2, 2 sur 3, 3 sur 5) : les téléchargements en cours sont coupés, plus aucune ouverture n'est possible. Sinon, votre signalement est compté et le partage reste ouvert aux autres.",
         ],
       },
       {
         h: "Ce que nous recevons",
         p: [
-          "Le signalement ne contient que la catégorie choisie (par exemple « Arnaque ») : ni le contenu, ni qui vous êtes. Nous ne pouvons pas lire le partage. Nous comptons, en mémoire seulement, les signalements par catégorie depuis le dernier démarrage du serveur et leur nombre dans l'heure, pour repérer un abus massif ; rien n'est écrit sur disque.",
-          `Sans le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit).`,
+          "Le signalement ne contient que la catégorie choisie (par exemple « Arnaque ») et la preuve que vous avez ouvert le partage : ni le contenu, ni qui vous êtes. Nous ne pouvons pas lire le partage. Nous comptons, en mémoire seulement, les signalements par catégorie depuis le dernier démarrage du serveur et leur nombre dans l'heure, pour repérer un abus massif ; rien n'est écrit sur disque.",
+          `Sans le lien et le mot de passe, rien ne peut être fait sur le partage : il s'effacera seul à son échéance (${v.h} h au plus en gratuit). Pour un contenu illégal, vous pouvez aussi écrire au contact des mentions légales en joignant le lien.`,
         ],
       },
     ],
@@ -342,44 +433,127 @@ const EN: Record<InfoName, (v: V) => InfoPage> = {
       },
     ],
   }),
-  conditions: () => ({
+  conditions: (v) => ({
     title: "Terms of use",
-    lede: "The rules for using Shhgone.",
-    draft: true,
+    lede: "The rules for using Shhgone. Updated on 20 November 2026.",
     blocks: [
-      { h: "Allowed use", p: ["Shhgone is for sending content privately. Using it to spread illegal content or to harm others is forbidden."] },
-      { h: "Reporting", p: ["Any recipient can report a share: it is destroyed at once. See “Report abuse”."] },
-      { h: "Liability", p: ["To be completed by the owner."] },
-      { h: "Governing law", p: ["To be completed by the owner."] },
+      {
+        h: "Purpose",
+        p: [
+          "Shhgone lets you send files, photos, videos, voice messages and notes, encrypted on your device, with a link and a password, without an account. These terms apply to any use of the site. By using Shhgone, you accept them.",
+        ],
+      },
+      {
+        h: "The service",
+        list: [
+          "Your content is encrypted in your browser before it leaves: we can neither read it, find it, nor give it back.",
+          `A share erases itself when it expires (${v.h} h at most on the free plan), after the chosen number of opens (${v.opens} at most), or after ${v.tries} wrong passwords. Free limits: ${v.n} items and ${v.size} per share.`,
+          "Shhgone is not a backup service: keep your originals. A lost link or password cannot be recovered, not even by us.",
+        ],
+      },
+      {
+        h: "Allowed use",
+        p: ["Shhgone is for sending content privately. You may not use it to:"],
+        list: [
+          "spread illegal content: child sexual abuse, glorifying or inciting terrorism, inciting hatred or violence, intimate content shared without consent;",
+          "harass, threaten, defraud or impersonate anyone;",
+          "spread malware or a phishing page;",
+          "share content you have no right to share (copyright, privacy, other people's personal data);",
+          "disrupt the service (mass automated sending, getting around the limits or the anti-bot check).",
+        ],
+      },
+      {
+        h: "Your responsibilities",
+        p: [
+          "You are responsible for what you send and for who you send it to. Pass on the link and the password through two different channels, and only to the person who should receive them.",
+        ],
+      },
+      {
+        h: "Reporting",
+        p: [
+          "Anyone who opened a share can report it, once per open. The share is deleted for everyone once half of its allowed opens have reported it (rounded up: 1 of 1, 1 of 2, 2 of 3, 3 of 5). One person alone therefore cannot delete a share meant for several people. See “Report abuse”.",
+          "On the decision of an authority, or when we are sent the link to a share that is clearly illegal, we may also delete it.",
+        ],
+      },
+      {
+        h: "Availability",
+        p: [
+          "The service is provided as is, with no guarantee of availability. It may be interrupted for maintenance or after an incident; an upload in progress may then be lost and will have to be done again.",
+        ],
+      },
+      {
+        h: "Liability",
+        p: [
+          "To the extent permitted by law, we are not liable for the content exchanged, which we cannot read, nor for a share disappearing under its rules (expiry, opens, wrong passwords, reports). Nothing in these terms limits the rights the law gives you, in particular as a consumer.",
+        ],
+      },
+      {
+        h: "Personal data",
+        p: ["What we keep, and above all what we don't, is described on the Privacy page."],
+      },
+      {
+        h: "Intellectual property",
+        p: ["Your content stays yours: we acquire no rights over it. Shhgone's code is public, under the AGPL-3.0 license."],
+      },
+      {
+        h: "Changes",
+        p: ["We may change these terms. The update date is shown at the top of this page; the version in force is the one shown when you use the service."],
+      },
+      {
+        h: "Governing law",
+        p: [
+          "These terms are governed by French law. In case of a dispute, an amicable solution is sought first through the contact in the legal notice; failing that, the French courts have jurisdiction, subject to the rules that protect consumers.",
+        ],
+      },
     ],
   }),
   mentions: () => ({
     title: "Legal notice",
-    lede: "Information about the publisher and the host of this site.",
+    lede: "Who publishes Shhgone, who hosts it, and how to reach us.",
     draft: true,
     blocks: [
-      { h: "Publisher", list: ["Name or company: to be completed by the owner.", "Address: to be completed by the owner.", "Contact: to be completed by the owner.", "Publication director: to be completed by the owner."] },
-      { h: "Host", list: ["Name: to be completed by the owner.", "Address: to be completed by the owner."] },
-      { h: "Source code", p: ["Shhgone's code is public, under the AGPL-3.0 license."] },
+      {
+        h: "Publisher",
+        list: [
+          "Name or company: to be completed by the owner.",
+          "Status and registration number (if a company): to be completed by the owner.",
+          "Address: to be completed by the owner.",
+          "Contact: to be completed by the owner.",
+          "Publication director: to be completed by the owner.",
+        ],
+      },
+      { h: "Host", list: ["Name or company: to be completed by the owner.", "Address: to be completed by the owner.", "Phone: to be completed by the owner."] },
+      {
+        h: "Contact and illegal content",
+        p: [
+          "To report illegal content: from the share (“Report this share”), or to the publisher's contact with the link; you can also report it to the authorities (in France: PHAROS, internet-signalement.gouv.fr).",
+          "Single point of contact for authorities and users (EU Digital Services Act, articles 11 and 12): the publisher's contact, in French or English.",
+        ],
+      },
+      {
+        h: "Personal data",
+        p: ["See the Privacy page. To exercise your rights, use the publisher's contact; you can also complain to the CNIL (cnil.fr)."],
+      },
+      { h: "Intellectual property and source code", p: ["The Shhgone name and logo belong to the publisher. Shhgone's code is public, under the AGPL-3.0 license."] },
     ],
   }),
   signaler: (v) => ({
     title: "Report abuse",
-    lede: "An illegal or malicious share? If you have the link and the password, you can destroy it yourself, right away.",
+    lede: "An illegal or malicious share? If you opened it, you can report it in two steps.",
     blocks: [
       {
         h: "From the share",
         list: [
           "Open the share with its link and password.",
-          "With the share open, choose “Report this share” at the bottom of the page, in the footer (“Trust” column), choose what is going on, then “Report and destroy”.",
-          "The share is destroyed at once for everyone: downloads in progress are cut, no open remains possible.",
+          "Below the content, choose “Report this share”, say what is going on, then “Report”.",
+          "Each open counts as one vote. The share is deleted for everyone once half of its allowed opens have reported it (1 of 1, 1 of 2, 2 of 3, 3 of 5): downloads in progress are cut, no open remains possible. Otherwise your report is counted and the share stays open to the others.",
         ],
       },
       {
         h: "What we receive",
         p: [
-          "A report holds only the category you chose (for example “Scam”): neither the content nor who you are. We cannot read the share. We count, in memory only, reports per category since the server last started and their number per hour, to spot mass abuse; nothing is written to disk.",
-          `Without the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan).`,
+          "A report holds only the category you chose (for example “Scam”) and the proof that you opened the share: neither the content nor who you are. We cannot read the share. We count, in memory only, reports per category since the server last started and their number per hour, to spot mass abuse; nothing is written to disk.",
+          `Without the link and the password, nothing can be done to the share: it erases itself when it expires (${v.h} h at most on the free plan). For illegal content, you can also write to the contact in the legal notice with the link.`,
         ],
       },
     ],

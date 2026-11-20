@@ -18,6 +18,8 @@ describe("interface publique", () => {
         "TITLE_MAX",
         "GrantInvalidError",
         "ReopenLimitError",
+        // Destruction par un destinataire avant la dernière ouverture (20 novembre).
+        "StillOpenError",
         "grantTag",
         "CHUNK",
         "SEG_CHUNKS",

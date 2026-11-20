@@ -78,9 +78,8 @@ func TestDestroyAfterLastOpen(t *testing.T) {
 	k := newKeys()
 	c := e.create(t, "", k, 1, 1)
 	e.upload(t, c, 1)
-	e.unlock(t, c.ID, k)
-	body := mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "reason": "report"})
-	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: body}), 204, "")
+	body := reportBody(k, e.grant(t, k), nil)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: body}), 200, detruitOui)
 	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: body}), 404, notFound)
 }
 

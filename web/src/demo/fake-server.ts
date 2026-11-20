@@ -823,25 +823,51 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     return s.state === "uploading" ? s.uploadDeadline > t : s.expiresAt > t;
   }
 
-  /** Destinataire : K_accès en en-tête, K_preuve dans le corps (POST /api/shares/destroy). */
+  /** Voix de signalement par partage (n° d'ouverture), en mémoire, comme share/report.go. */
+  const votes = new Map<string, Set<number>>();
+  /** Voix qui effacent un partage de maxOpens ouvertures permises (moitié, arrondie au-dessus). */
+  const reportsNeeded = (maxOpens: number) => Math.max(1, Math.ceil(maxOpens / 2));
+
+  /**
+   * Destinataire : K_accès en en-tête, K_preuve dans le corps (POST /api/shares/destroy). Sans
+   * motif : destruction, seulement quand plus aucune ouverture n'est possible (409 still_open).
+   * Signalement (20 novembre) : une voix par ouverture, prouvée par son octroi (`grant`) ;
+   * effacé quand les voix atteignent la moitié des ouvertures permises. Comme le serveur.
+   */
   async function destroy(req: Request): Promise<Response> {
-    const b = await readJSON(req, ["proof", "reason", "categorie"]);
+    const b = await readJSON(req, ["proof", "reason", "categorie", "grant"]);
     // Motif fermé (spec §36 S14) : absent, ou exactement "report" ; catégorie (conception compte
     // §21.10.2) : entier 1 à 10, seulement avec "report" ; absente : « Autre ». Comme le serveur.
     const report = "reason" in b;
-    if (report && b.reason !== "report") throw badRequest();
+    if (report && (b.reason !== "report" || typeof b.grant !== "string")) throw badRequest();
+    if (!report && "grant" in b) throw badRequest();
     if ("categorie" in b && (!report || !Number.isInteger(b.categorie) || (b.categorie as number) < 1 || (b.categorie as number) > 10)) throw badRequest();
     const ka = headerSecret(req, "X-Shh-Access");
     const kp = decodeB64(b.proof, 32);
     const e = await find(ka, "accessV");
     if (e === undefined || !isAlive(e[1])) throw notFound();
     const [id, s] = e;
-    if (s.proofV !== null && (await matches(kp, s.proofV))) {
-      retire(id, !report, now());
+    if (s.proofV === null || !(await matches(kp, s.proofV))) {
+      await countFailure(id, s); // K_accès juste, K_preuve faux : un essai
+      throw notFound();
+    }
+    if (!report) {
+      if (s.state !== "draining") throw new HttpFail(409, "still_open");
+      votes.delete(id);
+      retire(id, true, now());
       return empty(204);
     }
-    await countFailure(id, s); // K_accès juste, K_preuve faux : un essai
-    throw notFound();
+    const x = grantStr.get(b.grant as string);
+    if (x === undefined || x.id !== id || x.exp <= now()) throw new HttpFail(409, "grant_invalid");
+    const v = votes.get(id) ?? new Set<number>();
+    v.add(x.openN);
+    votes.set(id, v);
+    const gone = v.size >= reportsNeeded(s.maxOpens ?? 1);
+    if (gone) {
+      votes.delete(id);
+      retire(id, false, now());
+    }
+    return json(200, { detruit: gone });
   }
 
   /** Expéditeur : S_gestion en en-tête, corps vide (/api/manage/*). */

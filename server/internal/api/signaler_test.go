@@ -57,14 +57,19 @@ func TestCategorieBornesSalon(t *testing.T) {
 // comme pour le salon ; absente, comptée 10 ; un refus laisse le partage intact.
 func TestCategorieBornesPartage(t *testing.T) {
 	e := newEnv(t, false, nil)
+	grants := map[string]string{}
 	partage := func() keys {
 		e.clk.Add(time.Minute)
 		k := newKeys()
 		c := e.create(t, "", k, 1, 1)
 		e.upload(t, c, 1)
+		grants[string(k.preuve)] = e.grant(t, k) // l'unique ouverture : sa voix suffit
 		return k
 	}
 	detruire := func(k keys, corps map[string]any) (int, string) {
+		if corps["reason"] != nil {
+			corps["grant"] = grants[string(k.preuve)]
+		}
 		corps["proof"] = enc.EncodeToString(k.preuve)
 		w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: mustJSON(corps)})
 		return w.Code, strings.TrimSpace(w.Body.String())
@@ -77,11 +82,10 @@ func TestCategorieBornesPartage(t *testing.T) {
 			t.Errorf("%v : %d %s", c, code, body)
 		}
 	}
-	expect(t, e.do(req{method: "GET", path: "/api/shares/meta", hdr: access(k)}), 200, "") // intact
-	if code, _ := detruire(k, map[string]any{"reason": "report", "categorie": 9}); code != 204 {
+	if code, _ := detruire(k, map[string]any{"reason": "report", "categorie": 9}); code != 200 {
 		t.Fatal(code)
 	}
-	if code, _ := detruire(partage(), map[string]any{"reason": "report"}); code != 204 {
+	if code, _ := detruire(partage(), map[string]any{"reason": "report"}); code != 200 {
 		t.Fatal(code)
 	}
 	if code, _ := detruire(partage(), map[string]any{}); code != 204 { // destruction simple : non comptée
@@ -125,9 +129,8 @@ func TestCategorieJamaisSurDisque(t *testing.T) {
 	k := newKeys()
 	c := e.create(t, "", k, 1, 1)
 	e.upload(t, c, 1)
-	w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-		body: mustJSON(map[string]any{"proof": enc.EncodeToString(k.preuve), "reason": "report", "categorie": 7})})
-	expect(t, w, 204, "")
+	w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, e.grant(t, k), map[string]any{"categorie": 7})})
+	expect(t, w, 200, detruitOui)
 	ks := newKeys()
 	ms := salonExclusion(t, e, ks, 4, 1)
 	if r := e.signaler(map[string]string{"X-Shh-Membre": ms[1].jeton}, `{"categorie":7}`); r.code != 200 {

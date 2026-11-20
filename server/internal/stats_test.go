@@ -52,6 +52,8 @@ var allowedMaps = map[string]string{
 	"captcha/captcha.go:used":           "§9.5 défis anti-robot consommés",
 	"captcha/captcha.go:creates":        "§9.5 créations de l'heure par connexion",
 	"share/budget.go:m":                 "§9.5 budget de lecture par ouverture",
+	"share/report.go:m":                 "§9.5 voix de signalement d'un partage (20 novembre)",
+	"share/report.go:votes":             "§9.5 voix de signalement d'un partage (20 novembre)",
 	"share/service.go:up":               "§9.5 colonnes d'un partage vivant (échéance d'envoi, dernier segment), en mémoire (§36 S5, S12)",
 	"share/service.go:purge":            "§9.5 colonnes d'un partage vivant (purge d'un « draining »), en mémoire (§36 S12)",
 	"share/service.go:part":             "§9.5 colonnes d'un partage vivant (morceaux reçus d'un segment partagé, audit H-2), en mémoire",

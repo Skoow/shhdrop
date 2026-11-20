@@ -9,6 +9,7 @@ import {
   GrantInvalidError,
   NotFoundError,
   ReopenLimitError,
+  StillOpenError,
   collectToBlob,
   createShare,
   destroyShare,
@@ -120,10 +121,10 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const o = await openShare(r.link, PW, ORIGIN, undefined, net);
     expect(await shareStatus(r.manage, ORIGIN, net)).toMatchObject({ opensUsed: 1, maxOpens: 1, state: "draining" });
     await expect(openShare(r.link, PW, ORIGIN, undefined, net)).rejects.toBeInstanceOf(NotFoundError);
-    await o.destroy(10);
+    expect(await o.report(10)).toBe(true);
     expect(fake.shares()).toBe(0);
     await o.done();
-    expect(statuses).toContain("POST /api/shares/destroy 204");
+    expect(statuses).toContain("POST /api/shares/destroy 200");
     expect(statuses.at(-1)).toBe("POST /api/shares/done 410"); // jeton valide, partage disparu (spec §41.8)
   });
 
@@ -214,7 +215,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     expect(unlocks[0]!.length).toBe(unlocks[1]!.length);
   });
 
-  it("destroyShare par le lien de gestion, puis par lien + mot de passe", async ({ expect }) => {
+  it("destroyShare par le lien de gestion ; par lien + mot de passe : refusé tant qu'une ouverture reste (20 novembre)", async ({ expect }) => {
     const { fake, net } = setup();
     const a = await share(net);
     await destroyShare(a.manage, ORIGIN, net);
@@ -222,8 +223,8 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const b = await share(net);
     await expect(destroyShare(b.link, ORIGIN, { password: "faux-mot-de-passe", ...net })).rejects.toBeInstanceOf(NotFoundError);
     expect(fake.shares()).toBe(1); // un essai compté, pas de destruction
-    await destroyShare(b.link, ORIGIN, { password: PW, ...net });
-    expect(fake.shares()).toBe(0);
+    await expect(destroyShare(b.link, ORIGIN, { password: PW, ...net })).rejects.toBeInstanceOf(StillOpenError);
+    expect(fake.shares()).toBe(1);
   });
 
   it("expiration (horloge injectée) → 404 partout", async ({ expect }) => {
@@ -259,7 +260,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
 
   it("destruction faite ici : la surveillance en cours rend « stop », pas « gone » (l'écran de fin vient de destroy)", async ({ expect }) => {
     const { net } = setup({ watchHoldMs: 10_000 });
-    const r = await share(net, 2);
+    const r = await share(net, 1); // dernière ouverture : seule à pouvoir détruire (20 novembre)
     const o = await openShare(r.link, PW, ORIGIN, undefined, net);
     const pending = o.watch();
     await o.destroy();
@@ -281,15 +282,17 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const { net, statuses } = setup({ rateBytesPerS: 1e9 });
     const r = await share(net, 2, [bigFile()]);
     const a = await openShare(r.link, PW, ORIGIN, undefined, net);
-    await a.destroy(1);
+    expect(await a.report(1)).toBe(true); // 2 ouvertures permises : une voix suffit
     await expect(a.item(0)).rejects.toThrow();
     expect(statuses, statuses.join("\n")).toContain("GET /api/shares/segments/0 410");
     const fake2 = createFakeServer();
     // Catégorie (conception compte §21.10.2) : entier 1 à 10, seulement avec "report" (comme le serveur).
     const bad: Record<string, unknown>[] = [
       ...["ReperRaison", "", "REPORT", null].map((reason) => ({ reason })),
-      ...[0, 11, 1.5, "3", null].map((categorie) => ({ reason: "report", categorie })),
+      ...[0, 11, 1.5, "3", null].map((categorie) => ({ reason: "report", categorie, grant: "g" })),
       { categorie: 3 },
+      { reason: "report" }, // signalement sans octroi (20 novembre)
+      { grant: "g" }, // octroi sans signalement
     ];
     for (const extra of bad) {
       const res = await fake2.handle(

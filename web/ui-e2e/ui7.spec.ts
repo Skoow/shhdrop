@@ -99,7 +99,8 @@ test("destinataire : plus de « Signaler » en haut ; le lien du pied ouvre la c
   await page.goto(sent.link);
   await unlock(page, sent.password);
   await expect(page.locator("li.row").filter({ hasText: "foret-brume.jpg" })).toBeVisible();
-  await expect(page.locator("main").getByRole("button", { name: /Signaler/ })).toHaveCount(0);
+  // 20 novembre : « Signaler ce partage » aussi sous le contenu, bien visible.
+  await expect(page.locator("main [data-report-visible]")).toBeVisible();
   const foot = page.locator("footer[data-foot]");
   await expect(foot).toBeVisible(); // téléphone compris : sinon plus aucun moyen de signaler
   const report = foot.getByRole("button", { name: "Signaler ce partage" });

@@ -4,8 +4,9 @@
 // - Sortie de page (pagehide, démontage) : wipe() et révocation seulement, SANS done() (spec
 //   §41.4, D42-22) : l'ouverture reste valable jusqu'à l'échéance, pour qu'un rechargement ou un
 //   retour depuis ce navigateur la rouvre.
-// - Détruire, Signaler : opened.destroy() (ou destroy(catégorie), seule la catégorie compte), puis
-//   wipe() ; la dissolution (onDestroyed) ne commence qu'après la réponse du serveur.
+// - Détruire : opened.destroy(), puis wipe() ; la dissolution (onDestroyed) ne commence qu'après
+//   la réponse du serveur. Signaler : opened.report(catégorie), une voix (20 novembre) : si elle
+//   efface le partage, même fin ; sinon « reported », la lecture continue, rien n'est effacé.
 import { LimitError, NotFoundError, type Categorie, type Opened } from "../index";
 import { revokeAll } from "../viewers/blobs";
 
@@ -30,11 +31,12 @@ export async function finish(opened: Opened): Promise<void> {
   }
 }
 
-export type DestroyOutcome = "destroyed" | "gone" | "network" | "limit";
+export type DestroyOutcome = "destroyed" | "reported" | "gone" | "network" | "limit";
 
 /**
- * Détruire (report = false) ou Signaler (report = true) depuis l'écran de contenu.
+ * Détruire (report = null) ou Signaler (report = catégorie) depuis l'écran de contenu.
  * - succès → wipe(), révocation, onDestroyed(), « destroyed » ;
+ * - signalement compté sans effacer (moins de la moitié des ouvertures) → « reported » ;
  * - NotFoundError (déjà expiré ou détruit) → même fin, « gone » ;
  * - 429 (LimitError) → rien n'est effacé, « limit » : « Trop de demandes… » (ruling 7) ;
  * - toute autre erreur (réseau) → rien n'est effacé, « network » : Réessayer reste possible.
@@ -46,7 +48,9 @@ export async function destroyFromContent(
 ): Promise<DestroyOutcome> {
   let outcome: DestroyOutcome;
   try {
-    await (report !== null ? opened.destroy(report) : opened.destroy());
+    if (report !== null) {
+      if (!(await opened.report(report))) return "reported";
+    } else await opened.destroy();
     outcome = "destroyed";
   } catch (e) {
     if (e instanceof LimitError) return "limit";

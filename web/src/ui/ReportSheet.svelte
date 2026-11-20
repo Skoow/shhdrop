@@ -6,7 +6,7 @@
   //    navigateur). Catégorie facultative (décision du propriétaire du 14 novembre) : « Autre »
   //    est choisi d'avance, « Continuer » n'est jamais bloqué.
   // 2. Rappel de la catégorie (« Modifier »), ce qui va se passer, PHAROS en bandeau pour les codes
-  //    1 et 2 (la phrase des autorités reste pour les autres), « Signaler et détruire » (partage)
+  //    1 et 2 (la phrase des autorités reste pour les autres), « Signaler » (partage, une voix : 20 novembre)
   //    ou « Quitter et signaler » (salon, avec ses écrans C-5) ; focus sur « Annuler ».
   // Rien ne part avant le bouton de l'étape 2 : `onconfirm(catégorie)` fait la requête.
   import { tick } from "svelte";

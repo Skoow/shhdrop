@@ -9,6 +9,7 @@ export {
   PREPARED_MIN_LEFT_MS,
   CorruptError,
   GrantInvalidError,
+  StillOpenError,
   ReopenLimitError,
   grantTag,
   LimitError,

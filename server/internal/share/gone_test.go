@@ -168,7 +168,13 @@ func TestDeleteDuringDownloadGrace(t *testing.T) {
 		kill func(s *Service, k keys, id string) error
 	}{
 		{"expéditeur", func(s *Service, k keys, _ string) error { return s.DestroyManaged(k.gestion) }},
-		{"destinataire", func(s *Service, k keys, _ string) error { return s.DestroyWithProof(k.acces, k.preuve, false) }},
+		{"destinataire", func(s *Service, k keys, id string) error {
+			// Dernière ouverture permise prise : seul ce cas permet au destinataire de détruire.
+			if _, _, err := s.Unlock(id, k.acces, k.preuve); err != nil {
+				return err
+			}
+			return s.DestroyWithProof(k.acces, k.preuve)
+		}},
 		{"5 mots de passe faux", func(s *Service, k keys, id string) error {
 			for i := 0; i < maxAttempts; i++ {
 				s.Unlock(id, k.acces, rnd(32))
@@ -248,13 +254,15 @@ func TestDetachedClosedAtDone(t *testing.T) {
 // Exceptions sans grâce : signalement et destruction par l'administrateur coupent tous les
 // flux en cours (octets reçus < taille) ; aucune requête suivante n'est servie.
 func TestReportAndAdminCutStreams(t *testing.T) {
+	var grant2 string // octroi de la seconde ouverture, posé avant chaque cas
 	for _, tc := range []struct {
 		name string
 		kill func(s *Service, k keys, id string)
 	}{
-		{"signalement", func(s *Service, k keys, _ string) {
-			if err := s.DestroyWithProof(k.acces, k.preuve, true); err != nil {
-				t.Fatal(err)
+		{"signalement (partage de 2 ouvertures : une voix suffit)", func(s *Service, k keys, _ string) {
+			// La seconde ouverture signale avec son octroi : 1 voix, ReportsNeeded(2) = 1.
+			if gone, err := s.Report(k.acces, k.preuve, grant2); err != nil || !gone {
+				t.Fatal(gone, err)
 			}
 		}},
 		{"administrateur", func(s *Service, k keys, _ string) {
@@ -276,7 +284,12 @@ func TestReportAndAdminCutStreams(t *testing.T) {
 			k := newKeys()
 			id := ready(t, s, k, gb, 24, 2)
 			o1, _, _ := s.Unlock(id, k.acces, k.preuve)
-			o2, _, _ := s.Unlock(id, k.acces, k.preuve)
+			op2, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			o2 := op2.N
+			grant2 = op2.Grant
 			w, err := s.Watch(id, o2)
 			if err != nil {
 				t.Fatal(err)
@@ -361,9 +374,10 @@ func TestWatch(t *testing.T) {
 	}
 }
 
-// Audit F2 : un signalement après l'échéance ou une destruction coupe aussi les lectures en
-// grâce (spec §41.8 : « signalement : aucune grâce »). Réponse inchangée (introuvable, comme
-// tout partage disparu) ; il exige K_accès et K_preuve, comme un signalement ordinaire.
+// Audit F2, revu le 20 novembre : un signalement ne vise plus qu'un partage encore ouvert aux
+// ouvertures. Après l'échéance ou une destruction, il est refusé (introuvable) et ne coupe
+// rien : sinon une seule personne pourrait couper la lecture des autres (règle des voix,
+// report.go). Les lectures en grâce finissent normalement.
 func TestReportCutsGraceReads(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -398,24 +412,15 @@ func TestReportCutsGraceReads(t *testing.T) {
 			}
 			defer seg.Close()
 			tc.end(t, s, c, k, id)
-			// Mauvaise preuve : rien n'est coupé.
-			if err := s.DestroyWithProof(k.acces, rnd(32), true); !errors.Is(err, ErrNotFound) {
-				t.Fatal(err)
+			for _, p := range [][]byte{rnd(32), k.preuve} {
+				if _, err := s.Report(k.acces, p, "x"); !errors.Is(err, ErrNotFound) {
+					t.Fatal("réponse :", err)
+				}
 			}
 			if seg.Context().Err() != nil {
-				t.Fatal("flux coupé sans la bonne preuve")
-			}
-			if err := s.DestroyWithProof(k.acces, k.preuve, true); !errors.Is(err, ErrNotFound) {
-				t.Fatal("réponse :", err)
-			}
-			if seg.Context().Err() == nil {
-				t.Fatal("flux en grâce non coupé par le signalement")
+				t.Fatal("flux en grâce coupé par un signalement sur un partage fermé")
 			}
 			seg.Close()
-			mustGone(t, s, id, 2, o1)
-			if n := heldFDs(t, s, id); n > 0 {
-				t.Fatal("descripteur encore ouvert", n)
-			}
 		})
 	}
 }

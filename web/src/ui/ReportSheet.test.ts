@@ -2,7 +2,7 @@
 // Signalement avec catégories (conception compte §21.10, §21.15.7 ; plan du compte, lot 14 ;
 // décision du propriétaire du 14 novembre : catégorie facultative, « Autre » par défaut).
 // Dix catégories dans l'ordre fixe des codes 1 à 10, en boutons radio natifs d'un même groupe
-// (flèches du clavier données par le navigateur) ; aucune requête avant « Signaler et détruire » ;
+// (flèches du clavier données par le navigateur) ; aucune requête avant « Signaler » ;
 // PHAROS en bandeau pour les codes 1 et 2 ; focus sur « Annuler » à l'étape de confirmation.
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,16 +81,16 @@ describe("ReportSheet", () => {
     expect(bouton("Continuer").getAttribute("aria-disabled")).not.toBe("true");
   });
 
-  it("aucune requête avant « Signaler et détruire » ; la catégorie choisie part ; « Annuler » a le focus à l'étape 2", async () => {
+  it("aucune requête avant « Signaler » ; la catégorie choisie part ; « Annuler » a le focus à l'étape 2", async () => {
     const onconfirm = vi.fn(async () => null);
     await ouvrir({ sorte: "partage", onconfirm });
     choisir(6);
     await presser("Continuer");
     expect(onconfirm).not.toHaveBeenCalled();
     expect(texte()).toContain("Harcèlement");
-    expect(texte()).toContain("Le partage sera détruit tout de suite pour tout le monde. Nous ne voyons pas le contenu et ne gardons que la catégorie, sans rien qui vous identifie.");
+    expect(texte()).toContain("Chaque personne qui a ouvert ce partage compte pour une voix. Il est supprimé pour tout le monde quand la moitié des ouvertures permises l'ont signalé. Nous ne voyons pas le contenu et ne gardons que la catégorie, sans rien qui vous identifie.");
     expect(document.activeElement).toBe(bouton("Annuler"));
-    await presser("Signaler et détruire");
+    await presser("Signaler");
     expect(onconfirm).toHaveBeenCalledExactlyOnceWith(6);
   });
 
@@ -98,7 +98,7 @@ describe("ReportSheet", () => {
     const onconfirm = vi.fn(async () => null);
     await ouvrir({ sorte: "partage", onconfirm });
     await presser("Continuer");
-    await presser("Signaler et détruire");
+    await presser("Signaler");
     expect(onconfirm).toHaveBeenCalledExactlyOnceWith(10);
   });
 
@@ -111,7 +111,7 @@ describe("ReportSheet", () => {
       const banner = dlg().querySelector(".banner.warn");
       if (n <= 2) {
         expect(banner, `catégorie ${n}`).not.toBeNull();
-        expect(banner!.textContent!.replace(/\s+/g, " ")).toContain("Vous pouvez aussi le signaler aux autorités : PHAROS, internet-signalement.gouv.fr. Si vous avez le lien et le mot de passe, vous pouvez aussi le détruire vous-même : voir la page Signaler un abus.");
+        expect(banner!.textContent!.replace(/\s+/g, " ")).toContain("Vous pouvez aussi le signaler aux autorités : PHAROS, internet-signalement.gouv.fr. Plus de détails sur la page Signaler un abus.");
         const liens = [...banner!.querySelectorAll("a")];
         expect(liens.map((a) => a.getAttribute("href"))).toEqual(["https://www.internet-signalement.gouv.fr/", "/signaler"]);
         for (const a of liens) expect(a.getAttribute("rel")).toBe("noopener noreferrer");
@@ -140,7 +140,7 @@ describe("ReportSheet", () => {
     await ouvrir({ sorte: "partage", onconfirm });
     choisir(4);
     await presser("Continuer");
-    await presser("Signaler et détruire");
+    await presser("Signaler");
     expect(dlg().querySelector("[role=alert]")!.textContent).toContain("Connexion impossible");
     expect(dlg().open).toBe(true);
   });

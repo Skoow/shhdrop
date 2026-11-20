@@ -648,10 +648,10 @@ func TestDestroy(t *testing.T) {
 	if err := s.DestroyManaged(rnd(32)); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
-	if err := s.DestroyWithProof(k.acces, rnd(32), false); !errors.Is(err, ErrNotFound) {
+	if err := s.DestroyWithProof(k.acces, rnd(32)); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
-	if err := s.DestroyWithProof(rnd(32), k.preuve, false); !errors.Is(err, ErrNotFound) {
+	if err := s.DestroyWithProof(rnd(32), k.preuve); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
 	if rowCount(t, s, id) != 1 {
@@ -665,7 +665,13 @@ func TestDestroy(t *testing.T) {
 		t.Fatal(err)
 	}
 	id2 := ready(t, s, k, 1, 1, 1)
-	if err := s.DestroyWithProof(k.acces, k.preuve, false); err != nil {
+	if err := s.DestroyWithProof(k.acces, k.preuve); !errors.Is(err, ErrStillOpen) {
+		t.Fatal("détruit par un destinataire avant la dernière ouverture", err)
+	}
+	if _, _, err := s.Unlock(id2, k.acces, k.preuve); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DestroyWithProof(k.acces, k.preuve); err != nil {
 		t.Fatal(err)
 	}
 	gone(t, s, id2)
@@ -905,7 +911,7 @@ func TestDestroyCountsAttempts(t *testing.T) {
 	k := newKeys()
 	id := ready(t, s, k, 1, 1, 1)
 	for i := 1; i <= 4; i++ {
-		if err := s.DestroyWithProof(k.acces, rnd(32), false); !errors.Is(err, ErrNotFound) {
+		if err := s.DestroyWithProof(k.acces, rnd(32)); !errors.Is(err, ErrNotFound) {
 			t.Fatal(err)
 		}
 		if failed(t, s, id) != i {
@@ -913,15 +919,15 @@ func TestDestroyCountsAttempts(t *testing.T) {
 		}
 	}
 	// kAcces faux : ne compte pas.
-	s.DestroyWithProof(rnd(32), rnd(32), false)
+	s.DestroyWithProof(rnd(32), rnd(32))
 	if failed(t, s, id) != 4 {
 		t.Fatal("kAcces faux compté")
 	}
-	if err := s.DestroyWithProof(k.acces, rnd(32), false); !errors.Is(err, ErrNotFound) {
+	if err := s.DestroyWithProof(k.acces, rnd(32)); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
 	gone(t, s, id)
-	if err := s.DestroyWithProof(k.acces, rnd(32), false); !errors.Is(err, ErrNotFound) {
+	if err := s.DestroyWithProof(k.acces, rnd(32)); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
 	if _, _, err := s.Unlock(id, k.acces, k.preuve); !errors.Is(err, ErrNotFound) {
@@ -934,9 +940,9 @@ func TestMixedAttemptsShareCounter(t *testing.T) {
 	k := newKeys()
 	id := ready(t, s, k, 1, 1, 1)
 	s.Unlock(id, k.acces, rnd(32))
-	s.DestroyWithProof(k.acces, rnd(32), false)
+	s.DestroyWithProof(k.acces, rnd(32))
 	s.Unlock(id, k.acces, rnd(32))
-	s.DestroyWithProof(k.acces, rnd(32), false)
+	s.DestroyWithProof(k.acces, rnd(32))
 	_, _, err := s.Unlock(id, k.acces, rnd(32))
 	var bp *BadPassword
 	if !errors.As(err, &bp) || bp.AttemptsLeft != 0 {
@@ -1064,7 +1070,7 @@ func TestDestroyExpired(t *testing.T) {
 	up, _, _ := s.createAny(ku.req(1, 1, 1))
 	c.Add(6*time.Hour + 15*time.Minute) // 16:17 : partage expiré, envoi échu (16:15)
 	for x, k := range map[string]keys{id: k, up: ku} {
-		if err := s.DestroyWithProof(k.acces, rnd(32), false); !errors.Is(err, ErrNotFound) {
+		if err := s.DestroyWithProof(k.acces, rnd(32)); !errors.Is(err, ErrNotFound) {
 			t.Fatal(err)
 		}
 		if err := s.DestroyManaged(k.gestion); !errors.Is(err, ErrNotFound) {

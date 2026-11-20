@@ -6,7 +6,6 @@
 package share
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -226,6 +225,8 @@ type Service struct {
 	kill    killKey        // clé des noms de demandes de coupure (kill.go)
 	// grantKey : clé HMAC des octrois d'ouverture, tirée au démarrage, jamais écrite.
 	grantKey [32]byte
+	// reports : voix de signalement par partage, en mémoire seulement (report.go).
+	reports reportBox
 	// finalizing : envois dont un Finalize est en cours ; un seul à la fois par id, pour
 	// qu'aucun appel concurrent ne réécrive le bourrage (revue K1, I1).
 	finalizing struct {
@@ -1158,9 +1159,10 @@ func (s *Service) aliveUpload(id, state string, now int64) bool {
 
 // DestroyWithProof : destruction par le destinataire (K_accès et K_preuve). Partage
 // trouvé par V_accès ; K_preuve faux = un essai de mot de passe (compteur commun avec Unlock).
-// report (signalement) : aucune grâce, les flux en cours sont coupés (spec §41.8) ; sinon
-// les ouvertures actives finissent (cas 2).
-func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, report bool) error {
+// Seulement quand plus aucune ouverture n'est possible (« draining ») : un destinataire ne
+// peut pas effacer un partage que d'autres doivent encore ouvrir (20 novembre ; le
+// signalement, lui, compte des voix : report.go). Les ouvertures actives finissent (cas 2).
+func (s *Service) DestroyWithProof(kAcces, kPreuve []byte) error {
 	v := Verifier(kAcces)
 	if v == nil {
 		return ErrNotFound
@@ -1170,11 +1172,6 @@ func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, report bool) error {
 	var proofV []byte
 	err := s.DB.QueryRow(`SELECT id, proof_v, state FROM shares WHERE access_v=?2 AND `+alive, now, v).Scan(&id, &proofV, &state)
 	if err != nil {
-		if report && errors.Is(err, sql.ErrNoRows) {
-			if err := s.cutReported(v, kPreuve); err != nil {
-				return err
-			}
-		}
 		return notFound(err)
 	}
 	if !s.aliveUpload(id, state, now) {
@@ -1185,52 +1182,23 @@ func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, report bool) error {
 	defer mu.Unlock()
 	// Relu sous le verrou : un essai concurrent a pu épuiser le compteur (audit F1).
 	var failed int
-	if err := s.DB.QueryRow(`SELECT failed_attempts FROM shares WHERE id=?`, id).Scan(&failed); err != nil {
+	if err := s.DB.QueryRow(`SELECT failed_attempts, state FROM shares WHERE id=?`, id).Scan(&failed, &state); err != nil {
 		return notFound(err)
 	}
 	if failed >= maxAttempts {
-		if report {
-			if err := s.cutReported(v, kPreuve); err != nil {
-				return err
-			}
-		}
 		return ErrNotFound
 	}
 	if match(kPreuve, proofV) { // proof_v NULL (envoi en cours) : jamais juste
-		return s.retireOrNotFound(id, !report)
+		if state != "draining" {
+			return ErrStillOpen
+		}
+		s.reports.forget(id)
+		return s.retireOrNotFound(id, true)
 	}
 	if _, err := s.countFailure(id); err != nil && !errors.Is(err, ErrNotFound) {
 		return err
 	}
 	return ErrNotFound
-}
-
-// cutReported : signalement d'un partage déjà disparu pour les nouvelles ouvertures (échu non
-// encore balayé, 5 essais faux, ou retiré avec des ouvertures qui finissent sur un descripteur
-// détaché) : ses lectures en grâce sont coupées, sans grâce (spec §41.8, audit F2), si K_preuve
-// est juste. Aucun essai n'est compté (le partage n'ouvre plus rien) ; l'appelant répond
-// « introuvable », comme pour tout partage disparu.
-func (s *Service) cutReported(v, kPreuve []byte) error {
-	var id string
-	var proofV []byte
-	err := s.DB.QueryRow(`SELECT id, proof_v FROM shares WHERE access_v=?`, v).Scan(&id, &proofV)
-	switch {
-	case err == nil && match(kPreuve, proofV):
-		if _, err := s.retire(id, false, s.now()); err != nil {
-			return err
-		}
-	case err != nil && !errors.Is(err, sql.ErrNoRows):
-		return err
-	}
-	s.gone.mu.Lock()
-	defer s.gone.unlock()
-	s.gone.init()
-	for id, d := range s.gone.dead {
-		if bytes.Equal(d.accessV, v) && match(kPreuve, d.proofV) {
-			s.killLocked(id, d)
-		}
-	}
-	return nil
 }
 
 // DestroyManaged : destruction par l'expéditeur (S_gestion), partage trouvé par V_gestion.

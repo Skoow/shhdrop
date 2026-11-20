@@ -175,7 +175,9 @@ func TestDestroyReasonClosed(t *testing.T) {
 		code int
 	}{
 		{"absent", map[string]any{}, 204},
-		{"report", map[string]any{"reason": "report"}, 204},
+		{"report", map[string]any{"reason": "report", "grant": ""}, 200},
+		{"report sans octroi", map[string]any{"reason": "report"}, 400},
+		{"octroi sans report", map[string]any{"grant": ""}, 400},
 		{"libre", map[string]any{"reason": "ReperRaison"}, 400},
 		{"vide", map[string]any{"reason": ""}, 400},
 		{"majuscules", map[string]any{"reason": "REPORT"}, 400},
@@ -187,6 +189,10 @@ func TestDestroyReasonClosed(t *testing.T) {
 			k := newKeys()
 			c := e.create(t, "", k, 1, 1)
 			e.upload(t, c, 1)
+			g := e.grant(t, k) // dernière ouverture : la destruction simple est permise
+			if v, ok := tc.body["grant"]; ok && v == "" {
+				tc.body["grant"] = g
+			}
 			tc.body["proof"] = enc.EncodeToString(k.preuve)
 			w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: mustJSON(tc.body)})
 			if w.Code != tc.code || strings.Contains(w.Body.String(), "ReperRaison") {
@@ -194,7 +200,9 @@ func TestDestroyReasonClosed(t *testing.T) {
 			}
 			if tc.code == 400 {
 				expect(t, w, 400, badRequest)
-				expect(t, e.do(req{method: "GET", path: "/api/shares/meta", hdr: access(k)}), 200, "") // intact
+				// intact : encore là pour la dernière ouverture (meta ne répond plus en « draining »)
+				expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
+					body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})}), 204, "")
 			}
 		})
 	}
@@ -275,8 +283,7 @@ func TestHealthzReportsAlert(t *testing.T) {
 		k := newKeys()
 		c := e.create(t, "", k, 1, 1)
 		e.upload(t, c, 1)
-		expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-			body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "reason": "report"})}), 204, "")
+		expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, e.grant(t, k), nil)}), 200, detruitOui)
 		e.clk.Add(time.Minute)
 	}
 	if h := health(); h != `{"ok":true,"reports_alert":true}` {

@@ -149,7 +149,7 @@ describe("le serveur ne voit rien", () => {
     expect(Buffer.from(blobFile.subarray(16, 48)).equals(engagement), "R capturée = R du partage").toBe(true);
     const segOff = (n: number) => 48 + n * 64 * 65552;
     fillCopy = blobFile.subarray(segOff(3), segOff(6));
-    // Second partage (une seule ouverture) : lu puis détruit par Opened.destroy(catégorie), qui
+    // Second partage (une seule ouverture) : lu puis détruit par Opened.report(catégorie), qui
     // envoie K_accès et K_preuve ; ces requêtes et le disque sont fouillés comme les autres.
     const r2 = await createShare(srv.origin, [{ kind: "text", name: "", mime: "text/plain", data: utf8(`texte ${MARKER} texte`) }], {
       ttlHours: 1,
@@ -167,7 +167,7 @@ describe("le serveur ne voit rien", () => {
     kAcces2 = (await deriveAccess(kLien2)).kAcces;
     const o2 = await openShare(r2.link, GENERATED, srv.origin, undefined, { fetch });
     expect(o2.manifest.items[0]!.text).toBe(`texte ${MARKER} texte`);
-    await o2.destroy(6); // signalement « Harcèlement » (conception compte §21.10.2)
+    expect(await o2.report(6)).toBe(true); // signalement « Harcèlement », une voix sur une ouverture : effacé
     await o2.done(); // 410 « gone » attendu et toléré : le partage est déjà effacé
     o2.wipe();
     expect(seeds.list).toHaveLength(2);

@@ -27,7 +27,7 @@
   import { copyText } from "../ui/clipboard";
   import DownloadBar from "../ui/DownloadBar.svelte";
   import { formatOf } from "../ui/formats";
-  import { Clock, Download, Eye, Pause, Play, Square, Trash2 } from "../ui/Icon";
+  import { Clock, Download, Eye, Flag, Pause, Play, Square, Trash2 } from "../ui/Icon";
   import { chrome } from "../app/chrome.svelte";
   import IconButton from "../ui/IconButton.svelte";
   import InlineConfirm from "../ui/InlineConfirm.svelte";
@@ -40,7 +40,7 @@
   import ViewerPanel, { type ViewItem } from "../viewers/ViewerPanel.svelte";
   import { ZIP_BLOB_MAX, ZIP_BLOB_MAX_SMALL, createZip, zipName } from "../zip/store-zip";
 
-  type ContentEnd = Exclude<DestroyOutcome, "network" | "limit">;
+  type ContentEnd = Exclude<DestroyOutcome, "network" | "limit" | "reported">;
   type Props = {
     opened: Opened;
     /** Compte à rebours à zéro (porté par la capsule d'Open). */
@@ -358,6 +358,14 @@
       if (report === null) destroyError = msg;
       return msg;
     }
+    // Signalement compté sans effacer (moins de la moitié des ouvertures, 20 novembre) : la
+    // lecture continue ; un seul signalement par ouverture (le bouton disparaît).
+    if (out === "reported") {
+      reported = true;
+      reportOpen = false;
+      announce(t("report.counted"));
+      return null;
+    }
     if (report !== null) announce(t("report.done"));
     wiped = true;
     reportOpen = false;
@@ -375,6 +383,7 @@
     return null;
   }
   let reportOpen = $state(false);
+  let reported = $state(false);
   // Audit R2 : le destinataire efface la trace du partage dans ce navigateur, sans attendre l'échéance.
   let forgotten = $state(false);
   let forgetting = false;
@@ -391,7 +400,7 @@
   // Signaler (retours UI7) : plus de bouton en haut ; le lien « Signaler » du pied de page ouvre
   // la confirmation de CE partage tant qu'il est ouvert (AppShell lit chrome.report).
   $effect(() => {
-    if (closer.closed || wiped || ended !== null) return;
+    if (closer.closed || wiped || ended !== null || reported) return;
     const open = () => void (reportOpen = true);
     chrome.report = open;
     return () => {
@@ -545,6 +554,13 @@
         <p class="hint num">{o.opensLeft > 0 ? t("content.opensLeft", { n: o.opensLeft }) : t("content.allTaken")}</p>
       {/if}
       <p class="hint" data-return-limits>{t("content.return.limits")}</p>
+      <!-- Signaler, visible chez le destinataire (propriétaire, 20 novembre) : une voix par
+           ouverture ; après, la confirmation à la place du bouton. -->
+      {#if reported}
+        <p class="hint" data-reported>{t("report.counted")}</p>
+      {:else}
+        <button type="button" class="report" aria-haspopup="dialog" onclick={() => (reportOpen = true)} data-report-visible><Flag size={16} strokeWidth={2} aria-hidden="true" />{t("content.report")}</button>
+      {/if}
       {#if onforget}
         <!-- role=status toujours présent : l'annonce est lue quand son texte apparaît. -->
         <p class="hint" role="status" data-forgotten>{forgotten ? t("content.forgotten") : ""}</p>
@@ -701,6 +717,37 @@
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
+  }
+  /* Signaler : visible, discret, ambre (comme l'entrée « Signaler un abus » du menu). */
+  .report {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: start;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: rgb(245 185 80 / 0.1);
+    box-shadow: inset 0 0 0 1px rgb(245 185 80 / 0.35);
+    color: #f5c46a;
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .report:hover {
+    background: rgb(245 185 80 / 0.16);
+  }
+  .report:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (forced-colors: active) {
+    .report {
+      border: 1px solid ButtonText;
+      color: ButtonText;
+    }
   }
   .forget:focus-visible {
     outline: 2px solid var(--accent);

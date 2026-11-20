@@ -289,7 +289,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
 
   function adopt(cr: Created) {
     if (closed) {
-      void api.destroy(c, { sGestion: cr.sGestion }, undefined, true).catch(() => undefined);
+      void api.destroy(c, { sGestion: cr.sGestion }, true).catch(() => undefined);
       return;
     }
     created = cr;
@@ -362,7 +362,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
     if (created !== cr) return;
     created = null;
     // Au cas où il existerait encore (404 d'un essai rejoué) : destruction au mieux.
-    void api.destroy(c, { sGestion: cr.sGestion }, undefined, true).catch(() => undefined);
+    void api.destroy(c, { sGestion: cr.sGestion }, true).catch(() => undefined);
     cr.kLien.fill(0);
     cr.sGestion.fill(0);
     for (const e of els.values()) {
@@ -711,7 +711,7 @@ export function createDraft(origin: string, o: DraftOpts = {}) {
       const cr = created;
       created = null;
       if (!cr) return creating ? creating.then(() => undefined, () => undefined) : Promise.resolve();
-      const p = api.destroy(c, { sGestion: cr.sGestion }, undefined, true).catch(() => undefined);
+      const p = api.destroy(c, { sGestion: cr.sGestion }, true).catch(() => undefined);
       cr.kLien.fill(0);
       cr.sGestion.fill(0);
       return p;

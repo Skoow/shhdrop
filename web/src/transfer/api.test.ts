@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BadResponse, HttpError, captcha, create, ctx, destroy, done, finalize, getSegment, meta, putSegment, retryAfterHeader, status, unlock, watch, type Categorie, type FinalizeBody } from "./api";
+import { BadResponse, HttpError, captcha, create, ctx, destroy, done, finalize, getSegment, meta, putSegment, report, retryAfterHeader, status, unlock, watch, type Categorie, type FinalizeBody } from "./api";
 import type { KAcces, KPreuve, SGestion } from "../engine/pure";
 
 const FIN: FinalizeBody = {
@@ -106,7 +106,7 @@ describe("envoi : PUT de segment et finalize sans essai interne (le budget de cr
 it("destroy avec S_gestion : keepalive si demandé", async () => {
   const f = vi.fn(async (_: RequestInfo | URL, _i?: RequestInit) => new Response(null, { status: 204 }));
   const c = ctx("http://x", { fetch: f as unknown as typeof fetch });
-  await destroy(c, { sGestion: new Uint8Array(32) as SGestion }, undefined, true);
+  await destroy(c, { sGestion: new Uint8Array(32) as SGestion }, true);
   await destroy(c, { sGestion: new Uint8Array(32) as SGestion });
   expect(f.mock.calls.map((x) => x[1]!.keepalive)).toEqual([true, undefined]);
 });
@@ -176,7 +176,7 @@ describe("API v2 (spec §29.8)", () => {
     await meta(c, ka);
     await getSegment(c, "t", 3, 1);
     await done(c, "t");
-    await destroy(c, { kAcces: ka, kPreuve: kp }, 6);
+    await destroy(c, { kAcces: ka, kPreuve: kp });
     await destroy(c, { sGestion: sg });
     await status(c, sg);
     expect(urls).toEqual([
@@ -191,8 +191,8 @@ describe("API v2 (spec §29.8)", () => {
     expect(bodies[4]).toBeUndefined();
     expect(heads[4]!.get("X-Shh-Manage")).toBe(Buffer.from(sg).toString("base64url"));
     expect(heads[5]!.get("X-Shh-Manage")).toBe(Buffer.from(sg).toString("base64url"));
-    // Signalement par catégorie (conception compte §21.10.2) : corps exact, aucun autre champ.
-    expect(String(bodies[3])).toBe(`{"proof":"${Buffer.from(kp).toString("base64url")}","reason":"report","categorie":6}`);
+    // Destruction par le destinataire : corps exact, la preuve seule (signalement : test plus bas).
+    expect(String(bodies[3])).toBe(`{"proof":"${Buffer.from(kp).toString("base64url")}"}`);
   });
   it("finalize : jeton en en-tête, corps JSON exact", async () => {
     const f = vi.fn(async (_: RequestInfo | URL, _i?: RequestInit) => new Response('{"expires_in_s":5}'));
@@ -297,19 +297,24 @@ describe("audit web D4 : valeurs de meta bornées aux maxima de l'offre", () => 
 });
 
 
-it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute requête (conception compte §21.10.1)", async () => {
+it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute requête (conception compte §21.10.1) ; octroi dans le corps, réponse {detruit} (20 novembre)", async () => {
   const sent: string[] = [];
   const f = vi.fn(async (_u: string, init?: RequestInit) => {
     sent.push(String(init?.body));
-    return new Response(null, { status: 204 });
+    return String(init?.body).includes('"report"')
+      ? new Response(JSON.stringify({ detruit: sent.length % 2 === 0 }), { status: 200, headers: { "Content-Type": "application/json" } })
+      : new Response(null, { status: 204 });
   });
   const c = ctx("http://x", { fetch: f as unknown as typeof fetch, retryDelayMs: 1 });
   const a = { kAcces: new Uint8Array(32) as KAcces, kPreuve: new Uint8Array(32) as KPreuve };
-  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) await destroy(c, a, n as Categorie);
+  const got: boolean[] = [];
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) got.push(await report(c, a, n as Categorie, "g"));
   expect(sent.map((b) => JSON.parse(b).categorie)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  for (const bad of [0, 11, 1.5, -1, NaN]) await expect(destroy(c, a, bad as Categorie)).rejects.toThrow("categorie_invalide");
+  expect(sent.every((b) => JSON.parse(b).grant === "g")).toBe(true);
+  expect(got).toEqual([false, true, false, true, false, true, false, true, false, true]);
+  for (const bad of [0, 11, 1.5, -1, NaN]) await expect(report(c, a, bad as Categorie, "g")).rejects.toThrow("categorie_invalide");
   expect(f).toHaveBeenCalledTimes(10);
-  // Sans signalement : ni reason ni categorie.
+  // Sans signalement : ni reason, ni categorie, ni grant.
   await destroy(c, a);
   expect(JSON.parse(sent.at(-1)!)).toEqual({ proof: Buffer.from(new Uint8Array(32)).toString("base64url") });
 });

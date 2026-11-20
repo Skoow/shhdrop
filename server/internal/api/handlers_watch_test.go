@@ -307,8 +307,9 @@ func TestReportCutsStream(t *testing.T) {
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatal(resp, err)
 	}
-	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-		body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "reason": "report"})}), 204, "")
+	// Seconde ouverture qui signale : 1 voix, la moitié de 2 ouvertures (20 novembre).
+	g := e.grant(t, k)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g, nil)}), 200, detruitOui)
 	cn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, _ := io.Copy(io.Discard, resp.Body)
 	if n >= int64(share.SegmentSize(80, 0)) {

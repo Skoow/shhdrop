@@ -173,7 +173,7 @@ test("M16, M22, I2 : « Lien prêt » : heure de fin seule et arrondi dit ; h1 ;
 // du propriétaire du 12 novembre ; son explication est dans la bulle du balai (envoi.spec.ts).
 test("M15 : Signaler indique le vrai bouton ; plus de « Nettoyage automatique » dans le pied ; captures", async ({ page, shh, isMobile }) => {
   await page.goto(shh.origin + "/signaler");
-  await expect(page.getByText(/«\u202fSignaler ce partage\u202f» en bas de la page, dans le pied \(colonne «\u202fConfiance\u202f»\)/)).toBeVisible();
+  await expect(page.getByText(/En bas du contenu, choisissez «[\s\u202f]?Signaler ce partage[\s\u202f]?»/)).toBeVisible();
   await shot(page, "m15-signaler", isMobile);
   const foot = page.locator("footer.foot");
   await expect(foot.getByRole("switch")).toHaveCount(0);

@@ -59,7 +59,9 @@ const FORBIDDEN_IN_PROD = [
  * Adresses absolues admises dans index.html, pdf-frame.html et le CSS : espaces de noms XML
  * (SVG en ligne), de simples identifiants qu'aucun navigateur ne télécharge.
  */
-const ALLOWED_URLS = new Set(["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xlink", "http://www.w3.org/1999/xhtml"]);
+// « https://shhgone.com/s » : notre propre adresse, écrite en texte dans l'exemple du lien en
+// deux de l'accueil (propriétaire, 20 novembre : « affiche https devant ») ; jamais chargée.
+const ALLOWED_URLS = new Set(["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xlink", "http://www.w3.org/1999/xhtml", "https://shhgone.com/s"]);
 
 /**
  * Aucune ressource tierce (CLAUDE.md, spec §10) : rend chaque adresse http(s):// absolue, et

@@ -309,6 +309,31 @@ func (e *env) unlock(t *testing.T, id string, k keys) (string, int) {
 	return r.DownloadToken, r.Segments
 }
 
+// grant : ouvre le partage (une ouverture) et rend son octroi, qui porte la voix d'un
+// signalement (share.Report, 20 novembre).
+func (e *env) grant(t *testing.T, k keys) string {
+	t.Helper()
+	w := e.do(req{method: "POST", path: "/api/shares/unlock", hdr: access(k),
+		body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})})
+	expect(t, w, 200, "")
+	g, _ := jsonOf(t, w)["grant"].(string)
+	if g == "" {
+		t.Fatalf("unlock sans octroi : %q", w.Body.String())
+	}
+	return g
+}
+
+// reportBody : corps d'un signalement avec l'octroi de l'ouverture.
+func reportBody(k keys, grant string, extra map[string]any) []byte {
+	m := map[string]any{"proof": enc.EncodeToString(k.preuve), "reason": "report", "grant": grant}
+	for a, v := range extra {
+		m[a] = v
+	}
+	return mustJSON(m)
+}
+
+const detruitOui = `{"detruit":true}`
+
 func TestFullFlow(t *testing.T) {
 	e := newEnv(t, false, nil)
 	k := newKeys()
@@ -366,9 +391,13 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("status: %v", st)
 	}
 
-	// Destruction par le destinataire (K_accès + K_preuve).
-	w = e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-		body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})})
+	// Destruction par le destinataire (K_accès + K_preuve) : refusée tant qu'une ouverture
+	// reste possible (20 novembre), acceptée par la dernière.
+	destroy := req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
+		body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})}
+	expect(t, e.do(destroy), 409, `{"error":"still_open"}`)
+	e.unlock(t, c.ID, k)
+	w = e.do(destroy)
 	expect(t, w, 204, "")
 	expect(t, e.do(req{method: "GET", path: "/api/shares/meta", hdr: access(k)}), 404, notFound)
 	// Ouverture déjà terminée (done) : aucune grâce, 410 avec son jeton.

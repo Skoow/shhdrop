@@ -3,13 +3,19 @@ import { LimitError, NotFoundError, type Opened } from "../index";
 import { liveUrls, trackUrl } from "../viewers/blobs";
 import { destroyFromContent, finish, release } from "./endoflife";
 
-function fake(destroy: () => Promise<void> = async () => undefined, done: () => Promise<void> = async () => undefined) {
+function fake(destroy: () => Promise<void> = async () => undefined, done: () => Promise<void> = async () => undefined, gone = true) {
   const log: string[] = [];
   const o = {
-    destroy: vi.fn(async (r?: number) => {
-      log.push(`destroy(${r ?? ""})`);
+    destroy: vi.fn(async () => {
+      log.push("destroy()");
       await destroy();
       log.push("destroy résolu");
+    }),
+    report: vi.fn(async (r: number) => {
+      log.push(`report(${r})`);
+      await destroy();
+      log.push("report résolu");
+      return gone;
     }),
     done: vi.fn(async () => {
       log.push("done");
@@ -50,7 +56,7 @@ describe("release (pagehide, démontage ; spec §41.4)", () => {
 });
 
 describe("destroyFromContent", () => {
-  it("Détruire : destroy() sans argument ; Signaler : destroy(catégorie) ; wipe et onDestroyed après la réponse", async () => {
+  it("Détruire : destroy() ; Signaler : report(catégorie) ; wipe et onDestroyed après la réponse", async () => {
     for (const report of [null, 4] as const) {
       let release!: () => void;
       const { o, log } = fake(() => new Promise<void>((r) => (release = r)));
@@ -61,9 +67,18 @@ describe("destroyFromContent", () => {
       expect(o.wipe).not.toHaveBeenCalled();
       release();
       expect(await p).toBe("destroyed");
-      expect(o.destroy).toHaveBeenCalledWith(...(report !== null ? [4] : []));
-      expect(log).toEqual([`destroy(${report ?? ""})`, "destroy résolu", "wipe", "dissolution"]);
+      if (report !== null) expect(o.report).toHaveBeenCalledWith(4);
+      else expect(o.destroy).toHaveBeenCalledWith();
+      const v = report !== null ? "report" : "destroy";
+      expect(log).toEqual([report !== null ? "report(4)" : "destroy()", `${v} résolu`, "wipe", "dissolution"]);
     }
+  });
+  it("Signaler sans atteindre la moitié des ouvertures : « reported », rien n'est effacé (20 novembre)", async () => {
+    const { o } = fake(undefined, undefined, false);
+    const onDestroyed = vi.fn();
+    expect(await destroyFromContent(o, 3, { onDestroyed })).toBe("reported");
+    expect(o.wipe).not.toHaveBeenCalled();
+    expect(onDestroyed).not.toHaveBeenCalled();
   });
   it("NotFoundError → wipe(), gone", async () => {
     const { o } = fake(async () => Promise.reject(new NotFoundError()));

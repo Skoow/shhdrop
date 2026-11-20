@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { utf8, type Item } from "../src/engine/pure";
-import { BadPasswordError, NotFoundError, createShare, destroyShare, fetchMeta, openShare, shareStatus } from "../src/transfer/client";
+import { BadPasswordError, NotFoundError, StillOpenError, createShare, destroyShare, fetchMeta, openShare, shareStatus } from "../src/transfer/client";
 import { parseLink } from "../src/engine";
 import { solveAltcha } from "./altcha";
 import { startServer, type TestServer } from "./server";
@@ -162,19 +162,23 @@ describe("gestion : shareStatus et destruction", () => {
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
     await expect(destroyShare(r.manage, srv().origin, {})).rejects.toBeInstanceOf(NotFoundError);
   });
-  it("destruction par le lien de partage + mot de passe", async () => {
+  it("destruction par le lien de partage + mot de passe : refusée tant qu'une ouverture reste (20 novembre)", async () => {
     const r = await share(srv(), [textItem("b")]);
-    await destroyShare(r.link, srv().origin, { password: PW });
-    await expect(openShare(r.link, PW, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(StillOpenError);
+    expect(await shareStatus(r.manage, srv().origin)).toMatchObject({ opensUsed: 0 }); // intact
+    // La dernière ouverture, elle, peut détruire (Opened.destroy).
+    const o = await openShare(r.link, PW, srv().origin);
+    await o.destroy();
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
+    o.wipe();
   });
-  it("S1 : maxOpens=1, signalement après la dernière ouverture (draining) via Opened.destroy", async () => {
+  it("S1 : maxOpens=1, signalement après la dernière ouverture (draining) via Opened.report", async () => {
     const r = await share(srv(), [textItem("à signaler")], 1);
     const o = await openShare(r.link, PW, srv().origin);
     expect(await shareStatus(r.manage, srv().origin)).toMatchObject({ opensUsed: 1, state: "draining" });
     // destroyShare (lien + mot de passe) relit meta : impossible en « draining ».
     await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(NotFoundError);
-    await o.destroy(2); // signalement par catégorie (conception compte §21.10.2)
+    expect(await o.report(2)).toBe(true); // une voix sur une ouverture permise : effacé (20 novembre)
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
     await expect(o.destroy()).rejects.toBeInstanceOf(NotFoundError);
     o.wipe();

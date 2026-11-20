@@ -94,7 +94,7 @@ test("maxOpens = 1 (draining) : Détruire fonctionne quand même", async ({ page
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });
 
-test("Signaler : dix catégories, « Autre » par défaut, corps { proof, reason: \"report\", categorie }, détruit ; capture", async ({ page, shh, browser }) => {
+test("Signaler : bouton visible sous le contenu, dix catégories, « Autre » par défaut ; une voix par ouverture : 1 sur 3 ouvertures ne supprime pas, la 2ᵉ voix (moitié arrondie au-dessus) supprime ; capture", async ({ page, shh, browser }) => {
   test.setTimeout(150_000);
   const sent = await opened(browser, shh.origin, 3);
   await page.goto(sent.link);
@@ -103,10 +103,10 @@ test("Signaler : dix catégories, « Autre » par défaut, corps { proof, reason
   page.on("request", (r) => {
     if (new URL(r.url()).pathname === "/api/shares/destroy") bodies.push(r.postData() ?? "");
   });
-  // Retours UI7 : « Signaler » n'existe que dans le pied de page ; sur un partage ouvert, il ouvre
-  // la confirmation de CE partage (même action qu'avant).
-  await expect(page.locator("main").getByRole("button", { name: /Signaler/ })).toHaveCount(0);
-  await page.locator("footer[data-foot]").getByRole("button", { name: "Signaler ce partage" }).click();
+  // 20 novembre : « Signaler ce partage » visible sous le contenu (et toujours dans le pied).
+  const visible = page.locator("[data-report-visible]");
+  await expect(visible).toBeVisible();
+  await visible.click();
   const sheet = page.getByRole("dialog", { name: "Signaler ce contenu" });
   await expect(sheet).toBeVisible();
   // Lot 14 du compte : dix catégories en boutons radio, aucun champ libre ; « Autre » choisi d'avance.
@@ -119,15 +119,30 @@ test("Signaler : dix catégories, « Autre » par défaut, corps { proof, reason
   await sheet.getByRole("radio", { name: /^Arnaque/ }).check();
   await sheet.getByRole("button", { name: "Continuer" }).click();
   await expect(sheet.getByText(/PHAROS/)).toBeVisible();
-  await sheet.getByRole("button", { name: "Signaler et détruire" }).click();
-  await expect(page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+  await expect(sheet.getByText(/la moitié des ouvertures permises/)).toBeVisible();
+  await sheet.getByRole("button", { name: "Signaler", exact: true }).click();
+  // Une voix sur deux nécessaires (3 ouvertures permises) : compté, la lecture continue.
+  await expect(page.locator("[data-reported]")).toBeVisible({ timeout: 20_000 });
+  await expect(visible).toHaveCount(0);
+  await expect(page.locator("[data-eol]")).toBeVisible();
   expect(bodies).toHaveLength(1);
-  expect(Object.keys(JSON.parse(bodies[0]!))).toEqual(["proof", "reason", "categorie"]);
+  expect(Object.keys(JSON.parse(bodies[0]!))).toEqual(["proof", "reason", "categorie", "grant"]);
   expect(JSON.parse(bodies[0]!)).toMatchObject({ reason: "report", categorie: 8 });
+  expect((await fetchMeta(sent.link, shh.origin)).opensLeft).toBe(2); // une seule ouverture prise
+  // Une seconde personne ouvre et signale : 2 voix, la moitié de 3 arrondie au-dessus → supprimé.
+  const b = await freshPage(browser);
+  await b.page.goto(sent.link);
+  await unlock(b.page, sent.password);
+  await b.page.locator("[data-report-visible]").click();
+  const sheet2 = b.page.getByRole("dialog", { name: "Signaler ce contenu" });
+  await sheet2.getByRole("button", { name: "Continuer" }).click();
+  await sheet2.getByRole("button", { name: "Signaler", exact: true }).click();
+  await expect(b.page.getByRole("heading", { name: "Détruit" })).toBeVisible({ timeout: 20_000 });
+  await b.ctx.close();
   await expect(fetchMeta(sent.link, shh.origin)).rejects.toBeInstanceOf(NotFoundError);
 });
 
-test("ouverture non dernière : ni « Détruire » ni « Terminer » ; « Ce lien peut encore être ouvert 2 fois. » ; « Signaler » dans le pied de page", async ({ page, shh, browser }) => {
+test("ouverture non dernière : ni « Détruire » ni « Terminer » ; « Ce lien peut encore être ouvert 2 fois. » ; « Signaler » sous le contenu et dans le pied de page", async ({ page, shh, browser }) => {
   test.setTimeout(150_000);
   const sent = await opened(browser, shh.origin, 3);
   await page.goto(sent.link);

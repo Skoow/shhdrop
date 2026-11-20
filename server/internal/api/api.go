@@ -613,6 +613,8 @@ func fail(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusInsufficientStorage, "full")
 	case errors.Is(err, share.ErrGrantInvalid):
 		writeErr(w, http.StatusConflict, "grant_invalid")
+	case errors.Is(err, share.ErrStillOpen):
+		writeErr(w, http.StatusConflict, "still_open")
 	case errors.Is(err, share.ErrReopenLimit):
 		writeErr(w, http.StatusTooManyRequests, "reopen_limit")
 	case errors.Is(err, share.ErrBudget):

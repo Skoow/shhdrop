@@ -108,6 +108,18 @@ export class GrantInvalidError extends Error {
   }
 }
 
+/**
+ * Destruction par un destinataire refusée (409 still_open, 20 novembre) : d'autres ouvertures
+ * restent possibles ; seul le dernier destinataire, ou l'expéditeur, peut détruire. Signaler
+ * reste possible (une voix).
+ */
+export class StillOpenError extends Error {
+  constructor() {
+    super("ouvertures_restantes");
+    this.name = "StillOpenError";
+  }
+}
+
 /** Plus de 10 rechargements pour cette ouverture (429 reopen_limit) : une nouvelle sera comptée. */
 export class ReopenLimitError extends Error {
   constructor() {
@@ -175,6 +187,7 @@ function readerError(e: unknown): Error {
 // « introuvable ». Sinon l'écran dirait « supprimé » alors que le partage existe encore
 // (revue du 10 novembre). Texte fixe (ServerError) : l'écran propose de réessayer.
 function destroyError(e: unknown): Error {
+  if (e instanceof api.HttpError && e.status === 409 && e.code === "still_open") return new StillOpenError();
   const mapped = readerError(e);
   if (mapped instanceof NotFoundError && e instanceof api.HttpError && e.status !== 404 && e.status !== 410) return new ServerError(false);
   return mapped;
@@ -554,13 +567,17 @@ export type Opened = {
    */
   watch(signal?: AbortSignal): Promise<api.WatchResult>;
   /**
-   * Détruit le partage (« report » : signalement, motif non conservé par le serveur) avec
-   * K_accès et K_preuve gardés depuis l'ouverture, sans repasser par meta : marche aussi
-   * après la dernière ouverture (état « draining »). Erreurs : voir readerError ;
-   * Error("cles_effacees") après wipe().
+   * Détruit le partage avec K_accès et K_preuve gardés depuis l'ouverture, sans repasser par
+   * meta : seulement à la dernière ouverture permise (état « draining » ; sinon
+   * StillOpenError). Erreurs : voir readerError ; Error("cles_effacees") après wipe().
    */
-  /** Détruit le partage ; avec une catégorie : signalement (conception compte §21.10.2). */
-  destroy(report?: api.Categorie): Promise<void>;
+  destroy(): Promise<void>;
+  /**
+   * Signale le partage (catégorie, conception compte §21.10.2) avec l'octroi de cette
+   * ouverture : une voix. Rend vrai si elle l'a effacé (la moitié des ouvertures permises
+   * l'ont signalé, 20 novembre) ; faux sinon, et la lecture continue.
+   */
+  report(categorie: api.Categorie): Promise<boolean>;
   /**
    * Met à zéro K_accès, K_preuve et le segment en cache, et oublie le lecteur et les clés des
    * éléments (le manifeste reste en mémoire : voir ContainerReader.wipe). Ni destroy(), ni item(),
@@ -759,13 +776,27 @@ async function openWith(
           const r = await api.watch(c, u.downloadToken, signal);
           return r === "gone" && (destroying || finished) ? "stop" : r;
         },
-        destroy: (report) =>
+        destroy: () =>
           guarded(async () => {
             if (wiped) throw new Error("cles_effacees");
             destroying = true;
             try {
-              await api.destroy(c, { kAcces, kPreuve }, report);
+              await api.destroy(c, { kAcces, kPreuve });
               segs.clear(); // détruit : plus aucune lecture, même des segments gardés
+            } catch (e) {
+              destroying = false;
+              throw e;
+            }
+          }, (e) => (e instanceof Error && e.message === "cles_effacees" ? e : destroyError(e))),
+        report: (categorie) =>
+          guarded(async () => {
+            if (wiped) throw new Error("cles_effacees");
+            destroying = true;
+            try {
+              const gone = await api.report(c, { kAcces, kPreuve }, categorie, u.grant);
+              if (gone) segs.clear();
+              else destroying = false;
+              return gone;
             } catch (e) {
               destroying = false;
               throw e;

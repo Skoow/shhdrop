@@ -31,7 +31,7 @@ test("Sécurité : chiffrement, ce que voit le serveur, limites (historique, ong
   await page.screenshot({ path: `${SHOTS}securite-${w(isMobile)}.png`, fullPage: true });
 });
 
-test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En cours de rédaction », aucun e-mail ni identité inventée", async ({ page, shh }) => {
+test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En cours de rédaction » (Mentions seulement), aucun e-mail ni identité inventée", async ({ page, shh }) => {
   await page.goto(shh.origin + "/confidentialite");
   await expect(page.locator("main")).toContainText("Aucun cookie");
   await expect(page.locator("main")).toContainText("Votre adresse IP n'est pas enregistrée.");
@@ -39,15 +39,22 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await page.goto(shh.origin + "/signaler");
   await expect(page.getByRole("heading", { level: 1, name: "Signaler un abus" })).toBeVisible();
   await expect(page.locator("main")).toContainText("Signaler");
-  for (const [path, title] of [["/conditions", "Conditions d'utilisation"], ["/mentions-legales", "Mentions légales"]] as const) {
+  // Mentions légales : l'identité de l'éditeur et de l'hébergeur reste à compléter par le
+  // propriétaire (jamais inventée), d'où le bandeau ; Conditions : complètes (20 novembre).
+  await page.goto(shh.origin + "/mentions-legales");
+  await expect(page.getByRole("heading", { level: 1, name: "Mentions légales" })).toBeVisible();
+  await expect(page.locator("[data-draft]")).toHaveText("En cours de rédaction");
+  await expect(page.locator("main")).toContainText("compléter par le propriétaire");
+  for (const path of ["/conditions", "/mentions-legales"]) {
     await page.goto(shh.origin + path);
-    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-    await expect(page.locator("[data-draft]")).toHaveText("En cours de rédaction");
-    await expect(page.locator("main")).toContainText("compléter par le propriétaire");
     expect(await page.locator("main").innerText()).not.toMatch(/@|SAS|SARL|OVH|Hetzner|Scaleway/);
     expect(await axe(page)).toEqual([]);
   }
-  for (const p of ["/securite", "/confidentialite", "/signaler"]) {
+  await page.goto(shh.origin + "/conditions");
+  await expect(page.getByRole("heading", { level: 1, name: "Conditions d'utilisation" })).toBeVisible();
+  await expect(page.locator("main")).toContainText("la moitié de ses ouvertures permises");
+  await expect(page.locator("main")).not.toContainText("compléter par le propriétaire");
+  for (const p of ["/securite", "/confidentialite", "/signaler", "/conditions"]) {
     await page.goto(shh.origin + p);
     await expect(page.locator("[data-draft]")).toHaveCount(0);
     expect(await page.locator("main").innerText()).not.toContain("@");
