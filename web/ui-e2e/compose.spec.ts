@@ -668,7 +668,8 @@ test.describe("en-US", () => {
 
   test("composer in English ; capture", async ({ page, shh, isMobile }) => {
     if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(shh.origin + "/");
+    // Accueil anglais : « /en » (pages bilingues, 20 novembre : « / » reste en français).
+    await page.goto(shh.origin + "/en");
     // « Get started » mène à la page d'envoi (D41-37) ; puis « Add » (téléphone) ou la zone de dépôt.
     await page.locator('[data-make="room"]').click();
     await expect(page).toHaveURL(/\/envoyer$/);

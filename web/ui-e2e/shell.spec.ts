@@ -75,7 +75,8 @@ test("référencement : robots.txt et sitemap.xml ; pages publiques indexées, p
   expect(map.status()).toBe(200);
   expect(map.headers()["content-type"]).toMatch(/xml/);
   const locs = [...(await map.text()).matchAll(/<loc>https:\/\/shhgone\.com([^<]*)<\/loc>/g)].map((m) => m[1]);
-  expect(locs).toEqual(["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales"]);
+  // Pages bilingues (20 novembre) : chaque page indexée et sa version « /en ».
+  expect(locs).toEqual(["/", "/securite", "/confidentialite", "/offres", "/conditions", "/mentions-legales"].flatMap((p) => [p, p === "/" ? "/en" : "/en" + p]));
   const meta = (n: string) => page.locator(`meta[name="${n}"]`);
   for (const p of locs) {
     await page.goto(shh.origin + p);
