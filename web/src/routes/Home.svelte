@@ -474,21 +474,21 @@
      séparées par un point menthe ; plus de cases cochées. */
   .meta {
     display: inline-flex;
-    /* Une ligne ; texte très agrandi seulement : retour à la ligne entre deux assurances. */
-    flex-wrap: wrap;
+    /* Toujours une seule ligne (propriétaire, 20 novembre : « plus petit, sur une ligne »). */
+    flex-wrap: nowrap;
     justify-content: center;
     align-items: center;
     justify-self: start;
     gap: 0;
     max-width: 100%;
     margin: var(--sp-1) 0 0;
-    padding: 8px 16px;
+    padding: 6px 14px;
     border-radius: var(--r-pill);
     background: rgb(95 227 181 / 0.06);
     box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.22);
     list-style: none;
     color: #c4cde3;
-    font-size: var(--fs-small);
+    font-size: 0.8125rem;
     font-weight: 550;
     white-space: nowrap;
   }
@@ -691,15 +691,14 @@
   @media (max-width: 639px) {
     /* Assurances : toujours une ligne, le texte suit la largeur de l'écran (320 px compris). */
     .home:not(.compact) .meta {
-      flex-wrap: nowrap;
-      padding: 7px 12px;
-      font-size: min(0.8125rem, 3.05vw);
-      letter-spacing: -0.005em;
+      padding: 5px 10px;
+      font-size: min(0.75rem, 2.8vw);
+      letter-spacing: -0.01em;
     }
     .home:not(.compact) .meta li + li::before {
-      width: 4px;
-      height: 4px;
-      margin-inline: 7px;
+      width: 3px;
+      height: 3px;
+      margin-inline: 6px;
     }
     .home:not(.compact) .hero {
       gap: var(--sp-4);
