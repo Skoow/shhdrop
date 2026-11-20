@@ -35,7 +35,9 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
   await page.goto(shh.origin + "/confidentialite");
   await expect(page.locator("main")).toContainText("Aucun cookie");
   await expect(page.locator("main")).toContainText("Votre adresse IP n'est pas enregistrée.");
-  await expect(page.locator("#verification")).toContainText("Google voit alors votre adresse IP");
+  // Le repli Google reCAPTCHA n'est pas construit : la page ne l'annonce plus (audit du 20 novembre).
+  await expect(page.locator("#verification")).toContainText("sans service extérieur");
+  await expect(page.locator("main")).not.toContainText("Google");
   await page.goto(shh.origin + "/signaler");
   await expect(page.getByRole("heading", { level: 1, name: "Signaler un abus" })).toBeVisible();
   await expect(page.locator("main")).toContainText("Signaler");
