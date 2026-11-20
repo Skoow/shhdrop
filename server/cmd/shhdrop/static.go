@@ -113,6 +113,8 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 		// immuable (revue du 10 novembre ; remplace « aucun cache », retours CLEAN4).
 		if immutableAsset.MatchString("/"+name) && path.Base(name) == fi.Name() {
 			h.Set("Cache-Control", immutableCache)
+		} else if dayAsset.MatchString("/"+name) && path.Base(name) == fi.Name() {
+			h.Set("Cache-Control", dayCache)
 		}
 		// Variante précompressée au build (vite.config.ts, precompress) : mêmes octets une fois
 		// décompressés (SRI inchangée), jamais de compression à la volée ni sur /api/*.
@@ -140,6 +142,14 @@ func staticHandler(dir string, comptes, salons bool) (http.Handler, error) {
 var immutableAsset = regexp.MustCompile(`^/assets/.+-[A-Za-z0-9_-]{8,}\.(js|css|woff2|png|webp|svg|wasm)$`)
 
 const immutableCache = "public, max-age=31536000, immutable"
+
+// dayAsset : icônes, manifeste, polices et images fixes sans empreinte (audit de vitesse du
+// 20 novembre) : un jour de cache au lieu de no-store. Rien de secret ni de propre à quelqu'un ;
+// un changement met au plus un jour à être vu. HTML, cadre PDF (intégrité vérifiée), robots.txt
+// et sitemap.xml restent en no-store.
+var dayAsset = regexp.MustCompile(`^/(?:fonts/[a-z0-9-]+\.woff2|assets/[a-z0-9-]+\.(?:png|svg|webp)|favicon\.(?:svg|ico)|apple-touch-icon\.png|icon-(?:192|512)\.png|logo\.svg|manifest\.webmanifest)$`)
+
+const dayCache = "public, max-age=86400"
 
 // compressible : types précompressés par le build : texte, et le moteur WebAssembly (481 Ko,
 // 141 Ko en brotli, spec moteur §7) ; les images et polices le sont déjà.

@@ -839,8 +839,8 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
     // Motif fermé (spec §36 S14) : absent, ou exactement "report" ; catégorie (conception compte
     // §21.10.2) : entier 1 à 10, seulement avec "report" ; absente : « Autre ». Comme le serveur.
     const report = "reason" in b;
-    if (report && (b.reason !== "report" || typeof b.grant !== "string")) throw badRequest();
-    if (!report && "grant" in b) throw badRequest();
+    // Octroi toujours exigé (audit du 20 novembre) : vote ou destruction par la dernière ouverture.
+    if (typeof b.grant !== "string" || (report && b.reason !== "report")) throw badRequest();
     if ("categorie" in b && (!report || !Number.isInteger(b.categorie) || (b.categorie as number) < 1 || (b.categorie as number) > 10)) throw badRequest();
     const ka = headerSecret(req, "X-Shh-Access");
     const kp = decodeB64(b.proof, 32);
@@ -851,14 +851,15 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
       await countFailure(id, s); // K_accès juste, K_preuve faux : un essai
       throw notFound();
     }
+    const x = grantStr.get(b.grant as string);
+    if (x === undefined || x.id !== id || x.exp <= now()) throw new HttpFail(409, "grant_invalid");
     if (!report) {
-      if (s.state !== "draining") throw new HttpFail(409, "still_open");
+      // Seulement la DERNIÈRE ouverture (n = ouvertures données, plus aucune possible).
+      if (s.state !== "draining" || x.openN !== s.opensIssued) throw new HttpFail(409, "still_open");
       votes.delete(id);
       retire(id, true, now());
       return empty(204);
     }
-    const x = grantStr.get(b.grant as string);
-    if (x === undefined || x.id !== id || x.exp <= now()) throw new HttpFail(409, "grant_invalid");
     const v = votes.get(id) ?? new Set<number>();
     v.add(x.openN);
     votes.set(id, v);
@@ -867,7 +868,7 @@ export function createFakeServer(opts: FakeServerOpts = {}): FakeServer {
       votes.delete(id);
       retire(id, false, now());
     }
-    return json(200, { detruit: gone });
+    return json(200, { detruit: gone ? 1 : 0 });
   }
 
   /** Expéditeur : S_gestion en en-tête, corps vide (/api/manage/*). */

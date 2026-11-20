@@ -87,8 +87,11 @@ describe("Home (UI §9.1)", () => {
     const norm = (s: string | null | undefined) => (s ?? "").replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
     expect(norm(card("free").querySelector("[data-price]")!.textContent)).toBe("0 € sans abonnement");
     expect(norm(card("plus").querySelector("[data-price]")!.textContent)).toBe(`${PAID.plus.month} € / mois ou ${PAID.plus.year} € / an`);
-    expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus"]);
+    expect([...card("pro").querySelectorAll(".dk")].map((d) => d.textContent)).toEqual(["Taille par partage", "Durée au plus", "Ouvertures au plus", "Appels audio et vidéo"]);
     expect(norm(card("pro").querySelectorAll(".dv")[2]!.textContent)).toBe(String(PAID.pro.opens));
+    // Appels (20 novembre) : absents de l'offre gratuite, inclus dans Plus et Pro, marqués « bientôt ».
+    expect(norm(card("free").querySelector("[data-calls] .dv")!.textContent)).toBe("Non inclus");
+    for (const x of ["plus", "pro"]) expect(norm(card(x).querySelector("[data-calls] .dv")!.textContent)).toMatch(/^Inclus ?bientôt$/);
     expect(document.querySelectorAll("details[name=faq]")).toHaveLength(5);
     expect(document.querySelector('[data-slot="compose"]')).toBeNull(); // composeur : page d'envoi seulement
   });

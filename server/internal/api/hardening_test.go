@@ -79,7 +79,7 @@ func TestDestroyAfterLastOpen(t *testing.T) {
 	c := e.create(t, "", k, 1, 1)
 	e.upload(t, c, 1)
 	body := reportBody(k, e.grant(t, k), nil)
-	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: body}), 200, detruitOui)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: body}), 200, `{"detruit":1}`)
 	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: body}), 404, notFound)
 }
 

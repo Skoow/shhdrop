@@ -308,8 +308,13 @@ async function pseudoCanon(p: string): Promise<{ affiche: string; pCanon: string
 export const estPseudoProvisoire = (p: string | undefined | null): boolean => !!p && /^(Membre|Member)\d{6}$/u.test(p);
 
 /** Vrai si le compte ouvert a encore son pseudo provisoire. */
+/** Forme des pseudos provisoires, quelle que soit la casse : refusée à la saisie (audit du 20 novembre). */
+const formeProvisoire = (p: string) => /^(membre|member)\d{6}$/iu.test(p.trim());
+
 export function pseudoAChoisir(): boolean {
-  return !!ouverte && estPseudoProvisoire(account.profil?.pseudo);
+  // Réglage « Proposer mon pseudo et ma photo » coupé : le pseudo d'un salon reste à part du
+  // compte (audit du 20 novembre), il ne devient pas celui du compte.
+  return !!ouverte && account.profil?.reglages.proposerProfil === true && estPseudoProvisoire(account.profil.pseudo);
 }
 
 export async function verifierSaisie(s: { email?: string; mdp?: string; pseudo?: string }): Promise<Partial<Record<"email" | "mdp" | "pseudo", string>>> {
@@ -335,7 +340,9 @@ export async function verifierSaisie(s: { email?: string; mdp?: string; pseudo?:
   }
   if (s.pseudo !== undefined) {
     try {
-      if (estPseudoProvisoire(s.pseudo.trim())) throw new Error("pseudo_reserve");
+      // Forme des pseudos provisoires refusée quelle que soit la casse (audit du 20 novembre) :
+      // l'unicité ignore la casse, « membre123456 » bloquerait le pseudo provisoire d'un autre.
+      if (formeProvisoire(s.pseudo)) throw new Error("pseudo_reserve");
       await pseudoCanon(s.pseudo);
     } catch (e) {
       out.pseudo = code(e);
@@ -529,6 +536,7 @@ export async function pseudoLibre(p: string): Promise<boolean> {
 /** Change le pseudo (une fois par 24 h, serveur), puis l'écrit dans le coffre de profil. */
 export async function changerPseudo(p: string): Promise<void> {
   const o = ouverteOuErreur();
+  if (formeProvisoire(p)) throw new Error("pseudo_reserve");
   const { affiche, pCanon } = await pseudoCanon(p);
   await garde(() => api.changerPseudo(deps.net, o.jeton, pCanon));
   await ecrireProfil({ pseudo: affiche });

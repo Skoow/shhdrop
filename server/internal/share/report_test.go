@@ -28,16 +28,16 @@ func TestReportVotesPerOpening(t *testing.T) {
 		}
 		grants = append(grants, o.Grant)
 	}
-	// Même ouverture, trois fois : une voix.
+	// Même ouverture, trois fois : une voix, nouvelle la première fois seulement.
 	for i := 0; i < 3; i++ {
-		if gone, err := s.Report(k.acces, k.preuve, grants[0]); err != nil || gone {
-			t.Fatal(i, gone, err)
+		if gone, nouvelle, err := s.Report(k.acces, k.preuve, grants[0]); err != nil || gone || nouvelle != (i == 0) {
+			t.Fatal(i, gone, nouvelle, err)
 		}
 	}
-	if _, err := s.Report(k.acces, k.preuve, "AAAA"); !errors.Is(err, ErrGrantInvalid) {
+	if _, _, err := s.Report(k.acces, k.preuve, "AAAA"); !errors.Is(err, ErrGrantInvalid) {
 		t.Fatal("octroi faux accepté", err)
 	}
-	if _, err := s.Report(k.acces, rnd(32), grants[1]); !errors.Is(err, ErrNotFound) {
+	if _, _, err := s.Report(k.acces, rnd(32), grants[1]); !errors.Is(err, ErrNotFound) {
 		t.Fatal("mauvaise preuve acceptée", err)
 	}
 	var failed int
@@ -46,14 +46,14 @@ func TestReportVotesPerOpening(t *testing.T) {
 		t.Fatal("essais comptés :", failed)
 	}
 	for i := 1; i < 2; i++ {
-		if gone, err := s.Report(k.acces, k.preuve, grants[i]); err != nil || gone {
+		if gone, _, err := s.Report(k.acces, k.preuve, grants[i]); err != nil || gone {
 			t.Fatal(i, gone, err)
 		}
 	}
 	if rowCount(t, s, id) != 1 {
 		t.Fatal("effacé avant 3 voix")
 	}
-	gone, err := s.Report(k.acces, k.preuve, grants[2])
+	gone, _, err := s.Report(k.acces, k.preuve, grants[2])
 	if err != nil || !gone {
 		t.Fatal("3ᵉ voix :", gone, err)
 	}
@@ -73,7 +73,7 @@ func TestReportGrantOfOtherShare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Report(k2.acces, k2.preuve, o1.Grant); !errors.Is(err, ErrGrantInvalid) {
+	if _, _, err := s.Report(k2.acces, k2.preuve, o1.Grant); !errors.Is(err, ErrGrantInvalid) {
 		t.Fatal(err)
 	}
 	if rowCount(t, s, id2) != 1 {
@@ -81,24 +81,69 @@ func TestReportGrantOfOtherShare(t *testing.T) {
 	}
 }
 
-// Destruction par un destinataire : refusée tant que d'autres ouvertures restent possibles.
+// Destruction par un destinataire : seulement par le DERNIER (audit du 20 novembre, M1) :
+// refusée tant que d'autres ouvertures restent possibles, et refusée au premier destinataire
+// une fois toutes prises ; octroi absent ou faux refusé.
 func TestDestroyWithProofStillOpen(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()
 	id := ready(t, s, k, 1, 1, 2)
-	if _, _, err := s.Unlock(id, k.acces, k.preuve); err != nil {
+	o1, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DestroyWithProof(k.acces, k.preuve); !errors.Is(err, ErrStillOpen) {
+	if err := s.DestroyWithProof(k.acces, k.preuve, o1.Grant); !errors.Is(err, ErrStillOpen) {
 		t.Fatal(err)
 	}
-	if _, _, err := s.Unlock(id, k.acces, k.preuve); err != nil {
+	o2, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DestroyWithProof(k.acces, k.preuve); err != nil {
+	if err := s.DestroyWithProof(k.acces, k.preuve, o1.Grant); !errors.Is(err, ErrStillOpen) {
+		t.Fatal("le premier destinataire a détruit :", err)
+	}
+	if err := s.DestroyWithProof(k.acces, k.preuve, ""); !errors.Is(err, ErrGrantInvalid) {
+		t.Fatal(err)
+	}
+	if err := s.DestroyWithProof(k.acces, k.preuve, o2.Grant); err != nil {
 		t.Fatal(err)
 	}
 	if rowCount(t, s, id) != 0 {
 		t.Fatal("non effacé")
+	}
+}
+
+// Voix oubliées quand le partage est effacé par n'importe quel chemin (audit du 20 novembre, B1).
+func TestReportVotesForgottenOnDestroy(t *testing.T) {
+	s, _ := newSvc(t)
+	k := newKeys()
+	id := ready(t, s, k, 1, 1, 5)
+	o, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gone, nouvelle, err := s.Report(k.acces, k.preuve, o.Grant); err != nil || gone || !nouvelle {
+		t.Fatal(gone, nouvelle, err)
+	}
+	if err := s.DestroyManaged(k.gestion); err != nil {
+		t.Fatal(err)
+	}
+	s.reports.mu.Lock()
+	n := len(s.reports.m)
+	s.reports.mu.Unlock()
+	if n != 0 {
+		t.Fatal("voix encore en mémoire :", n)
+	}
+}
+
+// Signalement d'un partage encore en envoi : introuvable, pas une erreur interne (audit, B2).
+func TestReportDuringUpload(t *testing.T) {
+	s, _ := newSvc(t)
+	k := newKeys()
+	if _, _, err := s.createAny(k.req(1, 1, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Report(k.acces, k.preuve, "x"); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
 	}
 }

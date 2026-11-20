@@ -51,7 +51,7 @@
   <ol class="steps3">
     {#each how as k, i (k)}
       <li class="st rv" data-how-card style:--i="{i * 80}ms" {@attach reveal}>
-        <svg class={["ill", { wide: k === "gone" }]} viewBox={k === "gone" ? "0 0 200 164" : "0 0 128 164"} aria-hidden="true" focusable="false">
+        <svg class="ill" viewBox={k === "gone" ? "0 0 200 164" : "0 0 128 164"} aria-hidden="true" focusable="false">
           {#if k === "add"}
             <path d={PAGE} fill="#ebe6dc" />
             <path d="M92 0V32H124Z" fill="#bdb6a8" />
@@ -81,10 +81,8 @@
         </svg>
         <div class="tx">
           <span class="n num" aria-hidden="true">{i + 1}</span>
-          <div>
-            <h3><span class="sr-only">{i + 1}. </span>{t(`home.how.${k}.t` as Key)}</h3>
-            <p>{t(`home.how.${k}.p` as Key, limitParams(getLang()))}</p>
-          </div>
+          <h3><span class="sr-only">{i + 1}. </span>{t(`home.how.${k}.t` as Key)}</h3>
+          <p>{t(`home.how.${k}.p` as Key, limitParams(getLang()))}</p>
         </div>
       </li>
     {/each}
@@ -111,7 +109,7 @@
     {#each priv as k, i (k)}
       <li class={["prow", "rv", { soon: k === "room" }]} data-priv-card style:--i="{i * 70}ms" {@attach reveal}>
         <span class="tile-ic" aria-hidden="true">
-          {#if k === "account"}<UserX size={22} strokeWidth={1.8} />{:else if k === "server"}<EyeOff size={22} strokeWidth={1.8} />{:else if k === "clean"}<Broom size={22} strokeWidth={1.8} />{:else}<TabIcon id="chat" size={22} />{/if}
+          {#if k === "account"}<UserX size={30} strokeWidth={1.7} />{:else if k === "server"}<EyeOff size={30} strokeWidth={1.7} />{:else if k === "clean"}<Broom size={30} strokeWidth={1.7} />{:else}<TabIcon id="chat" size={30} />{/if}
         </span>
         <div>
           <h3>{t(`home.priv.${k}.t` as Key)}{#if k === "room"}{" "}<span class="pill">{t("foot.soon")}</span>{/if}</h3>
@@ -200,7 +198,6 @@
   /* Téléphone et tablette : deux colonnes (une seule si le texte est agrandi : 9 rem = 288 px à
      200 %) ; ordinateur : quatre, reliées par un pointillé. Chaque illustration a la même hauteur. */
   .steps3 {
-    --iw: min(110px, 28vw);
     display: grid;
     /* Deux étapes par ligne au plus, partout (propriétaire, 20 novembre) ; une seule colonne
        quand le texte est agrandi (9 rem = 288 px à 200 %). */
@@ -210,32 +207,45 @@
     padding: 0;
     list-style: none;
   }
+  /* 20 novembre (propriétaire : « revoir la grandeur des images pour mieux les centrer ») :
+     chaque étape est une colonne centrée ; toutes les illustrations ont la même hauteur (--ih),
+     leur largeur suit leur dessin, le texte est centré dessous. */
   .st {
     position: relative;
     display: grid;
+    justify-items: center;
     align-content: start;
     gap: var(--sp-4);
     min-width: 0;
+    text-align: center;
+  }
+  .steps3 {
+    --ih: clamp(112px, 26vw, 148px);
   }
   .ill {
     display: block;
-    width: var(--iw);
-    height: auto;
-  }
-  .ill.wide {
-    width: min(100%, calc(var(--iw) * 200 / 128));
+    height: var(--ih);
+    width: auto;
+    max-width: 100%;
   }
   .tx {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: var(--sp-3);
-    align-items: baseline;
+    justify-items: center;
+    gap: var(--sp-2);
+    max-width: 26rem;
   }
   .n {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgb(95 227 181 / 0.12);
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.35);
     color: var(--accent);
     font-family: var(--font-mono);
-    font-size: 0.9375rem;
-    font-weight: 600;
+    font-size: 0.875rem;
+    font-weight: 650;
   }
   .st p {
     margin: 0;
@@ -243,25 +253,17 @@
     font-size: 0.9375rem;
     line-height: 1.55;
     overflow-wrap: break-word;
+    text-wrap: pretty;
   }
   .st h3 {
     overflow-wrap: break-word;
   }
   @media (min-width: 1024px) {
     .steps3 {
-      --iw: clamp(110px, 9vw, 150px);
-      gap: 64px clamp(48px, 6vw, 112px);
-      width: min(100%, 62rem);
+      --ih: 168px;
+      gap: 72px clamp(48px, 7vw, 128px);
+      width: min(100%, 60rem);
       margin-inline: auto;
-    }
-    /* Colonne d'illustration commune (la plus large, « Ça s'efface ») : textes alignés. */
-    .st {
-      grid-template-columns: calc(var(--iw) * 200 / 128) minmax(0, 1fr);
-      align-items: center;
-      gap: var(--sp-5);
-    }
-    .ill {
-      justify-self: center;
     }
   }
 
@@ -277,20 +279,31 @@
     padding: 0;
     list-style: none;
   }
+  /* 20 novembre (propriétaire) : texte centré, pictogramme plus gros, centré au-dessus. */
   .prow {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: center;
+    align-content: start;
+    gap: var(--sp-3);
+    padding-block: var(--sp-6);
     border-block-start: 1px solid rgb(233 236 242 / 0.08);
-    gap: var(--sp-4);
-    padding-block: var(--sp-5);
     border-block-end: 1px solid rgb(233 236 242 / 0.08);
+    text-align: center;
   }
   .tile-ic {
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
-    color: var(--text-2);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 30%, rgb(95 227 181 / 0.18), rgb(95 227 181 / 0.05));
+    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
+    color: var(--accent);
+  }
+  .prow > div {
+    display: grid;
+    justify-items: center;
+    max-width: 30rem;
   }
   .prow h3,
   .prow p {

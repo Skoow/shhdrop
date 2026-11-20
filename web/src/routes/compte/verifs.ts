@@ -59,6 +59,39 @@ const COURANTS = [
   "gmx.com",
 ];
 
+/**
+ * Vrais domaines de messagerie à une lettre d'un domaine courant (audit du 20 novembre) : jamais
+ * « corrigés » (« ymail.com » n'est pas une faute pour « gmail.com »).
+ */
+const REELS = new Set([
+  "ymail.com",
+  "mail.com",
+  "email.com",
+  "gmx.de",
+  "gmx.net",
+  "aol.com",
+  "aol.fr",
+  "mac.com",
+  "pm.me",
+  "live.be",
+  "live.ca",
+  "hotmail.be",
+  "hotmail.de",
+  "hotmail.it",
+  "hotmail.es",
+  "outlook.be",
+  "outlook.de",
+  "outlook.es",
+  "outlook.it",
+  "yahoo.de",
+  "yahoo.es",
+  "yahoo.it",
+  "yahoo.ca",
+  "proton.ch",
+  "neuf.fr",
+  "club.fr",
+]);
+
 function distance(a: string, b: string): number {
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
   for (let j = 1; j <= b.length; j++) d[0]![j] = j;
@@ -77,7 +110,7 @@ export function suggestion(adresse: string): string | null {
   const i = adresse.lastIndexOf("@");
   if (i <= 0) return null;
   const dom = adresse.slice(i + 1).trim().toLowerCase();
-  if (dom.length < 4 || COURANTS.includes(dom)) return null;
+  if (dom.length < 4 || COURANTS.includes(dom) || REELS.has(dom)) return null;
   let mieux: string | null = null;
   let best = 3;
   for (const c of COURANTS) {

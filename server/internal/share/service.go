@@ -1157,12 +1157,14 @@ func (s *Service) aliveUpload(id, state string, now int64) bool {
 	return state != "uploading" || s.uploadOpen(id, now)
 }
 
-// DestroyWithProof : destruction par le destinataire (K_accès et K_preuve). Partage
-// trouvé par V_accès ; K_preuve faux = un essai de mot de passe (compteur commun avec Unlock).
-// Seulement quand plus aucune ouverture n'est possible (« draining ») : un destinataire ne
-// peut pas effacer un partage que d'autres doivent encore ouvrir (20 novembre ; le
-// signalement, lui, compte des voix : report.go). Les ouvertures actives finissent (cas 2).
-func (s *Service) DestroyWithProof(kAcces, kPreuve []byte) error {
+// DestroyWithProof : destruction par le destinataire (K_accès, K_preuve et l'octroi de son
+// ouverture). Partage trouvé par V_accès ; K_preuve faux = un essai de mot de passe (compteur
+// commun avec Unlock). Seulement par le DERNIER destinataire (audit du 20 novembre, M1) : plus
+// aucune ouverture possible (« draining ») et l'octroi est celui de la dernière ouverture
+// (n = opens_issued) ; sinon ErrStillOpen. Octroi faux : ErrGrantInvalid. Un destinataire ne
+// peut donc pas effacer un partage que d'autres doivent encore ouvrir ou rouvrir (D42-22). Les
+// ouvertures actives finissent (cas 2).
+func (s *Service) DestroyWithProof(kAcces, kPreuve []byte, grant string) error {
 	v := Verifier(kAcces)
 	if v == nil {
 		return ErrNotFound
@@ -1181,24 +1183,32 @@ func (s *Service) DestroyWithProof(kAcces, kPreuve []byte) error {
 	mu.Lock()
 	defer mu.Unlock()
 	// Relu sous le verrou : un essai concurrent a pu épuiser le compteur (audit F1).
-	var failed int
-	if err := s.DB.QueryRow(`SELECT failed_attempts, state FROM shares WHERE id=?`, id).Scan(&failed, &state); err != nil {
+	var failed, issued int
+	if err := s.DB.QueryRow(`SELECT failed_attempts, state, opens_issued FROM shares WHERE id=?`, id).Scan(&failed, &state, &issued); err != nil {
 		return notFound(err)
 	}
 	if failed >= maxAttempts {
 		return ErrNotFound
 	}
-	if match(kPreuve, proofV) { // proof_v NULL (envoi en cours) : jamais juste
-		if state != "draining" {
-			return ErrStillOpen
+	if !match(kPreuve, proofV) { // proof_v NULL (envoi en cours) : jamais juste
+		if _, err := s.countFailure(id); err != nil && !errors.Is(err, ErrNotFound) {
+			return err
 		}
-		s.reports.forget(id)
-		return s.retireOrNotFound(id, true)
+		return ErrNotFound
 	}
-	if _, err := s.countFailure(id); err != nil && !errors.Is(err, ErrNotFound) {
-		return err
+	idb, ok := idBytes(id)
+	if !ok {
+		return ErrNotFound
 	}
-	return ErrNotFound
+	n, ok := VerifyGrant(s.grantKey, idb, grant, s.Now())
+	if !ok {
+		return ErrGrantInvalid
+	}
+	if state != "draining" || int(n) != issued {
+		return ErrStillOpen
+	}
+	s.reports.forget(id)
+	return s.retireOrNotFound(id, true)
 }
 
 // DestroyManaged : destruction par l'expéditeur (S_gestion), partage trouvé par V_gestion.
@@ -1289,6 +1299,7 @@ func (s *Service) DestroyAdmin(kAcces []byte) error {
 func (s *Service) Sweep() (int, error) {
 	now := s.now()
 	s.sweepGone(now)
+	s.reports.purge(now)
 	rows, err := s.DB.Query(`SELECT id FROM shares WHERE state<>'ready' OR expires_at<=? OR failed_attempts>=?`, now, maxAttempts)
 	if err != nil {
 		return 0, err
@@ -1454,6 +1465,7 @@ func (s *Service) destroy(id string) (bool, error) {
 	// et dans shares.db tant que le WAL n'est pas replié.
 	s.Vidage.Demander()
 	s.forget(id)
+	s.reports.forget(id)
 	if state == "uploading" && s.OnAbandon != nil {
 		s.OnAbandon(id, bucket)
 	}

@@ -9,7 +9,7 @@
   import { t, type Key } from "../i18n/i18n.svelte";
   import { FileText, Pause, Play } from "./Icon";
   import { cipherText, rng } from "./decor";
-  import { PAUSE, STEP_MS, STEPS, TYPE_MS } from "./demo-steps";
+  import { PAUSE, STEPS, TYPE_MS, dureeEtape } from "./demo-steps";
 
   const uid = $props.id();
   // Section de l'accueil qui porte le titre visible (19 novembre, 3) : sinon, titre caché propre.
@@ -42,10 +42,12 @@
   $effect(() => {
     if (!playing) return;
     const now = step; // relu à chaque étape : un minuteur par étape
+    // Durée selon le texte de l'étape (titre et description, 20 novembre).
+    const ms = dureeEtape(t(`demo.s${now}.t` as Key) + t(`demo.s${now}.d` as Key));
     const timer = setTimeout(() => {
       step = now === STEPS.length ? 1 : now + 1;
       typed = 0; // la frappe de l'étape suivante repart du début
-    }, STEP_MS);
+    }, ms);
     return () => clearTimeout(timer);
   });
 

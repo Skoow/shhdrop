@@ -27,7 +27,7 @@ test.describe("français par défaut", () => {
     await expect(en.page).toHaveTitle("Page not found · Shhgone");
     // Titre par route (scan UX B9) : Sécurité, puis l'accueil.
     await openSecurity(en.page);
-    await expect(en.page).toHaveTitle("Security · Shhgone");
+    await expect(en.page).toHaveTitle("Security and encryption · Shhgone");
     await en.page.goto(shh.origin + "/");
     await expect(en.page).toHaveTitle("End-to-end encrypted sharing, no account · Shhgone");
     await en.ctx.close();

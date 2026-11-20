@@ -58,9 +58,10 @@
           </span>
           <span class="dt num" data-details>
             {#each details(x) as d (d.k)}<span class="dr"><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></span>{/each}
+            <!-- Appels des salons (20 novembre) : une ligne de l'offre ; Plus et Pro : inclus, avec
+                 « bientôt » tant qu'ils ne sont pas ouverts ; Gratuit : non inclus. -->
+            <span class="dr" data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge">{t("foot.soon")}</span>{/if}</span></span>
           </span>
-          <!-- Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles. -->
-          {#if x !== "free"}<span class="soon" data-soon-calls>{t(x === "pro" ? "offers.soon.calls.pro" : "offers.soon.calls.plus")}</span>{/if}
           <!-- Plus de flèche ronde (retours du propriétaire du 17 novembre) : un bouton texte en bas
                de la carte ; toute la carte reste le lien. -->
           <!-- Gratuit : pas de « Voir l'offre » (17 novembre), c'est l'offre en cours. -->
@@ -352,6 +353,22 @@
     color: var(--text);
     font-weight: 600;
     text-align: end;
+  }
+  .dv.no {
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  .sbadge {
+    display: inline-block;
+    margin-inline-start: 4px;
+    padding: 0 7px;
+    border-radius: var(--r-pill);
+    background: rgb(95 227 181 / 0.1);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    vertical-align: 1px;
   }
   /* « Voir l'offre › » en bas de la carte, sur toute sa largeur (17 novembre). */
   .go {

@@ -362,7 +362,9 @@ export function infoPages(base: string, demo: boolean): Plugin {
             // app.html : la même page sans l'accueil écrit, servie pour les autres adresses de
             // l'application (« /envoyer », « /envois »…) et le 404 (serveur Go, static.go) :
             // l'accueil ne s'y affiche jamais avant le script.
-            copyFileSync(indexFile, join(outDir, "app.html"));
+            // « noindex » (audit du 20 novembre) : ni l'envoi, ni un partage, ni le 404 ne sont des pages à indexer.
+            const appHtml = readFileSync(indexFile, "utf8");
+            writeFileSync(join(outDir, "app.html"), appHtml.replace("</head>", robots(undefined) + "</head>"));
             const r = renderHome();
             const body = clean(r.body, "index.html");
             const html = readFileSync(indexFile, "utf8");

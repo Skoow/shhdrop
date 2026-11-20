@@ -102,7 +102,7 @@ func TestValidateRefusesEmptyHashVerifier(t *testing.T) {
 	if _, err := s.Meta(nil); !errors.Is(err, ErrNotFound) {
 		t.Fatal("meta lu avec un secret vide", err)
 	}
-	if err := s.DestroyWithProof(nil, nil); !errors.Is(err, ErrNotFound) {
+	if err := s.DestroyWithProof(nil, nil, ""); !errors.Is(err, ErrNotFound) {
 		t.Fatal("détruit avec des secrets vides", err)
 	}
 }
@@ -150,7 +150,8 @@ func TestDestroyWhileDraining(t *testing.T) {
 	s, _ := newSvc(t)
 	k := newKeys()
 	id := ready(t, s, k, 1, 1, 1)
-	if _, _, err := s.Unlock(id, k.acces, k.preuve); err != nil {
+	o, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+	if err != nil {
 		t.Fatal(err)
 	}
 	var state string
@@ -158,10 +159,10 @@ func TestDestroyWhileDraining(t *testing.T) {
 	if state != "draining" {
 		t.Fatal(state)
 	}
-	if err := s.DestroyWithProof(k.acces, rnd(32)); !errors.Is(err, ErrNotFound) {
+	if err := s.DestroyWithProof(k.acces, rnd(32), ""); !errors.Is(err, ErrNotFound) {
 		t.Fatal("mauvais K_preuve accepté", err)
 	}
-	if err := s.DestroyWithProof(k.acces, k.preuve); err != nil {
+	if err := s.DestroyWithProof(k.acces, k.preuve, o.Grant); err != nil {
 		t.Fatal(err)
 	}
 	gone(t, s, id)

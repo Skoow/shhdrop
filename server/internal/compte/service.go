@@ -335,6 +335,10 @@ func (s *Service) InscriptionFin(jeton [32]byte, code string, d Donnees, o Optio
 		case !errors.Is(err, sql.ErrNoRows):
 			return err
 		}
+		// « Pris » dit l'existence d'un compte : même limite que pseudo/verifier, par étape (audit, M3).
+		if k := cleEtape(jeton); !s.lim.AllowPseudoVerifier(k[:]) {
+			return ErrLimit{heureSuivante(now)}
+		}
 		if pris, err := pseudoPrisTx(tx, pe); err != nil {
 			return err
 		} else if pris || pe == [32]byte{} {
@@ -576,9 +580,10 @@ func (s *Service) PseudoVerifier(c Courante, pCanon []byte) (bool, error) {
 }
 
 // PseudoEcart : temps minimal entre deux changements de pseudo (décision du propriétaire,
-// 20 novembre : « 3 fois par an au plus ») ; 122 jours = 365 / 3, arrondi au-dessus : jamais
-// plus de 3 changements sur 12 mois glissants, sans nouvelle colonne (pseudo_jour suffit).
-const PseudoEcart = 122 * jourS
+// 20 novembre : « 3 fois par an au plus ») ; 123 jours : 3 × 123 = 369 > 366, jamais plus de
+// 3 changements sur 12 mois glissants, même une année bissextile (audit, B4), sans nouvelle
+// colonne (pseudo_jour suffit).
+const PseudoEcart = 123 * jourS
 
 // ChangerPseudo : au plus un changement par PseudoEcart, l'attente ne courant qu'à partir d'un
 // premier changement (décision du propriétaire, 14 novembre : pseudo_jour vaut 0 tant que le
@@ -608,6 +613,10 @@ func (s *Service) ChangerPseudo(c Courante, pCanon []byte) error {
 		}
 		if pe != [32]byte{} && subtle.ConstantTimeCompare(actuel, pe[:]) == 1 {
 			return nil
+		}
+		// « Pris » dit l'existence d'un compte : même limite que pseudo/verifier (audit, M3).
+		if !s.lim.AllowPseudoVerifier(c.H[:]) {
+			return ErrLimit{heureSuivante(now)}
 		}
 		if pris, err := pseudoPrisTx(tx, pe); err != nil {
 			return err

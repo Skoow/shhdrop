@@ -781,7 +781,7 @@ async function openWith(
             if (wiped) throw new Error("cles_effacees");
             destroying = true;
             try {
-              await api.destroy(c, { kAcces, kPreuve });
+              await api.destroy(c, { kAcces, kPreuve, grant: u.grant });
               segs.clear(); // détruit : plus aucune lecture, même des segments gardés
             } catch (e) {
               destroying = false;
@@ -871,7 +871,8 @@ export async function destroyShare(link: string, expectedOrigin: string, opts: {
     try {
       const m = await api.meta(c, kAcces);
       keys = await keysFromMeta(p.kLien, m, opts.password!);
-      await api.destroy(c, { kAcces, kPreuve: keys.kPreuve });
+      // Sans ouverture, pas d'octroi : refusé (409), seul le dernier destinataire détruit.
+      await api.destroy(c, { kAcces, kPreuve: keys.kPreuve, grant: "" });
     } finally {
       kAcces.fill(0);
       keys?.kPreuve.fill(0);

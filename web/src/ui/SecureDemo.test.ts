@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "../i18n/en";
 import { fr } from "../i18n/fr";
 import { setLang } from "../i18n/i18n.svelte";
-import { STEP_MS, STEPS } from "./demo-steps";
+import { STEP_MIN_MS, STEP_MS, STEPS, dureeEtape } from "./demo-steps";
 import SecureDemo from "./SecureDemo.svelte";
 
 let c: Record<string, unknown> | null = null;
@@ -69,8 +69,17 @@ describe("SecureDemo", () => {
     expect(step()).toBe(7);
     tickSteps(1);
     expect(step()).toBe(1);
-    expect(STEP_MS * 7).toBeGreaterThanOrEqual(10_000);
-    expect(STEP_MS * 7).toBeLessThanOrEqual(40_000);
+  });
+
+  it("durée d'une étape selon son texte (20 novembre) : plus longue pour plus de texte, bornée", () => {
+    const d = (n: number) => dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr]);
+    expect(d(4)).toBeGreaterThan(d(3)); // « Rien de lisible sur le serveur » : la plus longue description
+    for (const n of STEPS) {
+      expect(d(n)).toBeGreaterThanOrEqual(STEP_MIN_MS);
+      expect(d(n)).toBeLessThanOrEqual(STEP_MS);
+    }
+    expect(dureeEtape("")).toBe(STEP_MIN_MS);
+    expect(dureeEtape("x".repeat(1000))).toBe(STEP_MS);
   });
 
   it("bouton pause/lecture visible : arrête puis reprend la boucle", () => {
@@ -155,7 +164,8 @@ describe("journal tapé (18 novembre) : un seul curseur, mots entiers", () => {
     for (let n = 1; n <= STEPS.length; n++) {
       // Pendant la frappe : un curseur au plus.
       // Pas de 35 ms (TYPE_MS) : chaque lettre relance son minuteur au passage des effets.
-      const ticks = Math.floor((STEP_MS - 100) / 35);
+      const dur = dureeEtape(fr[`demo.s${n}.t` as keyof typeof fr] + fr[`demo.s${n}.d` as keyof typeof fr]);
+      const ticks = Math.floor((dur - 100) / 35);
       for (let k = 0; k < ticks; k++) {
         vi.advanceTimersByTime(35);
         flushSync();
@@ -172,7 +182,7 @@ describe("journal tapé (18 novembre) : un seul curseur, mots entiers", () => {
       const last = rows.at(-1)!;
       expect(last.querySelector(".cur.idle")).not.toBeNull();
       expect(document.querySelectorAll(".log .cur")).toHaveLength(1);
-      vi.advanceTimersByTime(STEP_MS - ticks * 35);
+      vi.advanceTimersByTime(dur - ticks * 35);
       flushSync();
     }
   });

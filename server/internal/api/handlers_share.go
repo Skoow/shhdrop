@@ -542,14 +542,15 @@ func (s *server) done(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/shares/destroy : destruction ou signalement par le destinataire (K_accès en
 // en-tête, K_preuve dans le corps). L'expéditeur passe par /api/manage/destroy.
-// reason : absent (destruction, seulement quand plus aucune ouverture n'est possible : sinon
-// 409 still_open ; les ouvertures actives finissent ; 204) ou exactement "report"
+// grant (octroi de l'ouverture) : toujours obligatoire (audit du 20 novembre).
+// reason : absent (destruction, seulement par le dernier destinataire : sinon 409 still_open ;
+// les ouvertures actives finissent ; 204) ou exactement "report"
 // (signalement : une voix par ouverture, prouvée par `grant`, l'octroi de l'ouverture ; le
 // partage est effacé, flux coupés, quand les voix atteignent la moitié des ouvertures
-// permises : share.Report ; réponse 200 {"detruit": vrai|faux}). Toute autre valeur → 400,
+// permises : share.Report ; réponse 200 {"detruit": 1|0}). Toute autre valeur → 400,
 // jamais de texte libre (spec §36 S14, §41.8). categorie (conception du compte §21.10.2) :
 // entier 1 à 10, seulement avec "report" (sinon 400) ; absente : 10 « Autre » ; comptée en
-// mémoire (usage), jamais écrite. grant : seulement avec "report", obligatoire.
+// mémoire (usage), jamais écrite.
 func (s *server) destroy(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Proof     string          `json:"proof"`
@@ -562,7 +563,7 @@ func (s *server) destroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	report := b.Reason != nil
-	if report && (string(b.Reason) != `"report"` || b.Grant == nil) || !report && (b.Categorie != nil || b.Grant != nil) {
+	if b.Grant == nil || report && string(b.Reason) != `"report"` || !report && b.Categorie != nil {
 		fail(w, errBadRequest)
 		return
 	}
@@ -582,7 +583,7 @@ func (s *server) destroy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !report {
-		if err := s.svc.DestroyWithProof(ka, kp); err != nil {
+		if err := s.svc.DestroyWithProof(ka, kp, *b.Grant); err != nil {
 			fail(w, err)
 			return
 		}
@@ -590,19 +591,27 @@ func (s *server) destroy(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	gone, err := s.svc.Report(ka, kp, *b.Grant)
+	gone, nouvelle, err := s.svc.Report(ka, kp, *b.Grant)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	s.reports.add(s.svc.Now())
-	s.usage.SignalementPartage(cat) // en mémoire seulement : la base n'apprend aucune catégorie
+	// Une même ouverture qui signale de nouveau ne compte pas deux fois (audit du 20 novembre, M2).
+	if nouvelle {
+		s.reports.add(s.svc.Now())
+		s.usage.SignalementPartage(cat) // en mémoire seulement : la base n'apprend aucune catégorie
+	}
 	if gone {
 		s.usage.Destruction() // signalement compris, sans le distinguer (§15.2)
 	}
+	// Entier 0 ou 1 : même longueur de réponse dans les deux cas (S62, comme last_open).
+	d := 0
+	if gone {
+		d = 1
+	}
 	writeJSON(w, http.StatusOK, struct {
-		Detruit bool `json:"detruit"`
-	}{gone})
+		Detruit int `json:"detruit"`
+	}{d})
 }
 
 // POST /api/shares/grow {"bucket": b} : agrandit la réservation d'un brouillon (spec §41.14).

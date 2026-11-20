@@ -176,7 +176,7 @@ describe("API v2 (spec §29.8)", () => {
     await meta(c, ka);
     await getSegment(c, "t", 3, 1);
     await done(c, "t");
-    await destroy(c, { kAcces: ka, kPreuve: kp });
+    await destroy(c, { kAcces: ka, kPreuve: kp, grant: "g" });
     await destroy(c, { sGestion: sg });
     await status(c, sg);
     expect(urls).toEqual([
@@ -191,8 +191,8 @@ describe("API v2 (spec §29.8)", () => {
     expect(bodies[4]).toBeUndefined();
     expect(heads[4]!.get("X-Shh-Manage")).toBe(Buffer.from(sg).toString("base64url"));
     expect(heads[5]!.get("X-Shh-Manage")).toBe(Buffer.from(sg).toString("base64url"));
-    // Destruction par le destinataire : corps exact, la preuve seule (signalement : test plus bas).
-    expect(String(bodies[3])).toBe(`{"proof":"${Buffer.from(kp).toString("base64url")}"}`);
+    // Destruction par le destinataire : corps exact, preuve et octroi (signalement : test plus bas).
+    expect(String(bodies[3])).toBe(`{"proof":"${Buffer.from(kp).toString("base64url")}","grant":"g"}`);
   });
   it("finalize : jeton en en-tête, corps JSON exact", async () => {
     const f = vi.fn(async (_: RequestInfo | URL, _i?: RequestInit) => new Response('{"expires_in_s":5}'));
@@ -302,7 +302,7 @@ it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute re
   const f = vi.fn(async (_u: string, init?: RequestInit) => {
     sent.push(String(init?.body));
     return String(init?.body).includes('"report"')
-      ? new Response(JSON.stringify({ detruit: sent.length % 2 === 0 }), { status: 200, headers: { "Content-Type": "application/json" } })
+      ? new Response(JSON.stringify({ detruit: sent.length % 2 === 0 ? 1 : 0 }), { status: 200, headers: { "Content-Type": "application/json" } })
       : new Response(null, { status: 204 });
   });
   const c = ctx("http://x", { fetch: f as unknown as typeof fetch, retryDelayMs: 1 });
@@ -314,7 +314,7 @@ it("signalement : catégorie entière 1 à 10 seulement, refusée AVANT toute re
   expect(got).toEqual([false, true, false, true, false, true, false, true, false, true]);
   for (const bad of [0, 11, 1.5, -1, NaN]) await expect(report(c, a, bad as Categorie, "g")).rejects.toThrow("categorie_invalide");
   expect(f).toHaveBeenCalledTimes(10);
-  // Sans signalement : ni reason, ni categorie, ni grant.
-  await destroy(c, a);
-  expect(JSON.parse(sent.at(-1)!)).toEqual({ proof: Buffer.from(new Uint8Array(32)).toString("base64url") });
+  // Sans signalement (destruction par la dernière ouverture) : ni reason ni categorie, octroi exigé.
+  await destroy(c, { ...a, grant: "g" });
+  expect(JSON.parse(sent.at(-1)!)).toEqual({ proof: Buffer.from(new Uint8Array(32)).toString("base64url"), grant: "g" });
 });

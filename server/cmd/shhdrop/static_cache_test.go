@@ -55,7 +55,7 @@ func TestCacheControlEndToEnd(t *testing.T) {
 		res.Body.Close()
 		return res
 	}
-	const year, none = "public, max-age=31536000, immutable", "no-store"
+	const year, day, none = "public, max-age=31536000, immutable", "public, max-age=86400", "no-store"
 	for _, c := range []struct {
 		path string
 		code int
@@ -66,10 +66,10 @@ func TestCacheControlEndToEnd(t *testing.T) {
 		{"/assets/pow.worker-CqXgVHIX.js", 200, year},
 		{"/assets/engine-bJc2cw0Z.wasm", 200, year},
 		{"/assets/absent-AbCdEf12.js", 404, none}, // un 404 n'est jamais mis en cache un an
-		{"/assets/aurora-ink.png", 200, none},
-		{"/assets/grain.png", 200, none},
-		{"/assets/motif.svg", 200, none},
-		{"/fonts/mona-sans-latin-standard-normal.woff2", 200, none},
+		{"/assets/aurora-ink.png", 200, day},
+		{"/assets/grain.png", 200, day},
+		{"/assets/motif.svg", 200, day},
+		{"/fonts/mona-sans-latin-standard-normal.woff2", 200, day},
 		{"/", 200, none},
 		{"/index.html", 200, none},
 		{"/securite", 200, none},
@@ -79,9 +79,10 @@ func TestCacheControlEndToEnd(t *testing.T) {
 		{"/pdf-frame.css", 200, none},
 		{"/robots.txt", 200, none},
 		{"/sitemap.xml", 200, none},
-		{"/manifest.webmanifest", 200, none},
-		{"/favicon.svg", 200, none},
+		{"/manifest.webmanifest", 200, day},
+		{"/favicon.svg", 200, day},
 		{"/api/captcha", 200, none},
+		{"/fonts/absente.woff2", 404, none}, // un 404 jamais en cache
 		{"/api/assets/index-yRSR4HNN.js", 404, none},
 	} {
 		for _, m := range []string{"GET", "HEAD"} {

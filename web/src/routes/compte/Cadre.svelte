@@ -98,10 +98,14 @@
     outline-offset: 2px;
     border-radius: 4px;
   }
-  /* Lien dans une phrase : hauteur de la ligne, pas de cible de 44 px qui décale le texte. */
+  /* Lien dans une phrase (« conditions d'utilisation ») : blanc et souligné (20 novembre) ;
+     hauteur de la ligne, pas de cible de 44 px qui décale le texte. */
   .cadre :global(a.lien-t) {
     display: inline;
     min-height: 0;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
   .cadre :global(.note) {
     margin: 0;

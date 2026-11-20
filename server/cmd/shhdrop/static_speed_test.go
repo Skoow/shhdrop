@@ -147,7 +147,11 @@ func TestStaticPrecompressedAndImmutable(t *testing.T) {
 			}
 		}
 	}
-	for _, p := range []string{"/", "/robots.txt", "/assets/aurora-ink.png", "/assets/absent-AbCd_123.js", "/securite", "/nope"} {
+	// Images fixes sans empreinte : un jour (audit de vitesse du 20 novembre).
+	if cc := get("/assets/aurora-ink.png", "br").Header.Values("Cache-Control"); len(cc) != 1 || cc[0] != "public, max-age=86400" {
+		t.Errorf("png : Cache-Control %q", cc)
+	}
+	for _, p := range []string{"/", "/robots.txt", "/assets/absent-AbCd_123.js", "/securite", "/nope"} {
 		if cc := get(p, "br").Header.Get("Cache-Control"); cc != "" {
 			t.Errorf("%s : Cache-Control %q", p, cc)
 		}

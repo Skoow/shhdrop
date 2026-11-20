@@ -91,7 +91,7 @@ test.describe("barre du haut (ordinateur)", () => {
 });
 
 test("infographie : la boucle démarre seule, le bouton pause l'arrête, le survol à la souris aussi ; hors écran, arrêtée", async ({ page, shh }) => {
-  test.setTimeout(90_000); // une étape dure STEP_MS (5,5 s, 20 novembre)
+  test.setTimeout(120_000); // une étape dure jusqu'à STEP_MS (9 s, selon son texte : 20 novembre)
   await page.goto(shh.origin + "/");
   const demo = page.locator("[data-demo]");
   await demo.scrollIntoViewIfNeeded();

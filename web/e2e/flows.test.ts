@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { utf8, type Item } from "../src/engine/pure";
-import { BadPasswordError, NotFoundError, StillOpenError, createShare, destroyShare, fetchMeta, openShare, shareStatus } from "../src/transfer/client";
+import { BadPasswordError, GrantInvalidError, NotFoundError, StillOpenError, createShare, destroyShare, fetchMeta, openShare, shareStatus } from "../src/transfer/client";
 import { parseLink } from "../src/engine";
 import { solveAltcha } from "./altcha";
 import { startServer, type TestServer } from "./server";
@@ -162,15 +162,20 @@ describe("gestion : shareStatus et destruction", () => {
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
     await expect(destroyShare(r.manage, srv().origin, {})).rejects.toBeInstanceOf(NotFoundError);
   });
-  it("destruction par le lien de partage + mot de passe : refusée tant qu'une ouverture reste (20 novembre)", async () => {
-    const r = await share(srv(), [textItem("b")]);
-    await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(StillOpenError);
+  it("destruction par un destinataire : seulement la dernière ouverture, octroi exigé (audit du 20 novembre)", async () => {
+    const r = await share(srv(), [textItem("b")], 2);
+    // Lien + mot de passe sans ouverture : pas d'octroi, refusé (seul l'expéditeur détruit ainsi).
+    await expect(destroyShare(r.link, srv().origin, { password: PW })).rejects.toBeInstanceOf(GrantInvalidError);
     expect(await shareStatus(r.manage, srv().origin)).toMatchObject({ opensUsed: 0 }); // intact
-    // La dernière ouverture, elle, peut détruire (Opened.destroy).
-    const o = await openShare(r.link, PW, srv().origin);
-    await o.destroy();
+    const o1 = await openShare(r.link, PW, srv().origin);
+    await expect(o1.destroy()).rejects.toBeInstanceOf(StillOpenError); // une ouverture reste
+    const o2 = await openShare(r.link, PW, srv().origin);
+    await expect(o1.destroy()).rejects.toBeInstanceOf(StillOpenError); // pas la dernière
+    expect(await shareStatus(r.manage, srv().origin)).toMatchObject({ opensUsed: 2, state: "draining" });
+    await o2.destroy(); // la dernière ouverture détruit
     await expect(shareStatus(r.manage, srv().origin)).rejects.toBeInstanceOf(NotFoundError);
-    o.wipe();
+    o1.wipe();
+    o2.wipe();
   });
   it("S1 : maxOpens=1, signalement après la dernière ouverture (draining) via Opened.report", async () => {
     const r = await share(srv(), [textItem("à signaler")], 1);

@@ -67,9 +67,7 @@ func TestCategorieBornesPartage(t *testing.T) {
 		return k
 	}
 	detruire := func(k keys, corps map[string]any) (int, string) {
-		if corps["reason"] != nil {
-			corps["grant"] = grants[string(k.preuve)]
-		}
+		corps["grant"] = grants[string(k.preuve)] // toujours obligatoire (audit du 20 novembre)
 		corps["proof"] = enc.EncodeToString(k.preuve)
 		w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: mustJSON(corps)})
 		return w.Code, strings.TrimSpace(w.Body.String())
@@ -130,7 +128,7 @@ func TestCategorieJamaisSurDisque(t *testing.T) {
 	c := e.create(t, "", k, 1, 1)
 	e.upload(t, c, 1)
 	w := e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, e.grant(t, k), map[string]any{"categorie": 7})})
-	expect(t, w, 200, detruitOui)
+	expect(t, w, 200, `{"detruit":1}`)
 	ks := newKeys()
 	ms := salonExclusion(t, e, ks, 4, 1)
 	if r := e.signaler(map[string]string{"X-Shh-Membre": ms[1].jeton}, `{"categorie":7}`); r.code != 200 {

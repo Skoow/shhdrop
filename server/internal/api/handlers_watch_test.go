@@ -309,7 +309,7 @@ func TestReportCutsStream(t *testing.T) {
 	}
 	// Seconde ouverture qui signale : 1 voix, la moitié de 2 ouvertures (20 novembre).
 	g := e.grant(t, k)
-	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g, nil)}), 200, detruitOui)
+	expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, g, nil)}), 200, `{"detruit":1}`)
 	cn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, _ := io.Copy(io.Discard, resp.Body)
 	if n >= int64(share.SegmentSize(80, 0)) {

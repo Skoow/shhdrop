@@ -743,8 +743,8 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
       if (p.endsWith("/destroy")) {
         bodies.push(String(init?.body));
         headers.push(new Headers(init?.headers).get("X-Shh-Access"));
-        // Signalement : réponse {"detruit": faux} (une voix, pas encore la moitié) ; destruction : 204.
-        return String(init?.body).includes('"report"') ? j(200, { detruit: false }) : new Response(null, { status: 204 });
+        // Signalement : réponse {"detruit": 0} (une voix, pas encore la moitié) ; destruction : 204.
+        return String(init?.body).includes('"report"') ? j(200, { detruit: 0 }) : new Response(null, { status: 204 });
       }
       if (p.endsWith("/done")) {
         keepalive.push(init?.keepalive);
@@ -766,7 +766,7 @@ describe("Opened.destroy et done en keepalive (S1)", () => {
     expect(typeof b.proof).toBe("string");
     expect(headers[0]).toMatch(/^[A-Za-z0-9_-]{43}$/);
     await o.destroy();
-    expect(JSON.parse(bodies[1]!)).toEqual({ proof: b.proof });
+    expect(JSON.parse(bodies[1]!)).toEqual({ proof: b.proof, grant: GRANT0 });
     await o.done();
     expect(keepalive).toEqual([true]);
     o.wipe();

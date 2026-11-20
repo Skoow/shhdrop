@@ -39,7 +39,9 @@ describe("nom affiché : Shhgone", () => {
     const html = code(read("index.html"));
     expect(html).toMatch(/<title>[^<]* · Shhgone<\/title>/);
     expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Shhgone" />');
-    expect(html).toContain("<h1>Shhgone : ");
+    // Sans JavaScript : un paragraphe, pas un second h1 (l'accueil écrit au build porte le seul h1, audit SEO du 20 novembre).
+    expect(html).toContain("<p><strong>Shhgone : ");
+    expect(html.match(/<h1[ >]/g) ?? []).toHaveLength(0);
     expect(html).not.toMatch(/shhdrop/i);
   });
 

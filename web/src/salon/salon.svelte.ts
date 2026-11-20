@@ -11,6 +11,7 @@ import { SvelteSet } from "svelte/reactivity";
 import { ClientSalon, type EvClient, type Fin } from "./client";
 import { Conversation, type Bulle, type PieceInfo } from "./conversation";
 import { AFFICHE_MAX, PIECE_MAX, envoyerPiece, lirePiece } from "./pieces";
+import { IMAGES_SURES, typeAffichage } from "./affichage";
 import { stripMetadata } from "../media/strip";
 import { clickDownload, REVOKE_AFTER_MS } from "../viewers/save";
 import { preparer, oublier as oublierPreparation, type Duree } from "./creation";
@@ -646,8 +647,6 @@ const originaux = new Map<string, Blob>();
 let pieceLocale = 0;
 let fileDesEnvois: Promise<void> = Promise.resolve();
 
-/** Types d'image affichés (jamais SVG, spec §39.5 et UI §12.4). */
-const IMAGES_SURES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MIME = /^[a-z]+\/[a-z0-9][a-z0-9.+-]{0,80}$/;
 
 function liberer(cle: string): void {
@@ -724,7 +723,8 @@ function envoyerBlob(x: Session, donnees: Blob, p: { nom: string; mime: string; 
   conv.pieceEnvoi(local, { nom: p.nom, mime: p.mime, taille: donnees.size, sorte: p.sorte, dureeMs: p.dureeMs });
   const cle = `l${local}`;
   originaux.set(cle, donnees);
-  if (p.sorte === "image" || p.sorte === "vocal" || p.sorte === "video") pieces.urls[cle] = URL.createObjectURL(new Blob([donnees], { type: p.mime }));
+  const type = typeAffichage(p.sorte, p.mime);
+  if (type) pieces.urls[cle] = URL.createObjectURL(new Blob([donnees], { type }));
   // Une pièce à la fois (le serveur admet deux envois non finalisés par connexion).
   fileDesEnvois = fileDesEnvois.then(async () => {
     const c = x.client;
@@ -750,12 +750,12 @@ export async function afficherPiece(b: Bulle): Promise<void> {
   const x = s;
   const p = b.piece;
   if (!x?.client || !p?.ref || pieces.urls[b.cle]) return;
-  const mime = p.sorte === "image" && IMAGES_SURES.has(p.mime) ? p.mime : p.sorte === "vocal" ? "audio/webm" : p.sorte === "video" ? p.mime : null;
+  const mime = typeAffichage(p.sorte, p.mime);
   if (!mime || p.taille > (p.sorte === "video" ? PIECE_MAX : AFFICHE_MAX)) return;
   try {
     const blob = await lirePiece(net(), x.client.jeton, p.ref);
     if (s !== x) return;
-    pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: p.sorte === "vocal" && p.mime.startsWith("audio/") ? p.mime : mime }));
+    pieces.urls[b.cle] = URL.createObjectURL(new Blob([blob], { type: mime }));
   } catch (e) {
     pieces.erreurs[b.cle] = e instanceof api.SalonError && e.status === 404 ? "indisponible" : "lecture";
   }

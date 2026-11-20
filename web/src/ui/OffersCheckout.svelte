@@ -45,7 +45,6 @@
   const MEANS: readonly Means[] = ["card", "paypal", "crypto"];
   const API: Readonly<Record<Means, Moyen>> = { card: "carte", paypal: "paypal", crypto: "crypto" };
   // Appels des salons (19 novembre) : prévus, jamais vendus ni promis comme disponibles.
-  const appels = (x: PaidTier) => t(x === "pro" ? "offers.soon.calls.pro" : "offers.soon.calls.plus");
   // Ce que l'offre choisie ajoute au gratuit (lu dans PAID et limits.ts).
   const adds = $derived(
     chosen
@@ -154,8 +153,9 @@
             {/if}
             <ul class="dt num">
               {#each details(x).slice(1) as d (d.k)}<li><span class="dk">{d.k}</span>{" "}<span class="dv">{d.v}</span></li>{/each}
+              <!-- Appels des salons (20 novembre) : Plus et Pro inclus (« bientôt »), Gratuit non. -->
+              <li data-calls={x}><span class="dk">{t("offers.calls.label")}</span>{" "}<span class={["dv", { no: x === "free" }]}>{x === "free" ? t("offers.calls.no") : t("offers.calls.yes")}{#if x !== "free"}{" "}<span class="sbadge">{t("foot.soon")}</span>{/if}</span></li>
             </ul>
-            {#if x !== "free"}<p class="soon" data-soon-calls>{appels(x)}</p>{/if}
             {#if x !== "free"}
               {@const tier = x}
               <label class="pick">
@@ -409,6 +409,22 @@
   }
   .dv {
     font-weight: 600;
+  }
+  .dv.no {
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  .sbadge {
+    display: inline-block;
+    margin-inline-start: 4px;
+    padding: 0 7px;
+    border-radius: var(--r-pill);
+    background: rgb(95 227 181 / 0.1);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    vertical-align: 1px;
   }
   .pick {
     display: flex;

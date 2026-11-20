@@ -9,6 +9,7 @@
   import { formatDuration } from "../../i18n/format";
   import { vue, entrer, pseudoPropose, photoProposee, choisirAvatar, verifierPseudo, conversation } from "../../salon/salon.svelte";
   import { changerPseudo, pseudoAChoisir, pseudoLibre, verifierSaisie } from "../../account/session.svelte";
+  import { codeDe } from "../compte/erreurs";
   import AvatarPicker from "../../ui/AvatarPicker.svelte";
   import Cadre from "../compte/Cadre.svelte";
   import TextField from "../../ui/TextField.svelte";
@@ -44,7 +45,11 @@
         const r = await verifierSaisie({ pseudo });
         if (r.pseudo) errCompte = t(r.pseudo === "pseudo_reserve" ? "account.err.pseudoReserve" : `salon.pseudo.err.${r.pseudo === "pseudo_longueur" ? "longueur" : r.pseudo === "pseudo_ecritures" ? "ecritures" : "caracteres"}`);
         else if (!(await pseudoLibre(pseudo))) errCompte = t("account.pseudo.taken");
-      } catch {
+        // Enregistré AVANT d'entrer (audit du 20 novembre) : si le serveur refuse (pris entre-temps,
+        // trop d'essais), on le dit ici plutôt que d'entrer avec un pseudo que le compte n'a pas.
+        else await changerPseudo(pseudo);
+      } catch (e) {
+        errCompte = t(codeDe(e) === "pseudo_pris" ? "account.pseudo.taken" : "salon.pseudo.err.compte");
         errCompte = t("salon.pseudo.err.compte");
       } finally {
         envoi = false;
@@ -53,7 +58,6 @@
     }
     if (!entrer(pseudo)) return champ?.focus();
     if (photo) void choisirAvatar(photo);
-    if (premier) void changerPseudo(pseudo).catch(() => undefined);
   }
   $effect(() => {
     if (refuse) untrack(() => champ?.focus());

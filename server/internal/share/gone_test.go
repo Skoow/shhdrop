@@ -170,10 +170,11 @@ func TestDeleteDuringDownloadGrace(t *testing.T) {
 		{"expéditeur", func(s *Service, k keys, _ string) error { return s.DestroyManaged(k.gestion) }},
 		{"destinataire", func(s *Service, k keys, id string) error {
 			// Dernière ouverture permise prise : seul ce cas permet au destinataire de détruire.
-			if _, _, err := s.Unlock(id, k.acces, k.preuve); err != nil {
+			o, err := s.UnlockGrant(id, k.acces, k.preuve, "")
+			if err != nil {
 				return err
 			}
-			return s.DestroyWithProof(k.acces, k.preuve)
+			return s.DestroyWithProof(k.acces, k.preuve, o.Grant)
 		}},
 		{"5 mots de passe faux", func(s *Service, k keys, id string) error {
 			for i := 0; i < maxAttempts; i++ {
@@ -261,7 +262,7 @@ func TestReportAndAdminCutStreams(t *testing.T) {
 	}{
 		{"signalement (partage de 2 ouvertures : une voix suffit)", func(s *Service, k keys, _ string) {
 			// La seconde ouverture signale avec son octroi : 1 voix, ReportsNeeded(2) = 1.
-			if gone, err := s.Report(k.acces, k.preuve, grant2); err != nil || !gone {
+			if gone, _, err := s.Report(k.acces, k.preuve, grant2); err != nil || !gone {
 				t.Fatal(gone, err)
 			}
 		}},
@@ -413,7 +414,7 @@ func TestReportCutsGraceReads(t *testing.T) {
 			defer seg.Close()
 			tc.end(t, s, c, k, id)
 			for _, p := range [][]byte{rnd(32), k.preuve} {
-				if _, err := s.Report(k.acces, p, "x"); !errors.Is(err, ErrNotFound) {
+				if _, _, err := s.Report(k.acces, p, "x"); !errors.Is(err, ErrNotFound) {
 					t.Fatal("réponse :", err)
 				}
 			}

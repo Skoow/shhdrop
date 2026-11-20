@@ -224,7 +224,7 @@ fn croise_natif() {
         heure_ms: 1_700_000_000_005,
         regle: Regle::Desactive,
         message: Message::Profil {
-            pseudo: "Dédé".into(),
+            pseudo: "Dede".into(),
             couleur: 3,
             avatar: Some(RefPiece {
                 r: Graine::new([0x55; 32]),

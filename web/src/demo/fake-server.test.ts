@@ -9,7 +9,6 @@ import {
   GrantInvalidError,
   NotFoundError,
   ReopenLimitError,
-  StillOpenError,
   collectToBlob,
   createShare,
   destroyShare,
@@ -215,7 +214,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     expect(unlocks[0]!.length).toBe(unlocks[1]!.length);
   });
 
-  it("destroyShare par le lien de gestion ; par lien + mot de passe : refusé tant qu'une ouverture reste (20 novembre)", async ({ expect }) => {
+  it("destroyShare par le lien de gestion ; par lien + mot de passe sans ouverture : octroi refusé (20 novembre)", async ({ expect }) => {
     const { fake, net } = setup();
     const a = await share(net);
     await destroyShare(a.manage, ORIGIN, net);
@@ -223,7 +222,7 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
     const b = await share(net);
     await expect(destroyShare(b.link, ORIGIN, { password: "faux-mot-de-passe", ...net })).rejects.toBeInstanceOf(NotFoundError);
     expect(fake.shares()).toBe(1); // un essai compté, pas de destruction
-    await expect(destroyShare(b.link, ORIGIN, { password: PW, ...net })).rejects.toBeInstanceOf(StillOpenError);
+    await expect(destroyShare(b.link, ORIGIN, { password: PW, ...net })).rejects.toBeInstanceOf(GrantInvalidError);
     expect(fake.shares()).toBe(1);
   });
 
@@ -292,7 +291,8 @@ describe.concurrent("faux serveur de démo contre le vrai client", { timeout: 60
       ...[0, 11, 1.5, "3", null].map((categorie) => ({ reason: "report", categorie, grant: "g" })),
       { categorie: 3 },
       { reason: "report" }, // signalement sans octroi (20 novembre)
-      { grant: "g" }, // octroi sans signalement
+      {}, // destruction sans octroi (audit du 20 novembre : seule la dernière ouverture détruit)
+      { categorie: 3, grant: "g" }, // catégorie sans signalement
     ];
     for (const extra of bad) {
       const res = await fake2.handle(

@@ -16,6 +16,8 @@ describe("adresse", () => {
     expect(suggestion("lea@gmail.con")).toBe("lea@gmail.com");
     expect(suggestion("lea@gmail.com")).toBeNull();
     expect(suggestion("lea@yopmail.com")).toBeNull();
+    // Vrais domaines à une lettre d'un domaine courant : jamais « corrigés » (audit du 20 novembre).
+    for (const d of ["ymail.com", "mail.com", "email.com", "gmx.de", "aol.com", "mac.com", "hotmail.de", "yahoo.de"]) expect(suggestion(`lea@${d}`), d).toBeNull();
     expect(suggestion("lea@exemple.fr")).toBeNull();
   });
 });

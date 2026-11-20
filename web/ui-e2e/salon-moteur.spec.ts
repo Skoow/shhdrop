@@ -256,7 +256,7 @@ test("croisé natif ↔ WebAssembly : Welcome, Commit et messages du moteur nati
         for (const x of [croise.B, croise.C, croise.k1, croise.k2]) x.free();
         return lu;
       }, n2),
-    ).toBe("Dédé");
+    ).toBe("Dede");
     // Le test Rust a tout vérifié de son côté (messages du module, Commit, clés SFrame, codes).
     expect(await exit).toBe(0);
   } finally {

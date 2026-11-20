@@ -10,6 +10,8 @@ describe("pseudo provisoire", () => {
   });
   it("choisi à la main : réservé ; espaces et signes refusés ; « Lea42 » accepté", async () => {
     expect(await verifierSaisie({ pseudo: "Membre123456" })).toEqual({ pseudo: "pseudo_reserve" });
+    // Toute casse (l'unicité l'ignore) : audit du 20 novembre.
+    for (const p of ["membre123456", "MEMBER654321", "mEmBrE000000"]) expect(await verifierSaisie({ pseudo: p }), p).toEqual({ pseudo: "pseudo_reserve" });
     expect(await verifierSaisie({ pseudo: "Léa Dupont" })).toEqual({ pseudo: "pseudo_caracteres" });
     expect(await verifierSaisie({ pseudo: "Jean-Luc" })).toEqual({ pseudo: "pseudo_caracteres" });
     expect(await verifierSaisie({ pseudo: "admin" })).toEqual({ pseudo: "pseudo_reserve" });

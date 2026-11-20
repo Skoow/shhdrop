@@ -474,7 +474,11 @@ export async function watch(c: Ctx, token: string, signal?: AbortSignal): Promis
   }
 }
 
-export type DestroyAuth = { kAcces: KAcces; kPreuve: KPreuve } | { sGestion: SGestion };
+/**
+ * Destinataire : K_accès, K_preuve et l'octroi de son ouverture (toujours exigé, audit du
+ * 20 novembre : seul le dernier destinataire détruit) ; expéditeur : S_gestion.
+ */
+export type DestroyAuth = { kAcces: KAcces; kPreuve: KPreuve; grant: string } | { sGestion: SGestion };
 
 /**
  * Catégorie d'un signalement (conception compte §21.10.1) : codes fixes, mêmes dans le site et
@@ -485,8 +489,8 @@ export const CATEGORIES: readonly Categorie[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const CATEGORIE_AUTRE: Categorie = 10;
 
 /**
- * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy, corps `{"proof":…}` ;
- * seulement quand plus aucune ouverture n'est possible (sinon 409 still_open, 20 novembre).
+ * Destinataire (K_accès + K_preuve) : POST /api/shares/destroy, corps `{"proof":…,"grant":…}` ;
+ * seulement par la dernière ouverture (sinon 409 still_open, 20 novembre).
  * Expéditeur (S_gestion) : POST /api/manage/destroy, S_gestion en en-tête, corps vide (spec
  * §32). keepalive : la requête survit à la fermeture de la page (annulation d'un envoi,
  * `pagehide`).
@@ -498,7 +502,7 @@ export async function destroy(c: Ctx, a: DestroyAuth, keepalive?: boolean): Prom
       : {
           method: "POST",
           path: "/api/shares/destroy",
-          body: JSON.stringify({ proof: b64u(a.kPreuve) }),
+          body: JSON.stringify({ proof: b64u(a.kPreuve), grant: a.grant }),
           headers: { "Content-Type": "application/json", "X-Shh-Access": b64u(a.kAcces) },
         };
   await send(c, q, none);
@@ -524,8 +528,9 @@ export async function report(c: Ctx, a: { kAcces: KAcces; kPreuve: KPreuve }, ca
     },
     readJSON,
   );
-  if (typeof o.detruit !== "boolean") throw new BadResponse();
-  return o.detruit;
+  // 0 ou 1 (même longueur de réponse dans les deux cas, audit du 20 novembre).
+  if (o.detruit !== 0 && o.detruit !== 1) throw new BadResponse();
+  return o.detruit === 1;
 }
 
 export type Status = { opensUsed: number; maxOpens: number; expiresInS: number; state: string };

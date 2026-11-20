@@ -175,9 +175,9 @@ func TestDestroyReasonClosed(t *testing.T) {
 		code int
 	}{
 		{"absent", map[string]any{}, 204},
-		{"report", map[string]any{"reason": "report", "grant": ""}, 200},
-		{"report sans octroi", map[string]any{"reason": "report"}, 400},
-		{"octroi sans report", map[string]any{"grant": ""}, 400},
+		{"report", map[string]any{"reason": "report"}, 200},
+		{"sans octroi", map[string]any{"reason": "report", "grant": nil}, 400},
+		{"destruction sans octroi", map[string]any{"grant": nil}, 400},
 		{"libre", map[string]any{"reason": "ReperRaison"}, 400},
 		{"vide", map[string]any{"reason": ""}, 400},
 		{"majuscules", map[string]any{"reason": "REPORT"}, 400},
@@ -190,7 +190,9 @@ func TestDestroyReasonClosed(t *testing.T) {
 			c := e.create(t, "", k, 1, 1)
 			e.upload(t, c, 1)
 			g := e.grant(t, k) // dernière ouverture : la destruction simple est permise
-			if v, ok := tc.body["grant"]; ok && v == "" {
+			if v, ok := tc.body["grant"]; ok && v == nil {
+				delete(tc.body, "grant") // octroi absent : toujours obligatoire (audit du 20 novembre)
+			} else {
 				tc.body["grant"] = g
 			}
 			tc.body["proof"] = enc.EncodeToString(k.preuve)
@@ -202,7 +204,7 @@ func TestDestroyReasonClosed(t *testing.T) {
 				expect(t, w, 400, badRequest)
 				// intact : encore là pour la dernière ouverture (meta ne répond plus en « draining »)
 				expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-					body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})}), 204, "")
+					body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "grant": g})}), 204, "")
 			}
 		})
 	}
@@ -283,7 +285,7 @@ func TestHealthzReportsAlert(t *testing.T) {
 		k := newKeys()
 		c := e.create(t, "", k, 1, 1)
 		e.upload(t, c, 1)
-		expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, e.grant(t, k), nil)}), 200, detruitOui)
+		expect(t, e.do(req{method: "POST", path: "/api/shares/destroy", hdr: access(k), body: reportBody(k, e.grant(t, k), nil)}), 200, `{"detruit":1}`)
 		e.clk.Add(time.Minute)
 	}
 	if h := health(); h != `{"ok":true,"reports_alert":true}` {

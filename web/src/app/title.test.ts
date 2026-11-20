@@ -15,7 +15,7 @@ describe("titre de l'onglet", () => {
     expect(routeTitle("open")).toBe("Ouvrir un partage · Shhgone");
     expect(routeTitle("manage")).toBe("Gérer un partage · Shhgone");
     expect(routeTitle("notfound")).toBe("Page introuvable · Shhgone");
-    expect(routeTitle("securite")).toBe("Sécurité · Shhgone");
+    expect(routeTitle("securite")).toBe("Sécurité et chiffrement · Shhgone");
     expect(routeTitle("confidentialite")).toBe("Confidentialité · Shhgone");
     setLang("en");
     expect(routeTitle("home")).toBe("Send · Shhgone");

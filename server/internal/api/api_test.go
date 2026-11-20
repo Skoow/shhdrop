@@ -332,8 +332,6 @@ func reportBody(k keys, grant string, extra map[string]any) []byte {
 	return mustJSON(m)
 }
 
-const detruitOui = `{"detruit":true}`
-
 func TestFullFlow(t *testing.T) {
 	e := newEnv(t, false, nil)
 	k := newKeys()
@@ -393,11 +391,14 @@ func TestFullFlow(t *testing.T) {
 
 	// Destruction par le destinataire (K_accès + K_preuve) : refusée tant qu'une ouverture
 	// reste possible (20 novembre), acceptée par la dernière.
-	destroy := req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-		body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})}
-	expect(t, e.do(destroy), 409, `{"error":"still_open"}`)
-	e.unlock(t, c.ID, k)
-	w = e.do(destroy)
+	// Destruction : seulement par la DERNIÈRE ouverture, avec son octroi (audit du 20 novembre).
+	destroy := func(g string) req {
+		return req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
+			body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "grant": g})}
+	}
+	expect(t, e.do(destroy("x")), 409, `{"error":"grant_invalid"}`)
+	g := e.grant(t, k) // seconde et dernière ouverture
+	w = e.do(destroy(g))
 	expect(t, w, 204, "")
 	expect(t, e.do(req{method: "GET", path: "/api/shares/meta", hdr: access(k)}), 404, notFound)
 	// Ouverture déjà terminée (done) : aucune grâce, 410 avec son jeton.
@@ -1197,7 +1198,7 @@ func TestUniformNotFoundAllRoutes(t *testing.T) {
 		},
 		"destroy preuve": func(id string, k keys, _ string) req {
 			return req{method: "POST", path: "/api/shares/destroy", hdr: access(k),
-				body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve)})}
+				body: mustJSON(map[string]string{"proof": enc.EncodeToString(k.preuve), "grant": "x"})}
 		},
 		"segment": func(id string, _ keys, tok string) req {
 			return req{method: "GET", path: "/api/shares/segments/0", hdr: auth(tok)}
