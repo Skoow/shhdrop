@@ -37,7 +37,7 @@ export const LOG: readonly Line[] = [
   { n: 4, text: "demo.log.server", st: "demo.unreadable", tone: "ok" },
   { n: 4, text: "demo.log.search", st: "demo.st.nothing", tone: "atk", late: true },
   { n: 5, text: "demo.log.link", st: "demo.st.ok", tone: "ok" },
-  { n: 6, text: "demo.log.open", st: "demo.st.decrypted", tone: "ok" },
+  { n: 6, text: "demo.log.open", st: "demo.st.ok", tone: "ok" },
   { n: 7, text: "demo.log.erase", st: "demo.st.done", tone: "end" },
 ];
 /** Étapes, dans l'ordre (textes demo.sN.t et demo.sN.d). */

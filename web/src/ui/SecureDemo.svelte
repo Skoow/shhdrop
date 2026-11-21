@@ -234,7 +234,6 @@
       <g class="node">
         <text class="lbl" x="200" y="40">{t("demo.server")}</text>
         <rect class={["srv", { gone: at(shown, 7) }]} x="158" y="52" width="84" height="104" rx="12" />
-        <g class="leds"><circle cx="170" cy="63" r="2" /><circle cx="177" cy="63" r="2" /><circle cx="184" cy="63" r="2" /></g>
         <!-- Baies du serveur (18 novembre) : trois emplacements vides, que les blocs chiffrés remplissent. -->
         <g class={["slots", { off: at(shown, 7) }]}>
           {#each [0, 1, 2] as k (k)}<rect x="172" y={74 + k * 14} width="56" height="10" rx="3" />{/each}
@@ -448,10 +447,6 @@
   }
   .srv.gone {
     stroke-dasharray: 4 4;
-  }
-  .leds circle {
-    fill: var(--mint);
-    opacity: 0.55;
   }
   /* Balayage : les deux découpes glissent ensemble, la ligne les suit. */
   .scanr {
@@ -877,6 +872,16 @@
     .log {
       padding-inline: 12px;
       font-size: 0.6875rem;
+    }
+  }
+  /* Petits téléphones (360 px) : chaque ligne du journal tient sur une ligne (21 novembre). */
+  @media (max-width: 379px) {
+    .log {
+      padding-inline: 10px;
+      font-size: 0.625rem;
+    }
+    .ln {
+      column-gap: 6px;
     }
   }
   .ln {
