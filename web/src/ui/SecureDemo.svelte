@@ -84,6 +84,17 @@
     dy: Math.round(-20 - r() * 50),
     d: Math.round(r() * 420),
   }));
+  // Poussière de la photo chez le destinataire, à l'effacement (étape 7, 21 novembre).
+  const dustPeer = Array.from({ length: 16 }, (_, i) => ({
+    x: 310 + (i % 4) * 12,
+    y: 74 + Math.floor(i / 4) * 10,
+    dx: Math.round((r() - 0.5) * 50),
+    dy: Math.round(-15 - r() * 40),
+    d: 500 + Math.round(r() * 400),
+  }));
+  // Contenu des baies du serveur : brouillé qui change sans cesse (deux jeux qui alternent) : le
+  // serveur ne garde que du chiffré, montré au lieu d'être écrit (propriétaire, 21 novembre).
+  const garble = [cipherText(0xb10c, 9, 3).split("\n"), cipherText(0xc0de, 9, 3).split("\n")];
   const at = (n: number, ...steps: number[]) => steps.includes(n);
 
   // Journal façon terminal (décision du propriétaire du 16 novembre) : une ligne courte par étape,
@@ -189,18 +200,18 @@
           <path d="M42 108l16-18 10 10 8-7 14 15z" class="ph-hill" />
           <text class="fname" x="66" y="128">photo.jpg</text>
         </g>
-        <g class={["cipher", { on: at(shown, 2, 3, 4, 5, 6) }]} clip-path="url(#{uid}-above)">
+        <g class={["cipher", { on: at(shown, 2, 3), part: shown === 3 }]} clip-path="url(#{uid}-above)">
           {#each cipher as line, i (i)}<text class="mono" x="66" y={76 + i * 11}>{line}</text>{/each}
           <text class="fname x" x="66" y="138">Xq9#7b.z</text>
         </g>
         <rect class={["scan", { go: shown === 2 }]} x="26" y="52" width="80" height="2" rx="1" />
-        <g class={["sent", { on: at(shown, 7) }]}>
+        <g class={["sent", { on: at(shown, 4, 5, 6) }]}>
           <circle cx="66" cy="96" r="13" />
           <path d="M60 96.5l4 4 8-8.5" />
           <text x="66" y="128">{t("demo.st.sent")}</text>
         </g>
         <g transform="translate(100 56)">
-          <g class={["lock", { on: at(shown, 2, 3, 4, 5, 6) }]}>
+          <g class={["lock", { on: at(shown, 2, 3), part: shown === 3 }]}>
             <circle r="11" class="lock-bg" />
             <path class="lock-shackle" d="M-4 -1v-3a4 4 0 0 1 8 0v3" />
             <rect x="-5.5" y="-1" width="11" height="8" rx="2" class="lock-body" />
@@ -209,9 +220,12 @@
       </g>
 
       <!-- Paquet chiffré vers le serveur, puis vers le destinataire -->
-      <g class={["packet", "to-server", { on: at(shown, 3) }]}>
-        {#each [0, 1, 2, 3, 4, 5] as k (k)}<rect x={112 + (k % 3) * 7} y={99 + Math.floor(k / 3) * 7} width="5" height="5" rx="1" />{/each}
-      </g>
+      <!-- Étape 3 (21 novembre) : le bloc chiffré quitte l'appareil, en flot de paquets jusqu'au serveur. -->
+      {#each [0, 1, 2, 3] as v (v)}
+        <g class={["packet", "to-server", { on: at(shown, 3) }]} style:--pd="{300 + v * 260}ms">
+          {#each [0, 1, 2, 3] as k (k)}<rect x={106 + (k % 2) * 7} y={99 + Math.floor(k / 2) * 7} width="5" height="5" rx="1" />{/each}
+        </g>
+      {/each}
       <g class={["packet", "to-peer", { on: at(shown, 6) }]}>
         {#each [0, 1, 2, 3, 4, 5] as k (k)}<rect x={246 + (k % 3) * 7} y={99 + Math.floor(k / 3) * 7} width="5" height="5" rx="1" />{/each}
       </g>
@@ -228,14 +242,19 @@
         <g class={["blocks", { on: at(shown, 4, 5, 6) }]}>
           {#each [0, 1, 2] as k (k)}<rect x="172" y={74 + k * 14} width="56" height="10" rx="3" />{/each}
         </g>
-        <g class={["chip", "unread", { on: at(shown, 4, 5, 6) }]}>
-          <rect x="168" y="124" width="64" height="18" rx="9" />
-          <text x="200" y="136.5">{t("demo.unreadable")}</text>
+        <g class={["garble", { on: at(shown, 4, 5, 6) }]}>
+          {#each garble as jeu, j (j)}
+            <g class={["gset", `g${j}`]}>{#each jeu as line, k (k)}<text class="mono" x="200" y={81.5 + k * 14}>{line}</text>{/each}</g>
+          {/each}
         </g>
         <g class={["dust", { on: at(shown, 7) }]}>
           {#each dust as p, i (i)}<rect x={p.x} y={p.y} width="5" height="5" rx="1" style:--dx="{p.dx}px" style:--dy="{p.dy}px" style:--dl="{p.d}ms" />{/each}
         </g>
-        <text class={["nothing", { on: at(shown, 7) }]} x="200" y="108">{t("demo.empty")}</text>
+        <g class={["nothing", { on: at(shown, 7) }]}>
+          <!-- Corbeille : couvercle, cuve, deux traits. -->
+          <path d="M188 88h24M196 88v-3h8v3M191 88l2 22h14l2-22M197 93v13M203 93v13" />
+          <text x="200" y="128">{t("demo.empty")}</text>
+        </g>
       </g>
 
       <!-- Destinataire -->
@@ -250,11 +269,21 @@
           <path d="M328.5 86v-3.5a5.5 5.5 0 0 1 11 0V86" />
           <text x="334" y="122">{t("demo.st.waiting")}</text>
         </g>
-        <g class={["photo", "peer", { on: at(shown, 6) }]}>
+        <g class={["photo", "peer", { on: at(shown, 6, 7), vanish: shown === 7 }]}>
           <rect x="308" y="70" width="52" height="40" rx="6" class="ph-bg" />
           <circle cx="348" cy="80" r="5" class="ph-sun" />
           <path d="M310 108l16-18 10 10 8-7 14 15z" class="ph-hill" />
           <text class="fname" x="334" y="128">photo.jpg</text>
+        </g>
+        <g class={["dust", "peer-dust", { on: at(shown, 7) }]}>
+          {#each dustPeer as p, i (i)}<rect x={p.x} y={p.y} width="5" height="5" rx="1" style:--dx="{p.dx}px" style:--dy="{p.dy}px" style:--dl="{p.d}ms" />{/each}
+        </g>
+        <g class={["nothing", "gone-peer", { on: at(shown, 7) }]}>
+          <!-- Œil barré : le destinataire ne peut plus rien voir. -->
+          <path d="M320 98c4-6 9-9 14-9s10 3 14 9c-4 6-9 9-14 9s-10-3-14-9z" />
+          <circle cx="334" cy="98" r="3.5" />
+          <path d="M322 87l24 22" />
+          <text x="334" y="128">{t("demo.gone")}</text>
         </g>
         <g transform="translate(368 56)">
           <g class={["lock", "open", { on: at(shown, 6) }]}>
@@ -550,7 +579,6 @@
   .cipher,
   .lock,
   .blocks,
-  .chip,
   .nothing,
   .keys,
   .thief,
@@ -569,7 +597,6 @@
   .photo,
   .cipher,
   .blocks,
-  .chip,
   .nothing,
   .keys,
   .tags {
@@ -600,30 +627,97 @@
     stroke: rgb(95 227 181 / 0.45);
     stroke-width: 0.8;
   }
-  .chip rect {
-    fill: rgb(95 227 181 / 0.14);
-    stroke: rgb(95 227 181 / 0.5);
-  }
-  .chip text {
-    fill: var(--mint);
-    font-size: 9.5px;
-    font-weight: 650;
-    text-anchor: middle;
-  }
   .nothing.on {
-    transition-delay: 900ms;
+    transition-delay: 1100ms;
   }
-  .nothing {
+  .nothing text {
     fill: var(--text-2);
     font-size: 10px;
     font-weight: 600;
     text-anchor: middle;
   }
+  .nothing path {
+    fill: none;
+    stroke: var(--text-2);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nothing circle {
+    fill: none;
+    stroke: var(--text-2);
+    stroke-width: 1.8;
+  }
+  /* Le cadenas de l'envoyeur s'en va avec le chiffré : il ne reste rien sur l'appareil. */
+  .lock.part {
+    animation: fondu 400ms var(--ease-out) 1700ms both;
+  }
+  @keyframes fondu {
+    to {
+      opacity: 0;
+    }
+  }
+  /* Chez le destinataire, la photo part d'abord en poussière : l'œil barré vient après. */
+  .gone-peer.on {
+    transition-delay: 1700ms;
+  }
+  .photo.peer.vanish {
+    animation: vanish 1100ms var(--ease-in) 400ms both;
+  }
+  @keyframes vanish {
+    to {
+      opacity: 0;
+      transform: scale(0.9);
+      filter: blur(3px);
+    }
+  }
+  /* Baies du serveur : du brouillé qui change sans cesse, jamais un mot lisible. */
+  .garble {
+    opacity: 0;
+    transition: opacity 420ms var(--ease-out) 300ms;
+  }
+  .garble.on {
+    opacity: 1;
+  }
+  .garble text {
+    fill: rgb(95 227 181 / 0.8);
+    font-size: 7px;
+    letter-spacing: 0.04em;
+    text-anchor: middle;
+  }
+  .garble.on .gset {
+    animation: flip 700ms steps(1) infinite;
+  }
+  .garble.on .g1 {
+    animation-delay: 350ms;
+  }
+  @keyframes flip {
+    50% {
+      opacity: 0;
+    }
+  }
+  /* Étape 3 : le chiffré glisse hors de l'appareil vers le serveur et s'y fond. */
+  .cipher.part {
+    animation: part 1500ms var(--ease-in-out) 500ms both;
+  }
+  @keyframes part {
+    0% {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(118px) scale(0.35);
+      opacity: 0;
+    }
+  }
   .packet rect {
     fill: var(--mint);
   }
   .packet.on {
-    animation: travel 1700ms var(--ease-in-out) both;
+    animation: travel 1100ms var(--ease-in-out) var(--pd, 0ms) both;
+  }
+  .packet.to-peer.on {
+    animation-duration: 1700ms;
   }
   @keyframes travel {
     0% {
@@ -637,7 +731,7 @@
       opacity: 1;
     }
     100% {
-      transform: translateX(40px);
+      transform: translateX(46px);
       opacity: 0;
     }
   }

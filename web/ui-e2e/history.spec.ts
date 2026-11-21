@@ -121,7 +121,7 @@ test.describe("fr-FR", () => {
     await expect(page).toHaveTitle("Mes partages · Shhgone");
     await expect(page.locator("[data-counts]")).toHaveText("1 actif · 0 terminé");
     await expect(card(page)).toHaveCount(1);
-    await expect(card(page)).toContainText(/Créé (à l'instant|il y a \d+ min) · \d+ nov\., \d+ h \d\d/);
+    await expect(card(page)).toContainText(/Créé (à l'instant|il y a \d+[\s\u00a0\u202f]min) · \d+[\s\u00a0\u202f]nov\.[\s\u00a0\u202f]à[\s\u00a0\u202f]\d+[\s\u00a0\u202f]h[\s\u00a0\u202f]\d\d/);
     await expect(card(page).locator("[data-state-chip]")).toHaveText("Actif");
     await expect(card(page)).toContainText(/Expire dans \d+ h/);
     const body = await page.evaluate(() => document.body.innerText);
@@ -146,7 +146,7 @@ test.describe("fr-FR", () => {
     await card(page).getByRole("button", { name: "Actualiser" }).click();
     await expect(card(page)).toContainText("Ouvert 1 / 1", { timeout: 15_000 });
     expect(calls).toHaveLength(1);
-    await expect(card(page)).toContainText(/Ouvert entre \d+ h \d\d et \d+ h \d\d · 1 \/ 1/);
+    await expect(card(page)).toContainText(/Ouvert entre \d+[\s\u202f]h[\s\u202f]\d\d et \d+[\s\u202f]h[\s\u202f]\d\d · 1 \/ 1/);
     await expect(card(page).locator("[data-state-chip]")).toHaveText(/Toutes les ouvertures utilisées|Actif/);
     await shot(page, "history-details", isMobile);
 
