@@ -296,9 +296,10 @@
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: radial-gradient(circle at 50% 30%, rgb(95 227 181 / 0.18), rgb(95 227 181 / 0.05));
-    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.3);
-    color: var(--accent);
+    /* Bleu doux (--info), plus le vert d'accent (propriétaire, 21 novembre). */
+    background: radial-gradient(circle at 50% 30%, rgb(141 178 255 / 0.2), rgb(141 178 255 / 0.05));
+    box-shadow: inset 0 0 0 1px rgb(141 178 255 / 0.35);
+    color: var(--info);
   }
   .prow > div {
     display: grid;
