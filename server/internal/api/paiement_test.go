@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/skoow/shhdrop/server/internal/limits"
 	"github.com/skoow/shhdrop/server/internal/paiement"
 )
 
@@ -23,17 +26,30 @@ type prestTest struct {
 	vuH     http.Header
 	vuCorps []byte
 	vu      []paiement.Demande
+	paypal  bool // se présente comme PayPal (Nom, Moyen)
+	lus     int  // appels de Lire
 }
 
-func (p *prestTest) Moyen() paiement.Moyen { return paiement.Carte }
-func (p *prestTest) Nom() string           { return "stripe" }
-func (p *prestTest) Origines() []string    { return []string{"https://checkout.stripe.com/"} }
+func (p *prestTest) Moyen() paiement.Moyen {
+	if p.paypal {
+		return paiement.PayPal
+	}
+	return paiement.Carte
+}
+func (p *prestTest) Nom() string {
+	if p.paypal {
+		return "paypal"
+	}
+	return "stripe"
+}
+func (p *prestTest) Origines() []string { return []string{"https://checkout.stripe.com/"} }
 func (p *prestTest) Creer(_ context.Context, d paiement.Demande) (paiement.Session, error) {
 	p.vu = append(p.vu, d)
 	return paiement.Session{URL: p.url, Abonnement: p.abo}, p.errC
 }
 func (p *prestTest) Lire(_ context.Context, h http.Header, corps []byte) ([]paiement.Evenement, error) {
 	p.vuH, p.vuCorps = h, corps
+	p.lus++
 	return p.evs, p.errL
 }
 func (p *prestTest) Resilier(context.Context, string) error { return nil }
@@ -43,7 +59,7 @@ type envPaiement struct {
 	p *prestTest
 }
 
-func newEnvPaiement(t *testing.T) envPaiement {
+func newEnvPaiement(t *testing.T, autres ...paiement.Prestataire) envPaiement {
 	t.Helper()
 	e := newEnv(t, false, nil)
 	db, err := paiement.OuvrirBase(filepath.Join(e.dir, "paiements.db"))
@@ -53,7 +69,7 @@ func newEnvPaiement(t *testing.T) envPaiement {
 	t.Cleanup(func() { db.Close() })
 	p := &prestTest{url: "https://checkout.stripe.com/c/pay/cs_test_1"}
 	s, err := paiement.NewService(paiement.Config{DB: db, Now: e.clk.Now, Origine: "https://shhgone.test", Regime: paiement.OSS, Emetteur: "shhgone.test",
-		Prestataires: []paiement.Prestataire{p}})
+		Prestataires: append([]paiement.Prestataire{p}, autres...)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +80,13 @@ func newEnvPaiement(t *testing.T) envPaiement {
 func passB64(n byte) string { return base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{n}, 32)) }
 
 const corpsCommande = `{"offre":"plus","jours":30,"renouvelle":true,"moyen":"carte","pays":"FR","renonciation":true}`
+
+// preuve : corps de commande avec une preuve anti-robot fraîche (audit du 20 novembre, S2).
+func (e envPaiement) preuve(t *testing.T, corps, remote string) []byte {
+	t.Helper()
+	alt, shown := e.captchaFor(t, remote)
+	return []byte(strings.TrimSuffix(corps, "}") + `,"altcha":"` + alt + `","hp":"","shown_at":"` + shown + `"}`)
+}
 
 func TestPaiementDesactive(t *testing.T) {
 	e := newEnv(t, false, nil)
@@ -87,7 +110,7 @@ func TestPaiementOffre(t *testing.T) {
 func TestPaiementCommandeEtEtat(t *testing.T) {
 	e := newEnvPaiement(t)
 	hp := map[string]string{"X-Shh-Pass": passB64(1)}
-	w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: hp, body: []byte(corpsCommande)})
+	w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: hp, body: e.preuve(t, corpsCommande, "")})
 	if w.Code != 200 || w.Body.String() != `{"url":"https://checkout.stripe.com/c/pay/cs_test_1"}` {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -113,7 +136,7 @@ func TestPaiementCommandeEtEtat(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	// Même pass pour une seconde commande : conflit.
-	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: hp, body: []byte(corpsCommande)}), 409, `{"error":"conflit"}`)
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: hp, body: e.preuve(t, corpsCommande, "")}), 409, `{"error":"conflit"}`)
 	// Résiliation : aucun abonnement connu (le faux n'en a pas posé).
 	expect(t, e.do(req{method: "POST", path: "/api/paiement/resilier", hdr: hp}), 409, `{"error":"aucun_abonnement"}`)
 }
@@ -135,26 +158,50 @@ func TestPaiementCommandeRefus(t *testing.T) {
 	}
 	for i, r := range cas {
 		r.method, r.path = "POST", "/api/paiement/commande"
+		r.body = e.preuve(t, string(r.body), "")
 		if w := e.do(r); w.Code != 400 || w.Body.String() != bad {
 			t.Errorf("cas %d : %d %s", i, w.Code, w.Body.String())
 		}
 	}
+	if len(e.p.vu) != 0 {
+		t.Fatal("commande transmise", len(e.p.vu))
+	}
+	// Preuve anti-robot absente, fausse, piège rempli, déjà servie : 400, rien de créé.
+	hp := map[string]string{"X-Shh-Pass": passB64(4)}
+	bonne := e.preuve(t, corpsCommande, "")
+	alt, shown := e.captchaFor(t, "")
+	for i, corps := range [][]byte{
+		[]byte(corpsCommande),
+		[]byte(strings.TrimSuffix(corpsCommande, "}") + `,"altcha":"` + alt + `","hp":"x","shown_at":"` + shown + `"}`),
+		[]byte(strings.TrimSuffix(corpsCommande, "}") + `,"altcha":"` + alt[:len(alt)-4] + `AAA=","hp":"","shown_at":"` + shown + `"}`),
+		[]byte(strings.TrimSuffix(corpsCommande, "}") + `,"altcha":"` + alt + `","hp":"","shown_at":"autre"}`),
+	} {
+		if w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: hp, body: corps}); w.Code != 400 || w.Body.String() != bad {
+			t.Errorf("preuve %d : %d %s", i, w.Code, w.Body.String())
+		}
+	}
+	if len(e.p.vu) != 0 {
+		t.Fatal("commande sans preuve transmise")
+	}
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: hp, body: bonne}), 200, "")
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(5)}, body: bonne}), 400, bad)
+	e.p.vu = nil
 	// Prestataire en panne ou adresse refusée : 502, rien de gardé.
 	e.p.errC = errors.New("panne")
-	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(2)}, body: []byte(corpsCommande)}), 502, `{"error":"prestataire"}`)
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(2)}, body: e.preuve(t, corpsCommande, "")}), 502, `{"error":"prestataire"}`)
 	e.p.errC, e.p.url = nil, "https://evil.example/pay"
-	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(3)}, body: []byte(corpsCommande)}), 502, `{"error":"prestataire"}`)
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(3)}, body: e.preuve(t, corpsCommande, "")}), 502, `{"error":"prestataire"}`)
 }
 
 func TestPaiementCommandesLimitees(t *testing.T) {
 	e := newEnvPaiement(t)
 	for i := 0; i < 10; i++ {
-		w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(byte(10 + i))}, body: []byte(corpsCommande)})
+		w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(byte(10 + i))}, body: e.preuve(t, corpsCommande, "")})
 		if w.Code != 200 {
 			t.Fatal(i, w.Code, w.Body.String())
 		}
 	}
-	w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(99)}, body: []byte(corpsCommande)})
+	w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": passB64(99)}, body: e.preuve(t, corpsCommande, "")})
 	if w.Code != 429 || w.Header().Get("Retry-After") == "" {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -187,4 +234,32 @@ func TestPaiementWebhook(t *testing.T) {
 	if w := e.do(req{method: "GET", path: "/api/paiement/webhook/stripe"}); w.Code != 404 {
 		t.Fatal(w.Code)
 	}
+}
+
+// Audit du 20 novembre, S3 : webhooks PayPal limités par connexion et par /48, avant toute
+// lecture : au-delà, 429 et rien n'atteint le prestataire (aucun appel sortant possible).
+func TestPaiementWebhookPayPalLimite(t *testing.T) {
+	pp := &prestTest{paypal: true, errL: paiement.ErrSignature}
+	e := newEnvPaiement(t, pp)
+	corps := []byte(`{"id":"WH-1","event_type":"PAYMENT.CAPTURE.COMPLETED"}`)
+	for i := 0; i < limits.WebhooksPayPalPer64; i++ {
+		expect(t, e.do(req{method: "POST", path: "/api/paiement/webhook/paypal", body: corps, remote: "198.51.100.9:1"}), 400, `{"error":"bad_request"}`)
+	}
+	w := e.do(req{method: "POST", path: "/api/paiement/webhook/paypal", body: corps, remote: "198.51.100.9:1"})
+	if w.Code != 429 || w.Header().Get("Retry-After") == "" || pp.lus != limits.WebhooksPayPalPer64 {
+		t.Fatal(w.Code, w.Body.String(), pp.lus)
+	}
+	// Par /48 : 60 en tout, quelles que soient les connexions du bloc.
+	pp.lus = 0
+	for i := 0; i < limits.WebhooksPayPalPer48; i++ {
+		e.do(req{method: "POST", path: "/api/paiement/webhook/paypal", body: corps, remote: fmt.Sprintf("[2001:db8:7:%x::1]:1", i)})
+	}
+	if w := e.do(req{method: "POST", path: "/api/paiement/webhook/paypal", body: corps, remote: "[2001:db8:7:ffff::1]:1"}); w.Code != 429 || pp.lus != limits.WebhooksPayPalPer48 {
+		t.Fatal(w.Code, pp.lus)
+	}
+	// Une autre connexion passe ; Stripe n'est pas concerné ; la minute suivante, de nouveau.
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/webhook/paypal", body: corps, remote: "198.51.100.10:1"}), 400, `{"error":"bad_request"}`)
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/webhook/stripe", body: corps, remote: "198.51.100.9:1"}), 200, `{}`)
+	e.clk.Add(time.Minute)
+	expect(t, e.do(req{method: "POST", path: "/api/paiement/webhook/paypal", body: corps, remote: "198.51.100.9:1"}), 400, `{"error":"bad_request"}`)
 }

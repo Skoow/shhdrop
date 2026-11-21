@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/netip"
 	"time"
+
+	"github.com/skoow/shhdrop/server/internal/limits"
 )
 
 // Mot de passe oublié, par e-mail, sans perte du profil (conception §21.2.3, §21.2.4, R3, R4 ;
@@ -45,7 +47,7 @@ func (s *Service) OubliDebut(ip netip.Addr, email, langue string) ([32]byte, err
 	}
 	now := s.now()
 	canon, envoi := s.cles.Empreintes(a)
-	if !s.lim.AllowCourriel(ip, canon) {
+	if !s.lim.AllowCourriel(ip, canon, limits.MotifRecuperation) {
 		return [32]byte{}, ErrLimit{jourSuivant(now)}
 	}
 	var hb, eb []byte

@@ -71,6 +71,11 @@ const (
 	// Commandes de paiement par heure (conception du paiement §8) : par connexion et par /48.
 	CommandesPer64 = 10
 	CommandesPer48 = 30
+	// Webhooks PayPal par minute (audit du 20 novembre, S3) : chacun peut coûter un appel
+	// sortant authentifié (verify-webhook-signature) ; par connexion et par /48, à part de la
+	// limite générale. PayPal réessaie après un refus.
+	WebhooksPayPalPer64 = 30
+	WebhooksPayPalPer48 = 60
 	// Trames montantes par minute (fenêtre fixe), toutes connexions WebSocket confondues.
 	// 480 par connexion (IPv4 ou /64) et 960 par /48 (revue finale C-2, I4, 12 novembre) : une
 	// famille ou un bureau derrière un même NAT partage une adresse IPv4, et un membre actif
@@ -128,8 +133,11 @@ type Limiter struct {
 	join64  map[string]int
 	join48  map[string]int
 	// Paiement (conception du paiement §8) : commandes de l'heure.
-	paie64  map[string]int
-	paie48  map[string]int
+	paie64 map[string]int
+	paie48 map[string]int
+	// Webhooks PayPal de la minute (audit du 20 novembre, S3).
+	ppw64   map[string]int
+	ppw48   map[string]int
 	frame64 map[string]int
 	frame48 map[string]int
 	// Envois en cours (BeginUpload → FinishUpload / CancelUpload / AbandonUpload) : id →
@@ -153,7 +161,7 @@ type Limiter struct {
 	// jour, échecs, écritures et vérifications de l'heure. Clés : HMAC du secret du jour sur le
 	// préfixe IP, sur l'empreinte e_canon ou sur h (jamais en clair) ; vidées à l'heure ou à
 	// minuit UTC.
-	insc64, insc48, mail64, mail48, mailAdr                   map[string]int
+	insc64, insc48, mail64, mail48, mailAdr, mailAdr48        map[string]int
 	echec64, echec48, echecCpt, totpCpt, coffreCpt, pseudoCpt map[string]int
 	bannirHeure                                               int // global, aucune clé
 	// bytes64Max, bytes48Max : octets utiles par jour (BytesPer64, BytesPer48), ramenés à
@@ -299,7 +307,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.frame64 = map[string]int{}
 		l.frame48 = map[string]int{}
 		l.insc64, l.insc48 = map[string]int{}, map[string]int{}
-		l.mail64, l.mail48, l.mailAdr = map[string]int{}, map[string]int{}, map[string]int{}
+		l.mail64, l.mail48, l.mailAdr, l.mailAdr48 = map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}
 		// Les envois gardés repartent dans les compteurs du jour sous leurs clés de la veille
 		// (aucune adresse n'est gardée : BeginUpload recalcule ces clés avec l.prev). Les
 		// envois terminés la veille, eux, sont oubliés avec leurs compteurs.
@@ -341,6 +349,7 @@ func (l *Limiter) rotateLocked(now time.Time) {
 		l.seg48 = map[string]int{}
 		l.frame64 = map[string]int{}
 		l.frame48 = map[string]int{}
+		l.ppw64, l.ppw48 = map[string]int{}, map[string]int{}
 	}
 }
 
@@ -759,6 +768,21 @@ func (l *Limiter) AllowCommande(ip netip.Addr) bool {
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
 	return l.allowPairLocked(ip, l.paie64, l.paie48, CommandesPer64, CommandesPer48)
+}
+
+// AllowWebhookPayPal : un webhook PayPal, WebhooksPayPalPer64 par minute (fenêtre fixe) par
+// connexion et WebhooksPayPalPer48 par /48 (audit du 20 novembre, S3). Refus : MinuteRetry.
+func (l *Limiter) AllowWebhookPayPal(ip netip.Addr) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotateLocked(l.now())
+	return l.allowPairLocked(ip, l.ppw64, l.ppw48, WebhooksPayPalPer64, WebhooksPayPalPer48)
+}
+
+// MinuteRetry : délai jusqu'à la minute suivante (refus d'AllowWebhookPayPal).
+func (l *Limiter) MinuteRetry() time.Duration {
+	t := l.now().Unix()
+	return time.Duration(60-(t-floorDiv(t, 60)*60)) * time.Second
 }
 
 // AllowFrame : trame montante du salon, FramesPer64 par minute (fenêtre fixe) par connexion

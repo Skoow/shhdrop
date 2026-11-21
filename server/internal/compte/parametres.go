@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/netip"
 	"time"
+
+	"github.com/skoow/shhdrop/server/internal/limits"
 )
 
 // Paramètres du compte (conception §8.6, §12.4, §21.3, §21.6.2, R21 ; plan lot 5) : état,
@@ -222,7 +224,7 @@ func (s *Service) EmailDebut(c Courante, ip netip.Addr, actuel, nouveau, langue 
 		return [32]byte{}, err
 	}
 	canon, envoi := s.cles.Empreintes(n)
-	if !s.lim.AllowCourriel(ip, canon) {
+	if !s.lim.AllowCourriel(ip, canon, limits.MotifAdresse) {
 		return [32]byte{}, ErrLimit{jourSuivant(now)}
 	}
 	e := &etape{sorte: etapeEmail, h: c.H, canon: canon, envoi: envoi, langue: langue, essaisTOTP: essaisCode}

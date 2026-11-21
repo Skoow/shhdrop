@@ -61,7 +61,8 @@ test("Offres avec paiement : conditions du bouton, pass dans l'en-tête, erreur 
   await expect(sum.locator("[data-pay-error]")).toHaveText("Le prestataire de paiement ne répond pas. Rien n'a été prélevé ; réessayez plus tard.");
   expect(vus).toHaveLength(1);
   expect(vus[0]!.headers["x-shh-pass"]).toMatch(PASS);
-  expect(JSON.parse(vus[0]!.body!)).toEqual({ offre: "pro", jours: 365, renouvelle: false, moyen: "carte", pays: "DE", renonciation: true });
+  // Preuve anti-robot calculée par la page (défi du vrai serveur, audit du 20 novembre, S2).
+  expect(JSON.parse(vus[0]!.body!)).toEqual({ offre: "pro", jours: 365, renouvelle: false, moyen: "carte", pays: "DE", renonciation: true, altcha: expect.stringMatching(/^[A-Za-z0-9+/]+=*$/), hp: "", shown_at: expect.any(String) });
   expect(vus[0]!.url).toBe(shh.origin + "/api/paiement/commande");
   expect(vus[0]!.url + vus[0]!.body).not.toContain(vus[0]!.headers["x-shh-pass"]!);
   const garde = () => page.evaluate(() => new Promise<number>((ok) => {

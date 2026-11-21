@@ -105,3 +105,37 @@ func TestAllowCommandeHeure(t *testing.T) {
 		t.Fatal("pas remis à zéro à l'heure suivante")
 	}
 }
+
+// TestAllowWebhookPayPal : 30 par minute par connexion, 60 par /48 (audit du 20 novembre, S3),
+// à part des autres compteurs, vidés à la minute suivante.
+func TestAllowWebhookPayPal(t *testing.T) {
+	if WebhooksPayPalPer64 != 30 || WebhooksPayPalPer48 != 60 {
+		t.Fatal(WebhooksPayPalPer64, WebhooksPayPalPer48)
+	}
+	now := time.Date(2026, 11, 20, 10, 0, 15, 0, time.UTC)
+	l := newLim(&now)
+	for i := 0; i < 30; i++ {
+		if !l.AllowWebhookPayPal(ip("2001:db8:8:1::1")) {
+			t.Fatalf("webhook %d refusé", i+1)
+		}
+	}
+	if l.AllowWebhookPayPal(ip("2001:db8:8:1::2")) {
+		t.Fatal("31e webhook de la minute accepté")
+	}
+	for i := 0; i < 30; i++ {
+		l.AllowWebhookPayPal(ip("2001:db8:8:2::1"))
+	}
+	if l.AllowWebhookPayPal(ip("2001:db8:8:3::1")) {
+		t.Fatal("/48 plein mais webhook accepté")
+	}
+	if !l.AllowCommande(ip("2001:db8:8:1::1")) || !l.AllowRequest(ip("2001:db8:8:1::1")) {
+		t.Fatal("les webhooks ne doivent prendre aucun autre compteur")
+	}
+	if d := l.MinuteRetry(); d != 45*time.Second {
+		t.Fatal(d)
+	}
+	now = now.Add(45 * time.Second)
+	if len(l.ppw64) != 2 || !l.AllowWebhookPayPal(ip("2001:db8:8:1::1")) || len(l.ppw64) != 1 || len(l.ppw48) != 1 {
+		t.Fatal("pas remis à zéro à la minute suivante", len(l.ppw64))
+	}
+}

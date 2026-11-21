@@ -233,7 +233,7 @@ Toutes sous `/api/compte/` ; JSON strict (§8 : clés exactes, sans doublon, cor
 | Route | Authentification | Corps | Réponse |
 |---|---|---|---|
 | `POST inscription/debut` | anti-robot ALTCHA (mêmes champs que `POST /api/shares`) | `{ email, langue, altcha, hp, shown_at }` | `{ h, etape }` — **toujours la même forme**, que l'adresse soit libre, prise ou bannie (§8.7) |
-| `POST inscription/renvoyer` | étape | `{ etape }` | `{}` (au plus 1 par minute, 3 par jour et par adresse) |
+| `POST inscription/renvoyer` | étape | `{ etape }` | `{}` (au plus 1 par minute ; e-mails par adresse : §8.8) |
 | `POST inscription/fin` | étape + code | `{ etape, code, a_auth, env_mdp, v_s, env_s, blob, persistante, etiquette }` | 201 `{ session }` |
 | `POST connexion` | — (preuve ALTCHA après 5 échecs dans l'heure sur ce compte : réponse 403 `preuve_requise`, puis même corps avec `altcha, hp, shown_at`) | `{ email, a_auth, persistante, etiquette }` | `{ session, h, env_mdp, blob, gen }` ou `{ totp_requis: true, etape }` |
 | `POST connexion/totp` | étape | `{ etape, code }` | `{ session, h, env_mdp, blob, gen }` |
@@ -278,7 +278,7 @@ Salon (`server/internal/api/handlers_salon.go`), avec `SHH_COMPTES=1` :
 |---|---|
 | Anti-robot | ALTCHA (`server/internal/captcha`, difficulté partagée) sur `inscription/debut` et `oubli/debut` ; repli reCAPTCHA (§26) quand il existera |
 | Inscriptions | 3 par jour par connexion, 10 par /48 (§37.5) ; `SHH_COMPTES_MAX` |
-| E-mails | 3 par jour et par adresse (`e_canon`), 10 par jour par connexion ; renvoi après 60 s |
+| E-mails | ~~3 par jour et par adresse (`e_canon`)~~ → **20 novembre (audit S4)** : pour chaque motif (inscription, récupération, changement d'adresse, renvois compris) 3 par jour et par (adresse, bloc /48) et 9 par adresse ; 10 par jour par connexion, 30 par /48, tous motifs ; renvoi après 60 s. Les compteurs ne dépendent que des demandes, jamais de l'existence d'un compte |
 | Codes e-mail | 6 chiffres, 15 min, **5 essais** par code (puis l'étape meurt) |
 | Connexion | 20 échecs par heure par connexion, 60 par /48 ; par compte : au-delà de 5 échecs dans l'heure, la connexion à ce compte exige une preuve ALTCHA (jamais de verrouillage du compte, qui permettrait de bloquer quelqu'un) |
 | TOTP | 5 essais par étape ; 10 échecs par heure par compte, puis 429 pour ce compte pendant l'heure |

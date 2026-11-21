@@ -17,7 +17,7 @@ import (
 func (e envPaiement) passPaye(t *testing.T, n byte, corps string) string {
 	t.Helper()
 	pass := passB64(n)
-	if w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": pass}, body: []byte(corps)}); w.Code != 200 {
+	if w := e.do(req{method: "POST", path: "/api/paiement/commande", hdr: map[string]string{"X-Shh-Pass": pass}, body: e.preuve(t, corps, "")}); w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	c := e.p.vu[len(e.p.vu)-1]

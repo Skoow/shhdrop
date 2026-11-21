@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/skoow/shhdrop/server/internal/courriel"
+	"github.com/skoow/shhdrop/server/internal/limits"
 )
 
 // Étapes en mémoire (conception §8.3) : une inscription, une récupération ou un changement
@@ -36,6 +37,20 @@ const (
 	etapeEmail          // changement d'adresse : canon, envoi de la nouvelle adresse (lot 5)
 	etapeTOTPActivation // secret scellé en attente du premier code (lot 5)
 )
+
+// motifDe : compteurs d'e-mails de l'étape (audit du 20 novembre, S4) : inscription,
+// récupération et changement d'adresse comptés à part. Autre sorte : 0, refusé par le limiteur.
+func motifDe(s sorteEtape) limits.Motif {
+	switch s {
+	case etapeInscription:
+		return limits.MotifInscription
+	case etapeOubli:
+		return limits.MotifRecuperation
+	case etapeEmail:
+		return limits.MotifAdresse
+	}
+	return 0
+}
 
 type etape struct {
 	sorte        sorteEtape
