@@ -168,6 +168,23 @@ describe("Inscription, étape 2 (code)", () => {
     const pseudo = (C.confirmer.mock.calls[0]![2] as { pseudo: string }).pseudo;
     expect(document.querySelector("[data-pseudo-temp]")!.textContent!.replace(/[ \n\t]+/g, " ")).toContain(`Votre pseudo provisoire est «${NN}${pseudo}${NN}». Le changer dans votre profil`);
     expect(texte()).not.toMatch(/secours/i);
+    // Revue du 20 novembre (U11) : sans « Rester connecté », l'écran dit qu'un rechargement
+    // redemandera le mot de passe.
+    expect(document.querySelector("[data-session-note]")!.textContent).toBe(
+      `Vous êtes connecté sur cette page seulement${NN}: un rechargement ou un nouvel onglet vous redemandera votre mot de passe.`,
+    );
+  });
+
+  it("« Rester connecté sur cet appareil » (U11) : même case qu'à la connexion, décochée par défaut, passée à la création", async () => {
+    await jusquAuCode();
+    const caseRester = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(caseRester.checked).toBe(false);
+    expect(caseRester.labels![0]!.textContent!.trim()).toBe("Rester connecté sur cet appareil");
+    caseRester.click();
+    saisir("Code reçu par e-mail", "123456");
+    await presser("Valider");
+    expect(C.confirmer).toHaveBeenCalledWith("123456", MDP, expect.anything(), true);
+    expect(document.querySelector("[data-session-note]")!.textContent).toBe("Vous restez connecté sur cet appareil.");
   });
 
   it("code faux : « Code incorrect. Il reste {n} essais. » ; échu : « Code expiré. Demandez-en un nouveau. »", async () => {

@@ -139,8 +139,9 @@
   .toc li {
     flex: none;
   }
+  /* 44 px (revue du 20 novembre, U20). */
   .toc button {
-    min-height: 40px;
+    min-height: 44px;
     padding: var(--sp-2) var(--sp-4);
     border: 0;
     border-radius: var(--r-pill);

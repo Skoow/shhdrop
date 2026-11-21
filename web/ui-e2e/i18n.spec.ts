@@ -33,6 +33,22 @@ test.describe("français par défaut", () => {
     await expect(en.page).toHaveURL(shh.origin + "/en/securite");
     await en.page.goto(shh.origin + "/");
     await expect(en.page.locator("html")).toHaveAttribute("lang", "fr");
+    // Revue du 20 novembre (U10) : bandeau en haut de page (≥ 44 px), au-dessus de la barre du
+    // site et sans la recouvrir ; fermable (il ne revient pas en changeant d'écran).
+    const bar = en.page.locator("[data-english-bar]");
+    await expect(bar).toBeVisible();
+    const b = (await bar.boundingBox())!;
+    expect(b.y).toBe(0);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    const top = (await en.page.locator("header.top").boundingBox())!;
+    expect(top.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+    for (const l of [en.page.locator("[data-english-link]"), en.page.locator("[data-english-close]")]) {
+      expect((await l.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(await axe(en.page)).toEqual([]);
+    await en.page.locator("[data-english-close]").click();
+    await expect(bar).toHaveCount(0);
+    await en.page.goto(shh.origin + "/");
     await en.page.locator("[data-english-link]").click();
     await expect(en.page).toHaveURL(shh.origin + "/en");
     await expect(en.page).toHaveTitle("End-to-end encrypted sharing, no account · Shhgone");

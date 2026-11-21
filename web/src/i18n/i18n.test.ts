@@ -406,11 +406,14 @@ describe("décompte et échéance (retours UI4 : deux lignes, date et heure exac
 });
 
 describe("heures de l'historique (spec §33, UI §9.6.3)", () => {
-  it("formatDayTime : « 5 nov., 21 h 14 » ; « Nov 5, 9:14 PM »", async () => {
-    const { formatDayTime } = await import("./format");
+  it("formatDayTime : « 5 nov. à 21 h 14 » ; « Nov 5 at 9:14 PM » (même format que la fin d'un lien, U15)", async () => {
+    const { formatDayTime, formatEndsAt, formatClock } = await import("./format");
     const at = new Date(2026, 10, 5, 21, 14, 30).getTime();
-    expect(formatDayTime(at, "fr")).toBe("5 nov., 21 h 14");
-    expect(formatDayTime(at, "en").replace(/[\u00a0\u202f]/gu, " ")).toBe("Nov 5, 9:14 PM");
+    expect(formatDayTime(at, "fr")).toBe("5\u00a0nov. à 21\u202fh\u202f14");
+    expect(formatClock(at, "fr")).toBe("21\u202fh\u202f14");
+    expect(formatDayTime(at, "en").replace(/[\u00a0\u202f]/gu, " ")).toBe("Nov 5 at 9:14 PM");
+    expect(formatEndsAt(at, "fr")).toBe(`Se termine le ${formatDayTime(at, "fr")}`);
+    expect(formatEndsAt(at, "en")).toBe(`Ends ${formatDayTime(at, "en")}`);
   });
   it("formatAgo : à l'instant, minutes, heures, jours (espaces insécables)", async () => {
     const { formatAgo } = await import("./format");

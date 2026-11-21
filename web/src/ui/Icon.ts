@@ -74,3 +74,6 @@ export { default as PhoneOff } from "./icons/PhoneOff.svelte";
 export { default as Video } from "./icons/Video.svelte";
 export { default as VideoOff } from "./icons/VideoOff.svelte";
 export { default as MicOff } from "./icons/MicOff.svelte";
+export { default as VolumeX } from "./icons/VolumeX.svelte";
+export { default as Folder } from "./icons/Folder.svelte";
+export { default as Users } from "./icons/Users.svelte";

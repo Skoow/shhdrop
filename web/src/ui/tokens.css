@@ -71,7 +71,7 @@
   --aur-ink-o: 0.32;
 
   /* §4.1 familles */
-  --font-sans: "Mona Sans", system-ui, sans-serif;
+  --font-sans: "Mona Sans", "Mona Sans repli", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* §4.2 échelle : taille, interligne, poids, largeur (font-stretch) */

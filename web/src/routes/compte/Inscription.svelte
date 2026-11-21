@@ -23,6 +23,7 @@
   import CodeField from "../../ui/CodeField.svelte";
   import TextField from "../../ui/TextField.svelte";
   import Cadre from "./Cadre.svelte";
+  import Case from "./Case.svelte";
   import { codeDe, erreur, jourLong, type Champ } from "./erreurs";
   import MotDePasse from "./MotDePasse.svelte";
   import { obtenirPreuve, preparerPreuve } from "./preuve";
@@ -43,6 +44,11 @@
   let errs = $state<Partial<Record<Champ | "mdp2", string>>>({});
   let bandeau = $state<{ kind: "info" | "warn" | "danger"; texte: string; liens?: boolean } | null>(null);
   let envoi = $state(false);
+  // « Rester connecté sur cet appareil » (revue du 20 novembre, U11) : même case et même effet
+  // qu'à la connexion (persist.ts), choisie avant « Valider » ; décochée par défaut. L'écran
+  // « Compte créé. » dit ensuite si un rechargement redemandera le mot de passe.
+  let rester = $state(false);
+  let gardee = $state(false);
   const els: Partial<Record<Champ | "mdp2", HTMLInputElement | undefined>> = $state({});
   const ORDRE: (Champ | "mdp2")[] = ["email", "mdp", "mdp2", "code"];
 
@@ -131,7 +137,7 @@
       for (let essai = 0; ; essai++) {
         pseudo = pseudoProvisoire();
         try {
-          await confirmer(code, mdp, { pseudo, photo: null, langue: getLang(), reglages: { ...REGLAGES_DEFAUT }, pass: null }, false);
+          await confirmer(code, mdp, { pseudo, photo: null, langue: getLang(), reglages: { ...REGLAGES_DEFAUT }, pass: null }, rester);
           break;
         } catch (x) {
           if (codeDe(x) !== "pseudo_pris" || essai >= 2) throw x;
@@ -152,6 +158,7 @@
     }
     mdp = "";
     mdp2 = "";
+    gardee = rester;
     etape = "fini";
     announce(t("account.created"));
   }
@@ -205,6 +212,7 @@
     <DemoCode />
     <form novalidate onsubmit={(e) => e.preventDefault()}>
       <CodeField label={t("account.code")} error={errs.code} bind:value={code} bind:el={els.code} onvalue={() => (errs.code = undefined)} />
+      <Case label={t("account.stay")} bind:checked={rester} />
       <Button type="submit" onpress={creer}>{envoi ? t("account.verifying") : t("account.signup.create")}</Button>
     </form>
     <div class="actions">
@@ -216,6 +224,7 @@
       {t("account.created.pseudo", { pseudo })}
       <a class="lien-t" href={href("/compte/profil")} onclick={(e) => followLink(e, "/compte/profil")}>{t("account.created.pseudo.link")}</a>
     </p>
+    <p class="note" data-session-note>{gardee ? t("account.created.session.gardee") : t("account.created.session.memoire")}</p>
     <div class="actions">
       <Button onpress={() => navigate(apres === "salon" && __SALONS__ ? "/salon/nouveau" : "/")}>{t("account.continue")}</Button>
     </div>

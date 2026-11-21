@@ -21,7 +21,7 @@
   import Appel from "./Appel.svelte";
   import IconButton from "../../ui/IconButton.svelte";
   import VoiceRecorder from "../../ui/VoiceRecorder.svelte";
-  import { Mic, Paperclip, Phone, Video } from "../../ui/Icon";
+  import { Folder, Mic, Paperclip, Phone, Users, Video, Volume, VolumeX } from "../../ui/Icon";
   import { doitSonner, jouer, SILENCE_TOUJOURS } from "../../salon/son";
 
   const vue = S.vue;
@@ -364,19 +364,15 @@
         <IconButton label={t("salon.appel.audio")} variant="secondary" onpress={() => void S.appel()?.rejoindre(false)}><Phone size={20} /></IconButton>
         <IconButton label={t("salon.appel.video")} variant="secondary" onpress={() => void S.appel()?.rejoindre(true)}><Video size={20} /></IconButton>
       {/if}
+      <!-- Revue du 20 novembre (U8) : sur téléphone, boutons à icône de 44 px sur une ligne (le
+           libellé reste le nom accessible) ; ailleurs, icône et libellé. -->
       {#if silencieux}
-        <Button variant="secondary" dense onpress={() => S.silencieux(null)}>{t("salon.son.reactiver")}</Button>
+        <button type="button" class="bt coupe" aria-label={t("salon.son.reactiver")} onclick={() => S.silencieux(null)}><VolumeX size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.son.reactiver")}</span></button>
       {:else}
-        <Button variant="secondary" dense aria-expanded={choixSilence} onpress={() => {
-            choixSilence = !choixSilence;
-          }}>{t("salon.son.silence")}</Button>
+        <button type="button" class="bt" aria-label={t("salon.son.silence")} aria-expanded={choixSilence} onclick={() => (choixSilence = !choixSilence)}><Volume size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.son.silence")}</span></button>
       {/if}
-      <Button variant="secondary" dense onpress={() => {
-          fichiers = true;
-        }}>{t("salon.files.title")}</Button>
-      {#if !large}<Button variant="secondary" dense onpress={() => {
-            membres = true;
-          }}>{t("salon.room.members")}</Button>{/if}
+      <button type="button" class="bt" aria-label={t("salon.files.title")} onclick={() => (fichiers = true)}><Folder size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.files.title")}</span></button>
+      {#if !large}<button type="button" class="bt" aria-label={t("salon.room.members")} onclick={() => (membres = true)}><Users size={20} aria-hidden="true" /><span class="lib" aria-hidden="true">{t("salon.room.members")}</span></button>{/if}
     </div>
   </header>
 
@@ -590,6 +586,100 @@
     margin: 0;
     color: var(--text-2);
     font-size: 0.875rem;
+  }
+  /* Boutons de l'en-tête : icône et libellé (mesures de Button dense, secondaire). */
+  .bt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--hair-2);
+    border-radius: 10px;
+    background: rgb(255 255 255 / 0.045);
+    box-shadow: var(--edge-hi);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: 560;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+  .bt :global(svg) {
+    flex: none;
+  }
+  .bt.coupe {
+    color: var(--accent);
+  }
+  @media (hover: hover) {
+    .bt:hover {
+      background: rgb(255 255 255 / 0.08);
+    }
+  }
+  .bt:active {
+    transform: scale(0.97);
+  }
+  .bt:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* Téléphone (revue du 20 novembre, U8 : en-tête de ~170 px) : titre et boutons à icône seule
+     de 44 px sur une ligne, l'état du salon sur une ligne dessous. */
+  @media (max-width: 600px) {
+    .tete {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "titre boutons" "etat etat";
+      align-items: center;
+      column-gap: var(--sp-2);
+      row-gap: var(--sp-1);
+    }
+    .titre {
+      display: contents;
+    }
+    .tete h1 {
+      grid-area: titre;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .etat {
+      grid-area: etat;
+      font-size: var(--fs-micro);
+      line-height: var(--lh-micro);
+    }
+    .boutons {
+      grid-area: boutons;
+      flex-wrap: nowrap;
+      gap: var(--sp-1);
+    }
+    .bt {
+      width: 44px;
+      padding: 0;
+    }
+    .lib {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bt {
+      transition: none;
+    }
+    .bt:active {
+      transform: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .bt {
+      border-color: ButtonText;
+    }
   }
   .corps {
     flex: 1;

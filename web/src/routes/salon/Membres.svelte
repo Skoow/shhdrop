@@ -127,8 +127,11 @@
     color: var(--on-fmt);
     font-weight: 700;
   }
+  /* Zones tactiles de 44 px (revue du 20 novembre, U20). */
   .code summary {
-    min-height: 32px;
+    min-height: 44px;
+    padding-block: 12px;
+    box-sizing: border-box;
     color: var(--text-2);
     font-size: 0.8125rem;
     cursor: pointer;
@@ -157,7 +160,7 @@
   }
   .masquer {
     justify-self: start;
-    min-height: 32px;
+    min-height: 44px;
     padding: 0;
     border: 0;
     background: transparent;

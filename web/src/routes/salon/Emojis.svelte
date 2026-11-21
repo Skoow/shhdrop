@@ -58,9 +58,11 @@
     flex-wrap: wrap;
     gap: var(--sp-1);
   }
+  /* Zones tactiles de 44 px (revue du 20 novembre, U20) ; le dessin des teintes reste un disque
+     de 28 px, au centre d'un bouton de 44 px. */
   .groupes button {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 44px;
+    min-height: 44px;
     border: 1px solid transparent;
     border-radius: 10px;
     background: transparent;
@@ -71,22 +73,38 @@
     border-color: var(--accent);
     background: var(--surface-2);
   }
+  .tons {
+    gap: 0;
+  }
   .tons button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+  .tons button::before {
+    content: "";
+    box-sizing: border-box;
     width: 28px;
     height: 28px;
     border: 2px solid var(--line);
     border-radius: 50%;
-    cursor: pointer;
+    background: var(--ton);
   }
-  .tons button[aria-checked="true"] {
+  .tons button[aria-checked="true"]::before {
     border-color: var(--accent);
   }
-  .t0 { background: #f2c46d; }
-  .t1 { background: #f7dcc4; }
-  .t2 { background: #e5b896; }
-  .t3 { background: #c68e64; }
-  .t4 { background: #8d5a3b; }
-  .t5 { background: #5a3825; }
+  .t0 { --ton: #f2c46d; }
+  .t1 { --ton: #f7dcc4; }
+  .t2 { --ton: #e5b896; }
+  .t3 { --ton: #c68e64; }
+  .t4 { --ton: #8d5a3b; }
+  .t5 { --ton: #5a3825; }
   .grille {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
