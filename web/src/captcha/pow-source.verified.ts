@@ -2,7 +2,7 @@
 // d'intégrité. Le script du Worker de la preuve de travail (assets/pow-worker-EMPREINTE.js, construit
 // à part en script classique par le greffon shh-pow) est donc lu par fetch avec son empreinte
 // SHA-384, inscrite dans ce script (lui-même couvert par l'empreinte de la page), puis lancé
-// depuis un Blob de notre origine (CSP : worker-src 'self' blob:) par la politique Trusted Types
+// depuis un Blob de notre origine (CSP : worker-src blob:) par la politique Trusted Types
 // « shhdrop » (app/trusted.ts), comme le Worker d'Argon2id (engine/source.verified.ts).
 // Tout échec devient Error("reseau") ; l'essai suivant relit le fichier.
 import { integrity, src } from "virtual:shh-pow";

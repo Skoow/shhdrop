@@ -13,6 +13,7 @@ package main
 //	SHH_TURN_PORT         port d'écoute UDP et TCP (3478)
 //	SHH_TURN_PORTS        plage des ports relayés, UDP (49160-49999)
 //	SHH_TURN_ALLOCATIONS  allocations simultanées au plus, pour toute la machine (60)
+//	SHH_TURN_PAR_IP       allocations simultanées au plus par adresse d'origine (24)
 //	SHH_TURN_KBPS         débit relayé au plus par allocation, en kbit/s (2500)
 //
 // Bibliothèque : github.com/pion/turn/v4 (version épinglée par go.mod et go.sum). Identifiants
@@ -20,9 +21,11 @@ package main
 // passe base64(HMAC-SHA1(secret, nom)), calculés par le serveur Go (handlers_salon_appel.go).
 //
 // Ce qu'il ne fait jamais : écrire quoi que ce soit (aucun journal : le journaliseur de la
-// bibliothèque est coupé), relayer vers une adresse privée, de boucle locale ou de diffusion,
-// ni vers un autre port de la machine que ceux de sa propre plage (le relais ne sert pas de
-// rebond vers ses services ni vers le réseau interne).
+// bibliothèque est coupé), ni relayer vers autre chose que ses propres allocations. Tous les
+// participants d'un appel passent par ce relais (politique « relais seulement » du site) : le
+// correspondant d'une allocation est toujours une autre allocation, sur l'adresse du relais et
+// dans sa plage. Le relais n'est donc ni un mandataire ouvert vers Internet, ni un rebond vers
+// les services de la machine ou un réseau interne (revue du 21 novembre).
 
 import (
 	"errors"
@@ -52,6 +55,7 @@ type confTurn struct {
 	port         int
 	min, max     int
 	allocations  int
+	parIP        int
 	octetsSecond int
 }
 
@@ -159,6 +163,9 @@ func lireConfTurn(defaut func() (netip.Addr, error)) (confTurn, error) {
 	if c.allocations, err = entierEnv("SHH_TURN_ALLOCATIONS", 60, 2, 2000); err != nil {
 		return c, err
 	}
+	if c.parIP, err = entierEnv("SHH_TURN_PAR_IP", 24, 1, 2000); err != nil {
+		return c, err
+	}
 	kbps, err := entierEnv("SHH_TURN_KBPS", 2500, 100, 100000)
 	if err != nil {
 		return c, err
@@ -182,14 +189,40 @@ type connBridee struct {
 	maintien func() time.Time
 }
 
-// permis : destination joignable par le relais. La machine elle-même seulement sur la plage
-// relayée (un participant joint l'autre par son allocation) ; ailleurs, adresses publiques.
+// permis : destination joignable par le relais : une autre allocation de ce relais seulement
+// (son adresse, un port de sa plage).
 func (c *confTurn) permis(a netip.AddrPort) bool {
-	ip := a.Addr().Unmap()
-	if ip == c.ip {
-		return int(a.Port()) >= c.min && int(a.Port()) <= c.max
+	return a.Addr().Unmap() == c.ip && int(a.Port()) >= c.min && int(a.Port()) <= c.max
+}
+
+// parOrigine : allocations vivantes par adresse d'origine (en mémoire seulement, jamais écrites ;
+// une entrée disparaît avec sa dernière allocation).
+type parOrigine struct {
+	mu sync.Mutex
+	n  map[netip.Addr]int
+}
+
+func origine(a net.Addr) netip.Addr {
+	ap, err := netip.ParseAddrPort(a.String())
+	if err != nil {
+		return netip.Addr{}
 	}
-	return publique(ip)
+	return ap.Addr().Unmap()
+}
+
+func (p *parOrigine) nombre(a net.Addr) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.n[origine(a)]
+}
+
+func (p *parOrigine) ajouter(a net.Addr, d int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	k := origine(a)
+	if p.n[k] += d; p.n[k] <= 0 {
+		delete(p.n, k)
+	}
 }
 
 // Close : la prise rendue, l'allocation ne compte plus.
@@ -264,15 +297,22 @@ func serveurTurn(c confTurn, ecoute string) (*turn.Server, error) {
 	// La bibliothèque demande aussi l'avis avant chaque permission : même règle que l'envoi.
 	permission := func(_ net.Addr, peer net.IP) bool {
 		a, ok := netip.AddrFromSlice(peer)
-		return ok && (a.Unmap() == c.ip || publique(a))
+		return ok && a.Unmap() == c.ip
 	}
+	origines := &parOrigine{n: map[netip.Addr]int{}}
 	log := silence()
 	srv, err := turn.NewServer(turn.ServerConfig{
 		Realm:         realmTurn,
 		LoggerFactory: log,
 		AuthHandler:   turn.LongTermTURNRESTAuthHandler(c.secret, log.NewLogger("turn")),
 		// Plafond de toute la machine : au-delà, 486 (quota atteint), l'appel se dégrade.
-		QuotaHandler: func(string, string, net.Addr) bool { return compte.Load() < int64(c.allocations) },
+		QuotaHandler: func(_, _ string, src net.Addr) bool {
+			return compte.Load() < int64(c.allocations) && origines.nombre(src) < c.parIP
+		},
+		EventHandler: turn.EventHandler{
+			OnAllocationCreated: func(src, _ net.Addr, _, _, _ string, _ net.Addr, _ int) { origines.ajouter(src, 1) },
+			OnAllocationDeleted: func(src, _ net.Addr, _, _, _ string) { origines.ajouter(src, -1) },
+		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{PacketConn: udp, RelayAddressGenerator: gen(), PermissionHandler: permission},
 		},

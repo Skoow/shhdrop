@@ -101,13 +101,13 @@ func TestLireConfTurn(t *testing.T) {
 	}
 }
 
-// La machine elle-même n'est joignable que sur la plage relayée ; ailleurs, adresses publiques.
+// Seules les allocations de ce relais sont joignables : son adresse, sa plage ; jamais Internet.
 func TestPermis(t *testing.T) {
 	c := &confTurn{ip: netip.MustParseAddr("203.0.113.9"), min: 49160, max: 49999}
 	for s, attendu := range map[string]bool{
-		"203.0.113.9:49160": true, "203.0.113.9:49999": true,
+		"203.0.113.9:49160": true, "203.0.113.9:49999": true, "[::ffff:203.0.113.9]:49200": true,
 		"203.0.113.9:443": false, "203.0.113.9:22": false, "203.0.113.9:3478": false, "203.0.113.9:50000": false,
-		"8.8.8.8:5000": true, "10.0.0.1:5000": false, "127.0.0.1:49170": false, "172.30.53.2:8080": false,
+		"8.8.8.8:5000": false, "8.8.8.8:49200": false, "10.0.0.1:5000": false, "127.0.0.1:49170": false, "172.30.53.2:8080": false,
 	} {
 		if got := c.permis(netip.MustParseAddrPort(s)); got != attendu {
 			t.Errorf("permis(%s) = %v", s, got)
@@ -131,7 +131,7 @@ func TestConnBridee(t *testing.T) {
 	f := &faussePrise{}
 	now := time.Unix(1_700_000_000, 0)
 	b := &connBridee{PacketConn: f, c: c, compte: &atomic.Int64{}, jetons: 10_000, maintien: func() time.Time { return now }}
-	vers := &net.UDPAddr{IP: net.ParseIP("8.8.8.8"), Port: 5000}
+	vers := &net.UDPAddr{IP: net.ParseIP("203.0.113.9"), Port: 49200}
 	p := make([]byte, 1000)
 	for i := 0; i < 15; i++ {
 		if n, err := b.WriteTo(p, vers); n != 1000 || err != nil {
@@ -151,6 +151,7 @@ func TestConnBridee(t *testing.T) {
 	// Destination interdite : jetée, sans consommer le débit.
 	now = now.Add(time.Second)
 	_, _ = b.WriteTo(p, &net.UDPAddr{IP: net.ParseIP("10.0.0.1"), Port: 5000})
+	_, _ = b.WriteTo(p, &net.UDPAddr{IP: net.ParseIP("8.8.8.8"), Port: 49200})
 	_, _ = b.WriteTo(p, &net.UDPAddr{IP: net.ParseIP("203.0.113.9"), Port: 22})
 	if f.envoyes != 15_000 {
 		t.Fatalf("destination interdite envoyée : %d", f.envoyes)
@@ -158,7 +159,7 @@ func TestConnBridee(t *testing.T) {
 }
 
 // demarrer : relais réel sur la boucle locale (qui tient lieu d'adresse publique ici).
-func demarrer(t *testing.T, allocations int) (confTurn, string) {
+func demarrer(t *testing.T, allocations int, parIP ...int) (confTurn, string) {
 	t.Helper()
 	l, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	if err != nil {
@@ -166,7 +167,10 @@ func demarrer(t *testing.T, allocations int) (confTurn, string) {
 	}
 	port := l.LocalAddr().(*net.UDPAddr).Port
 	l.Close()
-	c := confTurn{secret: secretTest, ip: netip.MustParseAddr("127.0.0.1"), port: port, min: 40000, max: 40100, allocations: allocations, octetsSecond: 1 << 20}
+	c := confTurn{secret: secretTest, ip: netip.MustParseAddr("127.0.0.1"), port: port, min: 40000, max: 40100, allocations: allocations, parIP: 100, octetsSecond: 1 << 20}
+	if len(parIP) == 1 {
+		c.parIP = parIP[0]
+	}
 	srv, err := serveurTurn(c, "127.0.0.1")
 	if err != nil {
 		t.Fatal(err)
@@ -281,5 +285,43 @@ func TestRelaisDeBoutEnBout(t *testing.T) {
 	if r, err := echu.Allocate(); err == nil {
 		r.Close()
 		t.Fatal("identifiants échus acceptés")
+	}
+}
+
+// Plafond par adresse d'origine : au-delà, refus ; une allocation rendue libère sa place.
+func TestPlafondParOrigine(t *testing.T) {
+	_, adresse := demarrer(t, 100, 2)
+	nom, mdp := identifiants(secretTest, time.Now().Add(time.Hour))
+	a := client(t, adresse, nom, mdp)
+	ra, err := a.Allocate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := client(t, adresse, nom, mdp)
+	rb, err := b.Allocate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rb.Close()
+	c := client(t, adresse, nom, mdp)
+	if r, err := c.Allocate(); err == nil {
+		r.Close()
+		t.Fatal("troisième allocation de la même adresse acceptée")
+	}
+	// Rendue : la place se libère.
+	ra.Close()
+	a.Close()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		d := client(t, adresse, nom, mdp)
+		r, err := d.Allocate()
+		if err == nil {
+			r.Close()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("place jamais rendue :", err)
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }

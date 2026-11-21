@@ -5,7 +5,7 @@
 //
 // Argon2id : un Worker NEUF par calcul, arrêté après (argon2.ts). new Worker(url) n'a pas de
 // contrôle d'intégrité : son script (assets/engine-kdf-EMPREINTE.js) est lu une fois par fetch avec
-// son empreinte, puis lancé depuis un Blob de notre origine (CSP : worker-src 'self' blob:) par
+// son empreinte, puis lancé depuis un Blob de notre origine (CSP : worker-src blob:) par
 // la politique Trusted Types « shhdrop » (app/trusted.ts). Le Worker reçoit le module compilé
 // des octets vérifiés ci-dessus : il ne lit aucun fichier.
 import { integrity, src, workerIntegrity, workerSrc } from "virtual:shh-engine";

@@ -221,3 +221,33 @@ export async function emettre(pass: Uint8Array<ArrayBuffer>, requetes: Uint8Arra
     return null;
   }
 }
+
+/** Défi anti-robot (GET /api/captcha) pour une commande : réponse brute et instant de réception. */
+export type Defi = { challenge: Record<string, unknown>; shownAt: string; receivedAt: number };
+
+/**
+ * Lit un défi pour `commander` (revue du 21 novembre : la page Offres est une page
+ * d'information, elle ne doit pas tirer le moteur de chiffrement par transfer/). Sans cookie,
+ * sans redirection. « limite » : 429 ; null : autre échec (réseau, réponse mal formée).
+ */
+export async function lireDefi(n: Net = netParDefaut()): Promise<Defi | "limite" | null> {
+  let r: Response;
+  try {
+    r = await n.fetch(n.origin + "/api/captcha", { method: "GET", credentials: "omit", redirect: "error", cache: "no-store" });
+  } catch {
+    return null;
+  }
+  if (r.status === 429) return "limite";
+  if (!r.ok) return null;
+  let o: unknown;
+  try {
+    o = await r.json();
+  } catch {
+    return null;
+  }
+  const receivedAt = performance.now();
+  if (typeof o !== "object" || o === null) return null;
+  const { shown_at, fallback: _f, ...challenge } = o as Record<string, unknown>;
+  if (typeof shown_at !== "string" || shown_at.length > 512) return null;
+  return { challenge, shownAt: shown_at, receivedAt };
+}

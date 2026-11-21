@@ -20,8 +20,7 @@
   import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur, type Preuve } from "../paiement/api";
   import { garder, idbDuNavigateur, nouvelId, oublier, tirerPass } from "../paiement/pass";
   import { href } from "../app/router.svelte";
-  import { obtenirPreuve, preparerPreuve } from "../routes/compte/preuve";
-  import { LimitError } from "../index";
+  import { LimiteDefi, obtenirPreuve, preparerPreuve } from "../paiement/preuve";
   import { Check, Lock, Timer } from "./Icon";
 
   type Billing = "month" | "year";
@@ -126,7 +125,7 @@
       try {
         preuve = await obtenirPreuve();
       } catch (e) {
-        erreur = e instanceof LimitError ? "limite" : "reseau";
+        erreur = e instanceof LimiteDefi ? "limite" : "reseau";
         return;
       }
       const jours = billing === "month" ? 30 : 365;

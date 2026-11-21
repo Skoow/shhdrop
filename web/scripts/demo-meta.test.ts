@@ -29,6 +29,6 @@ describe("CSP de la démo", () => {
   test("Trusted Types et worker-src présents", () => {
     expect(DEMO_CSP).toContain("require-trusted-types-for 'script'");
     expect(DEMO_CSP).toContain("trusted-types svelte-trusted-html shhdrop");
-    expect(DEMO_CSP).toContain("worker-src 'self' blob:");
+    expect(DEMO_CSP).toContain("worker-src blob:");
   });
 });

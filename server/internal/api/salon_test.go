@@ -22,7 +22,7 @@ import (
 // cspActuelle : CSP commune d'avant le salon, recopiée telle quelle : sans salon elle ne doit
 // pas changer d'un octet.
 const cspActuelle = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; " +
-	"img-src 'self' blob:; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; " +
+	"img-src 'self' blob:; media-src 'self' blob:; connect-src 'self' blob:; worker-src blob:; frame-src 'self'; " +
 	"object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types svelte-trusted-html shhdrop"
 
 func TestCSPWebSocket(t *testing.T) {
