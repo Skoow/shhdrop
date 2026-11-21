@@ -74,6 +74,10 @@ const (
 	Revoque                            // remboursement total, litige, reversement
 	PoseAbonnement                     // identifiant d'abonnement connu
 	FinRenouvellement                  // abonnement arrêté (le pass va jusqu'à sa fin)
+	// LieRef : une seconde référence du même paiement (Stripe : PaymentIntent d'une facture
+	// d'abonnement, `invoice_payment.paid`) rangée avec la commande de Ref, pour qu'un
+	// remboursement ou un litige qui ne porte qu'elle retrouve la commande (risque S10).
+	LieRef
 )
 
 // Evenement : une conséquence d'un webhook, déjà vérifié par le prestataire.
@@ -87,6 +91,8 @@ type Evenement struct {
 	// Ref : référence du paiement chez le prestataire (Confirme : enregistrée ; Revoque : pour
 	// retrouver la commande sans métadonnées).
 	Ref string
+	// RefLiee : seconde référence du paiement de Ref (LieRef seulement).
+	RefLiee string
 	// Montant TTC en centimes et devise en minuscules (Confirme).
 	Montant int64
 	Devise  string
@@ -414,6 +420,9 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 	if err != nil {
 		return err
 	}
+	if ev.Sorte == LieRef {
+		return lierRef(tx, pr.Nom(), ev, l, ok, jourDe(s.now()))
+	}
 	if !ok {
 		// Un paiement confirmé sans commande dans ses métadonnées, retrouvé seulement par son
 		// abonnement : l'activation n'est peut-être pas encore arrivée ; le prestataire réessaie.
@@ -484,6 +493,31 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 		if _, err := tx.Exec(`UPDATE commandes SET renouvelle=0 WHERE id=?`, l.id); err != nil {
 			return err
 		}
+	}
+	return tx.Commit()
+}
+
+// lierRef : range l'empreinte de ev.RefLiee avec la commande de ev.Ref (déjà créditée). Déjà
+// rangée (paiement unique dont le PaymentIntent est la référence du crédit, ou événement
+// rejoué) : rien. Commande pas encore créditée : le prestataire réessaie (les événements
+// Stripe n'arrivent pas dans l'ordre). Seule une empreinte est gardée, comme pour Ref (§5.1).
+func lierRef(tx *sql.Tx, pr string, ev Evenement, l ligneCommande, ok bool, auj int64) error {
+	if ev.Ref == "" || ev.RefLiee == "" {
+		return nil
+	}
+	r := empreinteRef(pr, ev.RefLiee)
+	var deja int
+	if err := tx.QueryRow(`SELECT count(*) FROM refs WHERE r=?`, r).Scan(&deja); err != nil {
+		return err
+	}
+	if deja > 0 {
+		return nil
+	}
+	if !ok {
+		return ErrPasEncore
+	}
+	if _, err := tx.Exec(`INSERT INTO refs(r, commande, jour) VALUES(?,?,?)`, r, l.id, auj); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
