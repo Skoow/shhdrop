@@ -163,20 +163,66 @@ func TestCommanderRefus(t *testing.T) {
 	}
 }
 
+// Plafond des commandes en attente (§8 ; audit du 20 novembre, S2) : seules les commandes
+// encore en attente ET créées dans les dernières heures bloquent les ventes.
 func TestCommanderPlafondEnAttente(t *testing.T) {
 	b := nouveauBanc(t)
+	passI := func(i int) Pass {
+		p := passN(0xee)
+		p[0], p[1], p[2] = byte(i), byte(i>>8), byte(i>>16)
+		return p
+	}
+	// 1 000 commandes en attente d'il y a plus de 4 heures (gardées 7 jours) : ne bloquent rien.
 	for i := 0; i < maxEnAttente; i++ {
 		c, _ := nouvelleCommande()
-		var q [32]byte
-		copy(q[:], c[:])
-		q[31] = byte(i)
-		q[30] = byte(i >> 8)
+		q := passI(i).Empreinte()
 		if _, err := b.db.Exec(`INSERT INTO commandes VALUES(?,?,1,30,1,1,1,NULL,0,0)`, c[:], q[:]); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := b.s.Commander(context.Background(), passN(9), plusMois, "FR", true); err != ErrOccupe {
-		t.Fatal(err)
+	n := 0
+	commander := func() error {
+		n++
+		_, err := b.s.Commander(context.Background(), passI(100000+n), plusMois, "FR", true)
+		return err
+	}
+	// 1 000 commandes récentes, en attente : la suivante est refusée.
+	for i := 0; i < maxEnAttente; i++ {
+		if err := commander(); err != nil {
+			t.Fatal(i, err)
+		}
+		if i == maxEnAttente/2 {
+			b.now = b.now.Add(2 * time.Hour) // réparties sur plusieurs heures
+		}
+	}
+	if err := commander(); err != ErrOccupe {
+		t.Fatal("plafond", err)
+	}
+	// Après 4 heures, les premières ne sont plus récentes : une vente passe de nouveau…
+	b.now = b.now.Add(2 * time.Hour)
+	if err := commander(); err != nil {
+		t.Fatal("vieilles commandes encore comptées", err)
+	}
+	// … et la ligne reste gardée (paiement tardif encore crédité).
+	var lignes int
+	b.db.QueryRow(`SELECT count(*) FROM commandes WHERE etat=?`, etatAttente).Scan(&lignes)
+	if lignes != 2*maxEnAttente+1 {
+		t.Fatal("lignes", lignes)
+	}
+	// Récentes mais payées (ou non abouties) : plus en attente, ne bloquent pas.
+	b2 := nouveauBanc(t)
+	for i := 0; i < maxEnAttente; i++ {
+		b2.s.compterRecente(b2.now, 1)
+	}
+	if _, err := b2.s.Commander(context.Background(), passN(1), plusMois, "FR", true); err != nil {
+		t.Fatal("récentes mais pas en attente", err)
+	}
+	// Un échec chez le prestataire efface la commande et la retire du compte.
+	b3 := nouveauBanc(t)
+	b3.f.err = errors.New("panne")
+	b3.s.Commander(context.Background(), passN(2), plusMois, "FR", true)
+	if b3.s.nRecentes(b3.now) != 0 {
+		t.Fatal("commande effacée encore comptée")
 	}
 }
 

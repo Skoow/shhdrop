@@ -241,7 +241,7 @@ func (s *Service) InscriptionDebut(ip netip.Addr, email, langue string) (h [16]b
 		return h, jeton, ErrBusy
 	}
 	canon, envoi := s.cles.Empreintes(a)
-	if !s.lim.AllowCourriel(ip, canon) {
+	if !s.lim.AllowCourriel(ip, canon, limits.MotifInscription) {
 		return h, jeton, ErrLimit{jourSuivant(now)}
 	}
 	rand.Read(h[:])
@@ -287,7 +287,7 @@ func (s *Service) renvoyer(ip netip.Addr, jeton [32]byte, email string, sorte so
 	if d := e.envoye.Add(attenteRenvoi).Sub(now); d > 0 {
 		return ErrLimit{d}
 	}
-	if !s.lim.AllowCourriel(ip, canon) {
+	if !s.lim.AllowCourriel(ip, canon, motifDe(sorte)) {
 		return ErrLimit{jourSuivant(now)}
 	}
 	return s.envoyerCodeLocked(e, a.Exacte, now)

@@ -257,6 +257,17 @@ type stripeCharge struct {
 	Metadata      meta      `json:"metadata"`
 }
 
+// stripePaiementFacture : objet invoice_payment (versions « basil » et suivantes) : relie une
+// facture au PaymentIntent qui l'a payée.
+type stripePaiementFacture struct {
+	Status  string    `json:"status"`
+	Invoice idOuObjet `json:"invoice"`
+	Payment struct {
+		Type          string    `json:"type"`
+		PaymentIntent idOuObjet `json:"payment_intent"`
+	} `json:"payment"`
+}
+
 type stripeAbonnement struct {
 	ID       string `json:"id"`
 	Metadata meta   `json:"metadata"`
@@ -333,6 +344,18 @@ func (s *Stripe) Lire(_ context.Context, h http.Header, corps []byte) ([]Eveneme
 			return nil, nil
 		}
 		return []Evenement{ev}, nil
+	case "invoice_payment.paid":
+		// Une facture d'abonnement est créditée par son identifiant (invoice.paid) ; son
+		// PaymentIntent, seul porté par charge.refunded et charge.dispute.created, est rangé
+		// avec la même commande (risque S10 de la conception du paiement).
+		var o stripePaiementFacture
+		if json.Unmarshal(e.Data.Object, &o) != nil {
+			return nil, ErrSignature
+		}
+		if o.Status != "paid" || o.Payment.Type != "payment_intent" || o.Invoice == "" || o.Payment.PaymentIntent == "" {
+			return nil, nil
+		}
+		return []Evenement{{Sorte: LieRef, Ref: string(o.Invoice), RefLiee: string(o.Payment.PaymentIntent)}}, nil
 	case "customer.subscription.deleted":
 		var o stripeAbonnement
 		if json.Unmarshal(e.Data.Object, &o) != nil || o.ID == "" {

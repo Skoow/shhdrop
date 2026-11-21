@@ -102,6 +102,31 @@ func TestOubliAdresseExacteSeulement(t *testing.T) {
 	}
 }
 
+// Audit du 20 novembre, S4 : un tiers qui épuise les e-mails d'inscription vers une adresse
+// n'empêche pas sa récupération, même depuis son propre bloc.
+func TestOubliApresInscriptionsEpuisees(t *testing.T) {
+	b := nouveauBanc(t)
+	b.inscrire(t, ipA, "lea@exemple.fr", "lea")
+	b.clk.Add(24 * time.Hour)
+	for i := 0; i < 3; i++ {
+		if _, _, err := b.s.InscriptionDebut(ipN(20), "lea@exemple.fr", "fr"); err != nil {
+			t.Fatal(i, err)
+		}
+	}
+	var lim ErrLimit
+	if _, _, err := b.s.InscriptionDebut(ipN(21), "lea@exemple.fr", "fr"); err != nil {
+		t.Fatal("autre bloc", err)
+	}
+	if _, _, err := b.s.InscriptionDebut(ipN(20), "lea@exemple.fr", "fr"); !errors.As(err, &lim) {
+		t.Fatal("4e inscription depuis le même bloc", err)
+	}
+	for _, ip := range []netip.Addr{ipN(20), ipA} {
+		if _, err := b.s.OubliDebut(ip, "lea@exemple.fr", "fr"); err != nil {
+			t.Fatal("récupération bloquée par les inscriptions d'un tiers", err)
+		}
+	}
+}
+
 // Adresse existante ou non : mêmes réponses à chaque pas (étape, limites d'e-mails par adresse
 // et renvoi après 60 s), le seul écart est l'e-mail lui-même.
 func TestOubliReponseIdentique(t *testing.T) {
@@ -124,15 +149,19 @@ func TestOubliReponseIdentique(t *testing.T) {
 		if err := b.s.RenvoyerOubli(ipN(10), e, a); err != nil {
 			t.Fatalf("%s : renvoi : %v", a, err)
 		}
-		if _, err := b.s.OubliDebut(ipN(11), a, "fr"); err != nil {
+		if _, err := b.s.OubliDebut(ipN(10), a, "fr"); err != nil {
 			t.Fatal(a, err)
 		}
-		// 4e e-mail du jour vers cette adresse : refusé dans les deux cas.
-		if _, err := b.s.OubliDebut(ipN(12), a, "fr"); !errors.As(err, &lim) {
+		// 4e e-mail du jour vers cette adresse depuis le même bloc : refusé dans les deux cas.
+		if _, err := b.s.OubliDebut(ipN(10), a, "fr"); !errors.As(err, &lim) {
 			t.Fatalf("%s : 4e e-mail : %v", a, err)
 		}
+		// Depuis un autre bloc : permis dans les deux cas (audit du 20 novembre, S4).
+		if _, err := b.s.OubliDebut(ipN(11), a, "fr"); err != nil {
+			t.Fatalf("%s : autre bloc : %v", a, err)
+		}
 	}
-	// Seuls les e-mails réels sont partis : 3 vers lea@, aucun vers l'inconnue.
+	// Seuls les e-mails réels sont partis : 4 vers lea@, aucun vers l'inconnue.
 	b.post.mu.Lock()
 	defer b.post.mu.Unlock()
 	for _, m := range b.post.msgs[1:] {
@@ -140,7 +169,7 @@ func TestOubliReponseIdentique(t *testing.T) {
 			t.Fatalf("e-mail vers %s", m.A)
 		}
 	}
-	if len(b.post.msgs) != 4 {
+	if len(b.post.msgs) != 5 {
 		t.Fatalf("%d e-mails", len(b.post.msgs))
 	}
 }

@@ -15,11 +15,17 @@ const (
 	InscriptionsPer64 = 3
 	InscriptionsPer48 = 10
 	// E-mails par jour : par connexion, par /48 (ajout du lot 3 : sans lui, un /48 découpé en
-	// /64 multipliait par 65 536 les envois, comme pour SegmentsPer48Min) et par adresse
-	// (e_canon : une victime reçoit 3 codes par jour au plus, quelles que soient les connexions).
-	CourrielsPer64      = 10
-	CourrielsPer48      = 30
-	CourrielsParAdresse = 3
+	// /64 multipliait par 65 536 les envois, comme pour SegmentsPer48Min), puis, pour chaque
+	// motif (inscription, récupération, changement d'adresse) compté à part, par (adresse, bloc
+	// /48) et par adresse (e_canon). Audit du 20 novembre (S4) : un seul compteur de 3 par
+	// adresse, commun à tout, laissait un tiers empêcher la récupération d'un compte en
+	// demandant 3 inscriptions ; il faut maintenant 3 blocs /48 (ou 3 adresses IPv4) distincts
+	// pour fermer un motif à une adresse, et les deux autres motifs restent ouverts. Une victime
+	// reçoit au plus 3 × 9 = 27 codes par jour.
+	CourrielsPer64            = 10
+	CourrielsPer48            = 30
+	CourrielsParAdresseEtBloc = 3
+	CourrielsParAdresse       = 9
 	// Échecs de connexion par heure, par connexion et par /48 (puis 429).
 	EchecsConnexionPer64 = 20
 	EchecsConnexionPer48 = 60
@@ -62,20 +68,38 @@ func (l *Limiter) AllowInscription(ip netip.Addr) bool {
 	return l.allowPairLocked(ip, l.insc64, l.insc48, InscriptionsPer64, InscriptionsPer48)
 }
 
-// AllowCourriel : un e-mail vers l'adresse d'empreinte canon (e_canon) demandé depuis ip :
-// 10 par jour par connexion, 30 par /48, 3 par adresse. Compté seulement s'il est permis.
-// L'attente de 60 s entre deux envois d'une même étape est celle de l'étape (lot 4).
-func (l *Limiter) AllowCourriel(ip netip.Addr, canon [32]byte) bool {
+// Motif d'un e-mail du compte : chacun a ses propres compteurs par adresse (audit S4).
+type Motif uint8
+
+const (
+	MotifInscription  Motif = iota + 1 // inscription/debut et ses renvois
+	MotifRecuperation                  // oubli/debut et ses renvois
+	MotifAdresse                       // changement d'adresse et ses renvois
+)
+
+// AllowCourriel : un e-mail pour le motif m vers l'adresse d'empreinte canon (e_canon) demandé
+// depuis ip : 10 par jour par connexion et 30 par /48 (tous motifs), puis, pour ce motif, 3 par
+// (adresse, /48) et 9 par adresse. Compté seulement s'il est permis. Ne dépend que des demandes
+// déjà faites, jamais de l'existence d'un compte (aucune énumération). L'attente de 60 s entre
+// deux envois d'une même étape est celle de l'étape (lot 4).
+func (l *Limiter) AllowCourriel(ip netip.Addr, canon [32]byte, m Motif) bool {
+	if m < MotifInscription || m > MotifAdresse {
+		return false
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.rotateLocked(l.now())
 	k64, k48 := l.keyLocked(ip)
-	ka := l.cleLocked("courriel", canon[:])
-	if l.mail64[k64] >= CourrielsPer64 || l.mail48[k48] >= CourrielsPer48 || l.mailAdr[ka] >= CourrielsParAdresse {
+	sorte := "courriel" + strconv.Itoa(int(m))
+	ka := l.cleLocked(sorte, canon[:])
+	kab := l.cleLocked(sorte+"|"+k48, canon[:])
+	if l.mail64[k64] >= CourrielsPer64 || l.mail48[k48] >= CourrielsPer48 ||
+		l.mailAdr48[kab] >= CourrielsParAdresseEtBloc || l.mailAdr[ka] >= CourrielsParAdresse {
 		return false
 	}
 	l.mail64[k64]++
 	l.mail48[k48]++
+	l.mailAdr48[kab]++
 	l.mailAdr[ka]++
 	return true
 }

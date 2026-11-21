@@ -10,12 +10,18 @@
   // case de renonciation cochée (jamais précochée, §38.1). Au clic : un pass P est tiré et rangé
   // sur l'appareil AVANT la commande, puis la page hébergée du prestataire s'ouvre (redirection,
   // aucun script tiers ici). Rien n'est payé sur Shhgone.
+  //
+  // Preuve anti-robot (audit du 20 novembre, S2) : la commande porte une preuve de travail ALTCHA
+  // (défi lu et calculé dans son Worker dès que le bouton peut servir, comme les pages du compte) ;
+  // aucun repli tiers ici (le pass est sur cette page).
   import { formatBytes, formatDuration } from "../i18n/format";
   import { getLang, t } from "../i18n/i18n.svelte";
   import { CONTENT_MAX, MAX_OPENS, PAID, TTL_MAX_HOURS, type PaidTier } from "../limits";
-  import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur } from "../paiement/api";
+  import { commander, lireOffre, type ErreurCommande, type Moyen, type OffreServeur, type Preuve } from "../paiement/api";
   import { garder, idbDuNavigateur, nouvelId, oublier, tirerPass } from "../paiement/pass";
   import { href } from "../app/router.svelte";
+  import { obtenirPreuve, preparerPreuve } from "../routes/compte/preuve";
+  import { LimitError } from "../index";
   import { Check, Lock, Timer } from "./Icon";
 
   type Billing = "month" | "year";
@@ -100,6 +106,10 @@
   );
   let busy = $state(false);
   let erreur = $state<ErreurCommande | "stockage" | null>(null);
+  // Preuve calculée à l'avance, dès que rien n'empêche plus de payer.
+  $effect(() => {
+    if (chosen !== null && blocage === null) preparerPreuve();
+  });
   let going = $state(false);
 
   async function payer(): Promise<void> {
@@ -112,6 +122,13 @@
         erreur = "stockage";
         return;
       }
+      let preuve: Preuve;
+      try {
+        preuve = await obtenirPreuve();
+      } catch (e) {
+        erreur = e instanceof LimitError ? "limite" : "reseau";
+        return;
+      }
       const jours = billing === "month" ? 30 : 365;
       const g = { id: nouvelId(), pass: tirerPass(), offre: chosen, jours, renouvelle, moyen: API[means], enAttente: true, cree: Date.now(), pays } as const;
       try {
@@ -120,7 +137,7 @@
         erreur = "stockage";
         return;
       }
-      const r = await commander(g.pass, { offre: chosen, jours, renouvelle, moyen: API[means], pays, renonciation: waiver });
+      const r = await commander(g.pass, { offre: chosen, jours, renouvelle, moyen: API[means], pays, renonciation: waiver }, preuve);
       if ("url" in r) {
         going = true;
         location.assign(r.url);

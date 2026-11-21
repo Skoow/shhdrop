@@ -300,3 +300,90 @@ func TestStripeEvenements(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Risque S10 (audit du 20 novembre, S6) : un abonnement Stripe contesté ne porte, dans
+// charge.dispute.created, que le PaymentIntent de la facture ; invoice_payment.paid le range
+// avec la commande, et le litige révoque le pass.
+func TestStripeAbonnementConteste(t *testing.T) {
+	b := nouveauBanc(t)
+	s, _, now := nouveauStripeTest(t, true)
+	webhook := func(typ, objet string) error {
+		t.Helper()
+		corps := evenementStripe(typ, false, objet)
+		return b.s.Webhook(context.Background(), s, entete("Stripe-Signature", signeStripe(whsec, now.Unix(), corps)), []byte(corps))
+	}
+	c := b.commander(t, passN(1), plusMois)
+	lien := `{"id":"inpay_1","object":"invoice_payment","amount_paid":700,"currency":"eur","invoice":"in_1Sub",` +
+		`"is_default":true,"payment":{"type":"payment_intent","payment_intent":"pi_1Sub"},"status":"paid"}`
+	// Avant le crédit de la facture : le prestataire réessaiera.
+	if err := webhook("invoice_payment.paid", lien); err != ErrPasEncore {
+		t.Fatal("lien avant la facture", err)
+	}
+	if err := webhook("invoice.paid", `{"id":"in_1Sub","object":"invoice","billing_reason":"subscription_create","amount_paid":700,"currency":"eur",`+
+		`"parent":{"type":"subscription_details","subscription_details":{"metadata":{"commande":"`+c.String()+`"},"subscription":"sub_1Sub"}}}`); err != nil {
+		t.Fatal(err)
+	}
+	if e := b.etat(t, passN(1)); e.Etat != "payee" {
+		t.Fatal(e)
+	}
+	for range 2 { // rejoué : sans effet
+		if err := webhook("invoice_payment.paid", lien); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n int
+	b.db.QueryRow(`SELECT count(*) FROM refs WHERE commande=?`, c[:]).Scan(&n)
+	if n != 2 {
+		t.Fatal("références", n)
+	}
+	if err := webhook("charge.dispute.created", `{"id":"dp_1","object":"dispute","charge":"ch_1","payment_intent":"pi_1Sub","reason":"fraudulent","metadata":{}}`); err != nil {
+		t.Fatal(err)
+	}
+	if e := b.etat(t, passN(1)); e.Etat != "revoquee" {
+		t.Fatal("litige d'abonnement non révoqué", e)
+	}
+
+	// Remboursement total d'une facture d'abonnement : même chemin.
+	c2 := b.commander(t, passN(2), plusMois)
+	for _, ev := range [][2]string{
+		{"invoice.paid", `{"id":"in_2","billing_reason":"subscription_create","amount_paid":700,"currency":"eur",` +
+			`"parent":{"subscription_details":{"metadata":{"commande":"` + c2.String() + `"},"subscription":"sub_2"}}}`},
+		{"invoice_payment.paid", `{"invoice":"in_2","payment":{"type":"payment_intent","payment_intent":{"id":"pi_2"}},"status":"paid"}`},
+		{"charge.refunded", `{"id":"ch_2","object":"charge","refunded":true,"payment_intent":"pi_2","metadata":{}}`},
+	} {
+		if err := webhook(ev[0], ev[1]); err != nil {
+			t.Fatal(ev[0], err)
+		}
+	}
+	if e := b.etat(t, passN(2)); e.Etat != "revoquee" {
+		t.Fatal("remboursement d'abonnement non révoqué", e)
+	}
+
+	// Paiement unique : son PaymentIntent est déjà la référence du crédit ; le lien de la facture
+	// (invoice_creation) ne change rien et ne fait pas réessayer.
+	c3 := b.commander(t, passN(3), Formule{Plus, JoursAn, false, Carte})
+	if err := webhook("checkout.session.completed", `{"client_reference_id":"`+c3.String()+
+		`","mode":"payment","payment_status":"paid","payment_intent":"pi_3","amount_total":7000,"currency":"eur"}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := webhook("invoice_payment.paid", `{"invoice":"in_3","payment":{"type":"payment_intent","payment_intent":"pi_3"},"status":"paid"}`); err != nil {
+		t.Fatal(err)
+	}
+	// Paiement non abouti, ou d'un autre type : ignoré.
+	if evs := lireStripe(t, s, *now, "invoice_payment.paid", `{"invoice":"in_4","payment":{"type":"payment_intent","payment_intent":"pi_4"},"status":"open"}`); len(evs) != 0 {
+		t.Fatal(evs)
+	}
+	if evs := lireStripe(t, s, *now, "invoice_payment.paid", `{"invoice":"in_4","payment":{"type":"out_of_band_payment"},"status":"paid"}`); len(evs) != 0 {
+		t.Fatal(evs)
+	}
+	if e := un(lireStripe(t, s, *now, "invoice_payment.paid", lien)); e.Sorte != LieRef || e.Ref != "in_1Sub" || e.RefLiee != "pi_1Sub" {
+		t.Fatalf("%+v", e)
+	}
+}
+
+func un(evs []Evenement) Evenement {
+	if len(evs) != 1 {
+		panic(len(evs))
+	}
+	return evs[0]
+}

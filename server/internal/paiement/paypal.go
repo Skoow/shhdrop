@@ -2,6 +2,7 @@ package paiement
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -36,6 +37,61 @@ func (p Plans) de(f Formule) string {
 // verifsPayPal : vérifications de signature simultanées au plus (appel sortant chacune).
 const verifsPayPal = 4
 
+// Transmissions refusées (audit du 20 novembre, S3) : un Paypal-Transmission-Id que PayPal a
+// déjà déclaré faux (ou en cours de vérification) est refusé sans nouvel appel sortant, pendant
+// transmissionsDuree, pour transmissionsMax identifiants au plus (mémoire seulement).
+const (
+	transmissionsMax   = 4096
+	transmissionsDuree = time.Hour
+)
+
+// transmissions : empreintes SHA-256 des Paypal-Transmission-Id refusés par PayPal (ou en cours
+// de vérification) → échéance. Un identifiant vérifié avec succès, ou dont la vérification n'a
+// pas abouti (panne), n'est pas gardé : PayPal peut réessayer le même. Ni adresse, ni corps, ni
+// signature : rien de personnel ; perdu au redémarrage.
+type transmissions struct {
+	mu sync.Mutex
+	vu map[[32]byte]time.Time
+}
+
+// prendre : false si id est refusé ou en cours ; sinon il est marqué « en cours » (rendu par
+// finir). Table pleine : rien n'est marqué (les échus sont d'abord oubliés), la vérification a
+// lieu (bornée par verifsPayPal et la limite de la route).
+func (t *transmissions) prendre(id string, now time.Time) (cle [32]byte, marque, ok bool) {
+	cle = sha256.Sum256([]byte(id))
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if fin, vu := t.vu[cle]; vu {
+		if now.Before(fin) {
+			return cle, false, false
+		}
+		delete(t.vu, cle)
+	}
+	if len(t.vu) >= transmissionsMax {
+		for k, fin := range t.vu {
+			if !now.Before(fin) {
+				delete(t.vu, k)
+			}
+		}
+	}
+	if len(t.vu) >= transmissionsMax {
+		return cle, false, true
+	}
+	t.vu[cle] = now.Add(transmissionsDuree)
+	return cle, true, true
+}
+
+// finir : refuse = PayPal a dit la signature fausse : gardé jusqu'à l'échéance ; sinon oublié.
+func (t *transmissions) finir(cle [32]byte, refuse bool, now time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if refuse {
+		t.vu[cle] = now.Add(transmissionsDuree)
+	} else {
+		delete(t.vu, cle)
+	}
+}
+
 // PayPalP : prestataire PayPal.
 type PayPalP struct {
 	clientID, secret, webhookID string
@@ -45,6 +101,7 @@ type PayPalP struct {
 	http                        *Client
 	now                         func() time.Time
 	verifs                      chan struct{}
+	refusees                    transmissions
 
 	mu       sync.Mutex
 	jeton    string
@@ -58,7 +115,7 @@ func NouveauPayPal(clientID, secret, webhookID string, plans Plans, essai bool, 
 		base = "https://api-m.sandbox.paypal.com"
 	}
 	return &PayPalP{clientID: clientID, secret: secret, webhookID: webhookID, plans: plans, essai: essai, base: base,
-		http: c, now: now, verifs: make(chan struct{}, verifsPayPal)}
+		http: c, now: now, verifs: make(chan struct{}, verifsPayPal), refusees: transmissions{vu: map[[32]byte]time.Time{}}}
 }
 
 func (*PayPalP) Moyen() Moyen { return PayPal }
@@ -284,12 +341,30 @@ func (p *PayPalP) verifier(ctx context.Context, h http.Header, corps []byte) err
 	if json.Unmarshal(corps, &pre) != nil || pre.ID == "" || pre.EventType == "" {
 		return ErrSignature
 	}
+	// Identifiant de transmission déjà refusé par PayPal, ou en cours de vérification : refusé
+	// sans appel sortant (un faux webhook répété ne coûte qu'un appel).
+	cle, marque, ok := p.refusees.prendre(v[2], p.now())
+	if !ok {
+		return ErrSignature
+	}
 	select {
 	case p.verifs <- struct{}{}:
 		defer func() { <-p.verifs }()
 	default:
+		if marque {
+			p.refusees.finir(cle, false, p.now())
+		}
 		return ErrOccupe
 	}
+	err := p.verifierAPI(ctx, v, corps)
+	if marque {
+		p.refusees.finir(cle, errors.Is(err, ErrSignature), p.now())
+	}
+	return err
+}
+
+// verifierAPI : POST /v1/notifications/verify-webhook-signature, le corps reçu tel quel.
+func (p *PayPalP) verifierAPI(ctx context.Context, v [len(entetesPayPal)]string, corps []byte) error {
 	// Corps écrit à la main : webhook_event est le corps reçu, octet pour octet.
 	q := func(s string) string { b, _ := json.Marshal(s); return string(b) }
 	req := `{"auth_algo":` + q(v[0]) + `,"cert_url":` + q(v[1]) + `,"transmission_id":` + q(v[2]) +

@@ -20,6 +20,7 @@ function net(reply: (s: Seen) => Response | Promise<Response>) {
 const rep = (v: unknown, status = 200) => new Response(v === null ? null : JSON.stringify(v), { status, headers: { "Content-Type": "application/json" } });
 const P = new Uint8Array(32).fill(7);
 const demande: A.Demande = { offre: "pro", jours: 365, renouvelle: false, moyen: "carte", pays: "DE", renonciation: true };
+const preuve: A.Preuve = { altcha: "eyJzYWx0IjoieCJ9", hp: "", shown_at: "v1.jeton" };
 
 describe("adresses de redirection", () => {
   it("seulement les pages hébergées des prestataires", () => {
@@ -60,19 +61,19 @@ describe("couche HTTP du paiement", () => {
 
   it("commande : pass dans X-Shh-Pass seulement, corps exact, adresse vérifiée", async () => {
     const { n, seen } = net(() => rep({ url: "https://checkout.stripe.com/c/pay/cs_1" }));
-    expect(await A.commander(P, demande, n)).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_1" });
+    expect(await A.commander(P, demande, preuve, n)).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_1" });
     const s = seen[0]!;
     expect(s.method).toBe("POST");
     expect(s.url).toBe("https://shh.test/api/paiement/commande");
     expect(s.headers["X-Shh-Pass"]).toBe(b64u(P));
-    expect(JSON.parse(s.body!)).toEqual({ offre: "pro", jours: 365, renouvelle: false, moyen: "carte", pays: "DE", renonciation: true });
+    expect(JSON.parse(s.body!)).toEqual({ offre: "pro", jours: 365, renouvelle: false, moyen: "carte", pays: "DE", renonciation: true, ...preuve });
     expect(s.url + s.body).not.toContain(b64u(P));
     // Le serveur rend une adresse hors liste : jamais suivie.
-    expect(await A.commander(P, demande, net(() => rep({ url: "https://evil.example/pay" })).n)).toEqual({ erreur: "prestataire" });
+    expect(await A.commander(P, demande, preuve, net(() => rep({ url: "https://evil.example/pay" })).n)).toEqual({ erreur: "prestataire" });
     for (const [st, e] of [[400, "refus"], [409, "conflit"], [429, "limite"], [503, "occupe"], [502, "prestataire"], [500, "prestataire"]] as const)
-      expect(await A.commander(P, demande, net(() => rep({ error: "x" }, st)).n)).toEqual({ erreur: e });
-    expect(await A.commander(P, demande, net(() => Promise.reject(new Error("x"))).n)).toEqual({ erreur: "reseau" });
-    await expect(A.commander(new Uint8Array(31), demande, n)).rejects.toThrow("pass_invalide");
+      expect(await A.commander(P, demande, preuve, net(() => rep({ error: "x" }, st)).n)).toEqual({ erreur: e });
+    expect(await A.commander(P, demande, preuve, net(() => Promise.reject(new Error("x"))).n)).toEqual({ erreur: "reseau" });
+    await expect(A.commander(new Uint8Array(31), demande, preuve, n)).rejects.toThrow("pass_invalide");
   });
 
   it("état et résiliation", async () => {

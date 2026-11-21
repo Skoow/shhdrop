@@ -62,24 +62,60 @@ func TestAllowCourrielParAdresse(t *testing.T) {
 	now := t0
 	l := newLim(&now)
 	a := canonDe("lea@exemple.fr")
-	for i := 0; i < CourrielsParAdresse; i++ {
-		// Trois connexions différentes : la limite par adresse tient quand même.
-		if !l.AllowCourriel(ip(fmt.Sprintf("192.0.2.%d", i+1)), a) {
+	// Un même bloc (IPv4 : l'adresse elle-même) : 3 par jour vers la même adresse.
+	for i := 0; i < CourrielsParAdresseEtBloc; i++ {
+		if !l.AllowCourriel(ip("192.0.2.1"), a, MotifInscription) {
 			t.Fatalf("e-mail %d refusé", i+1)
 		}
 	}
-	if l.AllowCourriel(ip("198.51.100.1"), a) {
-		t.Fatal("4e e-mail du jour vers la même adresse accepté")
+	if l.AllowCourriel(ip("192.0.2.1"), a, MotifInscription) {
+		t.Fatal("4e e-mail du jour depuis le même bloc vers la même adresse accepté")
 	}
-	if !l.AllowCourriel(ip("198.51.100.1"), canonDe("autre@exemple.fr")) {
+	// Un /48 découpé en /64 : toujours le même bloc.
+	b := canonDe("bob@exemple.fr")
+	for i := 0; i < CourrielsParAdresseEtBloc; i++ {
+		l.AllowCourriel(ip(fmt.Sprintf("2001:db8:9:%x::1", i)), b, MotifInscription)
+	}
+	if l.AllowCourriel(ip("2001:db8:9:ff::1"), b, MotifInscription) {
+		t.Fatal("autre /64 du même /48 : la limite par (adresse, bloc) ne tient pas")
+	}
+	// D'autres blocs : jusqu'à 9 par adresse en tout, pour ce motif.
+	for i := CourrielsParAdresseEtBloc; i < CourrielsParAdresse; i++ {
+		if !l.AllowCourriel(ip(fmt.Sprintf("198.51.100.%d", i/CourrielsParAdresseEtBloc)), a, MotifInscription) {
+			t.Fatalf("e-mail %d refusé", i+1)
+		}
+	}
+	if l.AllowCourriel(ip("203.0.113.50"), a, MotifInscription) {
+		t.Fatal("10e e-mail du jour vers la même adresse accepté")
+	}
+	// Audit S4 : l'inscription épuisée par un tiers ne ferme ni la récupération ni le
+	// changement d'adresse, depuis aucun bloc.
+	for _, m := range []Motif{MotifRecuperation, MotifAdresse} {
+		for i := 0; i < CourrielsParAdresseEtBloc; i++ {
+			if !l.AllowCourriel(ip("192.0.2.1"), a, m) {
+				t.Fatalf("motif %d : e-mail %d refusé après l'épuisement de l'inscription", m, i+1)
+			}
+		}
+		if l.AllowCourriel(ip("192.0.2.1"), a, m) {
+			t.Fatalf("motif %d : 4e e-mail depuis le même bloc accepté", m)
+		}
+		if !l.AllowCourriel(ip("203.0.113.7"), a, m) {
+			t.Fatalf("motif %d : la victime, depuis son bloc, est bloquée par un tiers", m)
+		}
+	}
+	// Motif inconnu : refusé, rien de compté.
+	if l.AllowCourriel(ip("203.0.113.8"), canonDe("c"), 0) || l.AllowCourriel(ip("203.0.113.8"), canonDe("c"), 9) {
+		t.Fatal("motif inconnu accepté")
+	}
+	if !l.AllowCourriel(ip("198.51.100.1"), canonDe("autre@exemple.fr"), MotifInscription) {
 		t.Fatal("autre adresse refusée")
 	}
 	now = t0.Add(24 * time.Hour)
-	if !l.AllowCourriel(ip("198.51.100.1"), a) {
+	if !l.AllowCourriel(ip("198.51.100.1"), a, MotifInscription) {
 		t.Fatal("limite par adresse non remise à zéro à minuit")
 	}
-	if CourrielsParAdresse != 3 {
-		t.Fatal("borne de la conception §8.8 : 3 par jour et par adresse")
+	if CourrielsParAdresseEtBloc != 3 || CourrielsParAdresse != 9 {
+		t.Fatal("bornes (audit du 20 novembre, S4) : 3 par adresse et par bloc, 9 par adresse, par motif")
 	}
 }
 
@@ -87,28 +123,28 @@ func TestAllowCourrielParConnexion(t *testing.T) {
 	now := t0
 	l := newLim(&now)
 	for i := 0; i < CourrielsPer64; i++ {
-		if !l.AllowCourriel(ip("2001:db8:1:1::1"), canonDe(fmt.Sprint(i))) {
+		if !l.AllowCourriel(ip("2001:db8:1:1::1"), canonDe(fmt.Sprint(i)), MotifInscription) {
 			t.Fatalf("e-mail %d refusé", i+1)
 		}
 	}
-	if l.AllowCourriel(ip("2001:db8:1:1::9"), canonDe("x")) {
+	if l.AllowCourriel(ip("2001:db8:1:1::9"), canonDe("x"), MotifInscription) {
 		t.Fatal("11e e-mail du jour pour la même connexion accepté")
 	}
 	// Un refus ne compte nulle part : l'adresse « x » n'a rien consommé.
-	for i := 0; i < CourrielsParAdresse; i++ {
-		if !l.AllowCourriel(ip(fmt.Sprintf("2001:db8:1:%x::1", 10+i)), canonDe("x")) {
+	for i := 0; i < CourrielsParAdresseEtBloc; i++ {
+		if !l.AllowCourriel(ip(fmt.Sprintf("2001:db8:1:%x::1", 10+i)), canonDe("x"), MotifInscription) {
 			t.Fatal("un refus a été compté pour l'adresse")
 		}
 	}
 	// Le /48 : CourrielsPer48 au plus.
-	n := CourrielsPer64 + CourrielsParAdresse
+	n := CourrielsPer64 + CourrielsParAdresseEtBloc
 	for i := 0; n < CourrielsPer48; i++ {
-		if !l.AllowCourriel(ip(fmt.Sprintf("2001:db8:1:%x::1", 100+i)), canonDe(fmt.Sprint("y", i))) {
+		if !l.AllowCourriel(ip(fmt.Sprintf("2001:db8:1:%x::1", 100+i)), canonDe(fmt.Sprint("y", i)), MotifInscription) {
 			t.Fatalf("e-mail %d du /48 refusé", n+1)
 		}
 		n++
 	}
-	if l.AllowCourriel(ip("2001:db8:1:fff::1"), canonDe("z")) {
+	if l.AllowCourriel(ip("2001:db8:1:fff::1"), canonDe("z"), MotifInscription) {
 		t.Fatal("e-mail au-delà du plafond du /48 accepté")
 	}
 	if CourrielsPer64 != 10 || CourrielsPer48 != 30 {
@@ -277,7 +313,7 @@ func TestAllowBannir(t *testing.T) {
 func compteMaps(l *Limiter) map[string]int {
 	v := reflect.ValueOf(l).Elem()
 	out := map[string]int{}
-	for _, n := range []string{"insc64", "insc48", "mail64", "mail48", "mailAdr", "echec64", "echec48",
+	for _, n := range []string{"insc64", "insc48", "mail64", "mail48", "mailAdr", "mailAdr48", "echec64", "echec48",
 		"echecCpt", "totpCpt", "coffreCpt", "pseudoCpt"} {
 		f := v.FieldByName(n)
 		if !f.IsValid() {
@@ -292,7 +328,7 @@ func compteMaps(l *Limiter) map[string]int {
 func remplir(l *Limiter) {
 	c := canonDe("lea@exemple.fr")
 	l.AllowInscription(ip("192.0.2.1"))
-	l.AllowCourriel(ip("192.0.2.1"), c)
+	l.AllowCourriel(ip("192.0.2.1"), c, MotifInscription)
 	l.NoterEchecConnexion(ip("192.0.2.1"), c)
 	l.NoterEchecTOTP(hDe("a"))
 	l.AllowEcritureCoffre(hDe("a"))
@@ -349,7 +385,7 @@ func TestAucuneAdresseGardee(t *testing.T) {
 	h := hDe("h-du-compte-16oc")
 	a := ip("2001:db8:1:2::1")
 	l.AllowInscription(a)
-	l.AllowCourriel(a, c)
+	l.AllowCourriel(a, c, MotifInscription)
 	l.NoterEchecConnexion(a, c)
 	l.NoterEchecTOTP(h)
 	l.AllowEcritureCoffre(h)
@@ -357,7 +393,7 @@ func TestAucuneAdresseGardee(t *testing.T) {
 	reperes := []string{string(c[:]), hex.EncodeToString(c[:]), string(h[:]), hex.EncodeToString(h[:]),
 		"2001:db8:1:2", "2001:db8:1::", "lea@exemple.fr"}
 	v := reflect.ValueOf(l).Elem()
-	for _, n := range []string{"insc64", "insc48", "mail64", "mail48", "mailAdr", "echec64", "echec48",
+	for _, n := range []string{"insc64", "insc48", "mail64", "mail48", "mailAdr", "mailAdr48", "echec64", "echec48",
 		"echecCpt", "totpCpt", "coffreCpt", "pseudoCpt"} {
 		it := v.FieldByName(n).MapRange()
 		for it.Next() {
@@ -379,7 +415,7 @@ func TestAucuneAdresseGardee(t *testing.T) {
 		before[it.Key().String()] = true
 	}
 	now = t0.Add(24 * time.Hour)
-	l.AllowCourriel(a, c)
+	l.AllowCourriel(a, c, MotifInscription)
 	it = v.FieldByName("mailAdr").MapRange()
 	for it.Next() {
 		if before[it.Key().String()] {

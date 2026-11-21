@@ -95,6 +95,8 @@ export async function lireOffre(n: Net = netParDefaut()): Promise<OffreServeur |
 
 export type Demande = { offre: OffrePayante; jours: 30 | 365; renouvelle: boolean; moyen: Moyen; pays: string; renonciation: boolean };
 export type ErreurCommande = "refus" | "conflit" | "limite" | "occupe" | "prestataire" | "reseau";
+/** Preuve anti-robot ALTCHA (GET /api/captcha résolu), exigée par la commande (audit du 20 novembre, S2). */
+export type Preuve = { altcha: string; hp: string; shown_at: string };
 
 const entetePass = (pass: Uint8Array<ArrayBuffer>) => {
   if (pass.length !== 32) throw new Error("pass_invalide");
@@ -102,11 +104,21 @@ const entetePass = (pass: Uint8Array<ArrayBuffer>) => {
 };
 
 /** Commande : adresse de la page hébergée du prestataire (déjà vérifiée), ou la raison du refus. */
-export async function commander(pass: Uint8Array<ArrayBuffer>, d: Demande, n: Net = netParDefaut()): Promise<{ url: string } | { erreur: ErreurCommande }> {
+export async function commander(pass: Uint8Array<ArrayBuffer>, d: Demande, preuve: Preuve, n: Net = netParDefaut()): Promise<{ url: string } | { erreur: ErreurCommande }> {
   const r = await appel(n, "/commande", {
     method: "POST",
     headers: { ...entetePass(pass), "Content-Type": "application/json" },
-    body: JSON.stringify({ offre: d.offre, jours: d.jours, renouvelle: d.renouvelle, moyen: d.moyen, pays: d.pays, renonciation: d.renonciation }),
+    body: JSON.stringify({
+      offre: d.offre,
+      jours: d.jours,
+      renouvelle: d.renouvelle,
+      moyen: d.moyen,
+      pays: d.pays,
+      renonciation: d.renonciation,
+      altcha: preuve.altcha,
+      hp: preuve.hp,
+      shown_at: preuve.shown_at,
+    }),
   });
   if (r === null) return { erreur: "reseau" };
   if (r.status === 200) {

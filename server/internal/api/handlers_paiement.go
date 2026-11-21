@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/skoow/shhdrop/server/internal/captcha"
 	"github.com/skoow/shhdrop/server/internal/paiement"
 	"github.com/skoow/shhdrop/server/internal/share"
 )
@@ -185,7 +186,8 @@ func lirePass(r *http.Request) (paiement.Pass, error) {
 func failPaiement(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, paiement.ErrPass), errors.Is(err, paiement.ErrFormule), errors.Is(err, paiement.ErrPays),
-		errors.Is(err, paiement.ErrRenonciation), errors.Is(err, paiement.ErrMoyen), errors.Is(err, errBadRequest):
+		errors.Is(err, paiement.ErrRenonciation), errors.Is(err, paiement.ErrMoyen), errors.Is(err, errBadRequest),
+		errors.Is(err, captcha.ErrInvalid):
 		writeErr(w, http.StatusBadRequest, "bad_request")
 	case errors.Is(err, paiement.ErrConflit):
 		writeErr(w, http.StatusConflict, "conflit")
@@ -214,6 +216,9 @@ func (a paiementAPI) commande(w http.ResponseWriter, r *http.Request) {
 		Moyen        string `json:"moyen"`
 		Pays         string `json:"pays"`
 		Renonciation bool   `json:"renonciation"`
+		Altcha       string `json:"altcha"`
+		HP           string `json:"hp"`
+		ShownAt      string `json:"shown_at"`
 	}
 	if err := readJSON(w, r, &b); err != nil {
 		failPaiement(w, err)
@@ -225,7 +230,14 @@ func (a paiementAPI) commande(w http.ResponseWriter, r *http.Request) {
 		failPaiement(w, errBadRequest)
 		return
 	}
-	if !a.lim.AllowCommande(ipOf(r)) {
+	// Preuve anti-robot (audit du 20 novembre, S2 ; conception du paiement §8), comme une
+	// création de partage ou de salon : défi consommé, puis la limite par connexion et par /48.
+	ip := ipOf(r)
+	if err := a.antiRobot(b.Altcha, b.ShownAt, b.HP, ip); err != nil {
+		failPaiement(w, err)
+		return
+	}
+	if !a.lim.AllowCommande(ip) {
 		writeLimit(w, a.lim.JoinRetry())
 		return
 	}
@@ -235,6 +247,7 @@ func (a paiementAPI) commande(w http.ResponseWriter, r *http.Request) {
 		failPaiement(w, err)
 		return
 	}
+	a.cap.RecordCreate(ip) // difficulté qui double pour l'heure suivante (§22 D4)
 	writeJSON(w, http.StatusOK, struct {
 		URL string `json:"url"`
 	}{url})
@@ -319,7 +332,15 @@ func (a paiementAPI) webhook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request")
 		return
 	}
-	k64, k48 := limits.Prefixes(ipOf(r))
+	// Webhook PayPal (audit du 20 novembre, S3) : chacun peut coûter un appel sortant
+	// authentifié ; limite propre à la route, avant toute lecture (PayPal réessaie après 429).
+	ip := ipOf(r)
+	if pr.Nom() == "paypal" && !a.lim.AllowWebhookPayPal(ip) {
+		w.Header().Set("Connection", "close")
+		writeLimit(w, a.lim.MinuteRetry())
+		return
+	}
+	k64, k48 := limits.Prefixes(ip)
 	rendre, errPlace := corpsWebhook.Acquire(k64, k48)
 	if errPlace != nil {
 		w.Header().Set("Connection", "close")

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,11 +24,15 @@ const jourS = 86400
 
 // Durées de garde (conception §5.7, DP-12).
 const (
-	gardeAttente  = 7 * jourS   // commande en attente ou non aboutie
-	gardeLitiges  = 180 * jourS // après la fin du pass : délai des litiges
-	gardePass     = 31 * jourS  // pass après sa fin : validité des jetons émis
-	maxEnAttente  = 1000        // commandes en attente au plus (§8)
-	periodeJetons = 30 * jourS
+	gardeAttente = 7 * jourS   // commande en attente ou non aboutie
+	gardeLitiges = 180 * jourS // après la fin du pass : délai des litiges
+	gardePass    = 31 * jourS  // pass après sa fin : validité des jetons émis
+	maxEnAttente = 1000        // commandes en attente récentes au plus (§8)
+	// heuresRecentes : une commande est « récente » pendant l'heure UTC de sa création et les
+	// heuresRecentes-1 suivantes (3 à 4 h ; audit du 20 novembre, S2). Seules les récentes
+	// bloquent les ventes ; la ligne reste 7 jours (gardeAttente) pour un paiement tardif.
+	heuresRecentes = 4
+	periodeJetons  = 30 * jourS
 )
 
 func jourDe(t time.Time) int64 { return t.Unix() / jourS * jourS }
@@ -74,6 +79,10 @@ const (
 	Revoque                            // remboursement total, litige, reversement
 	PoseAbonnement                     // identifiant d'abonnement connu
 	FinRenouvellement                  // abonnement arrêté (le pass va jusqu'à sa fin)
+	// LieRef : une seconde référence du même paiement (Stripe : PaymentIntent d'une facture
+	// d'abonnement, `invoice_payment.paid`) rangée avec la commande de Ref, pour qu'un
+	// remboursement ou un litige qui ne porte qu'elle retrouve la commande (risque S10).
+	LieRef
 )
 
 // Evenement : une conséquence d'un webhook, déjà vérifié par le prestataire.
@@ -87,6 +96,8 @@ type Evenement struct {
 	// Ref : référence du paiement chez le prestataire (Confirme : enregistrée ; Revoque : pour
 	// retrouver la commande sans métadonnées).
 	Ref string
+	// RefLiee : seconde référence du paiement de Ref (LieRef seulement).
+	RefLiee string
 	// Montant TTC en centimes et devise en minuscules (Confirme).
 	Montant int64
 	Devise  string
@@ -125,6 +136,38 @@ type Service struct {
 	regime  Regime
 	prest   [4]Prestataire // indexé par Moyen
 	jetons  *Jetons
+
+	// recentes : commandes créées par heure UTC (heures depuis 1970), sur les heuresRecentes
+	// dernières heures ; un entier par heure, aucune clé, mémoire seulement (perdu au
+	// redémarrage : le plafond repart de zéro, jamais une vente bloquée de plus).
+	mu       sync.Mutex
+	recentes [heuresRecentes]struct{ heure, n int64 }
+}
+
+// compterRecente : d (+1 ou -1) commande créée dans l'heure de now.
+func (s *Service) compterRecente(now time.Time, d int64) {
+	h := now.Unix() / 3600
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b := &s.recentes[h%heuresRecentes]
+	if b.heure != h {
+		b.heure, b.n = h, 0
+	}
+	b.n = max(0, b.n+d)
+}
+
+// nRecentes : commandes créées dans l'heure de now et les heuresRecentes-1 précédentes.
+func (s *Service) nRecentes(now time.Time) int64 {
+	h := now.Unix() / 3600
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var n int64
+	for _, b := range s.recentes {
+		if b.heure > h-heuresRecentes && b.heure <= h {
+			n += b.n
+		}
+	}
+	return n
 }
 
 // NewService : au moins un prestataire, chacun une seule fois.
@@ -197,12 +240,17 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 	q := p.Empreinte()
 	now := s.now()
 	auj := jourDe(now)
-	var n int
-	if err := s.db.QueryRow(`SELECT count(*) FROM commandes WHERE etat=?`, etatAttente).Scan(&n); err != nil {
-		return "", err
-	}
-	if n >= maxEnAttente {
-		return "", ErrOccupe
+	// Plafond (§8, audit du 20 novembre, S2) : 1 000 commandes à la fois encore en attente ET
+	// créées dans les dernières heures. Les commandes en attente plus anciennes (gardées 7 jours
+	// pour un paiement tardif) ne bloquent plus les ventes : il faut entretenir l'attaque.
+	if s.nRecentes(now) >= maxEnAttente {
+		var n int
+		if err := s.db.QueryRow(`SELECT count(*) FROM commandes WHERE etat=?`, etatAttente).Scan(&n); err != nil {
+			return "", err
+		}
+		if n >= maxEnAttente {
+			return "", ErrOccupe
+		}
 	}
 	_, err = s.db.Exec(`INSERT INTO commandes(id,q,offre,jours,renouvelle,moyen,etat,abonnement,cree_jour,garde_jour)
 		VALUES(?,?,?,?,?,?,?,NULL,?,?)`, c[:], q[:], f.Offre, f.Jours, b2i(f.Renouvelle), f.Moyen, etatAttente, auj, auj+gardeAttente)
@@ -212,6 +260,7 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 		}
 		return "", err
 	}
+	s.compterRecente(now, 1)
 	ses, err := pr.Creer(ctx, Demande{Commande: c, Formule: f, Pays: pays, Ventilation: v,
 		Retour: s.origine + "/offres/retour", Webhook: s.origine + "/api/paiement/webhook/" + pr.Nom(),
 		RenonciationHeure: now.Unix()})
@@ -221,11 +270,13 @@ func (s *Service) Commander(ctx context.Context, p Pass, f Formule, pays string,
 	if err != nil {
 		// Rien n'a été payé : la commande s'efface (le pass ne sert plus, l'appareil en tirera un autre).
 		s.db.Exec(`DELETE FROM commandes WHERE id=?`, c[:])
+		s.compterRecente(now, -1)
 		return "", err
 	}
 	if ses.Abonnement != "" {
 		if !abonnementValide(ses.Abonnement) {
 			s.db.Exec(`DELETE FROM commandes WHERE id=?`, c[:])
+			s.compterRecente(now, -1)
 			return "", ErrPrestataire
 		}
 		if _, err := s.db.Exec(`UPDATE commandes SET abonnement=? WHERE id=?`, []byte(ses.Abonnement), c[:]); err != nil {
@@ -414,6 +465,9 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 	if err != nil {
 		return err
 	}
+	if ev.Sorte == LieRef {
+		return lierRef(tx, pr.Nom(), ev, l, ok, jourDe(s.now()))
+	}
 	if !ok {
 		// Un paiement confirmé sans commande dans ses métadonnées, retrouvé seulement par son
 		// abonnement : l'activation n'est peut-être pas encore arrivée ; le prestataire réessaie.
@@ -484,6 +538,31 @@ func (s *Service) appliquer(pr Prestataire, ev Evenement) error {
 		if _, err := tx.Exec(`UPDATE commandes SET renouvelle=0 WHERE id=?`, l.id); err != nil {
 			return err
 		}
+	}
+	return tx.Commit()
+}
+
+// lierRef : range l'empreinte de ev.RefLiee avec la commande de ev.Ref (déjà créditée). Déjà
+// rangée (paiement unique dont le PaymentIntent est la référence du crédit, ou événement
+// rejoué) : rien. Commande pas encore créditée : le prestataire réessaie (les événements
+// Stripe n'arrivent pas dans l'ordre). Seule une empreinte est gardée, comme pour Ref (§5.1).
+func lierRef(tx *sql.Tx, pr string, ev Evenement, l ligneCommande, ok bool, auj int64) error {
+	if ev.Ref == "" || ev.RefLiee == "" {
+		return nil
+	}
+	r := empreinteRef(pr, ev.RefLiee)
+	var deja int
+	if err := tx.QueryRow(`SELECT count(*) FROM refs WHERE r=?`, r).Scan(&deja); err != nil {
+		return err
+	}
+	if deja > 0 {
+		return nil
+	}
+	if !ok {
+		return ErrPasEncore
+	}
+	if _, err := tx.Exec(`INSERT INTO refs(r, commande, jour) VALUES(?,?,?)`, r, l.id, auj); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

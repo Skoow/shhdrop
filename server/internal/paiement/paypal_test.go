@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -169,6 +170,13 @@ func entetesPP() http.Header {
 	return h
 }
 
+// entetesPPId : entetesPP avec un autre Paypal-Transmission-Id.
+func entetesPPId(id string) http.Header {
+	h := entetesPP()
+	h.Set("Paypal-Transmission-Id", id)
+	return h
+}
+
 const ppCaptureComplete = `{"id":"WH-58D329510W468432D-8HN650336L201105X","create_time":"2026-11-19T15:00:00.000Z","resource_type":"capture","event_type":"PAYMENT.CAPTURE.COMPLETED","summary":"Payment completed for EUR 70.0 EUR","resource":{"amount":{"currency_code":"EUR","value":"70.00"},"seller_protection":{"status":"ELIGIBLE"},"supplementary_data":{"related_ids":{"order_id":"5O190127TN364715T"}},"final_capture":true,"custom_id":"a1b2c3d4e5f60718293a4b5c6d7e8f90","seller_receivable_breakdown":{"gross_amount":{"currency_code":"EUR","value":"70.00"},"paypal_fee":{"currency_code":"EUR","value":"2.73"},"net_amount":{"currency_code":"EUR","value":"67.27"}},"links":[{"href":"https://api.sandbox.paypal.com/v2/payments/captures/7NW873794T343360M","rel":"self","method":"GET"}],"id":"7NW873794T343360M","status":"COMPLETED"},"links":[],"event_version":"1.0","resource_version":"2.0"}`
 
 func TestPayPalVerificationBrute(t *testing.T) {
@@ -206,11 +214,11 @@ func TestPayPalVerificationRefus(t *testing.T) {
 		t.Fatal("FAILURE accepté", err)
 	}
 	f.verif, f.verifSt = `{"name":"VALIDATION_ERROR"}`, 400
-	if _, err := p.Lire(context.Background(), ok, []byte(ppCaptureComplete)); err != ErrSignature {
+	if _, err := p.Lire(context.Background(), entetesPPId("tid-400"), []byte(ppCaptureComplete)); err != ErrSignature {
 		t.Fatal("400 accepté", err)
 	}
 	f.verifSt = 503
-	if _, err := p.Lire(context.Background(), ok, []byte(ppCaptureComplete)); err != errVerif {
+	if _, err := p.Lire(context.Background(), entetesPPId("tid-503"), []byte(ppCaptureComplete)); err != errVerif {
 		t.Fatal("panne de PayPal : réessayer", err)
 	}
 	f.verif, f.verifSt = `{"verification_status":"SUCCESS"}`, 200
@@ -249,7 +257,10 @@ func TestPayPalVerificationsBornees(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < verifsPayPal; i++ {
 		wg.Add(1)
-		go func() { defer wg.Done(); p.Lire(context.Background(), entetesPP(), []byte(ppCaptureComplete)) }()
+		go func() {
+			defer wg.Done()
+			p.Lire(context.Background(), entetesPPId(fmt.Sprint("tid-", i)), []byte(ppCaptureComplete))
+		}()
 	}
 	// Attendre que les quatre places soient prises.
 	for i := 0; i < 500 && len(p.verifs) < verifsPayPal; i++ {
@@ -260,6 +271,118 @@ func TestPayPalVerificationsBornees(t *testing.T) {
 	}
 	close(f.bloquer)
 	wg.Wait()
+}
+
+// verifsFaites : appels sortants de vérification reçus par le faux PayPal.
+func (f *fauxPayPal) verifsFaites() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, a := range f.appels {
+		if a == "POST /v1/notifications/verify-webhook-signature" {
+			n++
+		}
+	}
+	return n
+}
+
+// Audit du 20 novembre, S3 : un faux webhook répété (même Paypal-Transmission-Id) ne provoque
+// qu'un appel sortant ; un identifiant vérifié, ou dont la vérification a échoué chez PayPal
+// (panne), n'est pas gardé : PayPal peut le renvoyer.
+func TestPayPalTransmissionRefusee(t *testing.T) {
+	p, f := nouveauPayPalTest(t)
+	now := time.Unix(1795000000, 0)
+	p.now = func() time.Time { return now }
+	f.verif = `{"verification_status":"FAILURE"}`
+	for i := 0; i < 20; i++ {
+		if _, err := p.Lire(context.Background(), entetesPP(), []byte(ppCaptureComplete)); err != ErrSignature {
+			t.Fatal(i, err)
+		}
+	}
+	if n := f.verifsFaites(); n != 1 {
+		t.Fatal("appels sortants pour un faux webhook répété :", n)
+	}
+	// Même faux, signature ou corps changés : toujours le même identifiant, aucun appel.
+	h := entetesPP()
+	h.Set("Paypal-Transmission-Sig", "autre")
+	if _, err := p.Lire(context.Background(), h, []byte(ppCaptureComplete)); err != ErrSignature || f.verifsFaites() != 1 {
+		t.Fatal(err, f.verifsFaites())
+	}
+	// Une heure après : oublié, de nouveau vérifié.
+	now = now.Add(transmissionsDuree)
+	p.Lire(context.Background(), entetesPP(), []byte(ppCaptureComplete))
+	if n := f.verifsFaites(); n != 2 {
+		t.Fatal("identifiant jamais oublié", n)
+	}
+	// Panne de PayPal : rien de gardé, le prestataire réessaie le même identifiant.
+	f.verifSt = 503
+	p.Lire(context.Background(), entetesPPId("tid-panne"), []byte(ppCaptureComplete))
+	f.verif, f.verifSt = `{"verification_status":"SUCCESS"}`, 200
+	if _, err := p.Lire(context.Background(), entetesPPId("tid-panne"), []byte(ppCaptureComplete)); err != nil {
+		t.Fatal("réessai après panne refusé", err)
+	}
+	// Vérifié : rien de gardé non plus (rejoué : vérifié de nouveau, idempotent ensuite).
+	if _, err := p.Lire(context.Background(), entetesPPId("tid-panne"), []byte(ppCaptureComplete)); err != nil {
+		t.Fatal(err)
+	}
+	if n := f.verifsFaites(); n != 5 {
+		t.Fatal(n)
+	}
+	if len(p.refusees.vu) != 1 {
+		t.Fatal("identifiants gardés", len(p.refusees.vu))
+	}
+}
+
+// Même identifiant envoyé en parallèle : une seule vérification en cours, les autres refusées
+// sans appel.
+func TestPayPalTransmissionEnCours(t *testing.T) {
+	p, f := nouveauPayPalTest(t)
+	p.jetonAcces(context.Background())
+	f.mu.Lock()
+	f.bloquer = make(chan struct{})
+	f.mu.Unlock()
+	f.verif = `{"verification_status":"FAILURE"}`
+	done := make(chan error)
+	go func() { _, err := p.Lire(context.Background(), entetesPP(), []byte(ppCaptureComplete)); done <- err }()
+	for i := 0; i < 500 && len(p.verifs) < 1; i++ {
+		time.Sleep(2 * time.Millisecond)
+	}
+	for i := 0; i < 10; i++ {
+		if _, err := p.Lire(context.Background(), entetesPP(), []byte(ppCaptureComplete)); err != ErrSignature {
+			t.Fatal(err)
+		}
+	}
+	close(f.bloquer)
+	if err := <-done; err != ErrSignature {
+		t.Fatal(err)
+	}
+	if n := f.verifsFaites(); n != 1 {
+		t.Fatal(n)
+	}
+}
+
+// Table pleine : rien n'est gardé de plus, la vérification a lieu (bornée ailleurs) ; les
+// identifiants échus sont oubliés d'abord.
+func TestTransmissionsBornees(t *testing.T) {
+	tr := transmissions{vu: map[[32]byte]time.Time{}}
+	now := time.Unix(1795000000, 0)
+	for i := 0; i < transmissionsMax; i++ {
+		c, marque, ok := tr.prendre(fmt.Sprint("id-", i), now)
+		if !marque || !ok {
+			t.Fatal(i)
+		}
+		tr.finir(c, true, now)
+	}
+	if _, marque, ok := tr.prendre("encore", now); marque || !ok {
+		t.Fatal("table pleine : ni gardé ni refusé")
+	}
+	if _, _, ok := tr.prendre("id-1", now); ok {
+		t.Fatal("refusé oublié")
+	}
+	now = now.Add(transmissionsDuree)
+	if _, marque, ok := tr.prendre("encore", now); !marque || !ok || len(tr.vu) != 1 {
+		t.Fatal("échus non oubliés", len(tr.vu))
+	}
 }
 
 func lirePP(t *testing.T, p *PayPalP, typ, ressource string) []Evenement {
