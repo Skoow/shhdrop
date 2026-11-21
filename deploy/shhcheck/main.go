@@ -1,4 +1,5 @@
-// Commande shhcheck : contrôles pour l'exploitation et relais de sortie, bibliothèque standard seulement.
+// Commande shhcheck : contrôles pour l'exploitation, relais de sortie (bibliothèque standard
+// seulement) et relais TURN des appels (turn.go, seule dépendance : pion/turn).
 //
 //	shhcheck health [hôte:port]
 //	    Santé du serveur Go, de l'intérieur du conteneur (l'image n'a ni shell ni curl) :
@@ -21,6 +22,12 @@
 //	    Contrôle d'exploitation : TLS implicite vers hôte:port, certificat valide pour hôte,
 //	    accueil SMTP « 220 », puis QUIT ; aucune authentification, aucun e-mail. Lancé dans le
 //	    conteneur du serveur, il passe par le relais (deploy.sh, compte activé).
+//
+//	shhcheck turn
+//	    Relais TURN des appels audio et vidéo du salon (turn.go) ; réglages par l'environnement.
+//
+//	shhcheck stun <hôte:port>
+//	    Contrôle d'exploitation : le relais répond à une requête STUN « Binding » (UDP).
 //
 // Codes de sortie : 0 réussite, 1 échec, 2 erreur d'usage. Rien n'est écrit sur disque.
 package main
@@ -51,12 +58,17 @@ func main() {
 			exit(relaisMain(os.Args[2], os.Args[3], ""))
 		case os.Args[1] == "relais" && len(os.Args) == 5:
 			exit(relaisMain(os.Args[2], os.Args[3], os.Args[4]))
+		case os.Args[1] == "turn" && len(os.Args) == 2:
+			exit(turnMain())
+		case os.Args[1] == "stun" && len(os.Args) == 3:
+			exit(stunMain(os.Args[2]))
 		case os.Args[1] == "smtp" && len(os.Args) == 3:
 			exit(smtpMain(os.Args[2]))
 		}
 	}
 	fmt.Fprintln(os.Stderr, "usage: shhcheck health [hôte:port] | shhcheck tls <hôte:port> <nom du site>\n"+
-		"       shhcheck relais <écoute IP:port> <cible hôte:port> [connexions] | shhcheck smtp <hôte:port>")
+		"       shhcheck relais <écoute IP:port> <cible hôte:port> [connexions] | shhcheck smtp <hôte:port>\n"+
+		"       shhcheck turn")
 	os.Exit(2)
 }
 

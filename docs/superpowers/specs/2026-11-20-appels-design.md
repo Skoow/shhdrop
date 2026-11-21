@@ -2,7 +2,7 @@
 
 20 novembre 2026. Demande du propriétaire : « fais la voix et la vidéo », à plusieurs. Complète la spécification du salon v3 §8 (`2026-11-11-salon-v3-design.md`), qui posait les contraintes et renvoyait à ce document.
 
-**État.** Codé et testé (moteur, serveur, site). **Désactivé en production** tant que le relais n'est pas installé (`deploy/README.md` §14) : sans relais, aucune route et aucun bouton.
+**État.** Codé et testé (moteur, serveur, site, relais). **Activé par défaut**, sans rien à installer (décision du propriétaire, 21 novembre : « il ne faut pas que les utilisateurs aient quoi que ce soit à installer, il faut que cela marche directement ») : le relais TURN fait partie de notre image et `deploy.sh` le met en place (`deploy/README.md` §14). Ouvert à tous les salons, sans offre payante (même décision).
 
 ## 1. Ce que fait la fonction
 
@@ -21,7 +21,7 @@
 | Chiffrement | **DTLS-SRTP** de bout en bout entre les deux navigateurs d'une paire | C'est celui de WebRTC : aucune crypto à nous |
 | Authentification | L'empreinte DTLS de chacun voyage dans l'offre et la réponse, qui sont des **messages du salon chiffrés et signés par MLS** | Un intermédiaire (relais, serveur) ne peut pas substituer sa propre empreinte |
 | Signalisation | Messages volatils du salon (`appel_present`, `appel_fin`, `appel_signal`) | Le serveur ne voit pas qui appelle qui ; rien n'est écrit sur disque |
-| Relais | coturn sur la machine, identifiants temporaires | Logiciel de référence ; le serveur Go ne relaie rien |
+| Relais | `shhcheck turn` dans notre image (bibliothèque pion/turn v4.1.4, épinglée), identifiants temporaires | Rien à installer ni à épingler en plus ; même image que le serveur ; le serveur Go ne relaie rien |
 
 ### 2.1 Écart avec la spécification du salon v3 §8 (à valider par le propriétaire)
 
@@ -64,11 +64,11 @@ Débit : vidéo 640 × 360, 24 images par seconde, 500 kbit/s au plus vers chaqu
 ## 5. Serveur (`server/internal/api/handlers_salon_appel.go`)
 
 - `POST /api/salons/appel` (en-tête `X-Shh-Membre`, corps `{}`) → `{urls, username, credential, ttl_s}`. Route absente sans relais configuré.
-- Identifiants temporaires de coturn : nom = `<échéance>:<16 octets aléatoires>`, mot de passe = `base64(HMAC-SHA1(secret, nom))`. Le nom ne désigne ni salon, ni siège, ni compte. Valables 6 heures. 20 demandes par heure et par membre.
+- Identifiants temporaires TURN (« REST ») : nom = `<échéance>:<16 octets aléatoires>`, mot de passe = `base64(HMAC-SHA1(secret, nom))`. Le nom ne désigne ni salon, ni siège, ni compte. Valables 6 heures. 20 demandes par heure et par membre.
 - `rejoindre` répond `calls: true` quand le relais est configuré : le site n'affiche les boutons que dans ce cas.
 - Configuration : `SHH_TURN_URLS`, `SHH_TURN_SECRET_FILE` (les deux ou aucune ; fichier 0400 ou 0600 hors du dossier de données).
 
-**HMAC-SHA1** est imposé par coturn pour ces identifiants. Ce n'est pas un choix de chiffrement du projet : il ne protège que l'accès au relais. À ajouter aux exceptions écrites de `CLAUDE.md` (décision du propriétaire).
+**HMAC-SHA1** est imposé par le protocole TURN (identifiants temporaires « REST ») pour ces identifiants. Ce n'est pas un choix de chiffrement du projet : il ne protège que l'accès au relais. À ajouter aux exceptions écrites de `CLAUDE.md` (décision du propriétaire).
 
 ## 6. Ce que chacun voit
 
@@ -79,22 +79,33 @@ Débit : vidéo 640 × 360, 24 images par seconde, 500 kbit/s au plus vers chaqu
 | Autres participants | Votre son et votre image ; l'adresse du relais | Votre adresse IP |
 | Disque | Rien | |
 
-## 7. Risques et points ouverts
+## 7. Relais (`deploy/shhcheck/turn.go`)
+
+- Écoute UDP et TCP sur 3478, réseau de la machine ; ports relayés 49160 à 49999 (UDP).
+- Adresse publique : `SHH_TURN_IP`, sinon celle de la route par défaut ; une adresse détectée privée est refusée (machine derrière un routeur), avec un message qui dit quoi faire.
+- Destinations : adresses publiques seulement ; la machine elle-même seulement sur sa plage relayée (un participant joint l'autre par son allocation). Jamais d'adresse privée, de boucle locale, de réseau interne Docker ni d'autre service de la machine.
+- Bornes : 60 allocations simultanées, 2,5 Mbit/s par allocation (paquets au-delà jetés) ; réglables.
+- Aucun journal : le journaliseur de la bibliothèque est coupé ; conteneur sans journal.
+- Tests : `deploy/shhcheck/turn_test.go` (vrai client TURN : relais entre deux allocations, destinations interdites, débit, plafond, identifiants faux ou échus) et `web/ui-e2e/appel.spec.ts` (trois navigateurs, ce même relais).
+
+## 8. Risques et points ouverts
 
 | Gravité | Sujet | État |
 |---|---|---|
-| Moyenne | **Offre payante.** La v3 §8 réserve les appels aux offres payantes ; le paiement n'est pas ouvert. Activer le relais ouvre les appels à tous les salons | Décision du propriétaire avant d'activer |
-| Moyenne | **Bande passante.** Un appel vidéo à 6 demande environ 15 Mbit/s au relais dans chaque sens | Plafonds dans `turnserver.conf` (60 Mbit/s en tout) ; à dimensionner |
-| Moyenne | **Journaux de coturn.** Par défaut il écrit des adresses IP | Coupés dans `deploy/turnserver.conf` ; à vérifier sur la machine (README §14, étape 6) |
-| Faible | **Identifiants non révocables.** Un membre exclu garde l'accès au relais jusqu'à 6 heures | Il n'y gagne qu'un relais bridé en débit, sans accès au salon ni aux appels |
+| Moyenne | **Bande passante.** Un appel vidéo à 6 demande environ 15 Mbit/s au relais dans chaque sens | Plafond par défaut environ 150 Mbit/s (réglable) ; à surveiller avec l'usage |
+| Moyenne | **Réseaux qui bloquent l'UDP et le port 3478** (certaines entreprises) : l'appel échoue | TURN sur TCP 3478 prévu ; TURN sur TLS 443 demanderait de partager le port de Caddy : pas fait |
+| Faible | **Identifiants non révocables.** Un membre exclu garde l'accès au relais jusqu'à 6 heures | Il n'y gagne qu'un relais bridé, sans accès au salon ni aux appels |
 | Faible | **Métadonnées.** Le relais sait qu'une adresse IP a été en appel, et quand | Inévitable avec un relais ; rien n'est gardé |
 | Faible | **Appel de plus de 6 heures** coupé à l'échéance des identifiants | Rappeler |
-| Faible | **Safari** : non testé (les tests utilisent le micro et la caméra factices de Chromium) | À essayer sur un vrai iPhone avant d'activer |
+| Faible | **Safari** : non testé (les tests utilisent le micro et la caméra factices de Chromium) | À essayer sur un vrai iPhone |
 | Faible | **Cadre légal** d'un service d'appels (v3 §8) | Avis du juriste, comme pour le salon |
 
-## 8. Preuves
+## 9. Preuves
+
 
 - Moteur : `cargo test -p shhdrop-salon` ; vecteurs régénérés.
 - Serveur : `go test ./...` (`salon_appel_test.go`, `config/appels_test.go`).
 - Site : `src/salon/appel.test.ts` (11 cas : appel à deux, à plusieurs, candidats filtrés, appels simultanés, exclusion, reprise, cadence).
-- De bout en bout : `ui-e2e/appel.spec.ts`, trois navigateurs, vrai serveur, vrai coturn : image et son reçus, paires de candidats « relay » des deux côtés sur chaque connexion.
+- Relais : `go test -race ./...` dans `deploy/shhcheck`.
+- De bout en bout : `ui-e2e/appel.spec.ts`, trois navigateurs, vrai serveur, notre relais : image et son reçus, paires de candidats « relay » des deux côtés sur chaque connexion.
+- Déploiement : `deploy/test-sortie.sh` (contrôles statiques du service `relais-turn`).

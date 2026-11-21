@@ -89,7 +89,8 @@ cfg comptes >"$work/avec.json" || die "docker compose config (profil comptes) é
 tous=comptes,paiement-stripe,paiement-paypal,paiement-nowpayments
 cfg "$tous" >"$work/tous.json" || die "docker compose config (tous les profils) échoue"
 j() { jq -e "$1" "$2" >/dev/null; }
-S=$work/sans.json A=$work/avec.json T=$work/tous.json
+cfg appels >"$work/appels.json" || die "docker compose config (profil appels) échoue"
+S=$work/sans.json A=$work/avec.json T=$work/tous.json P=$work/appels.json
 
 check "SHH_COMPTES vaut \"1\" dans compose.yaml (décision D8 du 19 novembre)" j '.services.shhdrop.environment.SHH_COMPTES == "1"' "$A"
 check "sans profil : ni relais ni réseau « sortie »" j '(.services | keys) == ["caddy","shhdrop"] and (.networks | keys) == ["interne"]' "$S"
@@ -117,6 +118,18 @@ check "relais : 65532, lecture seule, sans capacité, no-new-privileges, sans jo
 	j '.services["relais-smtp"] | .user == "65532:65532" and .read_only == true and .cap_drop == ["ALL"] and .security_opt == ["no-new-privileges:true"] and .logging.driver == "none"' "$A"
 check "relais : relancé s'il tombe, mémoire et processus bornés" \
 	j '.services["relais-smtp"] | .restart == "unless-stopped" and .pids_limit == 64 and .mem_limit != null' "$A"
+
+# Appels (README §14) : relais TURN de notre image, profil « appels », réseau de la machine
+# (adresse publique) mais sans aucun accès au réseau interne du serveur ni au disque.
+check "profil « appels » : le seul relais TURN" j '(.services | keys) == ["caddy","relais-turn","shhdrop"]' "$P"
+check "relais TURN : même image, /shhcheck turn, réseau de la machine" \
+	j '.services["relais-turn"].image == .services.shhdrop.image and (.services["relais-turn"] | .entrypoint == ["/shhcheck"] and .command == ["turn"] and .network_mode == "host" and .profiles == ["appels"])' "$P"
+check "relais TURN : compte 65532, lecture seule, sans capacité, no-new-privileges, sans journal" \
+	j '.services["relais-turn"] | .user == "65532:65532" and .read_only == true and .cap_drop == ["ALL"] and .security_opt == ["no-new-privileges:true"] and .logging.driver == "none" and .cap_add == null and .privileged != true' "$P"
+check "relais TURN : seul montage, les secrets en lecture seule (ni données, ni socket Docker)" \
+	j '[.services["relais-turn"].volumes[] | .target] == ["/run/secrets"] and (.services["relais-turn"].volumes[0].read_only == true)' "$P"
+check "relais TURN : secret par fichier seulement" \
+	j '.services["relais-turn"].environment.SHH_TURN_SECRET_FILE == "/run/secrets/shh_turn_secret" and ([.services["relais-turn"].environment | keys[] | select(test("SECRET") and (endswith("_FILE") | not))] == [])' "$P"
 
 # Paiement : interrupteurs dans compose.yaml seulement, un relais par prestataire.
 check "SHH_PAIEMENT et SHH_PAIEMENT_ESSAI valent \"0\" ou \"1\" (fichier commité)" \

@@ -1,19 +1,18 @@
 // Appel audio et vidéo À TROIS, de bout en bout par l'interface (conception des appels,
 // 20 novembre) : vrai binaire Go (SHH_SALONS=1, SHH_COMPTES=1, relais configuré), vrai relais
-// TURN (coturn, lancé ici sur l'adresse de la machine), trois navigateurs Chromium avec micro et
-// caméra factices. Prouve : l'appel se lance, les deux autres le voient et le rejoignent, chacun
-// reçoit vraiment l'image et le son des autres, TOUT le média passe par le relais (aucune
+// TURN de notre image (`shhcheck turn`, deploy/shhcheck/turn.go, construit ici depuis l'arbre :
+// exactement celui que compose.yaml lance en production), trois navigateurs Chromium avec micro
+// et caméra factices. Prouve : l'appel se lance, les deux autres le voient et le rejoignent,
+// chacun reçoit vraiment l'image et le son des autres, TOUT le média passe par le relais (aucune
 // connexion directe : paires de candidats « relay » des deux côtés), micro et caméra se coupent,
-// raccrocher retire la tuile chez les autres.
-//
-// coturn : paquet « coturn » (apt). Absent hors CI : test sauté avec un message ; en CI il est
-// exigé (l'étape d'installation est dans .github/workflows/ci.yml).
+// raccrocher retire la tuile chez les autres. Rien à installer : Go suffit (déjà exigé par les tests).
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { codeDuCourriel, demarrerSMTP, type FauxSMTP } from "../e2e/smtp";
 import { siteComptes } from "./comptes-site";
@@ -21,14 +20,8 @@ import { axe, capture, expect, test as base } from "./fixtures";
 
 const FROM = "Shhgone <ne-pas-repondre@shhgone.test>";
 const SMTP_MDP = "SmtpUiSecretVq4nRw";
+const SHHCHECK = fileURLToPath(new URL("../../deploy/shhcheck", import.meta.url));
 
-function turnserver(): string | null {
-  try {
-    return execFileSync("which", ["turnserver"], { encoding: "utf8" }).trim() || null;
-  } catch {
-    return null;
-  }
-}
 /** Adresse IPv4 de la machine hors boucle locale : Chromium ne propose pas de candidat sur 127.0.0.1. */
 function adresse(): string | null {
   for (const l of Object.values(networkInterfaces())) for (const a of l ?? []) if (a.family === "IPv4" && !a.internal) return a.address;
@@ -45,10 +38,24 @@ function portLibre(): Promise<number> {
   });
 }
 
-type Relais = { url: string; secretFile: string; arreter(): void };
+type Relais = { url: string; secretFile: string };
 
-const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string }>({
+const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string; shhcheck: string }>({
   site: [async ({}, use) => use(await siteComptes()), { scope: "worker", timeout: 360_000 }],
+  // Binaire du relais, construit une fois par processus de test depuis deploy/shhcheck.
+  shhcheck: [
+    async ({}, use) => {
+      const dir = mkdtempSync(join(tmpdir(), "shh-shhcheck-"));
+      const bin = join(dir, "shhcheck");
+      execFileSync("go", ["build", "-o", bin, "."], { cwd: SHHCHECK, stdio: "inherit", env: { ...process.env, CGO_ENABLED: "0" } });
+      try {
+        await use(bin);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    { scope: "worker", timeout: 300_000 },
+  ],
   smtp: async ({}, use) => {
     const smtp = await demarrerSMTP();
     try {
@@ -57,27 +64,31 @@ const test = base.extend<{ smtp: FauxSMTP; relais: Relais }, { site: string }>({
       await smtp.fermer();
     }
   },
-  relais: async ({}, use) => {
-    const bin = turnserver()!;
+  relais: async ({ shhcheck }, use) => {
     const ip = adresse()!;
     const port = await portLibre();
-    const secret = randomBytes(24).toString("hex");
     const dir = mkdtempSync(join(tmpdir(), "shh-turn-"));
     const secretFile = join(dir, "turn.secret");
-    writeFileSync(secretFile, secret + "\n");
+    writeFileSync(secretFile, randomBytes(24).toString("hex") + "\n");
     chmodSync(secretFile, 0o600);
-    // Mêmes choix que deploy/turnserver.conf (identifiants temporaires, aucun journal), sur
-    // l'adresse de la machine ; les plages privées restent permises ici (la machine de test en est une).
-    const proc: ChildProcess = spawn(
-      bin,
-      ["-n", "--listening-ip", ip, "--relay-ip", ip, "--listening-port", String(port), "--min-port", "49160", "--max-port", "49400", "--use-auth-secret", "--static-auth-secret", secret, "--realm", "shhgone.test", "--fingerprint", "--no-tls", "--no-dtls", "--no-cli", "--no-multicast-peers", "--log-file", "/dev/null", "--no-stdout-log", "--pidfile", join(dir, "turn.pid")],
-      { stdio: "ignore" },
-    );
-    await new Promise((r) => setTimeout(r, 1_500));
+    // Adresse de la machine donnée explicitement (elle est privée sur un banc d'essai).
+    const proc: ChildProcess = spawn(shhcheck, ["turn"], {
+      stdio: "ignore",
+      env: { PATH: process.env.PATH ?? "", SHH_TURN_SECRET_FILE: secretFile, SHH_TURN_IP: ip, SHH_TURN_PORT: String(port), SHH_TURN_PORTS: "49160-49400" },
+    });
     try {
-      await use({ url: `turn:${ip}:${port}?transport=udp`, secretFile, arreter: () => proc.kill("SIGKILL") });
+      // Prêt quand il répond en STUN (le contrôle que deploy.sh fait en production).
+      await expect.poll(() => {
+        try {
+          execFileSync(shhcheck, ["stun", `${ip}:${port}`], { stdio: "ignore" });
+          return true;
+        } catch {
+          return false;
+        }
+      }, { timeout: 15_000 }).toBe(true);
+      await use({ url: `turn:${ip}:${port}?transport=udp`, secretFile });
     } finally {
-      proc.kill("SIGKILL");
+      proc.kill("SIGTERM");
       rmSync(dir, { recursive: true, force: true });
     }
   },
@@ -96,7 +107,6 @@ test.use({
   launchOptions: { ...(process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : {}), args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
 });
 test.skip(({ browserName }) => browserName !== "chromium", "appel.spec.ts : Chromium (micro et caméra factices)");
-test.skip(() => !process.env.CI && (turnserver() === null || adresse() === null), "coturn absent de cette machine (apt install coturn) : exigé en CI");
 test.setTimeout(420_000);
 
 const champ = (page: Page, label: string) => page.getByLabel(label, { exact: true }).and(page.locator("input"));

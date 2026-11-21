@@ -9,13 +9,13 @@ import (
 )
 
 // Appels audio et vidéo du salon (conception des appels, 20 novembre) : le média passe toujours
-// par un relais TURN (coturn, deploy/turnserver.conf), jamais en direct entre participants. Le
+// par le relais TURN de notre image (deploy/shhcheck/turn.go), jamais en direct entre participants. Le
 // serveur ne relaie rien lui-même : il donne à un membre des identifiants temporaires, calculés
 // avec le secret partagé du relais.
 //
 //   - SHH_TURN_URLS : adresses du relais, séparées par des virgules, 4 au plus
 //     (ex. « turn:turn.shhgone.com:3478?transport=udp,turns:turn.shhgone.com:5349?transport=tcp ») ;
-//   - SHH_TURN_SECRET_FILE : fichier du secret partagé avec coturn (static-auth-secret), 32 à
+//   - SHH_TURN_SECRET_FILE : fichier du secret partagé avec le relais (deploy.sh le crée), 32 à
 //     128 octets imprimables sur une ligne, 0400 ou 0600, hors de SHH_DATA_DIR.
 //
 // Les deux ou aucune ; exigent SHH_SALONS=1. Sans elles : aucun appel (aucune route).
@@ -53,7 +53,7 @@ func appelsFromEnv(c *Config) error {
 
 // LireSecretTurn : secret partagé du relais lu dans le fichier (une ligne ; le saut de ligne
 // final est retiré). Refusé : lien symbolique, fichier lisible par d'autres que son
-// propriétaire, moins de 32 ou plus de 128 octets, caractère non imprimable (coturn lit ce
+// propriétaire, moins de 32 ou plus de 128 octets, caractère non imprimable (le relais lit ce
 // secret dans un fichier texte). Le message ne cite jamais le contenu.
 func LireSecretTurn(chemin string) ([]byte, error) {
 	fi, err := os.Lstat(chemin)

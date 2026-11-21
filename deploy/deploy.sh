@@ -121,6 +121,50 @@ fi
 export SHH_STRIPE_CLE_FILE SHH_STRIPE_WEBHOOK_FILE SHH_PAYPAL_SECRET_FILE SHH_NOWPAYMENTS_CLE_FILE SHH_NOWPAYMENTS_IPN_FILE
 export SHH_PAYPAL_CLIENT_ID SHH_PAYPAL_WEBHOOK_ID SHH_PAYPAL_PLANS
 
+# Appels audio et vidéo (README §14) : ACTIVÉS par défaut, sans rien à installer. Le relais
+# TURN est dans notre image (profil « appels ») ; son secret, partagé avec le serveur, est tiré
+# ici à la première installation et gardé sur le volume chiffré. SHH_APPELS=0 dans deploy/.env :
+# coupés (relais arrêté, aucune route ni bouton d'appel).
+appels=${SHH_APPELS:-1}
+[ "$appels" = 0 ] || [ "$appels" = 1 ] || die "SHH_APPELS doit valoir 0 ou 1 (deploy/.env)"
+SHH_TURN_URLS="" SHH_TURN_SECRET_FILE=""
+if [ "$appels" = 1 ]; then
+	profils=${profils:+$profils,}appels
+	SHH_TURN_URLS="turn:$SHH_DOMAIN:3478?transport=udp,turn:$SHH_DOMAIN:3478?transport=tcp"
+	SHH_TURN_SECRET_FILE=/run/secrets/shh_turn_secret
+fi
+export SHH_TURN_URLS SHH_TURN_SECRET_FILE
+
+# secret_turn : crée le secret du relais s'il manque (48 caractères hexadécimaux, compte 65532,
+# 0400), sans jamais l'afficher ; un secret présent est gardé tel quel.
+secret_turn() {
+	local f=$secrets/shh_turn_secret
+	[ "$appels" = 1 ] || return 0
+	if [ ! -e "$f" ] && [ ! -L "$f" ]; then
+		(umask 077 && od -An -N24 -tx1 /dev/urandom | tr -d ' \n' >"$f.tmp" && printf '\n' >>"$f.tmp")
+		chown 65532:65532 "$f.tmp" && chmod 0400 "$f.tmp" && mv "$f.tmp" "$f"
+		echo "appels : secret du relais créé ($f)"
+	fi
+	[ -f "$f" ] && [ ! -L "$f" ] && [ "$(stat -c '%u %a' "$f")" = "65532 400" ] ||
+		die "$f mal réglé : fichier du compte 65532, droits 0400 (README §14)"
+}
+
+# ports_turn : ports du relais ouverts dans le pare-feu de la machine. ufw actif : les règles
+# manquantes sont ajoutées (et dites) ; autre pare-feu : un avertissement avec les ports.
+ports_turn() {
+	[ "$appels" = 1 ] || return 0
+	local r
+	if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+		for r in 3478/udp 3478/tcp 49160:49999/udp; do
+			if ! ufw status 2>/dev/null | grep -qE "^${r}[[:space:]]+ALLOW"; then
+				ufw allow "$r" >/dev/null && echo "appels : pare-feu ouvert pour $r (relais TURN)"
+			fi
+		done
+	else
+		echo "appels : si un pare-feu filtre la machine, ouvrir 3478 (UDP et TCP) et 49160 à 49999 (UDP) pour le relais (README §14)."
+	fi
+}
+
 # dc <empreinte> <arguments de docker compose…>
 # « -f compose.yaml » explicite : sans lui, docker compose fusionne de lui-même un
 # compose.override.yaml posé à côté et suit COMPOSE_FILE (deploy/.env), qui pourraient changer
@@ -223,7 +267,14 @@ check() {
 		echo "contrôle : pas d'échange de clés X25519MLKEM768 en TLS 1.3" >&2
 		return 1
 	}
-	# 5. Compte activé : le fournisseur d'envoi répond, à travers le relais, en TLS vérifié pour
+	# 5. Appels : le relais TURN répond sur la machine (requête STUN « Binding » en UDP, sans
+	#    identifiants). Simple avertissement : sans lui, les appels échouent, le reste marche.
+	if [ "$appels" = 1 ]; then
+		docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+			--log-driver none --entrypoint /shhcheck "$SHH_IMAGE_REPO@$1" stun 127.0.0.1:3478 ||
+			echo "AVERTISSEMENT : le relais des appels ne répond pas sur 127.0.0.1:3478 (README §14) : les appels ne marcheront pas." >&2
+	fi
+	# 6. Compte activé : le fournisseur d'envoi répond, à travers le relais, en TLS vérifié pour
 	#    SHH_SMTP_HOST (accueil SMTP puis QUIT ; ni connexion au compte, ni e-mail). Simple
 	#    avertissement : une panne du fournisseur ne doit pas faire revenir à l'image d'avant,
 	#    mais sans lui, aucun code n'arrive et rien d'autre ne le dit (aucun journal).
@@ -240,6 +291,8 @@ install_version() {
 	exec 9>.deploy.lock
 	flock -n 9 || die "une autre installation est en cours"
 	preflight
+	secret_turn
+	ports_turn
 	echo "RAPPEL : vérification de provenance (spec §28.7) NON faite : aucun release.json signé (cosign) à vérifier ; verify-site.mjs se lance à la main, depuis un autre poste (README, §3)."
 	# Image absente : téléchargée par empreinte (le contenu est donc vérifié par Docker).
 	docker image inspect "$SHH_IMAGE_REPO@$new" >/dev/null 2>&1 || docker pull "$SHH_IMAGE_REPO@$new"
@@ -253,6 +306,7 @@ install_version() {
 	if [ "$avec_stripe" = 0 ]; then dc "$new" rm -sf relais-stripe >/dev/null 2>&1 || true; fi
 	if [ "$avec_paypal" = 0 ]; then dc "$new" rm -sf relais-paypal >/dev/null 2>&1 || true; fi
 	if [ "$avec_nowpayments" = 0 ]; then dc "$new" rm -sf relais-nowpayments >/dev/null 2>&1 || true; fi
+	if [ "$appels" = 0 ]; then dc "$new" rm -sf relais-turn >/dev/null 2>&1 || true; fi
 	if check "$new"; then
 		if [ "$new" != "$cur" ]; then
 			if valid "$cur"; then printf '%s\n' "$cur" >.release.prev; fi

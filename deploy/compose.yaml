@@ -90,9 +90,9 @@ services:
       # empêche le serveur de démarrer ET « shhdrop admin » de tourner (deploy/README.md §10).
       SHH_ORIGIN: https://${SHH_DOMAIN:?SHH_DOMAIN manquant (nom du site)}
       SHH_SALONS_MAX: ${SHH_SALONS_MAX:-200}
-      # Appels audio et vidéo du salon (README §14) : vides = pas d'appels. Le relais TURN
-      # (coturn) tourne sur la machine, hors de cette pile ; le serveur ne lui parle jamais,
-      # il calcule seulement des identifiants temporaires avec le secret partagé.
+      # Appels audio et vidéo du salon (README §14) : posés par deploy.sh (relais « relais-turn »
+      # ci-dessous, profil « appels », actif par défaut) ; vides = pas d'appels. Le serveur ne
+      # parle jamais au relais : il calcule des identifiants temporaires avec le secret partagé.
       SHH_TURN_URLS: ${SHH_TURN_URLS:-}
       SHH_TURN_SECRET_FILE: ${SHH_TURN_SECRET_FILE:-}
       # Capacité (README §11) : vide = calculée au démarrage d'après GOMEMLIMIT et nofile.
@@ -224,6 +224,49 @@ services:
       interne:
         ipv4_address: 172.30.53.3
       sortie: {}
+    logging:
+      driver: none
+
+  # Relais TURN des appels audio et vidéo du salon (profil « appels », posé par deploy.sh sauf
+  # SHH_APPELS=0 dans deploy/.env ; conception des appels, README §14). Même image (binaire
+  # /shhcheck, deploy/shhcheck/turn.go) : rien à installer sur la machine. Réseau de la machine :
+  # le relais doit annoncer et recevoir sur l'adresse publique, port 3478 (UDP et TCP) et la plage
+  # 49160-49999 (UDP) ; publier 840 ports par Docker serait lent et fragile. Il ne voit que des
+  # paquets chiffrés de bout en bout, ne relaie vers aucune adresse privée ni vers un autre port
+  # de la machine, et n'écrit rien (aucun journal).
+  relais-turn:
+    image: ${SHH_IMAGE:?SHH_IMAGE manquant (dépôt@sha256:…)}
+    profiles: ["appels"]
+    restart: unless-stopped
+    entrypoint: ["/shhcheck"]
+    command: ["turn"]
+    network_mode: host
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ulimits:
+      core: 0
+      nofile: 4096
+    pids_limit: 128
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 1.0
+    environment:
+      GOMEMLIMIT: 200MiB
+      SHH_TURN_SECRET_FILE: /run/secrets/shh_turn_secret
+      # Adresse publique : vide = celle de la route par défaut (machine louée ordinaire) ;
+      # derrière un routeur, la poser dans deploy/.env.
+      SHH_TURN_IP: ${SHH_TURN_IP:-}
+      SHH_TURN_ALLOCATIONS: ${SHH_TURN_ALLOCATIONS:-}
+      SHH_TURN_KBPS: ${SHH_TURN_KBPS:-}
+    volumes:
+      - type: bind
+        source: ${SHH_DATA_ROOT:?SHH_DATA_ROOT manquant}/secrets
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
     logging:
       driver: none
 

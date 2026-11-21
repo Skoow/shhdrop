@@ -3,7 +3,7 @@ package api
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha1" //nolint:gosec // HMAC-SHA1 imposé par le protocole TURN (identifiants temporaires de coturn), pas un choix
+	"crypto/sha1" //nolint:gosec // HMAC-SHA1 imposé par le protocole TURN (identifiants temporaires « REST »), pas un choix
 	"encoding/base64"
 	"encoding/hex"
 	"net/http"
@@ -19,12 +19,12 @@ import (
 // média (jamais en direct entre participants : l'adresse IP de chacun resterait visible des
 // autres, spec §39.3.1).
 //
-// Identifiants temporaires (mécanisme « use-auth-secret » de coturn) : nom = « <échéance
+// Identifiants temporaires (mécanisme « REST » de TURN, vérifié par deploy/shhcheck/turn.go) : nom = « <échéance
 // Unix>:<16 octets aléatoires en hex> », mot de passe = base64(HMAC-SHA1(secret partagé, nom)).
 // Le nom ne porte ni salon, ni siège, ni compte : le relais ne peut relier une session à
 // personne. Rien n'est écrit sur disque.
 
-// Turn : relais des appels. Secret : secret partagé avec coturn (static-auth-secret).
+// Turn : relais des appels. Secret : secret partagé avec le relais (deploy/shhcheck/turn.go).
 type Turn struct {
 	URLs   []string
 	Secret []byte

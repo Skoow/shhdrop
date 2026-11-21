@@ -108,8 +108,11 @@ COPY server/ ./
 ARG SHH_BUILD_ID
 RUN printf '%s' "$SHH_BUILD_ID" | grep -Eqx '[0-9a-f]{7,40}' || { echo "SHH_BUILD_ID manquant ou invalide : 7 à 40 chiffres hexadécimaux minuscules" >&2; exit 1; } \
  && go build -trimpath -buildvcs=false -ldflags="-s -w -buildid= -X main.buildID=$SHH_BUILD_ID" -o /out/shhdrop ./cmd/shhdrop
-# shhcheck : contrôle de santé du conteneur et test TLS hybride (deploy/shhcheck/main.go).
+# shhcheck : contrôle de santé du conteneur, test TLS hybride, relais de sortie et relais TURN
+# des appels (deploy/shhcheck ; dépendances épinglées par go.sum, vérifiées comme celles du serveur).
 WORKDIR /src/shhcheck
+COPY deploy/shhcheck/go.mod deploy/shhcheck/go.sum ./
+RUN go mod download && go mod verify
 COPY deploy/shhcheck/ ./
 RUN go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o /out/shhcheck .
 # Dossier de données vide (0700), pour un point de montage qui appartienne déjà au bon compte.

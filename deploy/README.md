@@ -41,7 +41,7 @@ Sur la machine (Linux récent, Docker Engine 25 ou plus avec Compose 2.24 ou plu
 - **heure** synchronisée (NTP : `timedatectl set-ntp true`) ;
 - **mises à jour de sécurité automatiques**, sans redémarrage automatique de la machine (`unattended-upgrades`, `Automatic-Reboot "false"`, §22) ;
 - compte par e-mail seulement (§12) : paquets `sqlite3` et `age` (version exacte, notée dans `deploy/.env`), `curl` ;
-- **SSH par clé seulement** (`PasswordAuthentication no`), **pare-feu** : 22, 80 et 443 en TCP, **443 en UDP** (HTTP/3, QUIC, décision du 13 novembre), rien d'autre. Avec ufw : `ufw allow 22/tcp`, `ufw allow 80/tcp`, `ufw allow 443/tcp`, `ufw allow 443/udp`. Sans l'ouverture UDP, les navigateurs restent en HTTP/2 (rien ne casse). Tampons UDP conseillés par la bibliothèque QUIC de Caddy, dans `/etc/sysctl.d/` : `net.core.rmem_max=7500000` et `net.core.wmem_max=7500000` (sinon HTTP/3 marche, plus lentement).
+- **SSH par clé seulement** (`PasswordAuthentication no`), **pare-feu** : 22, 80 et 443 en TCP, **443 en UDP** (HTTP/3, QUIC, décision du 13 novembre), et les ports du relais des appels (3478 en UDP et TCP, 49160 à 49999 en UDP : `deploy.sh` les ouvre lui-même avec ufw, §14), rien d'autre. Avec ufw : `ufw allow 22/tcp`, `ufw allow 80/tcp`, `ufw allow 443/tcp`, `ufw allow 443/udp`. Sans l'ouverture UDP, les navigateurs restent en HTTP/2 (rien ne casse). Tampons UDP conseillés par la bibliothèque QUIC de Caddy, dans `/etc/sysctl.d/` : `net.core.rmem_max=7500000` et `net.core.wmem_max=7500000` (sinon HTTP/3 marche, plus lentement).
 
 ## 2. Première installation
 
@@ -471,25 +471,21 @@ chown 65532:65532 /srv/shhdrop/secrets/shh_stripe_cle && chmod 0400 /srv/shhdrop
 
 `paiements.db` (empreintes des pass, commandes en attente, références des prestataires ; aucune identité, aucun montant, aucun pays ; jamais les clés privées des jetons) est sauvegardée **avec `comptes.db`**, chaque jour, dans son propre fichier chiffré (§12.4), et se restaure de la même façon (§12.5 : clés de jetons effacées ; un pass payé depuis la sauvegarde est à rembourser depuis le tableau de bord du prestataire). La sauvegarde doit être en place **le jour de l'activation** : perdre `paiements.db` rendrait inutilisables tous les pass payés.
 
-## 14. Appels audio et vidéo du salon (désactivés) : relais TURN
+## 14. Appels audio et vidéo du salon : relais TURN intégré
 
-Conception : `docs/superpowers/specs/2026-11-20-appels-design.md`. Les appels sont **désactivés** tant que `SHH_TURN_URLS` et `SHH_TURN_SECRET_FILE` sont vides : aucune route, aucun bouton dans le salon.
+Conception : `docs/superpowers/specs/2026-11-20-appels-design.md`. Les appels sont **activés par défaut** et **rien n'est à installer**, ni sur la machine ni chez les utilisateurs : le relais fait partie de notre image (`/shhcheck turn`, `deploy/shhcheck/turn.go`, bibliothèque pion/turn épinglée), lancé par `compose.yaml` (service `relais-turn`, profil « appels »).
 
-Tout le son et l'image passent par un relais TURN (coturn) installé **sur la machine**, hors de la pile Docker. Le relais ne voit que des paquets chiffrés de bout en bout et les adresses IP des deux bouts, en mémoire ; il n'écrit aucun journal. Le serveur Go ne parle jamais au relais.
+`deploy.sh` fait tout à chaque installation :
 
-À décider avant d'activer (propriétaire) :
+1. il tire le secret partagé du relais s'il n'existe pas (`<SHH_DATA_ROOT>/secrets/shh_turn_secret`, compte 65532, 0400) et ne l'affiche jamais ;
+2. il pose `SHH_TURN_URLS` (`turn:<SHH_DOMAIN>:3478`, UDP et TCP : le nom du site, aucun DNS de plus) et `SHH_TURN_SECRET_FILE` pour le serveur ;
+3. pare-feu ufw actif : il ouvre 3478 (UDP et TCP) et 49160 à 49999 (UDP) s'ils ne le sont pas, et le dit ; autre pare-feu : il rappelle ces ports ;
+4. après le démarrage, il vérifie que le relais répond (requête STUN sur 127.0.0.1:3478) ; sinon, un avertissement (le reste du site n'est pas touché).
 
-- **Bande passante.** Un appel vidéo à 6 demande environ 15 Mbit/s au relais, dans chaque sens. `turnserver.conf` plafonne à 60 Mbit/s en tout.
-- **Offre payante.** La spécification du salon (v3 §8) réserve les appels aux offres payantes ; le paiement n'est pas ouvert. Activer le relais aujourd'hui ouvre les appels à tous les salons.
-- **Nom et ports.** Un nom `turn.<domaine>` vers l'adresse publique ; ports 3478 (UDP et TCP) et 49160 à 49999 (UDP) ouverts dans le pare-feu ; 5349 (TLS) si un certificat est posé.
+Le relais utilise le réseau de la machine (adresse publique, plage de ports UDP), sous le compte 65532, en lecture seule, sans capacité ni journal. Il ne voit que des paquets chiffrés de bout en bout et les adresses IP des deux bouts, en mémoire ; il ne relaie vers aucune adresse privée, ni vers un autre port de la machine que sa propre plage.
 
-Mise en place :
+Réglages facultatifs, dans `deploy/.env` :
 
-1. `apt install coturn`, puis copier `deploy/turnserver.conf` en `/etc/turnserver.conf` (propriétaire `turnserver`, mode 0600).
-2. Y remplacer `<IP_PUBLIQUE>` (trois fois) et `<SECRET>` (`openssl rand -hex 24`).
-3. Écrire le même secret, seul sur une ligne, dans `<SHH_DATA_ROOT>/secrets/shh_turn_secret` (compte 65532, mode 0400).
-4. Dans `deploy/.env` : `SHH_TURN_URLS=turn:turn.<domaine>:3478?transport=udp,turn:turn.<domaine>:3478?transport=tcp` et `SHH_TURN_SECRET_FILE=/run/secrets/shh_turn_secret`.
-5. `systemctl enable --now coturn`, puis `deploy.sh`.
-6. Vérifier : `journalctl -u coturn` reste vide ; dans un salon, les boutons d'appel apparaissent ; un appel entre deux appareils sur deux réseaux différents s'établit.
-
-Couper les appels : vider les deux variables et relancer `deploy.sh` ; `systemctl disable --now coturn`.
+- `SHH_TURN_IP` : adresse IPv4 publique, si la machine est derrière un routeur (l'adresse détectée serait privée : le relais refuse alors de démarrer et le dit). Rediriger alors 3478 et 49160 à 49999 vers la machine ;
+- `SHH_TURN_ALLOCATIONS` (60) et `SHH_TURN_KBPS` (2 500) : allocations simultanées et débit par allocation. Un appel vidéo à 6 en prend 30 à environ 500 kbit/s ; les valeurs par défaut plafonnent le relais à environ 150 Mbit/s ;
+- `SHH_APPELS=0` : coupe les appels (relais arrêté, aucune route ni bouton d'appel).
