@@ -531,9 +531,3 @@ export function summarize(rows: readonly Row[], items: readonly number[]) {
   const active = count.queued + count.downloading + count.paused;
   return { total, done, rate, count, active, retryable: items.filter((i) => rows[i]?.state === "failed" && rows[i]!.retryable) };
 }
-
-/** Secondes restantes à `bytesPerS` (null si inconnu). */
-export function remainingSeconds(bytes: number, bytesPerS: number | null): number | null {
-  if (bytesPerS === null || !(bytesPerS > 0)) return null;
-  return Math.max(0, bytes) / bytesPerS;
-}

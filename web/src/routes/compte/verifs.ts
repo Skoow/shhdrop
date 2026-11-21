@@ -3,31 +3,38 @@
 // frappe probable dans un domaine courant, et ce qui manque à un nouveau mot de passe. Rien
 // n'est envoyé : le serveur refait ses propres contrôles (jetable, format) à l'inscription.
 // Import statique (règle des sources : pas de chargement dynamique dans routes/) ; ce module n'est inclus
-// que dans le site avec compte (__COMPTES__ : pages du compte), jamais dans le site public.
-import jetablesTxt from "../../../../server/internal/compte/jetables.txt?raw";
-import jetablesAjoutsTxt from "../../../../server/internal/compte/jetables-ajouts.txt?raw";
+// que dans le site avec compte (__COMPTES__ : pages du compte), jamais dans le site public. La
+// liste elle-même n'est pas dans le script en production : listes/jetables.verified.ts la lit
+// (fichier à part, empreinte vérifiée) à la première adresse vérifiée.
+import { lireJetables } from "../../listes/jetables";
 import type { Key } from "../../i18n/i18n.svelte";
 
-let liste: Set<string> | null = null;
+let liste: Promise<Set<string>> | null = null;
 
-/** Domaines jetables (server/internal/compte/jetables*.txt, mêmes listes que le serveur), lus une fois. */
-function domainesJetables(): Set<string> {
+/** Domaines jetables (server/internal/compte/jetables*.txt, mêmes listes que le serveur), lus une fois ; un échec de lecture sera retenté. */
+function domainesJetables(): Promise<Set<string>> {
   if (liste) return liste;
-  liste = new Set<string>();
-  for (const txt of [jetablesTxt, jetablesAjoutsTxt])
-    for (const l of txt.split("\n")) {
-      const d = l.trim().toLowerCase();
-      if (d && !d.startsWith("#")) liste.add(d);
-    }
-  return liste;
+  const p = lireJetables().then((l) => new Set(l));
+  p.catch(() => {
+    if (liste === p) liste = null;
+  });
+  return (liste = p);
 }
 
-/** Vrai si le domaine de l'adresse (ou un domaine parent) est jetable. */
+/**
+ * Vrai si le domaine de l'adresse (ou un domaine parent) est jetable. Liste illisible (réseau) :
+ * faux, l'inscription continue ; le serveur refait le contrôle (même liste) et refuse l'adresse.
+ */
 export async function estJetable(adresse: string): Promise<boolean> {
   const i = adresse.lastIndexOf("@");
   if (i < 0) return false;
   const parts = adresse.slice(i + 1).trim().toLowerCase().replace(/\.$/, "").split(".");
-  const s = domainesJetables();
+  let s: Set<string>;
+  try {
+    s = await domainesJetables();
+  } catch {
+    return false;
+  }
   for (let k = 0; k < parts.length - 1; k++) if (s.has(parts.slice(k).join("."))) return true;
   return false;
 }

@@ -77,8 +77,6 @@ describe("dictionnaires", () => {
     const exacts: Record<string, string> = {
       "account.signup.title": "Créer un compte",
       "account.signup.sub": "Le compte sert à créer des salons et à garder un abonnement. Partager, ouvrir et rejoindre restent sans compte.",
-      "account.email.hint": `C'est votre seul moyen de récupérer le compte${N}: utilisez une adresse que vous gardez.`,
-      "account.password.hint": `10${N}caractères au moins`,
       "account.password2.err": "Les deux mots de passe ne sont pas identiques.",
       "account.signup.send": "Recevoir un code",
       "account.signup.go": "Créer",
@@ -187,7 +185,7 @@ describe("dictionnaires", () => {
     // d'avance (décision du propriétaire du 16 novembre) : seulement la taille.
     expect(fr["compose.gauge.empty"]).toContain("{size} maximum");
     expect(en["compose.gauge.empty"]).toContain("up to {size}");
-    for (const d of [fr, en]) for (const k of ["compose.gauge.empty", "compose.drop.limit", "home.proof"] as const) expect(d[k], k).not.toContain("{n}");
+    for (const d of [fr, en]) for (const k of ["compose.gauge.empty", "compose.drop.limit"] as const) expect(d[k], k).not.toContain("{n}");
   });
 
   it("jamais « ≈ » ni « 100 % sécurisé »", () => {

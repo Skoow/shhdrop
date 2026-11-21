@@ -24,7 +24,7 @@
 // Secrets : K_lien et S_gestion gardés en mémoire de la page seulement, mis à zéro à `fermer` ;
 // K_accès_s, K_preuve_s et J_gestion mis à zéro après chaque requête (exigences 5, 33).
 import * as api from "./api";
-import { DEPUIS_REPRISE, accueil, lire, lu, ping, PREND_UN_RANG, quitter, retirer as retirerTrame, trame as trameClient, type Enregistrement } from "./protocole";
+import { DEPUIS_REPRISE, RAISONS_FIN, accueil, lire, lu, ping, PREND_UN_RANG, quitter, retirer as retirerTrame, trame as trameClient, type Enregistrement } from "./protocole";
 import type { Annonce, ClesSalon, EnveloppeEnvoi, Evenement, Message, Regle, Salon, SalonEngine } from "./engine";
 
 /** Ce que le client attend d'un WebSocket (celui du navigateur, ou un faux en test). */
@@ -430,12 +430,12 @@ export class ClientSalon {
         }
         return;
       case 0x05:
-        if (r.raison === 5) return this.#terminer("exclu");
-        if (r.raison === 4) return this.#terminer("remplace");
-        if (r.raison === 1) return this.#terminer("expire");
-        if (r.raison === 2) return this.#terminer("detruit");
-        if (r.raison === 7) return this.#terminer("interrompu");
-        return; // 6 : trop lent, la fermeture 4006 suit (reconnexion)
+        if (r.raison === RAISONS_FIN.exclu) return this.#terminer("exclu");
+        if (r.raison === RAISONS_FIN.remplace) return this.#terminer("remplace");
+        if (r.raison === RAISONS_FIN.expire) return this.#terminer("expire");
+        if (r.raison === RAISONS_FIN.detruit) return this.#terminer("detruit");
+        if (r.raison === RAISONS_FIN.interrompu) return this.#terminer("interrompu");
+        return; // RAISONS_FIN.lent : trop lent, la fermeture 4006 suit (reconnexion)
       case 0x0b:
         return this.#limite(r.secondes);
       case 0x0c:

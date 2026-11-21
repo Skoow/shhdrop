@@ -24,12 +24,3 @@ export function lienSalon(origin: string, sorte: "c" | "s", cle: Uint8Array, bas
   if (cle.length !== 32) throw new Error("argument_invalide");
   return origin + base.replace(/\/$/, "") + SALON_PATH + "#" + sorte + b64u(cle as Uint8Array<ArrayBuffer>);
 }
-
-/** Lien collé (« https://…/salon#c… » ou le fragment seul) : sorte et secret, ou null. */
-export function lireLienColle(s: string): { sorte: "c" | "s"; cle: Uint8Array<ArrayBuffer> } | null {
-  const t = s.trim();
-  const i = t.lastIndexOf("#");
-  if (i < 0) return null;
-  if (i > 0 && !/^https?:\/\/[^#\s]+\/salon$/.test(t.slice(0, i))) return null;
-  return lireFragment(t.slice(i));
-}

@@ -121,15 +121,28 @@ describe("check-dist.mjs, production", () => {
   });
 
   it("D4 : fichier de langue cité avec son empreinte, jamais orphelin ; anglais absent du script principal", () => {
-    const lang = '{"hero.title":"One link, one password, then nothing."}';
+    const lang = '{"hero.title":"One link, one password, then it\'s gone."}';
     const ok = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/locale-en-AbCdEf12.js",i="${sha384(Buffer.from(lang))}";`, "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(ok, false)).toEqual([]);
     const orphan = site({ "index.html": PROD_INDEX, "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(orphan, false).join("\n")).toContain("assets/locale-en-AbCdEf12.js : orphelin");
     const noSri = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const s="/assets/locale-en-AbCdEf12.js";', "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(noSri, false).join("\n")).toContain("assets/locale-en-AbCdEf12.js : son empreinte SHA-384");
-    const both = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/locale-en-AbCdEf12.js",i="${sha384(Buffer.from(lang))}",t="One link, one password, then nothing.";`, "assets/locale-en-AbCdEf12.js": lang });
+    const both = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/locale-en-AbCdEf12.js",i="${sha384(Buffer.from(lang))}",t="One link, one password, then it's gone.";`, "assets/locale-en-AbCdEf12.js": lang });
     expect(checkDist(both, false).join("\n")).toContain("dictionnaire anglais dans le script principal");
+  });
+
+  it("U13 : domaines jetables dans leur fichier, cité avec son empreinte, jamais orphelin ni dans un script ; exigé avec --comptes", () => {
+    const liste = '["0-mail.com","guerrillamail.com"]';
+    const ok = site({ "index.html": PROD_INDEX, "assets/index-a.js": `const s="/assets/jetables-AbCdEf12.js",i="${sha384(Buffer.from(liste))}";`, "assets/jetables-AbCdEf12.js": liste });
+    expect(checkDist(ok, false)).toEqual([]);
+    expect(checkDist(site({ "index.html": PROD_INDEX, "assets/jetables-AbCdEf12.js": liste }), false).join("\n")).toContain("assets/jetables-AbCdEf12.js : orphelin");
+    const noSri = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const s="/assets/jetables-AbCdEf12.js";', "assets/jetables-AbCdEf12.js": liste });
+    expect(checkDist(noSri, false).join("\n")).toContain("assets/jetables-AbCdEf12.js : son empreinte SHA-384");
+    const enLigne = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'const l="0-mail.com\\nguerrillamail.com\\n";' });
+    expect(checkDist(enLigne, false).join("\n")).toContain("assets/index-a.js : liste des domaines jetables dans un script");
+    const sansListe = site({ "index.html": PROD_INDEX, "assets/index-a.js": 'fetch(o+"/api/compte/connexion")' });
+    expect(checkDist(sansListe, false, true).join("\n")).toContain("assets/jetables-*.js absent alors que --comptes est demandé");
   });
 
   it("passe sans marque", () => {
@@ -143,7 +156,11 @@ describe("check-dist.mjs, production", () => {
       const r = run([d]);
       expect(r.code, trace).toBe(1);
       expect(r.err, trace).toMatch(/assets\/index-a\.js : module de compte « (\/api\/compte|shhdrop-compte) » dans un build sans __COMPTES__/);
-      if (trace.includes("/api/compte")) expect(run(["--comptes", d]), trace).toEqual({ code: 0, err: "" });
+      if (trace.includes("/api/compte")) {
+        const liste = '["0-mail.com"]';
+        const avec = site({ "index.html": PROD_INDEX, "assets/index-a.js": `${trace};const j="/assets/jetables-AbCdEf12.js",i="${sha384(Buffer.from(liste))}";`, "assets/jetables-AbCdEf12.js": liste });
+        expect(run(["--comptes", avec]), trace).toEqual({ code: 0, err: "" });
+      }
     }
     // --comptes sans module de compte : refusé (build fait sans SHH_SITE_COMPTES=1).
     const vide = site({ "index.html": PROD_INDEX, "assets/index-a.js": "console.info(1)" });
@@ -461,4 +478,12 @@ describe("check-dist.mjs --demo", () => {
       "index.html : « /assets/index-a.js » hors de la base /shhgone/",
     ]);
   });
+});
+
+it("sonde EN_PROBE présente dans en.ts (sinon le contrôle du dictionnaire anglais ne voit plus rien)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./check-dist.mjs", import.meta.url), "utf8");
+  const probe = /const EN_PROBE = "([^"]+)";/.exec(src)?.[1];
+  expect(probe).toBeTruthy();
+  expect(readFileSync(new URL("../src/i18n/en.ts", import.meta.url), "utf8")).toContain(JSON.stringify(probe).slice(1, -1));
 });

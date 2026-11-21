@@ -99,10 +99,7 @@ function rmsOf(samples: ArrayLike<number>): number {
   return Math.sqrt(sum / Math.max(1, samples.length));
 }
 
-/** RMS d'un échantillon → 0..1 sur une échelle en décibels (−60 dB → 0, −10 dB → 1). */
-export function levelOf(samples: ArrayLike<number>): number {
-  return dbLevel(rmsOf(samples));
-}
+/** RMS → 0..1 sur une échelle en décibels (−60 dB → 0, −10 dB → 1). */
 function dbLevel(rms: number): number {
   if (rms <= 0) return 0;
   return Math.min(1, Math.max(0, (20 * Math.log10(rms) + 60) / 50));
@@ -221,25 +218,6 @@ export const MINI_BARS = 28;
 export const LIVE_BARS = 40;
 const FLOOR = 0.06;
 
-/**
- * Forme d'onde : RMS de chaque tranche (canaux mélangés), normalisée sur la plus forte,
- * plancher visible de 0,06 (le silence reste un trait). Toujours `bars` valeurs dans [0,06 ; 1].
- */
-export function peaks(channels: readonly ArrayLike<number>[], bars = WAVE_BARS): number[] {
-  const n = channels[0]?.length ?? 0;
-  const out = new Array<number>(bars).fill(0);
-  if (n === 0) return out.map(() => FLOOR);
-  for (let b = 0; b < bars; b++) {
-    const a = Math.floor((b * n) / bars);
-    const z = Math.max(a + 1, Math.floor(((b + 1) * n) / bars));
-    let sum = 0;
-    for (const ch of channels) for (let i = a; i < z && i < n; i++) sum += ch[i]! * ch[i]!;
-    out[b] = Math.sqrt(sum / ((z - a) * channels.length));
-  }
-  const max = Math.max(...out);
-  return out.map((v) => (max > 0 ? Math.max(FLOOR, Math.round((v / max) * 1000) / 1000) : FLOOR));
-}
-
 /** Rééchantillonne une forme d'onde (moyenne par tranche) : mini-onde de la ligne. */
 export function resample(p: readonly number[], bars: number): number[] {
   if (p.length === 0) return new Array<number>(bars).fill(FLOOR);
@@ -250,28 +228,6 @@ export function resample(p: readonly number[], bars: number): number[] {
     for (let i = a; i < z; i++) s += p[i]!;
     return s / (z - a);
   });
-}
-
-type OfflineCtor = new (channels: number, length: number, rate: number) => { decodeAudioData(b: ArrayBuffer): Promise<AudioBuffer> };
-/** Fréquence de décodage basse : peu de mémoire le temps du calcul. */
-const DECODE_RATE = 8000;
-/** Au-delà, pas de décodage (mémoire bornée) : null, l'appelant affiche une onde neutre. */
-export const DECODE_MAX = 20 * 1024 * 1024;
-
-/**
- * Audio importé seulement (un vocal enregistré ici a déjà son onde, WaveAccumulator) : décode
- * pour la forme d'onde et la durée ; null si trop gros (> DECODE_MAX) ou si le navigateur ne sait pas.
- */
-export async function decodeWave(blob: Blob, bars = WAVE_BARS, Offline?: OfflineCtor): Promise<{ peaks: number[]; ms: number } | null> {
-  const Ctor = Offline ?? (globalThis.OfflineAudioContext as unknown as OfflineCtor | undefined);
-  if (!Ctor || blob.size > DECODE_MAX) return null;
-  try {
-    const audio = await new Ctor(1, 1, DECODE_RATE).decodeAudioData(await blob.arrayBuffer());
-    const chans = Array.from({ length: audio.numberOfChannels }, (_, i) => audio.getChannelData(i));
-    return { peaks: peaks(chans, bars), ms: Math.round(audio.duration * 1000) };
-  } catch {
-    return null;
-  }
 }
 
 /** Position de lecture (0 à 1) d'un toucher à `x` sur une onde qui va de `left` à `left + width`. */

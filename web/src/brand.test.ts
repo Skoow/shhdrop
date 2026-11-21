@@ -31,7 +31,6 @@ describe("nom affiché : Shhgone", () => {
     for (const [lang, dict] of [["fr", fr], ["en", en]] as const) {
       for (const [k, v] of Object.entries(dict)) expect(String(v), `${lang} ${k}`).not.toMatch(/shhdrop/i);
       expect(dict["shell.home"], lang).toMatch(/^Shhgone, /);
-      expect(dict["paid.title"], lang).toBe("Shhgone {tier}");
     }
   });
 

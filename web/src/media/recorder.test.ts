@@ -1,6 +1,6 @@
 // Enregistreur vocal (Task 12) : faux MediaRecorder, faux flux, fausse horloge.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DECODE_MAX, MINI_BARS, RATES, WAVE_BARS, WAVE_CAP, WaveAccumulator, decodeWave, levelOf, nextRate, peaks, rateLabel, resample, seekRatio, startVoice, type AudioCtxCtor, type VoiceRecorderCtor } from "./recorder";
+import { MINI_BARS, RATES, WAVE_BARS, WAVE_CAP, WaveAccumulator, nextRate, rateLabel, resample, seekRatio, startVoice, type AudioCtxCtor, type VoiceRecorderCtor } from "./recorder";
 
 class FakeRec {
   static last: FakeRec;
@@ -135,26 +135,19 @@ describe("startVoice", () => {
 });
 
 describe("onde", () => {
-  it("levelOf : silence 0, plein niveau 1, borné", () => {
-    expect(levelOf([0, 0, 0])).toBe(0);
-    expect(levelOf([1, -1])).toBe(1);
-    const mid = levelOf([0.01, -0.01]);
+  it("niveau en décibels : plein niveau 1, −40 dB entre 0,3 et 0,5, borné", () => {
+    const at = (samples: number[]) => {
+      const r = startVoice(fakeStream().stream, PICK, { Recorder: FakeRec as unknown as VoiceRecorderCtor, Audio: fakeAudio(samples).Audio, now, maxMs: 60_000 });
+      vi.advanceTimersByTime(50);
+      const v = r.level();
+      r.cancel();
+      return v;
+    };
+    expect(at([1, -1])).toBe(1);
+    const mid = at([0.01, -0.01]);
     expect(mid).toBeGreaterThan(0.3);
     expect(mid).toBeLessThan(0.5);
-  });
-
-  it("peaks : nombre de barres fixe, plus forte à 1, silence au plancher, canaux mélangés", () => {
-    const n = 6000;
-    const ch = Float32Array.from({ length: n }, (_, i) => (i < n / 2 ? 0 : Math.sin(i) * 0.5));
-    const p = peaks([ch], WAVE_BARS);
-    expect(p).toHaveLength(WAVE_BARS);
-    expect(Math.max(...p)).toBe(1);
-    expect(p[0]).toBe(0.06);
-    expect(p[WAVE_BARS - 1]).toBeGreaterThan(0.8);
-    expect(peaks([], 10)).toEqual(new Array(10).fill(0.06));
-    expect(peaks([new Float32Array(100)], 4)).toEqual([0.06, 0.06, 0.06, 0.06]);
-    // Plus court que le nombre de barres : jamais NaN.
-    expect(peaks([Float32Array.from([0.5, 0.2])], 5).every((v) => v >= 0.06 && v <= 1)).toBe(true);
+    expect(at([0, 0])).toBe(0);
   });
 
   it("resample et seekRatio", () => {
@@ -198,37 +191,6 @@ describe("onde", () => {
     expect(w[0]).toBe(1);
     expect(w[59]).toBeCloseTo(0.25, 2);
     expect(new WaveAccumulator().bars()).toBeNull();
-  });
-  it("decodeWave : au-delà de DECODE_MAX, pas de décodage (onde neutre chez l'appelant)", async () => {
-    let made = 0;
-    class Spy {
-      constructor() {
-        made++;
-      }
-      async decodeAudioData(): Promise<AudioBuffer> {
-        throw new Error("jamais");
-      }
-    }
-    const big = { size: DECODE_MAX + 1, arrayBuffer: async () => new ArrayBuffer(0) } as unknown as Blob;
-    expect(await decodeWave(big, 12, Spy)).toBeNull();
-    expect(made).toBe(0);
-  });
-  it("decodeWave : forme d'onde et durée depuis l'audio décodé ; échec de décodage → null", async () => {
-    const data = Float32Array.from({ length: 8000 }, (_, i) => Math.sin(i / 3));
-    class Ok {
-      async decodeAudioData() {
-        return { numberOfChannels: 1, duration: 1.25, getChannelData: () => data } as unknown as AudioBuffer;
-      }
-    }
-    class Ko {
-      async decodeAudioData(): Promise<AudioBuffer> {
-        throw new Error("format");
-      }
-    }
-    const w = await decodeWave(new Blob(["x"]), 12, Ok);
-    expect(w?.ms).toBe(1250);
-    expect(w?.peaks).toHaveLength(12);
-    expect(await decodeWave(new Blob(["x"]), 12, Ko)).toBeNull();
   });
 });
 

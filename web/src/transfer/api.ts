@@ -341,7 +341,6 @@ export async function finalize(c: Ctx, token: string, b: FinalizeBody | DraftFin
 export type Meta = { expiresInS: number; salt: string; kdf: { ops: number; mem: number }; bucket: number; segments: number; opensLeft: number };
 
 /** Octroi d'ouverture (spec §41.4) : 40 octets, soit 54 caractères base64url exactement. */
-export const GRANT_CHARS = 54;
 const GRANT_RE = /^[A-Za-z0-9_-]{54}$/;
 
 const grantHeader = (grant?: string): Record<string, string> => (grant ? { "X-Shh-Grant": grant } : {});
