@@ -29,6 +29,36 @@ jobs:
       - name: govulncheck
         working-directory: server
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      # Relais TURN des appels (deploy/shhcheck : pion/turn et ses dépendances).
+      - name: govulncheck (relais)
+        working-directory: deploy/shhcheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+  # Fuzzing hebdomadaire des analyseurs d'entrées hostiles (revue du 21 novembre) : 2 minutes
+  # chacun ; une entrée qui fait paniquer est gardée par Go dans testdata/fuzz et le job échoue.
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      - name: serveur
+        working-directory: server
+        run: |
+          set -e
+          go test -run='^$' -fuzz=FuzzDecodeB64 -fuzztime=120s ./internal/share
+          go test -run='^$' -fuzz=FuzzTrame -fuzztime=120s ./internal/salon
+          go test -run='^$' -fuzz=FuzzFlux -fuzztime=120s ./internal/salon
+          go test -run='^$' -fuzz=FuzzReadJSON -fuzztime=120s ./internal/api
+          go test -run='^$' -fuzz=FuzzExclure -fuzztime=120s ./internal/api
+          go test -run='^$' -fuzz=FuzzCheck -fuzztime=120s ./internal/token
+      - name: relais
+        working-directory: deploy/shhcheck
+        run: go test -run='^$' -fuzz=FuzzGarde -fuzztime=120s .
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 10

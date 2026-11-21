@@ -449,3 +449,15 @@ func isTimeout(err error) bool {
 	var ne net.Error
 	return errors.As(err, &ne) && ne.Timeout()
 }
+
+// Le filtre lit des octets venus de n'importe qui : jamais de panique, quel que soit le message.
+func FuzzGarde(f *testing.F) {
+	c := &confTurn{min: 49160, max: 49999}
+	m, _ := stun.Build(stun.TransactionID, stun.BindingRequest)
+	f.Add(m.Raw)
+	f.Add([]byte{0x40, 0x01, 0x00, 0x02, 1, 2})
+	f.Add([]byte{})
+	f.Fuzz(func(t *testing.T, b []byte) {
+		_ = c.garde(b)
+	})
+}
