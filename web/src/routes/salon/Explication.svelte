@@ -15,6 +15,7 @@
   import TextField from "../../ui/TextField.svelte";
   import Button from "../../ui/Button.svelte";
   import Banner from "../../ui/Banner.svelte";
+  import { ChevronDown } from "../../ui/Icon";
 
   const refuse = untrack(() => conversation()?.pseudoRefuse === true);
   let pseudo = $state(untrack(() => vue.monPseudo ?? pseudoPropose()));
@@ -66,18 +67,26 @@
 
 <Cadre titre={t("salon.intro.title")}>
   {#if refuse}<Banner kind="warn">{t("salon.pseudo.err.refuse")}</Banner>{/if}
-  <ul class="points">
+  <!-- Revue du 20 novembre (U18) : trois points essentiels visibles (chiffrement, effacement du
+       salon, effacement des messages et limite des captures), les autres sous « En savoir plus »,
+       toujours dans la page (aucun texte retiré) ; le champ du pseudonyme remonte. -->
+  <ul class="points" data-points-essentiels>
     <li>{t("salon.intro.1")}</li>
     <li>{t("salon.intro.2", { duree })}</li>
-    <li>{t("salon.intro.3")}</li>
     <li>{t("salon.intro.9")}</li>
-    <li>{t("salon.intro.4")}</li>
-    <li>{t("salon.intro.5")}</li>
-    <li>{t("salon.intro.6")}</li>
-    <li>{t("salon.intro.7")}</li>
-    <li>{t("salon.intro.8")}</li>
-    <li>{t("salon.intro.10")}</li>
   </ul>
+  <details class="plus" data-points-plus>
+    <summary><span>{t("salon.intro.more")}</span><ChevronDown size={18} aria-hidden="true" /></summary>
+    <ul class="points">
+      <li>{t("salon.intro.3")}</li>
+      <li>{t("salon.intro.4")}</li>
+      <li>{t("salon.intro.5")}</li>
+      <li>{t("salon.intro.6")}</li>
+      <li>{t("salon.intro.7")}</li>
+      <li>{t("salon.intro.8")}</li>
+      <li>{t("salon.intro.10")}</li>
+    </ul>
+  </details>
   <div class="form">
     <TextField
       label={t("salon.intro.pseudo")}
@@ -123,5 +132,43 @@
   .form {
     display: grid;
     gap: var(--sp-4);
+  }
+  .plus {
+    margin-top: calc(-1 * var(--sp-2));
+  }
+  .plus summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    list-style: none;
+    cursor: pointer;
+    color: var(--text);
+    font-weight: 560;
+  }
+  .plus summary::-webkit-details-marker {
+    display: none;
+  }
+  .plus summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
+  .plus summary :global(svg) {
+    flex: none;
+    color: var(--text-2);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .plus[open] summary :global(svg) {
+    transform: rotate(180deg);
+  }
+  .plus .points {
+    margin-top: var(--sp-2);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .plus summary :global(svg) {
+      transition: none;
+    }
   }
 </style>

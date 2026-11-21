@@ -393,6 +393,22 @@ describe("polices hébergées (UI §4.1)", () => {
     expect(t).toMatch(/font-weight:\s*100 800/);
     expect(t).toMatch(/unicode-range/);
   });
+  it("repli ajusté de Mona Sans (U4) : polices locales seulement, métriques fixées, juste après Mona Sans", () => {
+    const t = read("fonts.css");
+    const faces = [...t.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]!).filter((b) => b.includes('"Mona Sans repli"'));
+    expect(faces.length).toBe(2);
+    for (const f of faces) {
+      const srcs = [.../src:\s*([^;]*);/.exec(f)![1]!.matchAll(/(\w+)\(/g)].map((m) => m[1]);
+      expect(new Set(srcs)).toEqual(new Set(["local"]));
+      expect(f).toMatch(/local\("Arial( Bold)?"\)/);
+      for (const d of ["size-adjust", "ascent-override", "descent-override", "line-gap-override"]) expect(f).toMatch(new RegExp(`${d}:\\s*[\\d.]+%;`));
+    }
+    expect(faces[0]).toMatch(/font-weight:\s*100 549;/);
+    expect(faces[0]).toMatch(/size-adjust:\s*103\.66%/);
+    expect(faces[1]).toMatch(/font-weight:\s*550 1000;/);
+    expect(faces[1]).toMatch(/size-adjust:\s*101\.35%/);
+    expect(T.get("--font-sans")).toBe('"Mona Sans", "Mona Sans repli", system-ui, sans-serif');
+  });
   it("index.html : préchargement de Mona Sans seulement", () => {
     const html = readFileSync(join(webDir, "index.html"), "utf8");
     const pre = [...html.matchAll(/<link[^>]*rel="preload"[^>]*>/g)].map((m) => m[0]);
@@ -453,6 +469,8 @@ describe("Icon.ts (UI §6, jeu maison UI8)", () => {
     "log-out", "tag",
     // Appels du salon (20 novembre).
     "phone", "phone-off", "video", "video-off", "mic-off",
+    // En-tête du salon sur téléphone (revue du 20 novembre, U8).
+    "volume-x", "folder", "users",
   ];
   const pascal = (s: string) =>
     s.split("-").map((p) => p[0]!.toUpperCase() + p.slice(1)).join("");

@@ -92,32 +92,28 @@ export function formatCountdown(seconds: number, lang: Lang): string {
 
 /** Date et heure exactes de fin (retours UI4) : « Se termine le 9 nov. à 14 h 32 » ; « Ends Nov 9 at 2:32 PM ». */
 export function formatEndsAt(epochMs: number, lang: Lang): string {
-  const d = new Date(epochMs);
-  if (lang === "fr") {
-    const month = new Intl.DateTimeFormat("fr", { month: "short" }).format(d);
-    return `Se termine le ${d.getDate()} ${month} à ${d.getHours()} h ${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-  const date = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(d);
-  const time = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(d);
-  return `Ends ${date} at ${time}`;
+  return lang === "fr" ? `Se termine le ${formatDayTime(epochMs, lang)}` : `Ends ${formatDayTime(epochMs, lang)}`;
 }
 
 /** Heure seule (dernière lecture d'un état, audit M13) : « 9 h 41 » ; « 9:41 AM ». */
 export function formatClock(epochMs: number, lang: Lang): string {
   const d = new Date(epochMs);
-  if (lang === "fr") return `${d.getHours()} h ${String(d.getMinutes()).padStart(2, "0")}`;
+  if (lang === "fr") return `${d.getHours()}${sp(lang)}h${sp(lang)}${String(d.getMinutes()).padStart(2, "0")}`;
   return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(d);
 }
 
-/** Date et heure de création (historique, UI §9.6.3) : « 5 nov., 21 h 14 » ; « Nov 5, 9:14 PM ». */
+/**
+ * Date et heure, format unique du site (revue du 20 novembre, U15 : fin d'un lien, historique,
+ * état lu) : « 5 nov. à 21 h 14 » ; « Nov 5 at 9:14 PM ». Insécable entre le jour et le mois.
+ */
 export function formatDayTime(epochMs: number, lang: Lang): string {
   const d = new Date(epochMs);
   if (lang === "fr") {
     const month = new Intl.DateTimeFormat("fr", { month: "short" }).format(d);
-    return `${d.getDate()} ${month}, ${formatClock(epochMs, lang)}`;
+    return `${d.getDate()} ${month} à ${formatClock(epochMs, lang)}`;
   }
   const date = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(d);
-  return `${date}, ${formatClock(epochMs, lang)}`;
+  return `${date} at ${formatClock(epochMs, lang)}`;
 }
 
 /** Temps écoulé (historique) : « à l'instant », « il y a 3 min », « il y a 2 h », « il y a 3 jours ». */

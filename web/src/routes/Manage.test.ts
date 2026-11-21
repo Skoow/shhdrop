@@ -52,12 +52,12 @@ describe("Manage", () => {
     show();
     await settle();
     expect(status).toHaveBeenCalledTimes(1);
-    expect(document.querySelector("[data-read-at]")!.textContent).toContain("9 h 41");
+    expect(document.querySelector("[data-read-at]")!.textContent).toContain("9\u202fh\u202f41");
     vi.setSystemTime(new Date(2026, 10, 11, 9, 42, 0));
     await vi.advanceTimersByTimeAsync(60_000);
     await settle();
     expect(status).toHaveBeenCalledTimes(2);
-    expect(document.querySelector("[data-read-at]")!.textContent).toContain("9 h 43");
+    expect(document.querySelector("[data-read-at]")!.textContent).toContain("9\u202fh\u202f43");
   });
 
   it("relecture en vol pendant « Supprimer maintenant » : l'écran reste « Supprimé »", async () => {

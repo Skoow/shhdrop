@@ -77,10 +77,12 @@
 <Cadre titre={t("salon.new.title")} sous={t("salon.new.sub")}>
   {#if !connecte}
     <p class="note">{t("salon.new.login")}</p>
-    <ul class="liens">
-      <li><a href={href("/compte/connexion?suite=salon")} onclick={(e) => followLink(e, "/compte/connexion?suite=salon")}>{t("account.login.title")}</a></li>
-      <li><a href={href("/compte/inscription?suite=salon")} onclick={(e) => followLink(e, "/compte/inscription?suite=salon")}>{t("account.signup.title")}</a></li>
-    </ul>
+    <!-- Seule action de l'écran (revue du 20 novembre, U19) : de vrais boutons, « Se connecter »
+         en principal. Liens de navigation : l'élément reste <a>. -->
+    <div class="entrer">
+      <a class="b-entrer principal" href={href("/compte/connexion?suite=salon")} onclick={(e) => followLink(e, "/compte/connexion?suite=salon")}>{t("account.login.title")}</a>
+      <a class="b-entrer second" href={href("/compte/inscription?suite=salon")} onclick={(e) => followLink(e, "/compte/inscription?suite=salon")}>{t("account.signup.title")}</a>
+    </div>
   {:else}
     <div class="form">
       <Segmented label={t("salon.new.duration")} options={durees} bind:value={duree} />
@@ -105,6 +107,73 @@
 </Cadre>
 
 <style>
+  /* Mêmes mesures que Button.svelte (48 px, rayon 12 px), en lien. */
+  .entrer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+  .b-entrer {
+    flex: 1 1 200px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 20px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+    font-weight: 560;
+    line-height: 1.2;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+  .principal {
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.4),
+      inset 0 -1px 0 rgb(0 0 0 / 0.14),
+      0 10px 24px -14px rgb(0 0 0 / 0.9);
+  }
+  .second {
+    background: rgb(255 255 255 / 0.045);
+    color: var(--text);
+    border-color: var(--hair-2);
+    box-shadow: var(--edge-hi);
+  }
+  @media (hover: hover) {
+    .principal:hover {
+      background: var(--accent-hover);
+    }
+    .second:hover {
+      background: rgb(255 255 255 / 0.08);
+    }
+  }
+  .b-entrer:active {
+    transform: scale(0.97);
+  }
+  .b-entrer:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .b-entrer {
+      transition: none;
+    }
+    .b-entrer:active {
+      transform: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .b-entrer {
+      border-color: LinkText;
+    }
+  }
   .form {
     display: grid;
     gap: var(--sp-5);

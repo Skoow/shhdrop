@@ -97,6 +97,10 @@ export const GLYPHS = {
   // Menu du téléphone (retours du 15 novembre) : trois traits.
   "menu": [{ d: "M4.5 7h15M4.5 12h15M4.5 17h15" }],
   "send": [{ d: "M20.5 3.5l-10 10M20.5 3.5l-6 17-4-7-7-4z" }],
+  // En-tête du salon sur téléphone (revue du 20 novembre, U8) : son coupé, fichiers, participants.
+  "volume-x": [{ d: "M4.5 9.5h3l4.5-4v13l-4.5-4h-3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" }, { d: "M16 9.5l5 5M21 9.5l-5 5" }],
+  "folder": [{ d: "M3.5 7a2 2 0 0 1 2-2h3.6a1.5 1.5 0 0 1 1.2.6L11.5 7.5h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" }],
+  "users": [{ c: [9, 8.5, 3.25] }, { d: "M3 19.5a6 6 0 0 1 12 0" }, { d: "M15.5 5.6a3.25 3.25 0 0 1 0 5.8M17.5 13.9a6 6 0 0 1 3.5 5.6" }],
 } as const satisfies Record<string, readonly GlyphEl[]>;
 
 export type GlyphName = keyof typeof GLYPHS;

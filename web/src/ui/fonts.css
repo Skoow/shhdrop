@@ -18,3 +18,35 @@
   src: url(../assets/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2-variations");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* Repli ajusté (revue du 20 novembre, U4) : tant que Mona Sans n'est pas arrivée (réseau lent),
+   le texte s'affiche dans une police du système (Arial, ou ses équivalents métriques Liberation
+   Sans et Arimo) mise à l'échelle de Mona Sans : même largeur moyenne, mêmes hauteurs de ligne.
+   Le paragraphe d'accroche ne change plus de nombre de lignes à l'arrivée de la police (CLS de
+   l'accueil sur téléphone : 0,275 avant). Valeurs calculées sur le fichier de Mona Sans
+   (fontTools) : size-adjust = largeur moyenne d'un texte français et anglais en Mona Sans
+   ÷ celle d'Arial ; ascent, descent et line-gap = métriques de Mona Sans (1090, 320, 0 pour
+   1000) ÷ size-adjust. Texte courant (wght 430) contre Arial normal ; titres (wght 620,
+   wdth 104) contre Arial gras. Aucune requête : local() lit une police déjà installée ; sans
+   aucune de ces polices (Android : Roboto), on retombe sur system-ui, non ajustée. */
+@font-face {
+  font-family: "Mona Sans repli";
+  font-style: normal;
+  font-weight: 100 549;
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"), local("Arimo");
+  size-adjust: 103.66%;
+  ascent-override: 105.15%;
+  descent-override: 30.87%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Mona Sans repli";
+  font-style: normal;
+  font-weight: 550 1000;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold");
+  size-adjust: 101.35%;
+  ascent-override: 107.55%;
+  descent-override: 31.57%;
+  line-gap-override: 0%;
+}

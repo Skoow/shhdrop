@@ -47,7 +47,7 @@ describe("ShareCard : dernière lecture (audit R3)", () => {
   it("heure réelle de la lecture et rythme des relectures, en français et en anglais ; jamais « à l'instant »", () => {
     setLang("fr");
     const fr = render(entry(), T, true);
-    expect(fr).toBe("État lu à 18 h 58 · relu au plus toutes les 5\u202fmin");
+    expect(fr).toBe("État lu à 18\u202fh\u202f58 · relu au plus toutes les 5\u202fmin");
     expect(fr).not.toMatch(/instant/);
     void unmount(c!);
     setLang("en");
@@ -58,7 +58,7 @@ describe("ShareCard : dernière lecture (audit R3)", () => {
 
   it("lecture d'un autre jour : la date est dite aussi", () => {
     setLang("fr");
-    expect(render(entry({ lastSeenAt: T - 26 * 3600_000 }), T, true)).toMatch(/^État lu le 11 nov\., 16 h 58 · /);
+    expect(render(entry({ lastSeenAt: T - 26 * 3600_000 }), T, true)).toMatch(/^État lu le 11\snov\. à 16\sh\s58 · /);
   });
 });
 

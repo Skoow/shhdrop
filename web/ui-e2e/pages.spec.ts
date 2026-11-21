@@ -65,9 +65,20 @@ test("Confidentialité, Signaler, Conditions, Mentions : contenus, bandeau « En
 
 test("Offres (refaite le 16 novembre) : une seule présentation, facturation, choix de l'offre, récapitulatif ; rien n'est demandé ni prélevé ; capture", async ({ page, shh, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
+  const lectures: string[] = [];
+  page.on("request", (r) => {
+    if (new URL(r.url()).pathname.startsWith("/api/paiement")) lectures.push(r.url());
+  });
   await page.goto(shh.origin + "/offres");
   const co = page.locator("[data-checkout]");
   const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, " ");
+  // Paiement pas ouvert sur ce serveur (revue du 20 novembre, U12) : dit en t\u00eate de page, avant
+  // les offres, et les boutons portent \u00ab Bient\u00f4t \u00bb ; une seule lecture de /api/paiement.
+  const ferme = co.locator("[data-pay-closed]");
+  await expect(ferme).toHaveText("Le paiement n'est pas encore ouvert sur ce serveur. Rien n'est demand\u00e9 ni pr\u00e9lev\u00e9 aujourd'hui.");
+  expect((await ferme.boundingBox())!.y).toBeLessThan((await co.locator('[data-tier="free"]').boundingBox())!.y);
+  for (const x of ["plus", "pro"]) await expect(co.locator(`[data-tier="${x}"] [data-soon]`)).toHaveText("Bient\u00f4t");
+  expect(lectures).toEqual([shh.origin + "/api/paiement"]);
   // Trois offres, une seule fois chacune (plus de tableau qui redisait les cartes).
   await expect(co.locator("[data-tier]")).toHaveCount(3);
   await expect(page.locator("[data-offers], [data-prices]")).toHaveCount(0);
@@ -86,7 +97,7 @@ test("Offres (refaite le 16 novembre) : une seule présentation, facturation, ch
   const sum = co.locator("[data-summary]");
   expect(norm(await sum.innerText())).toMatch(/Pro · Mensuel · 20 € \/ mois/);
   // Paiement pas ouvert sur ce serveur (sans SHH_PAIEMENT) : le bouton le dit, aucun prélèvement.
-  const go = sum.getByRole("button", { name: "Payer sur la page sécurisée de Stripe" });
+  const go = sum.getByRole("button", { name: "Bientôt" });
   await expect(go).toBeDisabled();
   await expect(go).toHaveAccessibleDescription(/Rien n'est demandé ni prélevé aujourd'hui\./);
   await expect(page.locator("main form, main input[type=email], main input[type=password], main img")).toHaveCount(0);

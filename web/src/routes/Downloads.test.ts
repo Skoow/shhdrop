@@ -62,7 +62,7 @@ describe("Téléchargements", () => {
     expect(rows[0]!.querySelector("bdi")!.getAttribute("title")).toBe("rapport annuel 2026.pdf");
     expect(r0).toContain(`142${NNBSP}Mo`);
     expect(r0).toContain("Partage reçu");
-    expect(r0).toContain("9 h 41");
+    expect(r0).toContain("9\u202fh\u202f41");
     expect(rows[1]!.textContent).toContain("Salon");
     expect(rows[0]!.querySelector("button")!.getAttribute("aria-label")).toBe("Retirer de l'historique");
   });

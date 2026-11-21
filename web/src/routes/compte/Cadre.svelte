@@ -101,11 +101,21 @@
   /* Lien dans une phrase (« conditions d'utilisation ») : blanc et souligné (20 novembre) ;
      hauteur de la ligne, pas de cible de 44 px qui décale le texte. */
   .cadre :global(a.lien-t) {
+    position: relative;
     display: inline;
     min-height: 0;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
+  }
+  /* Zone tactile de 44 px de haut (revue du 20 novembre, U20) sans décaler le texte : un
+     pseudo-élément transparent déborde de la ligne, au-dessus et au-dessous. */
+  .cadre :global(a.lien-t::after) {
+    content: "";
+    position: absolute;
+    inset: 50% 0 auto;
+    height: 44px;
+    transform: translateY(-50%);
   }
   .cadre :global(.note) {
     margin: 0;

@@ -17,6 +17,7 @@
   import { garder, idbDuNavigateur, nouvelId, oublier, tirerPass } from "../paiement/pass";
   import { href } from "../app/router.svelte";
   import { Check, Lock, Timer } from "./Icon";
+  import Banner from "./Banner.svelte";
 
   type Billing = "month" | "year";
   // Mensuel sélectionné par défaut (décision du propriétaire du 16 novembre).
@@ -57,12 +58,19 @@
       : [],
   );
 
-  // Offre de CE serveur (null : pas de paiement ici, ou pas encore lue).
+  // Offre de CE serveur (null : pas de paiement ici, ou pas encore lue). Une seule lecture par
+  // affichage de la page. `ferme` : réponse reçue, paiement non ouvert (404, démo, injoignable) ;
+  // dit en tête de page et sur les boutons « Bientôt » (revue du 20 novembre, U12), plutôt qu'au
+  // bout du parcours seulement.
   let serveur = $state<OffreServeur | null>(null);
+  let lue = $state(false);
+  const ferme = $derived(lue && serveur === null);
   $effect(() => {
     let vivant = true;
     void lireOffre().then((o) => {
-      if (vivant) serveur = o;
+      if (!vivant) return;
+      serveur = o;
+      lue = true;
     });
     return () => {
       vivant = false;
@@ -135,6 +143,9 @@
 </script>
 
 <div class="co" data-checkout>
+  {#if ferme}
+    <div class="ferme" data-pay-closed><Banner kind="info">{t("offers.continue.wait")}</Banner></div>
+  {/if}
   <!-- Mise en page « La trame », version 2 (propriétaire, 19 novembre) : étapes numérotées à
        gauche (offre et rythme, moyen de paiement, compte), récapitulatif à droite. -->
   <div class="main">
@@ -160,7 +171,7 @@
               {@const tier = x}
               <label class="pick">
                 <input type="radio" name="{uid}-tier" value={tier} bind:group={chosen} />
-                <span>{chosen === tier ? t("offers.chosen") : t("offers.choose", { tier: name(tier) })}</span>
+                <span>{chosen === tier ? t("offers.chosen") : t("offers.choose", { tier: name(tier) })}{#if ferme}{" "}<span class="sbadge" data-soon>{t("offers.soon")}</span>{/if}</span>
                 {#if chosen === tier}<Check size={18} strokeWidth={2.4} aria-hidden="true" />{/if}
               </label>
             {/if}
@@ -245,7 +256,7 @@
         </label>
         <p class="wait">{t("offers.device")} <a href={href("/conditions")}>{t("offers.terms")}</a></p>
         <button type="button" class="go" disabled={blocage !== null || busy || going} aria-describedby="{uid}-wait" onclick={payer} data-pay>
-          {going ? t("offers.going", { who }) : t("offers.continue", { who })}
+          {ferme ? t("offers.soon") : going ? t("offers.going", { who }) : t("offers.continue", { who })}
         </button>
         {#if erreur}
           <p class="err" role="alert" data-pay-error>{t(`offers.err.${erreur}`)}</p>
@@ -276,6 +287,9 @@
       position: sticky;
       inset-block-start: 96px;
     }
+  }
+  .ferme {
+    grid-column: 1 / -1;
   }
   .main {
     display: grid;
