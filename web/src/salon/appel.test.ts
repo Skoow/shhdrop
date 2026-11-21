@@ -65,7 +65,7 @@ class FauxPC {
   getTransceivers = () => this.transceivers;
   #sdp(role: string) {
     // Un SDP plus long qu'un morceau, avec un candidat d'hôte qui ne doit jamais partir.
-    const lignes = ["v=0", `a=setup:${role}`, "a=fingerprint:sha-256 AA:BB", `a=${HOTE}`, `a=${RELAIS}`];
+    const lignes = ["v=0", `a=setup:${role}`, "a=fingerprint:sha-256 AA:BB", "m=audio 9 UDP/TLS/RTP/SAVPF 111", `a=${HOTE}`, `a=${RELAIS}`, "m=video 9 UDP/TLS/RTP/SAVPF 96"];
     for (let i = 0; lignes.join("\r\n").length < MORCEAU + 500; i++) lignes.push(`a=rtpmap:${i} codec/90000`);
     return lignes.join("\r\n") + "\r\n";
   }
@@ -178,6 +178,9 @@ describe("filtre des candidats", () => {
     expect(candidatRelais(RELAIS)).toBe(true);
     expect(candidatRelais(HOTE)).toBe(false);
     expect(candidatRelais("candidate:1 1 udp 1 10.0.0.1 1 typ relayed")).toBe(false);
+    // « typ relay » glissé ailleurs dans la ligne : refusé (revue du 21 novembre).
+    expect(candidatRelais("candidate:1 1 udp 1 10.0.0.5 9 typ host x typ relay")).toBe(false);
+    expect(filtrerSdp("v=0\r\na=candidate:1 1 udp 1 10.0.0.5 9 typ host x typ relay\r\n")).toBe("v=0\r\n");
   });
 });
 
@@ -404,5 +407,66 @@ describe("cas limites", () => {
     await w.avancer(30_000);
     const offres = w.envoyes.filter((e) => e.m.k === "appel_signal" && e.m.sorte === "offre" && e.m.i === 0);
     expect(offres.map((e) => (e.m as { pour: number }).pour).sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("membre malveillant (revue du 21 novembre)", () => {
+  /** Monde à trois en appel et connectés : A (0), V (1), H (2). */
+  async function aTrois() {
+    const w = new Monde();
+    const a = w.membre(0);
+    const v = w.membre(1);
+    const h = w.membre(2);
+    await a.rejoindre(false);
+    await v.rejoindre(false);
+    await h.rejoindre(false);
+    await w.avancer(5_000);
+    for (const l of w.pcs.values()) for (const pc of l) if (!pc.fermee) pc.etat("connected");
+    await pause();
+    return { w, a, v, h };
+  }
+
+  it("offres en boucle d'un plus petit siège : la connexion établie n'est pas refaite, la victime reste dans l'appel", async () => {
+    const { w, v, h } = await aTrois();
+    const id = (w.envoyes.find((e) => e.m.k === "appel_present")!.m as { appel: Uint8Array }).appel;
+    const avant = w.pcs.get(1)!.length;
+    const offre = "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n";
+    for (let i = 0; i < 120; i++) {
+      v.recu(0, { k: "appel_signal", appel: id, pour: 1, sorte: "offre", i: 0, n: 1, x: offre });
+      await w.avancer(500);
+    }
+    expect(w.pcs.get(1)!.length).toBe(avant);
+    expect(h.participants.map((p) => p.siege)).toContain(1);
+    // La présence de V est partie régulièrement malgré l'attaque.
+    const presences = w.envoyes.filter((e) => e.de === 1 && e.m.k === "appel_present").length;
+    expect(presences).toBeGreaterThanOrEqual(4);
+  }, 20_000);
+
+  it("identifiants d'appel toujours plus petits : aucune connexion démontée", async () => {
+    const { w, a } = await aTrois();
+    const ouvertes = () => [...w.pcs.values()].flat().filter((p) => !p.fermee).length;
+    const avant = ouvertes();
+    await w.avancer(11_000);
+    for (let i = 0; i < 60; i++) {
+      const id = new Uint8Array(16);
+      id[15] = 59 - i; // toujours plus petit
+      a.recu(5, { k: "appel_present", appel: id, video: false });
+      await w.avancer(500);
+    }
+    expect(ouvertes()).toBe(avant);
+  }, 20_000);
+
+  it("offre piégée (749 lignes m=) : refusée, aucune connexion créée", async () => {
+    const w = new Monde();
+    const v = w.membre(1);
+    await v.rejoindre(false);
+    const id = (w.envoyes[0]!.m as { appel: Uint8Array }).appel;
+    v.recu(0, { k: "appel_present", appel: id, video: false });
+    const avant = w.pcs.get(1)?.length ?? 0;
+    const x = Array.from({ length: 300 }, () => "m=video 9 UDP/TLS/RTP/SAVPF 96").join("\r\n");
+    const n = Math.ceil(x.length / 3000);
+    for (let i = 0; i < n; i++) v.recu(0, { k: "appel_signal", appel: id, pour: 1, sorte: "offre", i, n, x: x.slice(i * 3000, (i + 1) * 3000) });
+    await pause();
+    expect(w.pcs.get(1)?.length ?? 0).toBe(avant);
   });
 });

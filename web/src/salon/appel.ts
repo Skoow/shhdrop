@@ -68,6 +68,8 @@ type Paire = {
   attente: RTCIceCandidateInit[];
   distante: boolean;
   lien: Participant["lien"];
+  /** Création (horloge des dépendances) : une offre ne la remplace pas avant OFFRE_INTERVALLE_MS. */
+  debut: number;
 };
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
@@ -79,20 +81,36 @@ export function filtrerSdp(sdp: string): string {
   return (
     sdp
       .split(/\r?\n/)
-      .filter((l) => l !== "" && !(l.startsWith("a=candidate:") && !/ typ relay( |$)/.test(l)))
+      .filter((l) => l !== "" && !(l.startsWith("a=candidate:") && !candidatRelais(l.slice(2))))
       .join("\r\n") + "\r\n"
   );
 }
 
-/** Vrai pour un candidat ICE du relais seulement. */
+/**
+ * Vrai pour un candidat ICE du relais seulement : le type lu à sa place (8e champ :
+ * « candidate:<fondation> <composante> <transport> <priorité> <adresse> <port> typ relay »),
+ * jamais « typ relay » glissé ailleurs dans la ligne (revue du 21 novembre).
+ */
 export function candidatRelais(c: string): boolean {
-  return / typ relay( |$)/.test(c);
+  return /^candidate:\S+ \d+ \S+ \d+ \S+ \d+ typ relay( |$)/.test(c);
 }
+
+/** Offre acceptable : exactement une ligne m=audio et une m=video, rien d'autre (revue du 21 novembre). */
+export function offreSaine(sdp: string): boolean {
+  const m = sdp.split(/\r?\n/).filter((l) => l.startsWith("m="));
+  return m.length === 2 && m.filter((l) => l.startsWith("m=audio ")).length === 1 && m.filter((l) => l.startsWith("m=video ")).length === 1;
+}
+
+/** Une connexion établie n'est pas refaite sur une simple offre ; une en cours, au plus toutes les 10 s. */
+const OFFRE_INTERVALLE_MS = 10_000;
+
 
 export class Appel {
   readonly #d: DepsAppel;
   /** Identifiant (hex) de l'appel en cours dans le salon, connu de nous ; null : aucun. */
   #id: string | null = null;
+  /** Sièges qui ont déjà fait basculer l'appel vers un identifiant plus petit. */
+  #bascules = new Set<number>();
   #dans = false;
   #entree = false;
   #presents = new Map<number, { vu: number; video: boolean; essais: number }>();
@@ -172,7 +190,7 @@ export class Appel {
     this.camera = flux.getVideoTracks().length > 0;
     this.#entree = false;
     this.#dans = true;
-    if (this.#id === null) this.#id = hex(this.#d.alea());
+    if (this.#id === null) this.#adopter(hex(this.#d.alea()));
     this.#annoncer(true);
     for (const s of this.#presents.keys()) if (this.#d.moi < s) void this.#offrir(s);
     this.#veiller();
@@ -188,7 +206,10 @@ export class Appel {
     this.#dans = false;
     for (const s of [...this.#paires.keys()]) this.#fermer(s);
     this.#lacher();
-    if (this.#presents.size === 0) this.#id = null;
+    if (this.#presents.size === 0) {
+      this.#id = null;
+      this.#bascules.clear();
+    }
     this.#d.change();
   }
 
@@ -197,6 +218,7 @@ export class Appel {
     this.quitter();
     this.#presents.clear();
     this.#id = null;
+    this.#bascules.clear();
     this.#tic?.();
     this.#tic = null;
     this.#videur?.();
@@ -275,18 +297,30 @@ export class Appel {
     if (a.parts.length < a.n) return;
     this.#morceaux.delete(cle);
     const sdp = filtrerSdp(a.parts.join(""));
-    if (m.sorte === "offre") void this.#repondre(siege, sdp);
+    if (m.sorte === "offre") {
+      // Offres en rafale (revue du 21 novembre) : une connexion établie ou trop récente n'est pas
+      // refaite ; sinon chaque offre remplaçait la précédente et saturait notre file d'envoi.
+      const p = this.#paires.get(siege);
+      if (p && (p.lien === "lie" || this.#d.maintenant() - p.debut < OFFRE_INTERVALLE_MS)) return;
+      if (!offreSaine(sdp)) return;
+      void this.#repondre(siege, sdp);
+    }
     else void this.#reponse(siege, sdp);
   }
 
   #present(siege: number, id: string, video: boolean): void {
-    if (this.#id === null) this.#id = id;
+    if (this.#id === null) this.#adopter(id);
     else if (id !== this.#id) {
-      // Deux appels lancés en même temps : le plus petit identifiant l'emporte.
-      if (id > this.#id) return;
+      // Deux appels lancés en même temps : le plus petit identifiant l'emporte. Seulement tant
+      // qu'aucune connexion n'est établie, et une fois par siège (revue du 21 novembre : des
+      // identifiants toujours plus petits démontaient sinon toutes les connexions de tous, en
+      // boucle) ; ensuite, l'appel concurrent est ignoré.
+      const lie = [...this.#paires.values()].some((p) => p.lien === "lie");
+      if (id > this.#id || this.#bascules.has(siege) || lie) return;
+      this.#bascules.add(siege);
       for (const s of [...this.#paires.keys()]) this.#fermer(s);
       this.#presents.clear();
-      this.#id = id;
+      this.#adopter(id);
       if (this.#dans) this.#annoncer(true);
     }
     const avant = this.#presents.get(siege);
@@ -312,7 +346,7 @@ export class Appel {
       bundlePolicy: "max-bundle",
       rtcpMuxPolicy: "require",
     });
-    const p: Paire = { pc, offre, flux: this.#d.flux(), attente: [], distante: false, lien: "connexion" };
+    const p: Paire = { pc, offre, flux: this.#d.flux(), attente: [], distante: false, lien: "connexion", debut: this.#d.maintenant() };
     this.#paires.set(siege, p);
     const id = this.#id;
     pc.onicecandidate = (e) => {
@@ -322,6 +356,9 @@ export class Appel {
       if (ASCII.test(x)) this.#mettre({ k: "appel_signal", appel: deHex(id), pour: siege, sorte: "glace", i: 0, n: 1, x });
     };
     pc.ontrack = (e) => {
+      // Une piste par sorte au plus : une offre piégée ne fait pas empiler des pistes.
+      const k = e.track.kind;
+      if ((k !== "audio" && k !== "video") || p.flux.getTracks().some((t) => t.kind === k)) return;
       p.flux.addTrack(e.track);
       this.#d.change();
     };
@@ -464,8 +501,14 @@ export class Appel {
     for (let i = 0; i < n; i++) this.#mettre({ k: "appel_signal", appel: deHex(id), pour: siege, sorte, i, n, x: sdp.slice(i * MORCEAU, (i + 1) * MORCEAU) });
   }
 
+  #adopter(id: string): void {
+    this.#id = id;
+  }
+
   #fermer(siege: number): void {
     this.#tot.delete(siege);
+    // Ce qui restait à envoyer à ce siège ne sert plus (une offre ou une réponse remplacée).
+    this.#file = this.#file.filter((f) => !(f.m.k === "appel_signal" && f.m.pour === siege));
     const p = this.#paires.get(siege);
     if (!p) return;
     this.#paires.delete(siege);
@@ -491,6 +534,7 @@ export class Appel {
   #finSiVide(): void {
     if (this.#presents.size === 0 && !this.#dans) {
       this.#id = null;
+      this.#bascules.clear();
       this.#tic?.();
       this.#tic = null;
     }
@@ -503,9 +547,11 @@ export class Appel {
     const t = this.#d.maintenant();
     if (!force && t - this.#dernierePresence < 1_000) return;
     this.#dernierePresence = t;
-    // Une présence en file suffit : la plus récente remplace l'ancienne.
+    // Une présence en file suffit : la plus récente remplace l'ancienne, en tête de file (elle
+    // dit que nous sommes là : jamais retardée derrière la signalisation, revue du 21 novembre).
     this.#file = this.#file.filter((f) => f.m.k !== "appel_present");
-    this.#mettre({ k: "appel_present", appel: deHex(this.#id), video: this.camera });
+    this.#file.unshift({ m: { k: "appel_present", appel: deHex(this.#id), video: this.camera }, depuis: t });
+    this.#pousser();
   }
 
   /** Toutes les 5 s tant qu'un appel est connu : présence redite, participants muets retirés. */

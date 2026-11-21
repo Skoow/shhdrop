@@ -614,16 +614,35 @@ export class Conversation {
   }
 }
 
-/** Morceaux d'un texte : liens `https?://` cliquables, le reste en texte (aucun Markdown, §39.5). */
-export function morceaux(texte: string): { lien: boolean; t: string }[] {
+const PONCTUATION_FINALE = ".,;:!?)]»’'";
+/** Découpes déjà faites (un texte reçu ne change pas) : le fil est redessiné à chaque événement. */
+const decoupes = new Map<string, readonly { lien: boolean; t: string }[]>();
+const DECOUPES_MAX = 2000;
+
+/**
+ * Morceaux d'un texte : liens `https?://` cliquables, le reste en texte (aucun Markdown, §39.5).
+ * Coût linéaire et résultat gardé (revue du 21 novembre : une longue ponctuation finale coûtait
+ * un temps quadratique, recalculé pour chaque bulle à chaque changement du fil).
+ */
+export function morceaux(texte: string): readonly { lien: boolean; t: string }[] {
+  const deja = decoupes.get(texte);
+  if (deja) return deja;
+  const r = Object.freeze(decouper(texte));
+  if (decoupes.size >= DECOUPES_MAX) decoupes.delete(decoupes.keys().next().value!);
+  decoupes.set(texte, r);
+  return r;
+}
+
+function decouper(texte: string): { lien: boolean; t: string }[] {
   const out: { lien: boolean; t: string }[] = [];
   const re = /https?:\/\/[^\s<>"]+/g;
   let i = 0;
   for (const m of texte.matchAll(re)) {
     let u = m[0];
     // Ponctuation finale laissée au texte (« voir https://x.fr. »).
-    const fin = /[.,;:!?)\]»’']+$/.exec(u);
-    if (fin) u = u.slice(0, -fin[0].length);
+    let k = u.length;
+    while (k > 0 && PONCTUATION_FINALE.includes(u[k - 1]!)) k--;
+    u = u.slice(0, k);
     if (m.index! > i) out.push({ lien: false, t: texte.slice(i, m.index) });
     let valide = false;
     try {

@@ -207,3 +207,20 @@ describe("morceaux", () => {
     expect(morceaux("http://")).toEqual([{ lien: false, t: "http://" }]);
   });
 });
+
+describe("morceaux : messages piégés (revue du 21 novembre)", () => {
+  it("longue ponctuation après un lien : coût linéaire, même découpe", () => {
+    const t = "https://a" + ".".repeat(1990) + "x";
+    const t0 = performance.now();
+    for (let i = 0; i < 20; i++) morceaux(t + i);
+    expect((performance.now() - t0) / 20).toBeLessThan(2);
+    expect(morceaux("voir https://x.fr. puis")).toEqual([
+      { lien: false, t: "voir " },
+      { lien: true, t: "https://x.fr" },
+      { lien: false, t: ". puis" },
+    ]);
+  });
+  it("même texte : même résultat, sans recalcul", () => {
+    expect(morceaux("lien https://y.fr")).toBe(morceaux("lien https://y.fr"));
+  });
+});
