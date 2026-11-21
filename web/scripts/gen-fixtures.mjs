@@ -92,7 +92,9 @@ function exifTiff({ orientation, make = "ReperMake", thumb = true, extra = [] })
   const ifds = [{ entries: ifd0, next: thumb ? 3 : undefined }, { entries: [asc(0x9003, DATE), asc(0x9004, DATE)] }, { entries: gps }];
   if (!thumb) return tiff(ifds);
   ifds.push({ entries: [ptr(0x0201, "thumb"), { tag: 0x0202, type: LONG, count: 1, ref: "len:thumb" }] });
-  return tiff(ifds, { thumb: cat(new Uint8Array([0xff, 0xd8]), str("ReperThumb"), new Uint8Array([0xff, 0xd9])) });
+  // Vignette JPEG bien formée (SOI, un segment, EOI) : le nettoyage la coupe à son EOI et retire
+  // une vignette sans structure lisible (audit du 20 novembre, W7).
+  return tiff(ifds, { thumb: cat(new Uint8Array([0xff, 0xd8]), seg(0xdb, str("ReperThumb")), new Uint8Array([0xff, 0xd9])) });
 }
 
 // ---------- JPEG ----------

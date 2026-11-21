@@ -1316,6 +1316,8 @@ export const en = {
   "downloads.unavailable": "History unavailable in this browser (strict private browsing or storage refused).",
   "downloads.todo.one": "To download · {n}\u00a0item · {size}",
   "downloads.todo.other": "To download · {n}\u00a0items · {size}",
+  "downloads.notice": "Kept in Downloads on this device (30\u00a0days).",
+  "downloads.notice.no": "Don't keep",
   "downloads.until": "Available until {date}, then erased from the server",
   // Compte (plan du compte, lot 10) : pages présentes seulement si __COMPTES__.
   "title.compte": "Account",

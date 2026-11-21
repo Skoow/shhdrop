@@ -265,12 +265,17 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     // contient aucun octet du .wasm (magie « \0asm » version 1, en base64 ou en tableau de
     // nombres), ne cite aucun de ces fichiers sans son empreinte SHA-384, et aucun n'est orphelin.
     // Scripts du site (points d'entrée et morceaux partagés des pages séparées) : tout script
-    // sous assets/ sauf le Worker du moteur, le dictionnaire anglais et le Worker anti-robot.
-    const mains = all.filter((f) => /^assets\/(?!engine-|locale-|pow\.worker)[^/]+\.js$/.test(f.rel)).map((f) => ({ rel: f.rel, text: f.data.toString("utf8") }));
+    // sous assets/ sauf les scripts lus avec leur empreinte : Worker du moteur, dictionnaire
+    // anglais, et tout script de Worker (« worker » dans le nom : le Worker anti-robot,
+    // assets/pow-worker-*.js, audit du 20 novembre W3 ; ou un Worker émis par Vite, ?worker).
+    // new Worker(url) n'ayant pas de contrôle d'intégrité, chacun doit être cité avec son
+    // empreinte SHA-384 (lu par fetch avec `integrity`, puis lancé depuis un Blob).
+    const WORKER = /^assets\/[^/]*worker[^/]*\.js$/i;
+    const mains = all.filter((f) => /^assets\/(?!engine-|locale-)[^/]+\.js$/.test(f.rel) && !WORKER.test(f.rel)).map((f) => ({ rel: f.rel, text: f.data.toString("utf8") }));
     for (const m of mains) {
       if (m.text.includes("AGFzbQEAAAA") || /\b0,\s*97,\s*115,\s*109,\s*1,\s*0,\s*0,\s*0\b/.test(m.text))
         problems.push(`${m.rel} : octets WebAssembly en ligne dans le script principal : le moteur doit rester dans assets/engine-*.wasm, lu avec son empreinte`);
-      const cited = new Set([...m.text.matchAll(/\/(assets\/(?:engine-[A-Za-z0-9_-]+\.js|locale-[A-Za-z0-9_-]+\.js|[A-Za-z0-9._-]+\.wasm))/g)].map((x) => x[1]));
+      const cited = new Set([...m.text.matchAll(/\/(assets\/(?:engine-[A-Za-z0-9_-]+\.js|locale-[A-Za-z0-9_-]+\.js|[A-Za-z0-9._-]*worker[A-Za-z0-9._-]*\.js|[A-Za-z0-9._-]+\.wasm))/gi)].map((x) => x[1]));
       for (const rel of cited) {
         const data = byRel.get(rel);
         if (!data) problems.push(`${rel} : cité par le script principal, absent du site`);
@@ -280,7 +285,7 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
     // Fichier du moteur (.wasm, script du Worker) qu'aucun script principal ne cite : orphelin
     // (chargé d'ailleurs, sans contrôle d'intégrité, ou inutile). Cité sans empreinte : ci-dessus.
     for (const f of all)
-      if (/^assets\/(?:[^/]+\.wasm|engine-[^/]+\.js|locale-[^/]+\.js)$/i.test(f.rel) && !mains.some((m) => m.text.includes(`/${f.rel}`)))
+      if ((/^assets\/(?:[^/]+\.wasm|engine-[^/]+\.js|locale-[^/]+\.js)$/i.test(f.rel) || WORKER.test(f.rel)) && !mains.some((m) => m.text.includes(`/${f.rel}`)))
         problems.push(`${f.rel} : orphelin, aucun script principal ne le cite avec son empreinte SHA-384`);
     // Une seule langue au démarrage (D4) : le dictionnaire anglais (assets/locale-en-*.js, cité avec
     // son empreinte ci-dessus) n'est pas aussi dans le script principal.
@@ -323,6 +328,10 @@ export function checkDist(dir, demo, comptes = false, pages = []) {
   // est donc intégré à un script de la démo (base64 du module, magie « \0asm » version 1).
   for (const f of all)
     if (/\.wasm$/i.test(f.rel)) problems.push(`${f.rel} : fichier .wasm dans la démo : sa CSP (connect-src 'none') interdit de le lire, le moteur doit être intégré au script`);
+  // Aucun script de Worker dans la démo (W3) : sa CSP interdit de le lire avec son empreinte, et
+  // son faux serveur n'exige aucune preuve de travail ; new Worker(url) le lancerait sans contrôle.
+  for (const f of all)
+    if (/^assets\/[^/]*worker[^/]*\.js$/i.test(f.rel)) problems.push(`${f.rel} : script de Worker dans la démo (lancé sans contrôle d'intégrité)`);
   if (!all.some((f) => /\.m?js$/.test(f.rel) && f.data.includes("AGFzbQEAAAA")))
     problems.push("moteur WebAssembly absent des scripts de la démo (base64 « AGFzbQEAAAA ») : elle ne pourrait ni chiffrer ni ouvrir");
   // Les balises de la démo, dans l'ordre, en tout premier dans <head>.

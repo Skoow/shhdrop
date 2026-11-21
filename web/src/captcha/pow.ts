@@ -1,29 +1,38 @@
-// Preuve de travail anti-robot (UI §9.4.2), version minimale : un Worker dédié (fichier de
-// notre origine, permis par script-src 'self') cherche la solution ; arrêt par `signal`.
+// Preuve de travail anti-robot (UI §9.4.2), version minimale : un Worker dédié neuf cherche la
+// solution ; arrêt par `signal`. Son script est lu avec son empreinte et lancé depuis un Blob en
+// production (pow-source.verified.ts, spec §28.3, audit du 20 novembre W3).
 // Pas encore de pré-calcul ni de borne vraie avec repli (Task 14) : sans repli, le calcul va
 // jusqu'au bout, comme le prévoit la spécification.
 import type { CaptchaCtx, CaptchaProof } from "../index";
-import { scriptUrl } from "../app/trusted";
 import { parseChallenge, payload } from "./search";
-// Adresse du fichier du Worker, écrite par Vite (assets/pow.worker-EMPREINTE.js).
-import powWorkerUrl from "./pow.worker.ts?worker&url";
+import { startPowWorker } from "./pow-source";
 
-export function solvePow(challenge: unknown, ctx: CaptchaCtx, signal?: AbortSignal, onTried?: (tried: number) => void): Promise<CaptchaProof> {
+export async function solvePow(challenge: unknown, ctx: CaptchaCtx, signal?: AbortSignal, onTried?: (tried: number) => void): Promise<CaptchaProof> {
+  if (ctx.mode !== "pow") throw new Error("repli_indisponible"); // Tasks 15–16
+  const aborted = () => new DOMException("Aborted", "AbortError");
+  let c: ReturnType<typeof parseChallenge>;
+  let w: Worker;
+  try {
+    c = parseChallenge(challenge);
+  } catch {
+    throw new Error("pow_indisponible");
+  }
+  if (signal?.aborted) throw aborted();
+  try {
+    w = await startPowWorker();
+  } catch {
+    throw new Error("pow_indisponible");
+  }
+  // Arrêt demandé pendant la lecture du script : le Worker ne calcule rien.
+  if (signal?.aborted) {
+    w.terminate();
+    throw aborted();
+  }
   return new Promise((resolve, reject) => {
-    if (ctx.mode !== "pow") return reject(new Error("repli_indisponible")); // Tasks 15–16
-    let c: ReturnType<typeof parseChallenge>;
-    let w: Worker;
-    try {
-      c = parseChallenge(challenge);
-      w = new Worker(scriptUrl(powWorkerUrl), { type: "module" });
-    } catch {
-      return reject(new Error("pow_indisponible"));
-    }
     const stop = () => {
       w.terminate();
-      reject(new DOMException("Aborted", "AbortError"));
+      reject(aborted());
     };
-    if (signal?.aborted) return stop();
     signal?.addEventListener("abort", stop, { once: true });
     const done = () => {
       signal?.removeEventListener("abort", stop);
@@ -40,6 +49,11 @@ export function solvePow(challenge: unknown, ctx: CaptchaCtx, signal?: AbortSign
       done();
       reject(new Error("pow_indisponible"));
     };
-    w.postMessage(c);
+    try {
+      w.postMessage(c);
+    } catch {
+      done();
+      reject(new Error("pow_indisponible"));
+    }
   });
 }

@@ -72,8 +72,15 @@ describe("règles de sources", () => {
   // passe par l'interface publique (index.ts).
   it("pas d'import de transfer/, crypto/ ni engine/ (hors engine/pure) dans les écrans", () =>
     expect(offenders(RE_FORBIDDEN_IMPORT, inUiDir)).toEqual([]));
-  it("pas de fetch( ni XMLHttpRequest dans les écrans", () =>
-    expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, inUiDir)).toEqual([]));
+  // Exception écrite (audit du 20 novembre, W3) : captcha/pow-source.verified.ts lit le script du
+  // Worker anti-robot avec son empreinte (fetch + integrity, comme engine/source.verified.ts), et
+  // aucune adresse de l'API.
+  it("pas de fetch( ni XMLHttpRequest dans les écrans", () => {
+    expect(offenders(/\bfetch\s*\(|XMLHttpRequest/, (r) => inUiDir(r) && r !== "captcha/pow-source.verified.ts")).toEqual([]);
+    const pow = files.find((f) => f.rel === "captcha/pow-source.verified.ts")!.text;
+    expect(pow).toMatch(/fetch\(src, \{ integrity, credentials: "omit", redirect: "error" \}\)/);
+    expect(pow).not.toMatch(/\/api\/|XMLHttpRequest/);
+  });
   it("aucun stockage navigateur (hors historique local et retours, ci-dessous)", () =>
     expect(
       offenders(/localStorage|indexedDB|document\.cookie/, (r) => r !== "history/live.svelte.ts" && r !== "history/presence.svelte.ts" && r !== "history/returns.ts" && r !== "downloads/live.svelte.ts" && r !== "account/persist.ts" && r !== "paiement/pass.ts" && r !== "salon/preuve.ts"),

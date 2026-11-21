@@ -79,6 +79,11 @@ export type Downloads = {
   enabled(): Promise<boolean>;
   /** Coupé : l'historique existant est effacé. */
   setEnabled(v: boolean): Promise<void>;
+  /**
+   * Vrai une seule fois sur cet appareil (audit du 20 novembre, W4) : la ligne « Gardé dans
+   * Téléchargements… » est à montrer au premier fichier noté ; le drapeau est posé aussitôt.
+   */
+  takeNotice(): Promise<boolean>;
 };
 
 function randomId(): string {
@@ -144,6 +149,11 @@ export async function openDownloads(deps: { backend: Backend | null; now?: () =>
     async setEnabled(v) {
       if (!v) await b.clear();
       await b.setFlag("off", v ? undefined : true);
+    },
+    async takeNotice() {
+      if ((await b.flag("notice")) === true) return false;
+      await b.setFlag("notice", true);
+      return true;
     },
   };
 }

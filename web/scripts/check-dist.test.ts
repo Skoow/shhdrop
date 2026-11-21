@@ -281,6 +281,26 @@ describe("check-dist.mjs, production", () => {
     expect(prod(`const w="/assets/engine-kdf-AbCd1234.js";const i="${sha384(Buffer.from(w))}";`, { "assets/engine-kdf-AbCd1234.js": w })).toEqual([]);
   });
 
+  it("W3 (audit du 20 novembre) : le Worker anti-robot, comme tout script de Worker, est cité avec son empreinte SHA-384, jamais orphelin", () => {
+    const prod = (main: string, extra: Record<string, string> = {}) => checkDist(site({ "index.html": PROD_INDEX, "assets/index-a.js": main, ...extra }), false);
+    const w = "self.onmessage=1";
+    const hash = sha384(Buffer.from(w));
+    // Script émis par le greffon shh-pow (assets/pow-worker-*.js).
+    expect(prod('const w="/assets/pow-worker-AbCd1234.js";', { "assets/pow-worker-AbCd1234.js": w })).toEqual([
+      "assets/pow-worker-AbCd1234.js : son empreinte SHA-384 n'est pas inscrite dans le script principal (chargement sans contrôle d'intégrité)",
+    ]);
+    expect(prod(`const w="/assets/pow-worker-AbCd1234.js",i="${hash}";`, { "assets/pow-worker-AbCd1234.js": w })).toEqual([]);
+    // Ancien chemin (new Worker sur le fichier émis par Vite, ?worker&url) : cité sans empreinte, refusé.
+    expect(prod('new Worker("/assets/pow.worker-CqXgVHIX.js",{type:"module"});', { "assets/pow.worker-CqXgVHIX.js": w })).toEqual([
+      "assets/pow.worker-CqXgVHIX.js : son empreinte SHA-384 n'est pas inscrite dans le script principal (chargement sans contrôle d'intégrité)",
+    ]);
+    expect(prod('const w="/assets/pow-worker-AbCd1234.js";')).toEqual(["assets/pow-worker-AbCd1234.js : cité par le script principal, absent du site"]);
+    // Présent mais cité par aucun script : orphelin.
+    expect(prod("console.info(1)", { "assets/pow.worker-CqXgVHIX.js": w })).toEqual([
+      "assets/pow.worker-CqXgVHIX.js : orphelin, aucun script principal ne le cite avec son empreinte SHA-384",
+    ]);
+  });
+
   it("moteur WebAssembly : en production, tout .wasm de plus de 1 Kio a ses variantes .br et .gz (servies par static.go), qui redonnent le fichier", () => {
     const wasm = String.fromCharCode(0, 97, 115, 109, 1, 0, 0, 0) + "\x01".repeat(2000);
     const w = "assets/engine-AbCd1234.wasm";
@@ -382,6 +402,12 @@ describe("check-dist.mjs --demo", () => {
 
   it("passe avec la marque, les balises en tête de <head> et 404.html", () => {
     expect(run(["--demo", site(good())])).toEqual({ code: 0, err: "" });
+  });
+
+  it("W3 : aucun script de Worker dans la démo (sa CSP interdit de le lire avec son empreinte)", () => {
+    expect(checkDist(site({ ...good(), "assets/pow.worker-CqXgVHIX.js": "self.onmessage=1" }), true)).toEqual([
+      "assets/pow.worker-CqXgVHIX.js : script de Worker dans la démo (lancé sans contrôle d'intégrité)",
+    ]);
   });
 
   it("compte : admis dans la démo (compte essayable, faux serveur de l'onglet, 19 novembre)", () => {

@@ -33,6 +33,23 @@ function dump(v: unknown): string {
   return seen.join("\n");
 }
 
+describe("historique des téléchargements : ligne du premier fichier (W4)", () => {
+  it("takeNotice : vrai une seule fois sur cet appareil, même après réouverture ; le drapeau est chiffré à part des entrées, sans nom", async () => {
+    const idb = fakeIndexedDB();
+    const d = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
+    await d.add(fresh());
+    expect(await d.takeNotice()).toBe(true);
+    expect(await d.takeNotice()).toBe(false);
+    const again = (await openDownloads({ backend: downloadsIdb(idb), now: () => T0 }))!;
+    expect(await again.takeNotice()).toBe(false);
+    // Coupé puis remis : la ligne ne revient pas (elle a déjà été montrée).
+    await again.setEnabled(false);
+    await again.setEnabled(true);
+    expect(await again.takeNotice()).toBe(false);
+    expect(dump(idb.raw())).not.toContain("Facture");
+  });
+});
+
 describe("historique des téléchargements : stockage", () => {
   it("base « shhdrop-telechargements », chiffrée : aucun nom, taille, date ni champ en clair ; relue à l'identique", async () => {
     const idb = fakeIndexedDB();

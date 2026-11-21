@@ -334,6 +334,41 @@ describe("vignette EXIF gardée (décision du propriétaire du 11 novembre)", ()
     expect(keptTiff(fakeTiff(ok), null, 40)).toBeNull();
     expect(readOrientation(keptTiff(fakeTiff(ok), 3, 40)!)).toBe(3);
   });
+
+  // W7 (audit du 20 novembre) : la longueur déclarée dans l'IFD1 peut couvrir plus que la vignette.
+  const enc = (s: string) => [...s].map((c) => c.charCodeAt(0));
+  const thumbJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0, 0xff, 0xc0, 0, 3, 0, 0xff, 0xda, 0, 3, 0, 1, 2, 0xff, 0x00, 3, 0xff, 0xd0, 4, 0xff, 0xd9]);
+  it("vignette suivie d'octets dans la longueur déclarée : coupée à son EOI, rien après", () => {
+    const trailing = new Uint8Array([...thumbJpeg, ...enc("ReperApres"), 0xff, 0xd8, 0xff, 0xe1, 0, 8, ...enc("ReperX")]);
+    expect(readThumbnail(fakeTiff(trailing))).toEqual(thumbJpeg);
+    const kept = keptTiff(fakeTiff(trailing), null)!;
+    expect(found(kept)).toEqual([]);
+    expect(readThumbnail(kept)).toEqual(thumbJpeg);
+    expect(kept.length).toBe(8 + 2 + 4 + 2 + 3 * 12 + 4 + thumbJpeg.length);
+    // Vignette sans SOS (tables seules) : coupée à son EOI de même.
+    const ok = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0, 0xff, 0xd9]);
+    expect(readThumbnail(fakeTiff(new Uint8Array([...ok, ...enc("ReperApres")])))).toEqual(ok);
+  });
+  it("vignette sans EOI, segment qui déborde, ou longueur au-delà du TIFF : retirée", () => {
+    expect(readThumbnail(fakeTiff(thumbJpeg.subarray(0, thumbJpeg.length - 2)))).toBeNull();
+    expect(readThumbnail(fakeTiff(new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 3, 0])))).toBeNull();
+    expect(readThumbnail(fakeTiff(new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0, 40, 0, 0xff, 0xd9])))).toBeNull();
+    expect(readThumbnail(fakeTiff(new Uint8Array([0xff, 0xd8, 0x00, 0xff, 0xd9])))).toBeNull();
+    const t = fakeTiff(thumbJpeg);
+    new DataView(t.buffer).setUint32(36, thumbJpeg.length + 1); // longueur déclarée trop grande d'un octet
+    expect(readThumbnail(t)).toBeNull();
+  });
+  it("JPEG : octets après la fin de la vignette EXIF : absents du fichier nettoyé", async () => {
+    const src = fx("progressive.jpg");
+    const tiff = fakeTiff(new Uint8Array([...thumbJpeg, ...enc("ReperApres")]));
+    const body = [...enc("Exif\0\0"), ...tiff];
+    const b = new Uint8Array([0xff, 0xd8, 0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 0xff, ...body, ...src.subarray(2)]);
+    expect(found(b)).toContain("ReperApres");
+    const { r, out } = await clean("progressive.jpg", b);
+    expect(r.state).toBe("nettoye");
+    expect(found(out)).toEqual([]);
+    expect(readThumbnail(exifOf(out))).toEqual(thumbJpeg);
+  });
 });
 
 /** TIFF gros-boutiste : IFD0 vide → IFD1 (position, longueur) → vignette. */

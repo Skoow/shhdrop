@@ -6,7 +6,7 @@
   // titre, l'adresse ni un stockage. « Voir seulement » : aucune action de téléchargement ni de
   // copie dans le DOM (ni barre, ni ligne, ni visionneuse).
   import { lowMemory } from "../app/env";
-  import { recordDownload } from "../downloads/live.svelte";
+  import { declineDownloads, downloads, recordDownload } from "../downloads/live.svelte";
   import { afterSave } from "../downloads/store";
   import { guardUnload } from "../app/lifecycle";
   import { createDownloads, readSkipping, summarize, type Target } from "../flows/downloads.svelte";
@@ -408,6 +408,17 @@
     };
   });
 
+  // ---------- Historique des téléchargements : ligne du premier fichier noté (W4) ----------
+  // Audit du 20 novembre : l'historique reste activé par défaut (R12), mais le premier fichier
+  // noté sur cet appareil le dit, une seule fois (drapeau dans la base), avec « Ne pas garder ».
+  let declined = $state(false);
+  async function decline() {
+    await declineDownloads();
+    declined = true;
+    announce(t("downloads.off.done"));
+  }
+  $effect(() => () => void (downloads.notice = false));
+
   // ---------- Visionneuse ----------
   let viewAt = $state<number | null>(null);
   function openViewer(i: number) {
@@ -469,6 +480,14 @@
       onresumezip={() => dl.resumeZip()}
       onstopzip={() => dl.stopZip()}
     />
+    {#if declined}
+      <p class="kept" data-downloads-notice>{t("downloads.off.done")}</p>
+    {:else if downloads.notice}
+      <p class="kept" data-downloads-notice>
+        <span>{t("downloads.notice")}</span>
+        <button type="button" class="kept-no" onclick={() => void decline()}>{t("downloads.notice.no")}</button>
+      </p>
+    {/if}
   {/if}
 
   {#each groups as g (g.c)}
@@ -704,6 +723,38 @@
   }
   .hint:empty {
     display: none;
+  }
+  /* Historique des téléchargements (W4) : une ligne discrète, « Ne pas garder » en lien. */
+  .kept {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--sp-2);
+    max-width: 65ch;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+  }
+  .kept-no {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-2);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .kept-no:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  @media (hover: hover) {
+    .kept-no:hover {
+      color: var(--text);
+    }
   }
   /* Lien discret (audit R2) : texte souligné, cible d'appui de 44 px. */
   .forget {

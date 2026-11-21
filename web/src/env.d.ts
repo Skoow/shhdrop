@@ -33,6 +33,13 @@ declare module "virtual:shh-engine" {
   export const wasm: string;
 }
 
+// Worker de la preuve de travail (greffon shh-pow, vite.config.ts), production seulement : adresse
+// et empreinte SRI de assets/pow-worker-EMPREINTE.js.
+declare module "virtual:shh-pow" {
+  export const src: string;
+  export const integrity: string;
+}
+
 // Dictionnaire anglais (greffon shh-lang, vite.config.ts), production seulement : adresse et
 // empreinte SRI de assets/locale-en-EMPREINTE.js.
 declare module "virtual:shh-lang" {
