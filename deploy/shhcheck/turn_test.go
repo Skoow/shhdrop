@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1" //nolint:gosec // identifiants temporaires de TURN : HMAC-SHA1 imposé par le protocole
 	"encoding/base64"
+	"errors"
 	"net"
 	"net/netip"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/stun/v3"
 	"github.com/pion/turn/v4"
 )
 
@@ -160,6 +162,14 @@ func TestConnBridee(t *testing.T) {
 
 // demarrer : relais réel sur la boucle locale (qui tient lieu d'adresse publique ici).
 func demarrer(t *testing.T, allocations int, parIP ...int) (confTurn, string) {
+	return demarrerAvec(t, allocations, func(c *confTurn) {
+		if len(parIP) == 1 {
+			c.parIP = parIP[0]
+		}
+	})
+}
+
+func demarrerAvec(t *testing.T, allocations int, regler func(*confTurn)) (confTurn, string) {
 	t.Helper()
 	l, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	if err != nil {
@@ -167,10 +177,8 @@ func demarrer(t *testing.T, allocations int, parIP ...int) (confTurn, string) {
 	}
 	port := l.LocalAddr().(*net.UDPAddr).Port
 	l.Close()
-	c := confTurn{secret: secretTest, ip: netip.MustParseAddr("127.0.0.1"), port: port, min: 40000, max: 40100, allocations: allocations, parIP: 100, octetsSecond: 1 << 20}
-	if len(parIP) == 1 {
-		c.parIP = parIP[0]
-	}
+	c := confTurn{secret: secretTest, ip: netip.MustParseAddr("127.0.0.1"), port: port, min: 40000, max: 40100, allocations: allocations, parIP: 100, parNom: 100, octetsSecond: 1 << 20}
+	regler(&c)
 	srv, err := serveurTurn(c, "127.0.0.1")
 	if err != nil {
 		t.Fatal(err)
@@ -324,4 +332,120 @@ func TestPlafondParOrigine(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+// Plafond par identifiant : un même nom ne prend pas plus de parNom allocations, même depuis
+// plusieurs adresses (le nonce de la bibliothèque n'est pas lié à l'adresse).
+func TestPlafondParNom(t *testing.T) {
+	_, adresse := demarrerAvec(t, 100, func(c *confTurn) { c.parNom = 2 })
+	nom, mdp := identifiants(secretTest, time.Now().Add(time.Hour))
+	for i := 0; i < 2; i++ {
+		r, err := client(t, adresse, nom, mdp).Allocate()
+		if err != nil {
+			t.Fatal(i, err)
+		}
+		defer r.Close()
+	}
+	if r, err := client(t, adresse, nom, mdp).Allocate(); err == nil {
+		r.Close()
+		t.Fatal("troisième allocation du même identifiant acceptée")
+	}
+	autre, mdp2 := identifiants(secretTest, time.Now().Add(2*time.Hour))
+	r, err := client(t, adresse, autre, mdp2).Allocate()
+	if err != nil {
+		t.Fatal("un autre identifiant est refusé :", err)
+	}
+	r.Close()
+}
+
+// Liaison de canal hors de la plage relayée : jetée (mémoire du relais), dans la plage : acceptée.
+func TestGardeChannelBind(t *testing.T) {
+	c := &confTurn{min: 49160, max: 49999}
+	pour := func(port int) []byte {
+		m, err := stun.Build(stun.TransactionID, stun.NewType(stun.MethodChannelBind, stun.ClassRequest))
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := stun.XORMappedAddress{IP: net.ParseIP("203.0.113.9").To4(), Port: port}
+		if err := a.AddToAs(m, stun.AttrXORPeerAddress); err != nil {
+			t.Fatal(err)
+		}
+		m.WriteHeader()
+		return m.Raw
+	}
+	if !c.garde(pour(49200)) {
+		t.Fatal("liaison dans la plage jetée")
+	}
+	for _, p := range []int{1, 443, 49159, 50000, 65535} {
+		if c.garde(pour(p)) {
+			t.Fatalf("liaison vers le port %d acceptée", p)
+		}
+	}
+	// Demande d'allocation avec EVEN-PORT : jetée ; sans : passe.
+	alloc := func(even bool) []byte {
+		m, _ := stun.Build(stun.TransactionID, stun.NewType(stun.MethodAllocate, stun.ClassRequest))
+		if even {
+			m.Add(stun.AttrEvenPort, []byte{0x80})
+		}
+		m.WriteHeader()
+		return m.Raw
+	}
+	if c.garde(alloc(true)) || !c.garde(alloc(false)) {
+		t.Fatal("EVEN-PORT mal filtré")
+	}
+	// ChannelData et octets quelconques : laissés à la bibliothèque.
+	if !c.garde([]byte{0x40, 0x01, 0x00, 0x02, 1, 2}) || !c.garde([]byte{1}) {
+		t.Fatal("ChannelData jeté")
+	}
+}
+
+// Inondation de connexions TCP muettes : au-delà du plafond, refusées ; une fois fermées,
+// l'écoute TCP répond de nouveau (pion s'arrêtait pour toujours à la première erreur d'Accept).
+func TestEcouteTCPBornee(t *testing.T) {
+	_, adresse := demarrerAvec(t, 4, func(c *confTurn) { c.parIP = 3 }) // TCP : 8 au total, 3 par adresse
+	var muettes []net.Conn
+	for i := 0; i < 20; i++ {
+		c, err := net.Dial("tcp4", adresse)
+		if err != nil {
+			t.Fatal(err)
+		}
+		muettes = append(muettes, c)
+	}
+	time.Sleep(300 * time.Millisecond)
+	// Au-delà de 3 pour cette adresse : fermées par le relais.
+	fermees := 0
+	for _, c := range muettes {
+		_ = c.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+		if _, err := c.Read(make([]byte, 1)); err != nil && !isTimeout(err) {
+			fermees++
+		}
+	}
+	if fermees < 17 {
+		t.Fatalf("connexions muettes refusées : %d, attendu au moins 17", fermees)
+	}
+	for _, c := range muettes {
+		c.Close()
+	}
+	time.Sleep(200 * time.Millisecond)
+	// Un Binding STUN en TCP passe de nouveau.
+	c, err := net.Dial("tcp4", adresse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	req := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
+	if _, err := c.Write(req.Raw); err != nil {
+		t.Fatal(err)
+	}
+	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	buf := make([]byte, 1500)
+	n, err := c.Read(buf)
+	if err != nil || n < 20 {
+		t.Fatalf("pas de réponse STUN en TCP après l'inondation : %v", err)
+	}
+}
+
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }

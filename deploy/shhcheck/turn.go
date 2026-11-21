@@ -14,6 +14,7 @@ package main
 //	SHH_TURN_PORTS        plage des ports relayés, UDP (49160-49999)
 //	SHH_TURN_ALLOCATIONS  allocations simultanées au plus, pour toute la machine (60)
 //	SHH_TURN_PAR_IP       allocations simultanées au plus par adresse d'origine (24)
+//	SHH_TURN_PAR_NOM      allocations simultanées au plus par identifiant temporaire (12)
 //	SHH_TURN_KBPS         débit relayé au plus par allocation, en kbit/s (2500)
 //
 // Bibliothèque : github.com/pion/turn/v4 (version épinglée par go.mod et go.sum). Identifiants
@@ -56,6 +57,7 @@ type confTurn struct {
 	min, max     int
 	allocations  int
 	parIP        int
+	parNom       int
 	octetsSecond int
 }
 
@@ -164,6 +166,9 @@ func lireConfTurn(defaut func() (netip.Addr, error)) (confTurn, error) {
 		return c, err
 	}
 	if c.parIP, err = entierEnv("SHH_TURN_PAR_IP", 24, 1, 2000); err != nil {
+		return c, err
+	}
+	if c.parNom, err = entierEnv("SHH_TURN_PAR_NOM", 12, 1, 2000); err != nil {
 		return c, err
 	}
 	kbps, err := entierEnv("SHH_TURN_KBPS", 2500, 100, 100000)
@@ -300,24 +305,34 @@ func serveurTurn(c confTurn, ecoute string) (*turn.Server, error) {
 		return ok && a.Unmap() == c.ip
 	}
 	origines := &parOrigine{n: map[netip.Addr]int{}}
+	noms := &parNom{n: map[string]int{}}
 	log := silence()
 	srv, err := turn.NewServer(turn.ServerConfig{
 		Realm:         realmTurn,
 		LoggerFactory: log,
 		AuthHandler:   turn.LongTermTURNRESTAuthHandler(c.secret, log.NewLogger("turn")),
 		// Plafond de toute la machine : au-delà, 486 (quota atteint), l'appel se dégrade.
-		QuotaHandler: func(_, _ string, src net.Addr) bool {
-			return compte.Load() < int64(c.allocations) && origines.nombre(src) < c.parIP
+		QuotaHandler: func(nom, _ string, src net.Addr) bool {
+			return compte.Load() < int64(c.allocations) && origines.nombre(src) < c.parIP && noms.nombre(nom) < c.parNom
 		},
 		EventHandler: turn.EventHandler{
-			OnAllocationCreated: func(src, _ net.Addr, _, _, _ string, _ net.Addr, _ int) { origines.ajouter(src, 1) },
-			OnAllocationDeleted: func(src, _ net.Addr, _, _, _ string) { origines.ajouter(src, -1) },
+			OnAllocationCreated: func(src, _ net.Addr, _, nom, _ string, _ net.Addr, _ int) {
+				origines.ajouter(src, 1)
+				noms.ajouter(nom, 1)
+			},
+			OnAllocationDeleted: func(src, _ net.Addr, _, nom, _ string) {
+				origines.ajouter(src, -1)
+				noms.ajouter(nom, -1)
+			},
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
-			{PacketConn: udp, RelayAddressGenerator: gen(), PermissionHandler: permission},
+			{PacketConn: &priseGardee{PacketConn: udp, c: &c}, RelayAddressGenerator: gen(), PermissionHandler: permission},
 		},
 		ListenerConfigs: []turn.ListenerConfig{
-			{Listener: tcp, RelayAddressGenerator: gen(), PermissionHandler: permission},
+			{
+				Listener:              &ecouteBornee{Listener: tcp, c: &c, max: 2 * c.allocations, parIP: c.parIP, inactif: 60 * time.Second, par: map[string]int{}},
+				RelayAddressGenerator: gen(), PermissionHandler: permission,
+			},
 		},
 	})
 	if err != nil {
