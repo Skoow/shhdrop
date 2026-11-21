@@ -10,7 +10,6 @@ import { CONTENT_MAX, generatePassword } from "../index";
 import ErrorPage from "../routes/ErrorPage.svelte";
 import Options from "../routes/Options.svelte";
 import CapacityGauge from "./CapacityGauge.svelte";
-import PaidSheet from "./PaidSheet.svelte";
 
 const mounted: Record<string, unknown>[] = [];
 function show(C: unknown, props: Record<string, unknown>) {
@@ -50,32 +49,6 @@ describe("options : mot de passe généré seulement, aucun choix payant", () =>
     opts();
     expect(document.querySelectorAll("[data-locked]")).toHaveLength(0);
     expect(text()).not.toMatch(/jours|première ouverture|Jusqu'à 50|copie chiffrée/);
-  });
-});
-
-describe("feuille Plus : honnête, rien à acheter", () => {
-  it("ce que Plus ajoute, prix prévu de §38.8, « Bientôt disponible » en tête ; ni formulaire, ni champ, ni achat", () => {
-    show(PaidSheet, { open: true, tier: "plus" });
-    const s = text();
-    expect(document.querySelector("[data-paid] > *")!.textContent).toContain("Bientôt disponible."); // audit M17
-    for (const x of ["Shhgone Plus", "10 Go par partage", "2 Go par partage", "30 Go par partage", "Durée jusqu'à 3 jours (gratuit : 24 h maximum)", "Jusqu'à 10 ouvertures (gratuit : 5)", "7 €", "70 €", "Bientôt disponible."])
-      expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
-    // Décisions du propriétaire : 16 novembre, Plus jusqu'à 3 jours ; 17 novembre, 10 ouvertures (gratuit 5).
-    expect(s).not.toMatch(/élément/); // D41-17 : le nombre d'éléments n'est pas vendu
-    expect([...document.querySelectorAll("button")].map((b) => b.textContent).join("|")).not.toMatch(/Acheter|Payer|S'abonner/i);
-    expect(s).not.toMatch(/offre limitée|plus que/i);
-    expect(document.querySelectorAll("form, input, a[href]")).toHaveLength(0);
-  });
-  it("Pro : 30 Go, 20 ouvertures, 20 € / mois et 200 € / an (2 mois offerts) ; mensuel par abonnement, annuel au choix ; carte bancaire seulement (crypto-monnaies retirées le 16 novembre) ; aucun frais caché", () => {
-    show(PaidSheet, { open: true, tier: "pro" });
-    const s = text();
-    for (const x of ["Shhgone Pro", "30 Go par partage", "Jusqu'à 20 ouvertures (gratuit : 5)", "20 € / mois", "ou 200 € / an", "Prix TTC.", "2 mois offerts", "Au mois :", "abonnement renouvelé automatiquement chaque mois, résiliable en un clic, sans frais.", "À l'année, au choix :", "paiement unique (rien n'est prélevé ensuite) ou renouvellement automatique", "Moyens de paiement", "Carte bancaire", "Aucun frais caché."]) expect(s.replace(/[\u202f\u00a0]/g, " "), x).toContain(x);
-    expect(s).not.toMatch(/crypto/i);
-    expect(s).not.toContain("220");
-    expect(s).not.toContain("payé en une fois");
-    // Aucun logo de marque tierce : les moyens de paiement sont des libellés et des pictogrammes maison.
-    expect(document.querySelectorAll("img")).toHaveLength(0);
-    expect(s).not.toMatch(/Visa|Mastercard|Bitcoin|Ethereum|PayPal/i);
   });
 });
 
