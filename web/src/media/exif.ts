@@ -6,6 +6,7 @@
 // (perte de qualité, nouveau code de compression) ; l'étiquette d'orientation ne dit rien de
 // la personne (ni lieu, ni appareil, ni date) et garde l'affichage identique.
 import { Malformed, u16be, u16le, u32be, u32le } from "./bytes";
+import { cleanThumbnail } from "./jpeg-scan";
 
 export const ORIENTATION = 0x0112;
 
@@ -77,7 +78,8 @@ export function emptyTiff(le = false): Uint8Array<ArrayBuffer> {
 // à ce qui décrit la vignette (Compression = 6, position, longueur), puis la vignette octet
 // pour octet. Aucune autre étiquette (appareil, dates, position GPS, logiciel…) n'y survit.
 // Une vignette qui porte elle-même des métadonnées (segment APP1 à APP15 ou commentaire) est
-// retirée : elle ferait revenir ce que le nettoyage enlève.
+// retirée : elle ferait revenir ce que le nettoyage enlève. Elle est coupée juste après son EOI
+// (audit du 20 novembre, W7) ; sans EOI lisible, elle est retirée (jpeg-scan.ts).
 
 export const COMPRESSION = 0x0103;
 export const THUMB_OFFSET = 0x0201;
@@ -108,24 +110,13 @@ export function readThumbnail(tiff: Uint8Array): Uint8Array | null {
       else len = v;
     }
     if (off <= 0 || len < 4 || off + len > tiff.length) return null;
-    const thumb = tiff.slice(off, off + len);
-    if (thumb[0] !== 0xff || thumb[1] !== 0xd8 || carriesMetadata(thumb)) return null;
-    return thumb;
+    // Coupée à son EOI (audit du 20 novembre, W7) : rien de ce que la longueur déclarée couvre
+    // après la fin de la vignette n'est recopié ; sans EOI, la vignette est retirée.
+    const thumb = cleanThumbnail(tiff.subarray(off, off + len));
+    return thumb ? thumb.slice() : null;
   } catch {
     return null;
   }
-}
-
-/** Segments de tête d'un JPEG (jusqu'au premier SOS) : APP1 à APP15 ou COM présent. */
-function carriesMetadata(j: Uint8Array): boolean {
-  let o = 2;
-  while (o + 4 <= j.length && j[o] === 0xff) {
-    const m = j[o + 1]!;
-    if (m === 0xda || m === 0xd9) return false;
-    if ((m >= 0xe1 && m <= 0xef) || m === 0xfe) return true;
-    o += 2 + ((j[o + 2]! << 8) | j[o + 3]!);
-  }
-  return false;
 }
 
 /**

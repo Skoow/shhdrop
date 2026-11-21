@@ -6,6 +6,9 @@
 // MPF, cartes de gain et de profondeur, vidéo des photos animées).
 import { Malformed, concat, slice, startsWith, u16be, u8 } from "./bytes";
 import { keptTiff, orientationToKeep } from "./exif";
+import { scanEnd } from "./jpeg-scan";
+
+export { scanEnd };
 
 const EXIF_ID = "Exif\0\0";
 /** Tables et trames gardées : DQT, DHT, DAC, DRI, DNL, SOF0 à SOF15 (sauf DHT, JPG, DAC). */
@@ -16,23 +19,6 @@ export function keptTable(m: number): boolean {
 function segment(m: number, body: Uint8Array): Uint8Array {
   if (body.length + 2 > 0xffff) throw new Malformed("jpeg_segment");
   return concat([new Uint8Array([0xff, m, (body.length + 2) >> 8, (body.length + 2) & 0xff]), body]);
-}
-
-/** Fin des données compressées qui suivent un SOS : position du marqueur suivant. */
-export function scanEnd(b: Uint8Array, o: number): number {
-  for (let i = o; i < b.length - 1; i++) {
-    if (b[i] !== 0xff) continue;
-    let j = i + 1;
-    while (j < b.length && b[j] === 0xff) j++;
-    if (j >= b.length) break;
-    const n = b[j]!;
-    if (n === 0x00 || (n >= 0xd0 && n <= 0xd7)) {
-      i = j;
-      continue;
-    }
-    return j - 1;
-  }
-  throw new Malformed("jpeg_sans_fin");
 }
 
 export function cleanJpeg(b: Uint8Array): Uint8Array<ArrayBuffer> {

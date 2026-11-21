@@ -12,6 +12,11 @@ export const downloads = $state({
   entries: [] as DownloadEntry[],
   /** « Garder l'historique » (activé par défaut, R12). */
   enabled: true,
+  /**
+   * Audit du 20 novembre (W4) : vrai après le premier fichier noté sur cet appareil, une seule
+   * fois ; l'écran du contenu dit alors que le nom est gardé (30 jours), avec « Ne pas garder ».
+   */
+  notice: false,
 });
 
 function backend(): Backend | null {
@@ -64,10 +69,18 @@ export async function recordDownload(e: NewDownload): Promise<void> {
   const d = await store();
   if (!d) return;
   try {
-    if ((await d.add(e)) && downloads.status === "ready") await reload(d);
+    if (!(await d.add(e))) return;
+    if (await d.takeNotice()) downloads.notice = true;
+    if (downloads.status === "ready") await reload(d);
   } catch {
     // historique illisible : le fichier est enregistré quand même
   }
+}
+
+/** « Ne pas garder » (W4) : coupe l'historique, comme la page Téléchargements, et l'efface. */
+export async function declineDownloads(): Promise<void> {
+  downloads.notice = false;
+  await setDownloadsEnabled(false);
 }
 
 export async function removeDownload(id: string): Promise<void> {

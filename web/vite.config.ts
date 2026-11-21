@@ -143,6 +143,50 @@ export function engineWasm(base: string, demo: boolean): Plugin {
 }
 
 /**
+ * Worker de la preuve de travail anti-robot (spec §28.3, audit du 20 novembre W3) : new Worker(url)
+ * n'a pas de contrôle d'intégrité. ./pow-source, importé par un module de src/captcha/, est
+ * remplacé par pow-source.verified.ts (production) ou pow-source.demo.ts (démo : preuve factice,
+ * aucun Worker) ; tout autre chemin vers src/captcha/pow-source.ts arrête le build (son Worker
+ * serait lancé sans empreinte). Production : au premier import de virtual:shh-pow, pow.worker.ts
+ * est construit à part en script classique et écrit sous assets/pow-worker-EMPREINTE.js ; son
+ * adresse et son empreinte SHA-384 vont dans le script (lu par fetch avec `integrity`, puis Worker
+ * depuis un Blob). Contrôle : scripts/check-dist.mjs (cité avec son empreinte, jamais orphelin).
+ */
+export function powWorker(base: string, demo: boolean): Plugin {
+  const VIRTUAL = "virtual:shh-pow";
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  return {
+    name: "shh-pow",
+    apply: "build",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (source === VIRTUAL) return "\0" + VIRTUAL;
+      const from = importer?.replace(/\\/g, "/") ?? "";
+      if (/^\.\/pow-source(?:\.ts)?$/.test(source) && from.includes("/src/captcha/")) return join(here, demo ? "src/captcha/pow-source.demo.ts" : "src/captcha/pow-source.verified.ts");
+      return null;
+    },
+    async load(id) {
+      if (id.replace(/\\/g, "/").endsWith("/src/captcha/pow-source.ts")) this.error("shh-pow : src/captcha/pow-source.ts (Worker sans empreinte) n'entre jamais dans un build");
+      if (id !== "\0" + VIRTUAL) return null;
+      if (demo) this.error("shh-pow : pas de Worker de preuve de travail dans la démo");
+      const out = await build({
+        configFile: false,
+        root: here,
+        logLevel: "warn",
+        build: { write: false, sourcemap: false, lib: { entry: join(here, "src/captcha/pow.worker.ts"), name: "shhPow", formats: ["iife"], fileName: () => "pow.js" } },
+      });
+      const outputs = (Array.isArray(out) ? out : [out]).flatMap((o) => ("output" in o ? o.output : []));
+      const chunk = outputs.find((c) => c.type === "chunk");
+      if (!chunk || chunk.type !== "chunk" || outputs.length !== 1) this.error("shh-pow : build du Worker inattendu");
+      const worker = Buffer.from(chunk.code);
+      const fileName = `assets/pow-worker-${createHash("sha256").update(worker).digest("base64url").slice(0, 8)}.js`;
+      this.emitFile({ type: "asset", fileName, source: worker });
+      return `export const src = ${JSON.stringify(base + fileName)}; export const integrity = ${JSON.stringify(sha384(worker))};`;
+    },
+  };
+}
+
+/**
  * Module WebAssembly du salon (engine/salon-wasm, Task 9 du salon), à part du moteur des partages.
  * ./source, importé par un module de src/salon/, est remplacé par source.verified.ts (production)
  * ou source.demo.ts (démo : seulement les règles du pseudo, pour le compte essayable) ; tout autre chemin vers src/salon/source.ts arrête le
@@ -543,7 +587,7 @@ export function salonPages(actifs: boolean): Plugin {
 export default defineConfig(({ mode, command }) => {
   const demo = mode === "demo";
   return {
-    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), jetonsWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
+    plugins: [comptesPages(comptesActifs(demo)), salonPages(salonsActifs(demo)), svelte(), infoPages(demo ? DEMO_BASE : "/", demo), sri(demo ? DEMO_BASE : "/"), engineWasm(demo ? DEMO_BASE : "/", demo), powWorker(demo ? DEMO_BASE : "/", demo), salonWasm(demo ? DEMO_BASE : "/", demo), jetonsWasm(demo ? DEMO_BASE : "/", demo), langAsset(demo ? DEMO_BASE : "/", demo), ...(demo ? [demoMeta()] : [demoGuard(), precompress()])],
     base: demo ? DEMO_BASE : "/",
     // Listes d'adresses jetables du serveur (mêmes fichiers), lues par routes/compte/verifs.ts.
     server: { fs: { allow: [".", "../server/internal/compte"] } },

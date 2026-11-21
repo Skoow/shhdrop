@@ -403,9 +403,11 @@ test.describe("Argon2id à la demande, hors du fil principal (10 novembre ; mote
   test("accueil : Argon2id n'est pas chargé ; à l'envoi : script du Worker vérifié lu une fois, calcul dans un Worker ; l'ouverture donne le même contenu", async ({ page, shh, browser }) => {
     test.setTimeout(120_000);
     const kdf: string[] = [];
+    const pow: string[] = [];
     const workers: string[] = [];
     const watch = (p: Page) => {
       p.on("request", (r) => void (/\/assets\/engine-kdf-[^/]+\.js$/.test(r.url()) && kdf.push(r.url())));
+      p.on("request", (r) => void (/\/assets\/pow-worker-[^/]+\.js$/.test(r.url()) && pow.push(r.url())));
       p.on("worker", (w) => workers.push(w.url()));
     };
     watch(page);
@@ -418,11 +420,15 @@ test.describe("Argon2id à la demande, hors du fil principal (10 novembre ; mote
     const sent = await sendShare(s.page, shh.origin + "/", { text: "Argon2id dans un Worker" });
     await s.ctx.close();
     expect(kdf.length).toBe(1);
-    expect(workers.filter((u) => u.startsWith("blob:")).length).toBe(1);
+    // W3 (audit du 20 novembre) : le Worker anti-robot aussi vient d'un script lu avec son
+    // empreinte, lancé depuis un Blob ; aucun Worker n'est lancé sur une adresse de fichier.
+    expect(pow.length).toBe(1);
+    expect(workers.filter((u) => !u.startsWith("blob:"))).toEqual([]);
+    expect(workers.length).toBe(2); // preuve de travail + Argon2id
     await page.goto(sent.link);
     await unlock(page, sent.password);
     // unlock() a vu « Contenu » : la clé dérivée est la bonne (sinon, « mot de passe incorrect »).
-    expect(workers.filter((u) => u.startsWith("blob:")).length).toBe(2);
+    expect(workers.filter((u) => u.startsWith("blob:")).length).toBe(3);
   });
 
   test("repli : sans Worker depuis un Blob, le calcul se fait dans la page avec le moteur vérifié et l'ouverture marche", async ({ page, shh, browser }) => {
