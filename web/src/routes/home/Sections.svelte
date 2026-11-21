@@ -240,9 +240,10 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: rgb(95 227 181 / 0.12);
-    box-shadow: inset 0 0 0 1px rgb(95 227 181 / 0.35);
-    color: var(--accent);
+    /* Même bleu doux (--info) que les ronds de « hors de notre portée » (propriétaire, 21 novembre). */
+    background: radial-gradient(circle at 50% 30%, rgb(141 178 255 / 0.2), rgb(141 178 255 / 0.05));
+    box-shadow: inset 0 0 0 1px rgb(141 178 255 / 0.35);
+    color: var(--info);
     font-family: var(--font-mono);
     font-size: 0.875rem;
     font-weight: 650;
