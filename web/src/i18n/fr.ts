@@ -346,7 +346,7 @@ export const fr = {
   "seo.offres": "Offres Shhgone Plus et Pro, bientôt disponibles\u202f: plus d'espace, durées plus longues et plus d'ouvertures, avec le même chiffrement de bout en bout.",
   "seo.conditions": "Conditions d'utilisation de Shhgone, service de partage chiffré de bout en bout, sans compte pour partager.",
   "seo.mentions": "Mentions légales de Shhgone\u202f: éditeur, hébergeur et contact.",
-  "title.landing": "Partage chiffré de bout en bout, sans compte",
+  "title.landing": "Partagez en secret, puis ça s'efface",
   "title.inbox": "Accueil",
   "title.home": "Envoyer",
   "title.envoyer": "Envoyer",

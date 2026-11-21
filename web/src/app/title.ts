@@ -27,6 +27,8 @@ export function setProgressTitle(percent: number | null, lang: string): void {
 }
 
 export function routeTitle(screen: TitleScreen): string {
+  // Accueil (titre choisi par le propriétaire, 21 novembre) : le nom d'abord, puis la promesse.
+  if (screen === "landing") return `${BRAND} · ${t("title.landing")}`;
   return `${t(`title.${screen}`)} · ${BRAND}`;
 }
 

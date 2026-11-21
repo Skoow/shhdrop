@@ -1,15 +1,15 @@
 <script lang="ts">
-  // Logo « Trame » (scripts/gen-logo.mjs) : « shh » plein, « gone » en trame de points.
+  // Logo « Trame » (scripts/gen-logo.mjs) : S qui s'efface, « hh » plein, « gone » en trame de points.
   // Statique à l'arrivée : le logo au repos s'affiche tout de suite, rien ne s'anime.
   // Animations (écran de destruction seulement) : opacity et transform (Web Animations API, aucun attribut style),
   // rien en mouvement réduit (UI §7.5). Chronologie de la gomme dans logoMotion.ts.
   import { tick } from "svelte";
-  import { LOGO_DOTS, LOGO_HEAD, LOGO_STROKE, LOGO_TAIL, LOGO_VIEWBOX, MARK_PATH } from "./logo-paths";
+  import { LOGO_DOTS, LOGO_HEAD, LOGO_STROKE, LOGO_TAIL, LOGO_VIEWBOX, MARK_DOTS, MARK_STROKE, MARK_WIDTH } from "./logo-paths";
   import { CRUMBS, ERASE, ERASER_RUBBER, ERASER_SLEEVE, eraseTimeline, type Timeline } from "./logoMotion";
   import { reducedMotion } from "./motion";
 
   type Props = {
-    /** Mot-symbole complet, ou marque seule (o rayé, celui du favicon). */
+    /** Mot-symbole complet, ou marque seule (S qui s'efface, celui du favicon). */
     variant?: "wordmark" | "mark";
   };
   let { variant = "wordmark" }: Props = $props();
@@ -86,8 +86,9 @@
 </script>
 
 {#if variant === "mark"}
-  <svg bind:this={svg} class="logo mark" viewBox="4 4 22 22" role="img" aria-label="Shhgone" focusable="false">
-    <path class="stripes" d={MARK_PATH} />
+  <svg bind:this={svg} class="logo mark" viewBox="3 2 26 28" role="img" aria-label="Shhgone" focusable="false">
+    <path class="stroke" d={MARK_STROKE} stroke-width={MARK_WIDTH} />
+    <path class="mark-dots" d={MARK_DOTS} />
   </svg>
 {:else}
   <svg bind:this={svg} class={["logo", "word", gone && "gone"]} viewBox={LOGO_VIEWBOX} role="img" aria-label="Shhgone" focusable="false">
@@ -150,16 +151,20 @@
     height: 24px;
   }
   .head,
-  .tail {
+  .tail,
+  .stroke {
     fill: none;
     stroke: currentColor;
+  }
+  .stroke {
+    stroke-linecap: round;
   }
   /* État statique : « shh » plein, « gone » en trame. */
   .tail {
     opacity: 0;
   }
   .dots,
-  .stripes {
+  .mark-dots {
     fill: var(--accent);
   }
   .ink,
@@ -199,7 +204,7 @@
       color: CanvasText;
     }
     .dots,
-    .stripes,
+    .mark-dots,
     .crumb {
       fill: currentColor;
     }

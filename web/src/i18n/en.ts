@@ -345,7 +345,7 @@ export const en = {
   "seo.offres": "Shhgone Plus and Pro plans, coming soon: more space, longer durations and more opens, with the same end-to-end encryption.",
   "seo.conditions": "Terms of use of Shhgone, an end-to-end encrypted sharing service, with no account needed to share.",
   "seo.mentions": "Legal notice of Shhgone: publisher, host and contact.",
-  "title.landing": "End-to-end encrypted sharing, no account",
+  "title.landing": "Share in secret, then it's gone",
   "title.inbox": "Home",
   "title.home": "Send",
   "title.envoyer": "Send",

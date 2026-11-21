@@ -33,7 +33,7 @@ test.describe("fr-FR", () => {
     // Tout en haut de la page, avant l'en-tête, sans bouton de fermeture.
     expect((await banner.boundingBox())!.y).toBe(0);
     await expect(banner.getByRole("button")).toHaveCount(0);
-    await expect(page).toHaveTitle("Démo · Partage chiffré de bout en bout, sans compte · Shhgone");
+    await expect(page).toHaveTitle("Démo · Shhgone · Partagez en secret, puis ça s'efface");
     // La démo est servie par GitHub Pages, hors d'Europe : rien ne prétend le contraire (plus de
     // sur-titre depuis le 15 novembre).
     await expect(page.locator("[data-eyebrow]")).toHaveCount(0);
@@ -392,7 +392,7 @@ test.describe("en-US", () => {
   test("bandeau en anglais ; capture", async ({ page, demo }) => {
     await page.goto(demo.url);
     await expect(page.getByRole("note")).toHaveText(BANNER_EN);
-    await expect(page).toHaveTitle("Demo · End-to-end encrypted sharing, no account · Shhgone");
+    await expect(page).toHaveTitle("Demo · Shhgone · Share in secret, then it's gone");
     await page.waitForTimeout(700);
     await capture(page, "demo-home-en");
   });

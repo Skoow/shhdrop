@@ -1,14 +1,32 @@
-// Logo « Trame » et favicon (scripts/gen-logo.mjs) : sorties à jour, géométrie tenue.
+// Logo « Trame » et marque « S qui s'efface » (scripts/gen-logo.mjs) : sorties à jour, géométrie tenue.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error module .mjs sans déclarations
-import { OUTPUTS, build, mark } from "./gen-logo.mjs";
+import { MARK, MARK_SMALL, OUTPUTS, build, mark, sGeom } from "./gen-logo.mjs";
 // @ts-expect-error module .mjs sans déclarations
 import { ico } from "./gen-icons.mjs";
 
 const web = dirname(dirname(fileURLToPath(import.meta.url)));
+type Dot = [number, number, number];
+
+/** Points du S : rayons décroissants, écarts croissants et positifs (aucun point ne touche son voisin). */
+function checkTrail(dots: Dot[]) {
+  let last = Infinity, lastGap = -Infinity;
+  for (let i = 0; i < dots.length; i++) {
+    const [x, y, r] = dots[i]!;
+    expect(r).toBeLessThan(last);
+    last = r;
+    if (i > 0) {
+      const [px, py, pr] = dots[i - 1]!;
+      const gap = Math.hypot(x - px, y - py) - r - pr;
+      expect(gap).toBeGreaterThan(0.2);
+      expect(gap).toBeGreaterThan(lastGap - 0.25); // l'écart grandit (à l'écart près de la dérive)
+      lastGap = gap;
+    }
+  }
+}
 
 describe("gen-logo", () => {
   it("les fichiers commités sont ceux que produit le générateur", () => {
@@ -16,30 +34,47 @@ describe("gen-logo", () => {
       expect(readFileSync(join(web, rel), "utf8"), rel).toBe(gen());
   });
 
-  it("trame légère : 6 tranches, une soixantaine de points (« gone »), rien d'autre qu'arcs et déplacements", () => {
+  it("trame légère : le S en points puis 6 tranches, une soixantaine de points (« gone »), rien d'autre qu'arcs et déplacements", () => {
     const b = build();
-    expect(b.dots).toHaveLength(6);
+    expect(b.dots).toHaveLength(7);
     expect(b.count).toBeGreaterThan(50);
     expect(b.count).toBeLessThan(70);
     for (const d of b.dots) expect(d).toMatch(/^(M[-\d. ]+a[-\d. ]+a[-\d. ]+)+$/);
+    checkTrail(b.capDots);
   });
 
-  it("mot-symbole « shhgone » : « shh » plein (3 lettres), « gone » en trame, nommé Shhgone", () => {
+  it("mot-symbole « Shhgone » : S capitale + « hh » pleins (3 lettres), « gone » en trame, nommé Shhgone", () => {
     const b = build();
-    expect(b.head.match(/M/g)).toHaveLength(5); // s : 1 tracé ; h : 2 chacun
+    expect(b.head.match(/M/g)).toHaveLength(5); // S : 1 tracé ; h : 2 chacun
     const svg = (OUTPUTS as Record<string, () => string>)["public/logo.svg"]!();
     expect(svg).toContain('aria-label="Shhgone"');
     expect(svg).not.toMatch(/shhdrop/i);
   });
 
-  it("favicon : bords des bandes sur des unités paires (net à 16 px)", () => {
-    const d = mark() as string;
-    const ys = [
-      ...[...d.matchAll(/M[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1])),
-      ...[...d.matchAll(/A[\d.]+ [\d.]+ 0 [01] [01] [\d.]+ ([\d.]+)/g)].map((m) => Number(m[1])),
-    ];
-    expect(ys.length).toBeGreaterThan(0);
-    for (const y of ys) expect(y % 2, String(y)).toBe(0);
+  it("S : épine continue (deux arcs exacts), le reste repris par le fantôme de la gomme", () => {
+    const g = sGeom(MARK);
+    expect(g.solid).toMatch(/^M[-\d. ]+A[-\d. ]+A[-\d. ]+$/);
+    const end = g.solid.split(" ").slice(-2).join(" ");
+    expect(g.rest.startsWith(`M${end}A`)).toBe(true);
+  });
+
+  it("marque : S dans la tuile (marge ≥ 2 u), points qui s'effacent, variante 16 px à trois points plus gros", () => {
+    for (const [conf, n] of [[MARK, 6], [MARK_SMALL, 3]] as const) {
+      const m = mark(conf === MARK_SMALL);
+      const dots = m.geom.dots as Dot[];
+      expect(dots).toHaveLength(n);
+      checkTrail(dots);
+      for (const [x, y, r] of dots) {
+        expect(x - r).toBeGreaterThanOrEqual(2);
+        expect(x + r).toBeLessThanOrEqual(30);
+        expect(y + r).toBeLessThanOrEqual(30);
+      }
+      // Bornes du trait : épine à rx, ry du centre, plus la demi-épaisseur.
+      expect(conf.cx - conf.rx - conf.W / 2).toBeGreaterThanOrEqual(2);
+      expect(conf.cyU - conf.ry - conf.W / 2).toBeGreaterThanOrEqual(2);
+      expect(conf.cyU + 3 * conf.ry + conf.W / 2).toBeLessThanOrEqual(30);
+    }
+    expect(MARK_SMALL.r1).toBeGreaterThanOrEqual(1.25); // ≥ 0,6 px à 16 px
   });
 
   it("favicon.ico : en-tête ICO, entrées 16 et 32 en PNG", () => {

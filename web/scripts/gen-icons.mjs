@@ -1,8 +1,9 @@
-// Icônes PNG et ICO du site (favicon « o rayé », scripts/gen-logo.mjs), rendues localement par Chromium.
+// Icônes PNG et ICO du site (marque « S qui s'efface », scripts/gen-logo.mjs), rendues localement par Chromium.
 // Aucune image générée par IA : le SVG construit est rastérisé tel quel.
 //   node scripts/gen-icons.mjs      (PW_LOCAL_CHROMIUM=1 sur le poste de développement)
 // Sorties : public/apple-touch-icon.png (180, plein cadre), public/icon-192.png et public/icon-512.png
-// (marge de sécurité « maskable » : l'anneau tient dans 60 % du côté), public/favicon.ico (16 et 32).
+// (marge de sécurité « maskable » : la marque tient dans 80 % du côté), public/favicon.ico (16, variante
+// à trois points, et 32).
 import { chromium } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -13,10 +14,10 @@ const web = join(dirname(fileURLToPath(import.meta.url)), "..");
 const launch = process.env.PW_LOCAL_CHROMIUM === "1" ? { executablePath: "/opt/pw-browsers/chromium" } : {};
 
 const PNG = {
-  "apple-touch-icon.png": [180, { rounded: false, scale: 0.85, center: true }],
-  "icon-192.png": [192, { rounded: false, scale: 0.78, center: true }],
-  "icon-512.png": [512, { rounded: false, scale: 0.78, center: true }],
-  "favicon-16": [16, {}],
+  "apple-touch-icon.png": [180, { rounded: false, scale: 0.85 }],
+  "icon-192.png": [192, { rounded: false, scale: 0.78 }],
+  "icon-512.png": [512, { rounded: false, scale: 0.78 }],
+  "favicon-16": [16, { small: true }],
   "favicon-32": [32, {}],
 };
 

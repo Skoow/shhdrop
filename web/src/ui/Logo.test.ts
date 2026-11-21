@@ -21,21 +21,22 @@ afterEach(() => {
 });
 
 describe("Logo", () => {
-  it("mot-symbole : image nommée « Shhgone », trame en 6 tranches, aucun attribut style", () => {
+  it("mot-symbole : image nommée « Shhgone », S en points puis trame en 6 tranches, aucun attribut style", () => {
     show({});
     const svg = document.querySelector("svg")!;
     expect(svg.getAttribute("role")).toBe("img");
     expect(svg.getAttribute("aria-label")).toBe("Shhgone");
-    expect(svg.querySelectorAll(".dots")).toHaveLength(6);
+    expect(svg.querySelectorAll(".dots")).toHaveLength(7);
     expect(svg.querySelectorAll("*").length).toBeLessThanOrEqual(10);
     expect(document.body.innerHTML).not.toContain("style=");
   });
 
-  it("marque seule : le o rayé, même nom accessible", () => {
+  it("marque seule : le S qui s'efface (trait plein + points), même nom accessible", () => {
     show({ variant: "mark" });
     const svg = document.querySelector("svg")!;
     expect(svg.getAttribute("aria-label")).toBe("Shhgone");
-    expect(svg.querySelectorAll(".stripes")).toHaveLength(1);
+    expect(svg.querySelectorAll(".stroke")).toHaveLength(1);
+    expect(svg.querySelectorAll(".mark-dots")).toHaveLength(1);
   });
 
   it("mouvement réduit : pas de dissolution animée", async () => {
@@ -61,7 +62,7 @@ describe("Logo", () => {
     expect(svg.getAttribute("aria-label")).toBe("Shhgone");
     expect(svg.classList.contains("gone")).toBe(false);
     expect(svg.querySelector(".head")).not.toBeNull();
-    expect(svg.querySelectorAll(".dots")).toHaveLength(6);
+    expect(svg.querySelectorAll(".dots")).toHaveLength(7);
     expect(svg.querySelector(".finger, .wave, mask")).toBeNull();
   });
 
@@ -89,7 +90,7 @@ describe("Logo", () => {
     expect(erase.tracks.find((t) => t.target === ".ink")!.fill).toBe("forwards");
   });
 
-  it("gomme : sa course et le masque couvrent tout le mot-symbole (« shhgone », plus large que l'ancien)", async () => {
+  it("gomme : sa course et le masque couvrent tout le mot-symbole (« Shhgone », S capitale)", async () => {
     const { ERASE } = await import("./logoMotion");
     const { LOGO_VIEWBOX, LOGO_STROKE } = await import("./logo-paths");
     const [x, , w] = LOGO_VIEWBOX.split(" ").map(Number);
@@ -116,7 +117,7 @@ describe("Logo", () => {
     expect(document.querySelector("svg")!.classList.contains("gone")).toBe(true);
   });
 
-  it("dissolve() : les 6 tranches s'effacent puis la promesse se résout", async () => {
+  it("dissolve() : les points du S puis les 6 tranches s'effacent puis la promesse se résout", async () => {
     reduce(false);
     const animate = vi
       .spyOn(Element.prototype, "animate")
@@ -124,7 +125,7 @@ describe("Logo", () => {
     const c = show({});
     await (c.dissolve as () => Promise<void>)();
     flushSync();
-    expect(animate).toHaveBeenCalledTimes(6);
+    expect(animate).toHaveBeenCalledTimes(7);
     expect(document.querySelector("svg")!.classList.contains("gone")).toBe(true);
   });
 });
